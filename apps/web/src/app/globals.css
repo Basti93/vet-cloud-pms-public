@@ -1,25 +1,12 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-}
+@import "tailwindcss";
 
 .fc {
   font-family: inherit;
 }
-
 .fc .fc-button-primary {
-  background-color: #3b82f6;
-  border-color: #3b82f6;
+  background-color: #3b82f6 \!important;
+  border-color: #3b82f6 \!important;
 }
-
 .fc .fc-button-primary:hover {
-  background-color: #2563eb;
-}
-
-.fc .fc-col-header-cell {
-  background-color: #f3f4f6;
-  color: #111827;
+  background-color: #2563eb \!important;
 }

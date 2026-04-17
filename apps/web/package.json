@@ -1,5 +1,5 @@
 {
-  "name": "web",
+  "name": "@vet-cloud/web",
   "version": "0.0.1",
   "private": true,
   "scripts": {
@@ -9,25 +9,25 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
+    "@clerk/nextjs": "latest",
+    "@fullcalendar/daygrid": "latest",
+    "@fullcalendar/interaction": "latest",
+    "@fullcalendar/list": "latest",
+    "@fullcalendar/react": "latest",
+    "@fullcalendar/timegrid": "latest",
+    "@vapi-ai/web": "latest",
+    "lucide-react": "latest",
     "next": "^15.0.0",
-    "@clerk/nextjs": "^latest",
-    "@fullcalendar/react": "^latest",
-    "@fullcalendar/daygrid": "^latest",
-    "@fullcalendar/timegrid": "^latest",
-    "@fullcalendar/interaction": "^latest",
-    "lucide-react": "^latest",
-    "tailwindcss": "^3.4.0",
-    "@vapi-ai/web": "^latest"
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "typescript": "^5.3.0",
-    "@types/react": "^19.0.0",
-    "@types/node": "^20.0.0",
-    "eslint": "^8.0.0",
-    "eslint-config-next": "^15.0.0",
-    "autoprefixer": "^10.4.0",
-    "postcss": "^8.4.0"
+    "@tailwindcss/postcss": "^4.2.2",
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "autoprefixer": "latest",
+    "postcss": "latest",
+    "tailwindcss": "latest",
+    "typescript": "^5.0.0"
   }
 }
