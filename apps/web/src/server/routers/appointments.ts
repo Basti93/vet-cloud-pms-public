@@ -1,11 +1,11 @@
 import { z } from "zod";
-import { eq, and, gte, lte, desc } from "drizzle-orm";
+import { eq, and, gte, lte } from "drizzle-orm";
 import { createTRPCRouter, protectedProcedure } from "@/server/trpc";
-import { appointments, users } from "@/lib/db/schema";
+import { appointments, patients, owners, users } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
 
 export const appointmentsRouter = createTRPCRouter({
-  // List appointments for a date range
+  // ── List (simple) ──────────────────────────────────────────────────────────
   list: protectedProcedure
     .input(
       z.object({
@@ -16,13 +16,8 @@ export const appointmentsRouter = createTRPCRouter({
     )
     .query(async ({ ctx, input }) => {
       const conditions = [eq(appointments.tenantId, input.tenantId)];
-
-      if (input.from) {
-        conditions.push(gte(appointments.startTime, input.from));
-      }
-      if (input.to) {
-        conditions.push(lte(appointments.endTime, input.to));
-      }
+      if (input.from) conditions.push(gte(appointments.startTime, input.from));
+      if (input.to) conditions.push(lte(appointments.endTime, input.to));
 
       return ctx.db
         .select()
@@ -31,24 +26,87 @@ export const appointmentsRouter = createTRPCRouter({
         .orderBy(appointments.startTime);
     }),
 
-  // Get single appointment
+  // ── List with patient + owner details (for calendar & lists) ──────────────
+  listWithDetails: protectedProcedure
+    .input(
+      z.object({
+        tenantId: z.string().uuid(),
+        from: z.date().optional(),
+        to: z.date().optional(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const conditions = [eq(appointments.tenantId, input.tenantId)];
+      if (input.from) conditions.push(gte(appointments.startTime, input.from));
+      if (input.to) conditions.push(lte(appointments.endTime, input.to));
+
+      const rows = await ctx.db
+        .select({
+          id: appointments.id,
+          tenantId: appointments.tenantId,
+          title: appointments.title,
+          description: appointments.description,
+          startTime: appointments.startTime,
+          endTime: appointments.endTime,
+          status: appointments.status,
+          source: appointments.source,
+          patientId: appointments.patientId,
+          vetId: appointments.vetId,
+          createdAt: appointments.createdAt,
+          patientName: patients.name,
+          patientSpecies: patients.species,
+          ownerFirstName: owners.firstName,
+          ownerLastName: owners.lastName,
+          ownerPhone: owners.phone,
+          vetFirstName: users.firstName,
+          vetLastName: users.lastName,
+        })
+        .from(appointments)
+        .leftJoin(patients, eq(appointments.patientId, patients.id))
+        .leftJoin(owners, eq(patients.ownerId, owners.id))
+        .leftJoin(users, eq(appointments.vetId, users.id))
+        .where(and(...conditions))
+        .orderBy(appointments.startTime);
+
+      return rows;
+    }),
+
+  // ── Single appointment with details ───────────────────────────────────────
   byId: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      const result = await ctx.db
-        .select()
+      const rows = await ctx.db
+        .select({
+          id: appointments.id,
+          tenantId: appointments.tenantId,
+          title: appointments.title,
+          description: appointments.description,
+          startTime: appointments.startTime,
+          endTime: appointments.endTime,
+          status: appointments.status,
+          source: appointments.source,
+          patientId: appointments.patientId,
+          vetId: appointments.vetId,
+          createdAt: appointments.createdAt,
+          patientName: patients.name,
+          patientSpecies: patients.species,
+          ownerFirstName: owners.firstName,
+          ownerLastName: owners.lastName,
+          ownerPhone: owners.phone,
+        })
         .from(appointments)
+        .leftJoin(patients, eq(appointments.patientId, patients.id))
+        .leftJoin(owners, eq(patients.ownerId, owners.id))
         .where(eq(appointments.id, input.id))
         .limit(1);
 
-      if (!result[0]) {
+      if (!rows[0]) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Termin nicht gefunden" });
       }
-
-      return result[0];
+      return rows[0];
     }),
 
-  // Create appointment
+  // ── Create ─────────────────────────────────────────────────────────────────
   create: protectedProcedure
     .input(
       z.object({
@@ -67,52 +125,42 @@ export const appointmentsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const [created] = await ctx.db
         .insert(appointments)
-        .values({
-          tenantId: input.tenantId,
-          patientId: input.patientId,
-          vetId: input.vetId,
-          startTime: input.startTime,
-          endTime: input.endTime,
-          title: input.title,
-          description: input.description,
-          source: input.source,
-          status: "scheduled",
-        })
+        .values({ ...input, status: "scheduled" })
         .returning();
-
       return created;
     }),
 
-  // Update status
-  updateStatus: protectedProcedure
+  // ── Update ─────────────────────────────────────────────────────────────────
+  update: protectedProcedure
     .input(
       z.object({
         id: z.string().uuid(),
-        status: z.enum(["scheduled", "completed", "cancelled", "no-show"]),
+        title: z.string().min(1).max(255).optional(),
+        description: z.string().optional(),
+        startTime: z.date().optional(),
+        endTime: z.date().optional(),
+        status: z
+          .enum(["scheduled", "completed", "cancelled", "no-show"])
+          .optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
+      const { id, ...data } = input;
       const [updated] = await ctx.db
         .update(appointments)
-        .set({ status: input.status, updatedAt: new Date() })
-        .where(eq(appointments.id, input.id))
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(appointments.id, id))
         .returning();
 
-      if (!updated) {
-        throw new TRPCError({ code: "NOT_FOUND" });
-      }
-
+      if (!updated) throw new TRPCError({ code: "NOT_FOUND" });
       return updated;
     }),
 
-  // Delete
+  // ── Delete ─────────────────────────────────────────────────────────────────
   delete: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      await ctx.db
-        .delete(appointments)
-        .where(eq(appointments.id, input.id));
-
+      await ctx.db.delete(appointments).where(eq(appointments.id, input.id));
       return { success: true };
     }),
 });
