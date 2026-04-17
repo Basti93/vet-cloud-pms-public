@@ -16,6 +16,8 @@ interface AppointmentModalProps {
   onClose: () => void;
   tenantId: string;
   onSuccess?: () => void;
+  /** Pre-select a patient (e.g. when opening from the patient detail page) */
+  preselectedPatientId?: string;
   /** Pre-fill when editing an existing appointment */
   editData?: {
     id: string;
@@ -52,6 +54,7 @@ export function AppointmentModal({
   onSuccess,
   editData,
   defaultStart,
+  preselectedPatientId,
 }: AppointmentModalProps) {
   const isEdit = !!editData;
   const defaultStartDate = defaultStart ?? new Date();
@@ -60,7 +63,7 @@ export function AppointmentModal({
   const [form, setForm] = useState({
     title: editData?.title ?? "",
     description: editData?.description ?? "",
-    patientId: editData?.patientId ?? "",
+    patientId: editData?.patientId ?? preselectedPatientId ?? "",
     vetId: editData?.vetId ?? "",
     startTime: toLocalDateTimeInput(editData?.startTime ? new Date(editData.startTime) : defaultStartDate),
     endTime: toLocalDateTimeInput(editData?.endTime ? new Date(editData.endTime) : defaultEndDate),
@@ -77,7 +80,7 @@ export function AppointmentModal({
       setForm({
         title: editData?.title ?? "",
         description: editData?.description ?? "",
-        patientId: editData?.patientId ?? "",
+        patientId: editData?.patientId ?? preselectedPatientId ?? "",
         vetId: editData?.vetId ?? "",
         startTime: toLocalDateTimeInput(editData?.startTime ? new Date(editData.startTime) : s),
         endTime: toLocalDateTimeInput(editData?.endTime ? new Date(editData.endTime) : addMinutes(s, 30)),
@@ -182,7 +185,7 @@ export function AppointmentModal({
           value={form.patientId}
           onChange={(e) => set("patientId", e.target.value)}
           error={errors.patientId}
-          disabled={isEdit}
+          disabled={isEdit || !!preselectedPatientId}
         >
           <option value="">— Patient auswählen —</option>
           {patients?.map((p) => (

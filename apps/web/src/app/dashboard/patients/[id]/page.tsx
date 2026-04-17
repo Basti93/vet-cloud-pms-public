@@ -1,6 +1,6 @@
 "use client";
 
-import { use } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft, Phone, Mail, MapPin, Calendar, Weight,
@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { AppointmentStatusBadge, SpeciesIcon } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AppointmentModal } from "@/components/appointments/AppointmentModal";
 import { trpc } from "@/lib/trpc/client";
 import { useTenant } from "@/hooks/useTenant";
 
@@ -71,9 +72,10 @@ function AppointmentItem({ appt }: {
 export default function PatientDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { tenantId } = useTenant();
+  const [apptModalOpen, setApptModalOpen] = useState(false);
 
   const { data, isLoading } = trpc.patients.byId.useQuery({ id }, { enabled: !!id });
-  const { data: appointments, isLoading: apptLoading } = trpc.appointments.listWithDetails.useQuery(
+  const { data: appointments, isLoading: apptLoading, refetch: refetchAppts } = trpc.appointments.listWithDetails.useQuery(
     { tenantId: tenantId! },
     { enabled: !!tenantId }
   );
@@ -143,7 +145,9 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
             </p>
           </div>
         </div>
-        <Button><Plus size={16} /> Neuer Termin</Button>
+        <Button onClick={() => setApptModalOpen(true)} disabled={!tenantId}>
+          <Plus size={16} /> Neuer Termin
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -177,7 +181,9 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                   <span className="ml-2 text-sm font-normal text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{upcoming.length}</span>
                 )}
               </h2>
-              <Button variant="outline" size="sm"><Plus size={14} /> Termin</Button>
+              <Button variant="outline" size="sm" onClick={() => setApptModalOpen(true)} disabled={!tenantId}>
+                <Plus size={14} /> Termin
+              </Button>
             </div>
             {apptLoading ? (
               <div className="space-y-3"><Skeleton className="h-16 rounded-xl" /><Skeleton className="h-16 rounded-xl" /></div>
@@ -253,6 +259,16 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
           </div>
         </div>
       </div>
+
+      {tenantId && (
+        <AppointmentModal
+          open={apptModalOpen}
+          onClose={() => setApptModalOpen(false)}
+          tenantId={tenantId}
+          onSuccess={() => refetchAppts()}
+          preselectedPatientId={id}
+        />
+      )}
     </div>
   );
 }
