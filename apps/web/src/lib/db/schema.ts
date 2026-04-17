@@ -144,6 +144,7 @@ export const patients = pgTable(
     microchipId: varchar("microchip_id", { length: 50 }),
     weight: integer("weight"), // in Gramm
     color: varchar("color", { length: 100 }),
+    allergies: text("allergies"), // Komma-getrennte Liste oder JSON
     notes: text("notes"),
     active: boolean("active").default(true).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -242,6 +243,130 @@ export const voiceCalls = pgTable(
   (table) => ({
     tenantIdIdx: index("voice_calls_tenant_id_idx").on(table.tenantId),
     vapiIdIdx: index("voice_calls_vapi_id_idx").on(table.vapiCallId),
+  })
+);
+
+// ============================================================================
+// DIAGNOSES (Diagnosen & Medizinische Notizen)
+// ============================================================================
+
+export const diagnoses = pgTable(
+  "diagnoses",
+  {
+    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    patientId: uuid("patient_id")
+      .notNull()
+      .references(() => patients.id, { onDelete: "cascade" }),
+    vetId: uuid("vet_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "set null" }),
+    title: varchar("title", { length: 255 }).notNull(), // z.B. "Otitis Externa"
+    description: text("description"), // Detaillierte Notizen
+    icd10Code: varchar("icd10_code", { length: 10 }), // Medizinischer Code
+    severity: varchar("severity", {
+      length: 50,
+      enum: ["mild", "moderate", "severe"],
+    }),
+    status: varchar("status", {
+      length: 50,
+      enum: ["active", "resolved", "monitoring"],
+    })
+      .default("active")
+      .notNull(),
+    dateOfDiagnosis: timestamp("date_of_diagnosis", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (table) => ({
+    tenantIdIdx: index("diagnoses_tenant_id_idx").on(table.tenantId),
+    patientIdIdx: index("diagnoses_patient_id_idx").on(table.patientId),
+    dateIdx: index("diagnoses_date_idx").on(table.dateOfDiagnosis),
+  })
+);
+
+// ============================================================================
+// MEDICATIONS (Medikamente & Rezepte)
+// ============================================================================
+
+export const medications = pgTable(
+  "medications",
+  {
+    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    patientId: uuid("patient_id")
+      .notNull()
+      .references(() => patients.id, { onDelete: "cascade" }),
+    diagnosisId: uuid("diagnosis_id").references(() => diagnoses.id, {
+      onDelete: "set null",
+    }), // Optional: verknüpft mit Diagnose
+    medicationName: varchar("medication_name", { length: 255 }).notNull(),
+    dosage: varchar("dosage", { length: 100 }).notNull(), // z.B. "500mg"
+    frequency: varchar("frequency", { length: 100 }).notNull(), // z.B. "2x täglich"
+    route: varchar("route", {
+      length: 50,
+      enum: ["oral", "injection", "topical", "ophthalmic", "other"],
+    })
+      .default("oral"),
+    startDate: timestamp("start_date", { withTimezone: true }).notNull(),
+    endDate: timestamp("end_date", { withTimezone: true }),
+    notes: text("notes"), // Spezielle Anweisungen
+    prescribedBy: uuid("prescribed_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (table) => ({
+    tenantIdIdx: index("medications_tenant_id_idx").on(table.tenantId),
+    patientIdIdx: index("medications_patient_id_idx").on(table.patientId),
+    diagnosisIdIdx: index("medications_diagnosis_id_idx").on(table.diagnosisId),
+  })
+);
+
+// ============================================================================
+// VITALS (Vitalzeichen & Gewicht-Tracking)
+// ============================================================================
+
+export const vitals = pgTable(
+  "vitals",
+  {
+    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    patientId: uuid("patient_id")
+      .notNull()
+      .references(() => patients.id, { onDelete: "cascade" }),
+    recordedBy: uuid("recorded_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "set null" }),
+    weight: integer("weight"), // in Gramm
+    temperature: varchar("temperature", { length: 10 }), // z.B. "38.5°C"
+    heartRate: integer("heart_rate"), // Herzfrequenz (Schläge/Min)
+    respiratoryRate: integer("respiratory_rate"), // Atemfrequenz
+    notes: text("notes"), // Allgemeine Bemerkungen
+    recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (table) => ({
+    tenantIdIdx: index("vitals_tenant_id_idx").on(table.tenantId),
+    patientIdIdx: index("vitals_patient_id_idx").on(table.patientId),
+    recordedAtIdx: index("vitals_recorded_at_idx").on(table.recordedAt),
   })
 );
 
