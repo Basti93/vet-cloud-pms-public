@@ -28,6 +28,7 @@ export const patientsRouter = createTRPCRouter({
           name: patients.name,
           species: patients.species,
           breed: patients.breed,
+          color: patients.color,
           birthDate: patients.birthDate,
           weight: patients.weight,
           active: patients.active,
