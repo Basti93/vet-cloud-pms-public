@@ -156,14 +156,13 @@ async function main() {
       // CREATE PATIENTS
       // ────────────────────────────────────────────────────────────────────
       const createdPatients = await Promise.all(
-        TEST_DATA.patients.map((p) =>
+        TEST_DATA.patients.map(({ ownerIndex, ...patientData }) =>
           db
             .insert(patients)
             .values({
               tenantId: DEMO_TENANT_ID,
-              ownerId: createdOwners[p.ownerIndex]!.id,
-              ...p,
-              ownerIndex: undefined,
+              ownerId: createdOwners[ownerIndex]!.id,
+              ...patientData,
               birthDate: new Date(new Date().getFullYear() - 3, 0, 1),
               active: true,
             })
@@ -176,15 +175,14 @@ async function main() {
       // CREATE DIAGNOSES
       // ────────────────────────────────────────────────────────────────────
       const createdDiagnoses = await Promise.all(
-        TEST_DATA.diagnoses.map((d) =>
+        TEST_DATA.diagnoses.map(({ patientIndex, ...diagnosisData }) =>
           db
             .insert(diagnoses)
             .values({
               tenantId: DEMO_TENANT_ID,
               vetId: vet.id,
-              patientId: createdPatients[d.patientIndex]!.id,
-              ...d,
-              patientIndex: undefined,
+              patientId: createdPatients[patientIndex]!.id,
+              ...diagnosisData,
               dateOfDiagnosis: new Date(
                 now.getTime() - 7 * 24 * 60 * 60 * 1000
               ),
@@ -198,18 +196,16 @@ async function main() {
       // CREATE MEDICATIONS
       // ────────────────────────────────────────────────────────────────────
       await Promise.all(
-        TEST_DATA.medications.map((m) =>
+        TEST_DATA.medications.map(({ patientIndex, diagnosisIndex, ...medicationData }) =>
           db.insert(medications).values({
             tenantId: DEMO_TENANT_ID,
             prescribedBy: vet.id,
-            patientId: createdPatients[m.patientIndex]!.id,
+            patientId: createdPatients[patientIndex]!.id,
             diagnosisId:
-              m.diagnosisIndex !== null
-                ? createdDiagnoses[m.diagnosisIndex]!.id
+              diagnosisIndex !== null
+                ? createdDiagnoses[diagnosisIndex]!.id
                 : undefined,
-            ...m,
-            patientIndex: undefined,
-            diagnosisIndex: undefined,
+            ...medicationData,
             startDate: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
           })
         )
@@ -219,16 +215,14 @@ async function main() {
       // CREATE VITALS
       // ────────────────────────────────────────────────────────────────────
       await Promise.all(
-        TEST_DATA.vitals.map((v) =>
+        TEST_DATA.vitals.map(({ patientIndex, daysAgo, ...vitalData }) =>
           db.insert(vitals).values({
             tenantId: DEMO_TENANT_ID,
             recordedBy: vet.id,
-            patientId: createdPatients[v.patientIndex]!.id,
-            ...v,
-            patientIndex: undefined,
-            daysAgo: undefined,
+            patientId: createdPatients[patientIndex]!.id,
+            ...vitalData,
             recordedAt: new Date(
-              now.getTime() - v.daysAgo * 24 * 60 * 60 * 1000
+              now.getTime() - daysAgo * 24 * 60 * 60 * 1000
             ),
           })
         )
@@ -238,22 +232,20 @@ async function main() {
       // CREATE INTERNAL APPOINTMENTS
       // ────────────────────────────────────────────────────────────────────
       await Promise.all(
-        TEST_DATA.internalAppointments.map((apt) => {
+        TEST_DATA.internalAppointments.map(({ patientIndex, daysFromNow, hour, ...aptData }) => {
           const startTime = new Date(
-            now.getTime() + apt.daysFromNow * 24 * 60 * 60 * 1000
+            now.getTime() + daysFromNow * 24 * 60 * 60 * 1000
           );
-          startTime.setHours(apt.hour, 0, 0, 0);
+          startTime.setHours(hour, 0, 0, 0);
           const endTime = new Date(startTime.getTime() + 30 * 60 * 1000);
 
           return db.insert(appointments).values({
             tenantId: DEMO_TENANT_ID,
-            patientId: createdPatients[apt.patientIndex]!.id,
+            patientId: createdPatients[patientIndex]!.id,
             vetId: vet.id,
             startTime,
             endTime,
-            title: apt.title,
-            description: apt.description,
-            status: apt.status,
+            ...aptData,
             source: "manual",
           });
         })
@@ -263,21 +255,20 @@ async function main() {
       // CREATE ONLINE BOOKINGS
       // ────────────────────────────────────────────────────────────────────
       await Promise.all(
-        TEST_DATA.onlineBookings.map((booking) => {
+        TEST_DATA.onlineBookings.map(({ patientIndex, daysFromNow, hour, ...bookingData }) => {
           const startTime = new Date(
-            now.getTime() + booking.daysFromNow * 24 * 60 * 60 * 1000
+            now.getTime() + daysFromNow * 24 * 60 * 60 * 1000
           );
-          startTime.setHours(booking.hour, 0, 0, 0);
+          startTime.setHours(hour, 0, 0, 0);
           const endTime = new Date(startTime.getTime() + 30 * 60 * 1000);
 
           return db.insert(appointments).values({
             tenantId: DEMO_TENANT_ID,
-            patientId: createdPatients[booking.patientIndex]!.id,
+            patientId: createdPatients[patientIndex]!.id,
             vetId: vet.id,
             startTime,
             endTime,
-            title: booking.title,
-            status: booking.status,
+            ...bookingData,
             source: "online_booking",
           });
         })

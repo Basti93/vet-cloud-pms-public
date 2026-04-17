@@ -25,7 +25,6 @@ if (fs.existsSync(envPath)) {
 
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import * as schema from "../src/lib/db/schema";
 import {
   tenants,
   users,
@@ -47,7 +46,18 @@ const dbUrl =
   DATABASE_URL +
   (DATABASE_URL.includes("?") ? "&sslmode=require" : "?sslmode=require");
 const sql = postgres(dbUrl, { max: 1 });
-const db = drizzle(sql, { schema });
+const db = drizzle(sql, {
+  schema: {
+    tenants,
+    users,
+    owners,
+    patients,
+    appointments,
+    diagnoses,
+    medications,
+    vitals,
+  },
+});
 
 async function seed() {
   try {
@@ -112,14 +122,13 @@ async function seed() {
     // ────────────────────────────────────────────────────────────────────────
     console.log("🐕 Creating patients...");
     const createdPatients = await Promise.all(
-      TEST_DATA.patients.map((p) =>
+      TEST_DATA.patients.map(({ ownerIndex, ...patientData }) =>
         db
           .insert(patients)
           .values({
             tenantId,
-            ownerId: createdOwners[p.ownerIndex]!.id,
-            ...p,
-            ownerIndex: undefined,
+            ownerId: createdOwners[ownerIndex]!.id,
+            ...patientData,
             birthDate: new Date(new Date().getFullYear() - 3, 0, 1),
             active: true,
           })
@@ -134,15 +143,14 @@ async function seed() {
     // ────────────────────────────────────────────────────────────────────────
     console.log("🩺 Creating diagnoses...");
     const createdDiagnoses = await Promise.all(
-      TEST_DATA.diagnoses.map((d) =>
+      TEST_DATA.diagnoses.map(({ patientIndex, ...diagnosisData }) =>
         db
           .insert(diagnoses)
           .values({
             tenantId,
             vetId: vetUser.id,
-            patientId: createdPatients[d.patientIndex]!.id,
-            ...d,
-            patientIndex: undefined,
+            patientId: createdPatients[patientIndex]!.id,
+            ...diagnosisData,
             dateOfDiagnosis: new Date(
               Date.now() - 7 * 24 * 60 * 60 * 1000
             ),
@@ -158,19 +166,17 @@ async function seed() {
     // ────────────────────────────────────────────────────────────────────────
     console.log("💊 Creating medications...");
     await Promise.all(
-      TEST_DATA.medications.map((m) =>
+      TEST_DATA.medications.map(({ patientIndex, diagnosisIndex, ...medicationData }) =>
         db
           .insert(medications)
           .values({
             tenantId,
             prescribedBy: vetUser.id,
-            patientId: createdPatients[m.patientIndex]!.id,
-            diagnosisId: m.diagnosisIndex !== null
-              ? createdDiagnoses[m.diagnosisIndex]!.id
+            patientId: createdPatients[patientIndex]!.id,
+            diagnosisId: diagnosisIndex !== null
+              ? createdDiagnoses[diagnosisIndex]!.id
               : undefined,
-            ...m,
-            patientIndex: undefined,
-            diagnosisIndex: undefined,
+            ...medicationData,
             startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
           })
       )
@@ -182,17 +188,15 @@ async function seed() {
     // ────────────────────────────────────────────────────────────────────────
     console.log("📊 Creating vitals...");
     await Promise.all(
-      TEST_DATA.vitals.map((v) =>
+      TEST_DATA.vitals.map(({ patientIndex, daysAgo, ...vitalData }) =>
         db
           .insert(vitals)
           .values({
             tenantId,
             recordedBy: vetUser.id,
-            patientId: createdPatients[v.patientIndex]!.id,
-            ...v,
-            patientIndex: undefined,
-            daysAgo: undefined,
-            recordedAt: new Date(Date.now() - v.daysAgo * 24 * 60 * 60 * 1000),
+            patientId: createdPatients[patientIndex]!.id,
+            ...vitalData,
+            recordedAt: new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000),
           })
       )
     );
@@ -204,22 +208,20 @@ async function seed() {
     console.log("📅 Creating internal appointments...");
     const now = new Date();
     await Promise.all(
-      TEST_DATA.internalAppointments.map((apt) => {
+      TEST_DATA.internalAppointments.map(({ patientIndex, daysFromNow, hour, ...aptData }) => {
         const startTime = new Date(
-          now.getTime() + apt.daysFromNow * 24 * 60 * 60 * 1000
+          now.getTime() + daysFromNow * 24 * 60 * 60 * 1000
         );
-        startTime.setHours(apt.hour, 0, 0, 0);
+        startTime.setHours(hour, 0, 0, 0);
         const endTime = new Date(startTime.getTime() + 30 * 60 * 1000);
 
         return db.insert(appointments).values({
           tenantId,
-          patientId: createdPatients[apt.patientIndex]!.id,
+          patientId: createdPatients[patientIndex]!.id,
           vetId: vetUser.id,
           startTime,
           endTime,
-          title: apt.title,
-          description: apt.description,
-          status: apt.status,
+          ...aptData,
           source: "manual",
         });
       })
@@ -231,21 +233,20 @@ async function seed() {
     // ────────────────────────────────────────────────────────────────────────
     console.log("📅 Creating online bookings...");
     await Promise.all(
-      TEST_DATA.onlineBookings.map((booking) => {
+      TEST_DATA.onlineBookings.map(({ patientIndex, daysFromNow, hour, ...bookingData }) => {
         const startTime = new Date(
-          now.getTime() + booking.daysFromNow * 24 * 60 * 60 * 1000
+          now.getTime() + daysFromNow * 24 * 60 * 60 * 1000
         );
-        startTime.setHours(booking.hour, 0, 0, 0);
+        startTime.setHours(hour, 0, 0, 0);
         const endTime = new Date(startTime.getTime() + 30 * 60 * 1000);
 
         return db.insert(appointments).values({
           tenantId,
-          patientId: createdPatients[booking.patientIndex]!.id,
+          patientId: createdPatients[patientIndex]!.id,
           vetId: vetUser.id,
           startTime,
           endTime,
-          title: booking.title,
-          status: booking.status,
+          ...bookingData,
           source: "online_booking",
         });
       })
@@ -259,7 +260,7 @@ async function seed() {
     console.log("✨ Seed completed successfully!\n");
     console.log("📊 Summary:");
     console.log(`  • Tenant: ${TEST_DATA.tenant.name}`);
-    console.log(`  • Users: ${stats.owners}`);
+    console.log(`  • Users: 2`);
     console.log(`  • Owners: ${stats.owners}`);
     console.log(`  • Patients: ${stats.patients}`);
     console.log(`  • Diagnoses: ${stats.diagnoses}`);
@@ -268,12 +269,11 @@ async function seed() {
     console.log(
       `  • Appointments: ${stats.internalAppointments} internal + ${stats.onlineBookings} bookings`
     );
-
-    await sql.end();
   } catch (error) {
     console.error("❌ Seed failed:", error);
-    await sql.end();
     process.exit(1);
+  } finally {
+    await sql.end();
   }
 }
 
