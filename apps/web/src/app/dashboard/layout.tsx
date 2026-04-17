@@ -34,7 +34,7 @@ export default function DashboardLayout({
         </nav>
 
         <div className="absolute bottom-6 left-6 right-6">
-          <UserButton afterSignOutUrl="/" />
+          <UserButton />
         </div>
       </aside>
 
