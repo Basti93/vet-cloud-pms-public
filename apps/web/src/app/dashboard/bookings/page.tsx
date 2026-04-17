@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { trpc } from '@/lib/trpc/client';
 import { useAuth } from '@clerk/nextjs';
 import { AlertCircle, CheckCircle2, XCircle, Calendar, User, Clock } from 'lucide-react';
@@ -12,9 +12,24 @@ export default function BookingsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [tenantId, setTenantId] = useState<string | null>(null);
 
-  // Get tenant ID from localStorage (set during sign-in)
-  const tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null;
+  // Get tenant ID from user's metadata (set in Clerk during sign-in)
+  useEffect(() => {
+    const getTenantId = async () => {
+      try {
+        // Try to get from session or user metadata
+        const response = await fetch('/api/auth/tenant');
+        const data = await response.json();
+        if (data.tenantId) {
+          setTenantId(data.tenantId);
+        }
+      } catch (error) {
+        console.error('Failed to fetch tenant ID:', error);
+      }
+    };
+    getTenantId();
+  }, [userId]);
 
   // Fetch bookings
   const { data: bookings, isLoading: isFetching, refetch } = trpc.booking.list.useQuery(
