@@ -6,7 +6,24 @@
  * (oder: npx tsx scripts/seed.ts)
  */
 
-import "dotenv/config";
+import fs from "fs";
+import path from "path";
+
+// Load .env.local manually
+const envPath = path.resolve(process.cwd(), ".env.local");
+if (fs.existsSync(envPath)) {
+  const envContent = fs.readFileSync(envPath, "utf-8");
+  envContent.split("\n").forEach((line) => {
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith("#")) {
+      const [key, ...valueParts] = trimmed.split("=");
+      if (key && valueParts.length > 0) {
+        process.env[key.trim()] = valueParts.join("=").trim();
+      }
+    }
+  });
+}
+
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "../src/lib/db/schema";
@@ -23,7 +40,8 @@ if (!DATABASE_URL) {
   throw new Error("DATABASE_URL not set — check .env.local");
 }
 
-const sql = postgres(DATABASE_URL, { max: 1 });
+const dbUrl = DATABASE_URL + (DATABASE_URL.includes("?") ? "&sslmode=require" : "?sslmode=require");
+const sql = postgres(dbUrl, { max: 1 });
 const db = drizzle(sql, { schema });
 
 // ── Helper ────────────────────────────────────────────────────────────────────

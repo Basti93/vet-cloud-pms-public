@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useMemo } from "react";
 import dynamic from "next/dynamic";
 import type FullCalendarType from "@fullcalendar/react";
 import { Plus, ChevronLeft, ChevronRight, Calendar, List } from "lucide-react";
@@ -126,8 +126,14 @@ export default function SchedulePage() {
   const [editAppt, setEditAppt] = useState<ApptDetail | null>(null);
   const [defaultStart, setDefaultStart] = useState<Date | undefined>();
 
-  const from = new Date(); from.setMonth(from.getMonth() - 1);
-  const to = new Date(); to.setMonth(to.getMonth() + 3);
+  // ✅ FIX: Memoize date range to prevent infinite refetch loop
+  const { from, to } = useMemo(() => {
+    const from = new Date();
+    from.setMonth(from.getMonth() - 1);
+    const to = new Date();
+    to.setMonth(to.getMonth() + 3);
+    return { from, to };
+  }, []); // Empty deps = created once on mount, never changes
 
   const { data: appointments, isLoading, refetch } = trpc.appointments.listWithDetails.useQuery(
     { tenantId: tenantId!, from, to },

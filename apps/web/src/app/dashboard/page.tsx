@@ -8,7 +8,7 @@ import { AppointmentStatusBadge, SpeciesIcon } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppointmentModal } from "@/components/appointments/AppointmentModal";
 import { NewPatientModal } from "@/components/patients/NewPatientModal";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 
 function StatCard({
   label,
@@ -43,11 +43,16 @@ export default function DashboardHome() {
   const [apptModalOpen, setApptModalOpen] = useState(false);
   const [patientModalOpen, setPatientModalOpen] = useState(false);
 
-  const today = new Date();
-  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const todayEnd = new Date(todayStart.getTime() + 86_400_000);
-  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-  const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  // ✅ FIX: Memoize all date ranges to prevent infinite refetch loops
+  const { today, todayStart, todayEnd, monthStart, monthEnd, upcomingEnd } = useMemo(() => {
+    const today = new Date();
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const todayEnd = new Date(todayStart.getTime() + 86_400_000);
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    const upcomingEnd = new Date(today.getTime() + 7 * 86_400_000);
+    return { today, todayStart, todayEnd, monthStart, monthEnd, upcomingEnd };
+  }, []); // Empty deps = created once on mount, never changes
 
   const { data: patients, refetch: refetchPatients } = trpc.patients.list.useQuery(
     { tenantId: tenantId! },
@@ -60,7 +65,7 @@ export default function DashboardHome() {
   );
 
   const { data: upcomingAppts, isLoading: upcomingLoading } = trpc.appointments.listWithDetails.useQuery(
-    { tenantId: tenantId!, from: today, to: new Date(today.getTime() + 7 * 86_400_000) },
+    { tenantId: tenantId!, from: today, to: upcomingEnd },
     { enabled: !!tenantId }
   );
 
