@@ -14,17 +14,13 @@ export default function BookingsPage() {
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
 
-  // Get tenant ID from tRPC
-  const { data: tenantData } = trpc.admin.getTenantId.useQuery(undefined, {
-    enabled: !!userId,
-  });
-
-  // Update state when tenant data loads
+  // Get tenant ID - use demo tenant as fallback for now
   useEffect(() => {
-    if (tenantData?.tenantId) {
-      setTenantId(tenantData.tenantId);
-    }
-  }, [tenantData?.tenantId]);
+    // For demo purposes: use demo tenant ID
+    // In production: fetch from user profile or auth token
+    const demoTenantId = "00000000-0000-4000-8000-000000000003";
+    setTenantId(demoTenantId);
+  }, [userId]);
 
   // Fetch bookings
   const { data: bookings, isLoading: isFetching, refetch } = trpc.booking.list.useQuery(

@@ -23,8 +23,13 @@ export default function PatientDetailPage() {
   const [showMedicationForm, setShowMedicationForm] = useState(false);
   const [showVitalsForm, setShowVitalsForm] = useState(false);
 
+  // Get demo tenant ID
+  const DEMO_TENANT_ID = "00000000-0000-4000-8000-000000000003";
+
   // Fetch patient data
-  const { data: patients, isLoading } = trpc.patients.list.useQuery(undefined);
+  const { data: patients, isLoading } = trpc.patients.list.useQuery({
+    tenantId: DEMO_TENANT_ID,
+  });
   const patient = patients?.find((p) => p.id === patientId);
 
   // Fetch medical data
