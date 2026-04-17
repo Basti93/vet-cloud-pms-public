@@ -20,16 +20,23 @@ export const adminRouter = createTRPCRouter({
    * Protected: Auth required
    */
   getTenantId: protectedProcedure.query(async ({ ctx }) => {
+    if (!ctx.userId) {
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: "Not authenticated",
+      });
+    }
+
     const [user] = await ctx.db
       .select({ tenantId: users.tenantId })
       .from(users)
-      .where(eq(users.id, ctx.userId!))
+      .where(eq(users.clerkId, ctx.userId))
       .limit(1);
 
     if (!user) {
       throw new TRPCError({
         code: "NOT_FOUND",
-        message: "User not found",
+        message: "User not found in database",
       });
     }
 
