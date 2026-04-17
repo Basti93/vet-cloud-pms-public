@@ -142,6 +142,7 @@ export const appointmentsRouter = createTRPCRouter({
         status: z
           .enum(["scheduled", "completed", "cancelled", "no-show"])
           .optional(),
+        vetId: z.string().uuid().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -154,6 +155,34 @@ export const appointmentsRouter = createTRPCRouter({
 
       if (!updated) throw new TRPCError({ code: "NOT_FOUND" });
       return updated;
+    }),
+
+  // ── List by Patient (for patient detail page) ──────────────────────────────
+  listByPatient: protectedProcedure
+    .input(
+      z.object({
+        patientId: z.string().uuid(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const rows = await ctx.db
+        .select({
+          id: appointments.id,
+          title: appointments.title,
+          startTime: appointments.startTime,
+          endTime: appointments.endTime,
+          status: appointments.status,
+          source: appointments.source,
+          createdAt: appointments.createdAt,
+          vetFirstName: users.firstName,
+          vetLastName: users.lastName,
+        })
+        .from(appointments)
+        .leftJoin(users, eq(appointments.vetId, users.id))
+        .where(eq(appointments.patientId, input.patientId))
+        .orderBy(appointments.startTime);
+
+      return rows;
     }),
 
   // ── Delete ─────────────────────────────────────────────────────────────────

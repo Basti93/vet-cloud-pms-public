@@ -111,6 +111,11 @@ export function AppointmentModal({
     { enabled: open }
   );
 
+  const { data: vets } = trpc.vet.list.useQuery(
+    { tenantId },
+    { enabled: open }
+  );
+
   // Mutations
   const createAppt = trpc.appointments.create.useMutation({ onSuccess: () => { onSuccess?.(); onClose(); } });
   const updateAppt = trpc.appointments.update.useMutation({ onSuccess: () => { onSuccess?.(); onClose(); } });
@@ -125,6 +130,7 @@ export function AppointmentModal({
     const errs: Record<string, string> = {};
     if (!form.title.trim()) errs.title = "Bitte Titel angeben";
     if (!form.patientId) errs.patientId = "Bitte Patient auswählen";
+    if (!form.vetId) errs.vetId = "Bitte Arzt auswählen";
     if (!form.startTime) errs.startTime = "Pflichtfeld";
     return errs;
   };
@@ -137,9 +143,6 @@ export function AppointmentModal({
     const startTime = new Date(form.startTime);
     const endTime = new Date(form.endTime);
 
-    // For vet ID: use first available vet (simplified — onboarding will link properly)
-    const vetId = form.vetId || form.patientId; // fallback
-
     if (isEdit && editData) {
       updateAppt.mutate({
         id: editData.id,
@@ -148,12 +151,13 @@ export function AppointmentModal({
         startTime,
         endTime,
         status: form.status as any,
+        vetId: form.vetId,
       });
     } else {
       createAppt.mutate({
         tenantId,
         patientId: form.patientId,
-        vetId: vetId || form.patientId, // TODO: proper vet selection
+        vetId: form.vetId,
         startTime,
         endTime,
         title: form.title,
@@ -191,6 +195,21 @@ export function AppointmentModal({
           {patients?.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name} ({p.species}{p.breed ? ` · ${p.breed}` : ""}) — {p.ownerFirstName} {p.ownerLastName}
+            </option>
+          ))}
+        </Select>
+
+        {/* Vet */}
+        <Select
+          label="Arzt *"
+          value={form.vetId}
+          onChange={(e) => set("vetId", e.target.value)}
+          error={errors.vetId}
+        >
+          <option value="">— Arzt auswählen —</option>
+          {vets?.map((v) => (
+            <option key={v.id} value={v.id}>
+              Dr. {v.firstName} {v.lastName} ({v.appointmentCount} Termine)
             </option>
           ))}
         </Select>

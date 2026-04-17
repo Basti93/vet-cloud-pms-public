@@ -34,6 +34,7 @@ import {
   diagnoses,
   medications,
   vitals,
+  vetSchedules,
 } from "../src/lib/db/schema";
 import { TEST_DATA, DEMO_TENANT_ID, getTestDataStats } from "./test-data";
 
@@ -95,12 +96,38 @@ async function seed() {
       )
     );
 
-    const vetUser = createdUsers.find((u) => u?.role === "vet");
-    if (!vetUser) throw new Error("No vet user created");
+    const createdVets = createdUsers.filter((u) => u?.role === "vet");
+    if (createdVets.length === 0) throw new Error("No vet users created");
+    const vetUser = createdVets[0]!; // Use first vet as default
     console.log(`  ✓ ${createdUsers.length} users\n`);
 
     // ────────────────────────────────────────────────────────────────────────
+    // 2b. CREATE VET SCHEDULES
+    // ────────────────────────────────────────────────────────────────────────
+    console.log("📅 Creating vet schedules...");
+    const createdSchedules = await Promise.all(
+      TEST_DATA.vetSchedules.map((schedule) => {
+        const vet = createdVets[schedule.vetIndex];
+        if (!vet) return null;
+        return db
+          .insert(vetSchedules)
+          .values({
+            tenantId,
+            vetId: vet.id,
+            dayOfWeek: schedule.dayOfWeek,
+            startHour: schedule.startHour,
+            endHour: schedule.endHour,
+            isWorkingDay: schedule.isWorkingDay,
+          })
+          .returning()
+          .then((r) => r[0]);
+      })
+    );
+    console.log(`  ✓ ${createdSchedules.filter(Boolean).length} vet schedules\n`);
+
+    // ────────────────────────────────────────────────────────────────────────
     // 3. CREATE OWNERS
+    // (skipping 2c on purpose - schedules are in 2b)
     // ────────────────────────────────────────────────────────────────────────
     console.log("👨‍👩‍👧 Creating owners...");
     const createdOwners = await Promise.all(
@@ -260,7 +287,8 @@ async function seed() {
     console.log("✨ Seed completed successfully!\n");
     console.log("📊 Summary:");
     console.log(`  • Tenant: ${TEST_DATA.tenant.name}`);
-    console.log(`  • Users: 2`);
+    console.log(`  • Users: ${createdUsers.length} (${stats.vets} vets)`);
+    console.log(`  • Vet schedules: ${stats.vetSchedules}`);
     console.log(`  • Owners: ${stats.owners}`);
     console.log(`  • Patients: ${stats.patients}`);
     console.log(`  • Diagnoses: ${stats.diagnoses}`);

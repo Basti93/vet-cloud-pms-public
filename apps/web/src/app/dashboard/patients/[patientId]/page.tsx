@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   Calendar,
   Edit2,
+  Clock,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -42,6 +43,10 @@ export default function PatientDetailPage() {
     { enabled: !!patientId }
   );
   const { data: vitalsList } = trpc.medical.vitals.list.useQuery(
+    { patientId },
+    { enabled: !!patientId }
+  );
+  const { data: appointmentsList } = trpc.appointments.listByPatient.useQuery(
     { patientId },
     { enabled: !!patientId }
   );
@@ -230,6 +235,63 @@ export default function PatientDetailPage() {
               <p className="text-gray-500 text-center py-8">Keine aktiven Medikamente</p>
             )}
           </div>
+        </div>
+
+        {/* Appointments/Termine */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-indigo-600" />
+              Termine & Ärzte
+            </h2>
+          </div>
+
+          {appointmentsList && appointmentsList.length > 0 ? (
+            <div className="space-y-3">
+              {appointmentsList.map((apt) => (
+                <div key={apt.id} className="border border-gray-200 rounded p-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <p className="font-semibold text-gray-900">{apt.title}</p>
+                      <p className="text-sm text-gray-600 mt-1 flex items-center gap-2">
+                        <Clock className="w-4 h-4" />
+                        {new Date(apt.startTime).toLocaleDateString('de-DE', {
+                          weekday: 'short',
+                          day: '2-digit',
+                          month: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </p>
+                      {apt.vetFirstName && apt.vetLastName && (
+                        <p className="text-sm text-indigo-600 mt-1 font-medium">
+                          Dr. {apt.vetFirstName} {apt.vetLastName}
+                        </p>
+                      )}
+                    </div>
+                    <span
+                      className={`px-2 py-1 rounded text-xs font-medium flex-shrink-0 ${
+                        apt.status === 'scheduled'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : apt.status === 'completed'
+                          ? 'bg-green-100 text-green-800'
+                          : apt.status === 'cancelled'
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}
+                    >
+                      {apt.status === 'scheduled' && 'Geplant'}
+                      {apt.status === 'completed' && 'Abgeschlossen'}
+                      {apt.status === 'cancelled' && 'Abgesagt'}
+                      {apt.status === 'no-show' && 'Nicht erschienen'}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-500 text-center py-8">Keine Termine erfasst</p>
+          )}
         </div>
 
         {/* Vitals */}

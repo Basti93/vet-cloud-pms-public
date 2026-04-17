@@ -41,9 +41,23 @@ export const TEST_DATA = {
     },
     {
       clerkId: "user_demo_vet_001",
-      email: "vet@demo.example.com",
+      email: "vet1@demo.example.com",
       firstName: "Dr.",
-      lastName: "Tierarzt",
+      lastName: "Mueller",
+      role: "vet" as const,
+    },
+    {
+      clerkId: "user_demo_vet_002",
+      email: "vet2@demo.example.com",
+      firstName: "Dr.",
+      lastName: "Schmidt",
+      role: "vet" as const,
+    },
+    {
+      clerkId: "user_demo_vet_003",
+      email: "vet3@demo.example.com",
+      firstName: "Dr.",
+      lastName: "Weber",
       role: "vet" as const,
     },
   ],
@@ -342,6 +356,39 @@ export const TEST_DATA = {
       status: "scheduled" as const,
     },
   ],
+
+  // ────────────────────────────────────────────────────────────────────────
+  // VET SCHEDULES (indexed by vetIndex in users array: 1=Mueller, 2=Schmidt, 3=Weber)
+  // dayOfWeek: 0=Sun, 1=Mon, ..., 6=Sat
+  // ────────────────────────────────────────────────────────────────────────
+  vetSchedules: [
+    // Dr. Mueller (vetIndex 1) - Monday to Friday, 8-18
+    { vetIndex: 1, dayOfWeek: 1, startHour: 8, endHour: 18, isWorkingDay: true },
+    { vetIndex: 1, dayOfWeek: 2, startHour: 8, endHour: 18, isWorkingDay: true },
+    { vetIndex: 1, dayOfWeek: 3, startHour: 8, endHour: 18, isWorkingDay: true },
+    { vetIndex: 1, dayOfWeek: 4, startHour: 8, endHour: 18, isWorkingDay: true },
+    { vetIndex: 1, dayOfWeek: 5, startHour: 8, endHour: 18, isWorkingDay: true },
+    { vetIndex: 1, dayOfWeek: 6, startHour: 10, endHour: 14, isWorkingDay: true }, // Saturday morning
+    { vetIndex: 1, dayOfWeek: 0, startHour: 0, endHour: 0, isWorkingDay: false }, // Sunday off
+
+    // Dr. Schmidt (vetIndex 2) - Tuesday to Saturday, 9-17
+    { vetIndex: 2, dayOfWeek: 1, startHour: 9, endHour: 17, isWorkingDay: true },
+    { vetIndex: 2, dayOfWeek: 2, startHour: 9, endHour: 17, isWorkingDay: true },
+    { vetIndex: 2, dayOfWeek: 3, startHour: 0, endHour: 0, isWorkingDay: false }, // Wednesday off
+    { vetIndex: 2, dayOfWeek: 4, startHour: 9, endHour: 17, isWorkingDay: true },
+    { vetIndex: 2, dayOfWeek: 5, startHour: 9, endHour: 17, isWorkingDay: true },
+    { vetIndex: 2, dayOfWeek: 6, startHour: 9, endHour: 14, isWorkingDay: true }, // Saturday afternoon
+    { vetIndex: 2, dayOfWeek: 0, startHour: 0, endHour: 0, isWorkingDay: false }, // Sunday off
+
+    // Dr. Weber (vetIndex 3) - Monday to Friday, 10-19 (late shift)
+    { vetIndex: 3, dayOfWeek: 1, startHour: 10, endHour: 19, isWorkingDay: true },
+    { vetIndex: 3, dayOfWeek: 2, startHour: 10, endHour: 19, isWorkingDay: true },
+    { vetIndex: 3, dayOfWeek: 3, startHour: 10, endHour: 19, isWorkingDay: true },
+    { vetIndex: 3, dayOfWeek: 4, startHour: 10, endHour: 19, isWorkingDay: true },
+    { vetIndex: 3, dayOfWeek: 5, startHour: 10, endHour: 19, isWorkingDay: true },
+    { vetIndex: 3, dayOfWeek: 6, startHour: 0, endHour: 0, isWorkingDay: false }, // Saturday off
+    { vetIndex: 3, dayOfWeek: 0, startHour: 0, endHour: 0, isWorkingDay: false }, // Sunday off
+  ],
 };
 
 // ────────────────────────────────────────────────────────────────────────
@@ -359,5 +406,7 @@ export function getTestDataStats() {
     onlineBookings: TEST_DATA.onlineBookings.length,
     totalAppointments:
       TEST_DATA.internalAppointments.length + TEST_DATA.onlineBookings.length,
+    vets: TEST_DATA.users.filter((u) => u.role === "vet").length,
+    vetSchedules: TEST_DATA.vetSchedules.length,
   };
 }

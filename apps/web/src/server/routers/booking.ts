@@ -156,12 +156,13 @@ export const bookingRouter = createTRPCRouter({
       return tenant;
     }),
 
-  /** Public: Return available 30-min slots for a given tenant + calendar date */
+  /** Public: Return available 30-min slots for a given tenant + calendar date (optionally filtered by vet) */
   getAvailableSlots: publicProcedure
     .input(
       z.object({
         tenantId: z.string().uuid(),
         date: z.date(),
+        vetId: z.string().uuid().optional(),
       })
     )
     .query(async ({ ctx, input }) => {
@@ -170,19 +171,23 @@ export const bookingRouter = createTRPCRouter({
       const dayEnd = new Date(input.date);
       dayEnd.setHours(23, 59, 59, 999);
 
+      const conditions = [
+        eq(appointments.tenantId, input.tenantId),
+        gte(appointments.startTime, dayStart),
+        lte(appointments.startTime, dayEnd),
+      ];
+
+      if (input.vetId) {
+        conditions.push(eq(appointments.vetId, input.vetId));
+      }
+
       const booked = await ctx.db
         .select({
           startTime: appointments.startTime,
           endTime: appointments.endTime,
         })
         .from(appointments)
-        .where(
-          and(
-            eq(appointments.tenantId, input.tenantId),
-            gte(appointments.startTime, dayStart),
-            lte(appointments.startTime, dayEnd)
-          )
-        );
+        .where(and(...conditions));
 
       const allSlots = generateDaySlots(input.date);
 
@@ -216,6 +221,7 @@ export const bookingRouter = createTRPCRouter({
           email: z.string().email(),
           phone: z.string().min(3).max(20),
         }),
+        vetId: z.string().uuid().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -224,12 +230,23 @@ export const bookingRouter = createTRPCRouter({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Dieser Zeitslot liegt in der Vergangenheit" });
       }
 
-      // Pick first active user (vet/admin) for this tenant as appointment owner
-      const [vet] = await ctx.db
-        .select({ id: users.id })
-        .from(users)
-        .where(and(eq(users.tenantId, input.tenantId), eq(users.active, true)))
-        .limit(1);
+      // Use provided vetId or pick first active user (vet/admin) for this tenant as appointment owner
+      let vet: { id: string } | undefined;
+      if (input.vetId) {
+        const [selectedVet] = await ctx.db
+          .select({ id: users.id })
+          .from(users)
+          .where(and(eq(users.id, input.vetId), eq(users.tenantId, input.tenantId), eq(users.active, true)))
+          .limit(1);
+        vet = selectedVet;
+      } else {
+        const [firstVet] = await ctx.db
+          .select({ id: users.id })
+          .from(users)
+          .where(and(eq(users.tenantId, input.tenantId), eq(users.active, true)))
+          .limit(1);
+        vet = firstVet;
+      }
 
       if (!vet) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Kein Tierarzt konfiguriert" });

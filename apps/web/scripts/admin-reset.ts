@@ -36,8 +36,9 @@ import {
   diagnoses,
   medications,
   vitals,
+  vetSchedules,
 } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import {
   TEST_DATA,
   DEMO_TENANT_ID,
@@ -93,6 +94,10 @@ async function main() {
       console.log(`🔄 Resetting demo tenant data...`);
 
       // Delete in correct order (foreign key constraints)
+      const vetSchedulesCount = await db
+        .delete(vetSchedules)
+        .where(eq(vetSchedules.tenantId, DEMO_TENANT_ID));
+
       const voiceCallsCount = await db
         .delete(voiceCalls)
         .where(eq(voiceCalls.tenantId, DEMO_TENANT_ID));
@@ -134,7 +139,37 @@ async function main() {
         );
       }
 
+      // Get all vets for schedule creation
+      const allVets = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(
+          and(
+            eq(users.tenantId, DEMO_TENANT_ID),
+            eq(users.role, "vet"),
+            eq(users.active, true)
+          )
+        );
+
       const now = new Date();
+
+      // ────────────────────────────────────────────────────────────────────
+      // CREATE VET SCHEDULES
+      // ────────────────────────────────────────────────────────────────────
+      await Promise.all(
+        TEST_DATA.vetSchedules.map((schedule) => {
+          const vetForSchedule = allVets[schedule.vetIndex];
+          if (!vetForSchedule) return null;
+          return db.insert(vetSchedules).values({
+            tenantId: DEMO_TENANT_ID,
+            vetId: vetForSchedule.id,
+            dayOfWeek: schedule.dayOfWeek,
+            startHour: schedule.startHour,
+            endHour: schedule.endHour,
+            isWorkingDay: schedule.isWorkingDay,
+          });
+        })
+      );
 
       // ────────────────────────────────────────────────────────────────────
       // CREATE OWNERS
@@ -281,6 +316,7 @@ async function main() {
 
       console.log(`✅ Reset complete!`);
       console.log(`📊 Deleted:`);
+      console.log(`   - Vet schedules: ${vetSchedulesCount.count || 0}`);
       console.log(`   - Voice calls: ${voiceCallsCount.count || 0}`);
       console.log(`   - Medications: ${medicationsCount.count || 0}`);
       console.log(`   - Vitals: ${vitalsCount.count || 0}`);
@@ -289,6 +325,8 @@ async function main() {
       console.log(`   - Patients: ${patientsCount.count || 0}`);
       console.log(`   - Owners: ${ownersCount.count || 0}`);
       console.log(`📊 Created test data:`);
+      console.log(`   - Vets: ${stats.vets}`);
+      console.log(`   - Vet schedules: ${stats.vetSchedules}`);
       console.log(`   - Owners: ${stats.owners}`);
       console.log(`   - Patients: ${stats.patients}`);
       console.log(

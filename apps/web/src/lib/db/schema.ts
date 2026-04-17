@@ -400,6 +400,41 @@ export const auditLogs = pgTable(
 );
 
 // ============================================================================
+// VET_SCHEDULES (Vet Availability)
+// ============================================================================
+
+export const vetSchedules = pgTable(
+  "vet_schedules",
+  {
+    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    vetId: uuid("vet_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    dayOfWeek: smallint("day_of_week").notNull(), // 0 = Sunday, 1 = Monday, etc.
+    startHour: smallint("start_hour").notNull(), // 8
+    endHour: smallint("end_hour").notNull(), // 18
+    isWorkingDay: boolean("is_working_day").default(true).notNull(), // false = off
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (table) => ({
+    tenantVetIdIdx: index("vet_schedules_tenant_vet_idx").on(
+      table.tenantId,
+      table.vetId
+    ),
+    dayIdx: index("vet_schedules_day_idx").on(table.dayOfWeek),
+  })
+);
+
+// ============================================================================
 // RLS Policies (für später, muss in Postgres direkt gesetzt werden)
 // ============================================================================
 

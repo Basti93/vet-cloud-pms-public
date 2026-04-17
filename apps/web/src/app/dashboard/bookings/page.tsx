@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { trpc } from '@/lib/trpc/client';
 import { useAuth } from '@clerk/nextjs';
-import { AlertCircle, CheckCircle2, XCircle, Calendar, User, Clock } from 'lucide-react';
+import { AlertCircle, CheckCircle2, XCircle, Calendar, User, Clock, Filter } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function BookingsPage() {
@@ -13,6 +13,7 @@ export default function BookingsPage() {
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
+  const [selectedVetId, setSelectedVetId] = useState<string | null>(null);
 
   // Get tenant ID - use demo tenant as fallback for now
   useEffect(() => {
@@ -21,6 +22,12 @@ export default function BookingsPage() {
     const demoTenantId = "00000000-0000-4000-8000-000000000003";
     setTenantId(demoTenantId);
   }, [userId]);
+
+  // Fetch all vets
+  const { data: vets } = trpc.vet.list.useQuery(
+    { tenantId: tenantId || '' },
+    { enabled: !!tenantId && !!userId }
+  );
 
   // Fetch bookings
   const { data: bookings, isLoading: isFetching, refetch } = trpc.booking.list.useQuery(
@@ -76,10 +83,14 @@ export default function BookingsPage() {
     await rejectMutation.mutateAsync({ appointmentId, tenantId });
   };
 
-  // Filter bookings by status
-  const pendingBookings = bookings?.filter(b => b.status === 'scheduled') || [];
-  const confirmedBookings = bookings?.filter(b => b.status === 'completed') || [];
-  const rejectedBookings = bookings?.filter(b => b.status === 'cancelled') || [];
+  // Filter bookings by status and vet
+  const filteredBookings = selectedVetId
+    ? bookings?.filter(b => b.patient && true) // Will filter by vet in next step
+    : bookings || [];
+
+  const pendingBookings = filteredBookings?.filter(b => b.status === 'scheduled') || [];
+  const confirmedBookings = filteredBookings?.filter(b => b.status === 'completed') || [];
+  const rejectedBookings = filteredBookings?.filter(b => b.status === 'cancelled') || [];
 
   const formatDateTime = (date: Date | string) => {
     const d = typeof date === 'string' ? new Date(date) : date;
@@ -96,10 +107,31 @@ export default function BookingsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-6">
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
+        {/* Header with Vet Selector */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Buchungsanfragen</h1>
-          <p className="text-gray-600">Verwalten Sie Ihre Online-Buchungen</p>
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">Buchungsanfragen</h1>
+              <p className="text-gray-600">Verwalten Sie Ihre Online-Buchungen</p>
+            </div>
+            {vets && vets.length > 0 && (
+              <div className="flex items-center gap-3">
+                <Filter className="w-4 h-4 text-gray-600" />
+                <select
+                  value={selectedVetId || ''}
+                  onChange={(e) => setSelectedVetId(e.target.value || null)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="">Alle Ärzte</option>
+                  {vets.map((vet) => (
+                    <option key={vet.id} value={vet.id}>
+                      Dr. {vet.firstName} {vet.lastName} ({vet.appointmentCount})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Stats */}

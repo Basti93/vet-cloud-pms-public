@@ -2,11 +2,11 @@
 
 import { use, useState } from "react";
 import { trpc } from "@/lib/trpc/client";
-import { ChevronLeft, ChevronRight, Check, Phone, MapPin, Clock, Calendar, AlertCircle, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, Phone, MapPin, Clock, Calendar, AlertCircle, Loader2, Stethoscope } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type Step = "date" | "details" | "confirm" | "success";
+type Step = "vet" | "date" | "details" | "confirm" | "success";
 
 interface Slot { start: Date; end: Date }
 
@@ -22,6 +22,13 @@ interface OwnerForm {
   lastName: string;
   email: string;
   phone: string;
+}
+
+interface VetOption {
+  id: string;
+  firstName: string;
+  lastName: string;
+  appointmentCount: number;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -263,17 +270,20 @@ function StepDate({
 
 function StepDetails({
   slot,
+  vets,
   primaryColor,
   onBack,
   onNext,
 }: {
   slot: Slot;
+  vets?: VetOption[];
   primaryColor: string;
   onBack: () => void;
-  onNext: (patient: PatientForm, owner: OwnerForm) => void;
+  onNext: (patient: PatientForm, owner: OwnerForm, vetId?: string) => void;
 }) {
   const [patient, setPatient] = useState<PatientForm>({ name: "", species: "Hund", breed: "", reason: "" });
   const [owner, setOwner] = useState<OwnerForm>({ firstName: "", lastName: "", email: "", phone: "" });
+  const [selectedVetId, setSelectedVetId] = useState<string>("");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const setP = (f: keyof PatientForm, v: string) => {
@@ -300,7 +310,7 @@ function StepDetails({
   const handleSubmit = () => {
     const e = validate();
     if (Object.keys(e).length > 0) { setErrors(e); return; }
-    onNext(patient, owner);
+    onNext(patient, owner, selectedVetId || undefined);
   };
 
   const inputClass = "w-full rounded-xl border border-gray-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40 focus:border-[var(--primary)] transition placeholder:text-gray-400";
@@ -411,6 +421,26 @@ function StepDetails({
         </div>
       </div>
 
+      {/* Vet Selection (Optional) */}
+      {vets && vets.length > 0 && (
+        <div className="space-y-4 pt-2 border-t border-gray-100">
+          <h3 className="font-semibold text-gray-800 text-sm uppercase tracking-wide pt-2">Tierarzt (optional)</h3>
+          <select
+            value={selectedVetId}
+            onChange={(e) => setSelectedVetId(e.target.value)}
+            className={inputClass + " bg-white"}
+          >
+            <option value="">— Automatisch zuweisen —</option>
+            {vets.map((vet) => (
+              <option key={vet.id} value={vet.id}>
+                Dr. {vet.firstName} {vet.lastName}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-gray-400">Falls nicht ausgewählt, wird der nächste verfügbare Tierarzt zugewiesen.</p>
+        </div>
+      )}
+
       {/* Actions */}
       <div className="flex gap-3 pt-2">
         <button
@@ -438,6 +468,8 @@ function StepConfirm({
   patient,
   owner,
   tenantId,
+  vets,
+  selectedVetId,
   primaryColor,
   onBack,
   onSuccess,
@@ -446,16 +478,28 @@ function StepConfirm({
   patient: PatientForm;
   owner: OwnerForm;
   tenantId: string;
+  vets?: VetOption[];
+  selectedVetId?: string;
   primaryColor: string;
   onBack: () => void;
-  onSuccess: (result: { startTime: Date; ownerName: string; patientName: string }) => void;
+  onSuccess: (result: { startTime: Date; ownerName: string; patientName: string; vetName?: string }) => void;
 }) {
+  // Find vet name from selected or suggested vet
+  const getVetName = () => {
+    if (selectedVetId && vets) {
+      const vet = vets.find((v) => v.id === selectedVetId);
+      return vet ? `Dr. ${vet.firstName} ${vet.lastName}` : undefined;
+    }
+    return undefined;
+  };
+
   const bookMutation = trpc.booking.book.useMutation({
     onSuccess: (data) => {
       onSuccess({
         startTime: new Date(data.startTime),
         ownerName: data.ownerName,
         patientName: data.patientName,
+        vetName: getVetName(),
       });
     },
   });
@@ -477,11 +521,13 @@ function StepConfirm({
         email: owner.email,
         phone: owner.phone,
       },
+      vetId: selectedVetId || undefined,
     });
   };
 
   const rows: [string, string][] = [
     ["Termin", `${fmtLong(slot.start)}, ${fmtTime(slot.start)} – ${fmtTime(slot.end)} Uhr`],
+    ...(selectedVetId && vets ? [["Tierarzt", getVetName() || "–"]] : [["Tierarzt", "Automatisch zugewiesen"]]),
     ["Tier", `${patient.name} (${patient.species}${patient.breed ? `, ${patient.breed}` : ""})`],
     ["Grund", patient.reason],
     ["Besitzer", `${owner.firstName} ${owner.lastName}`],
@@ -547,12 +593,14 @@ function SuccessScreen({
   startTime,
   ownerName,
   patientName,
+  vetName,
   clinicName,
   primaryColor,
 }: {
   startTime: Date;
   ownerName: string;
   patientName: string;
+  vetName?: string;
   clinicName: string;
   primaryColor: string;
 }) {
@@ -577,6 +625,12 @@ function SuccessScreen({
             {fmtLong(startTime)}, {fmtTime(startTime)} Uhr
           </span>
         </div>
+        {vetName && (
+          <div className="flex items-center gap-3 text-sm">
+            <Stethoscope size={16} className="text-gray-400 flex-shrink-0" />
+            <span className="text-gray-600">{vetName}</span>
+          </div>
+        )}
         <div className="flex items-center gap-3 text-sm">
           <Clock size={16} className="text-gray-400 flex-shrink-0" />
           <span className="text-gray-600">{clinicName} wird Ihre Anfrage in Kürze bestätigen.</span>
@@ -607,11 +661,17 @@ export default function BookingPage({
   const { data: clinic, isLoading: clinicLoading, error: clinicError } =
     trpc.booking.getClinic.useQuery({ slug: tenantSlug });
 
+  const { data: vets } = trpc.vet.list.useQuery(
+    { tenantId: clinic?.id || "" },
+    { enabled: !!clinic?.id }
+  );
+
   const [step, setStep] = useState<Step>("date");
   const [slot, setSlot] = useState<Slot | null>(null);
   const [patient, setPatient] = useState<PatientForm | null>(null);
   const [owner, setOwner] = useState<OwnerForm | null>(null);
-  const [successData, setSuccessData] = useState<{ startTime: Date; ownerName: string; patientName: string } | null>(null);
+  const [selectedVetId, setSelectedVetId] = useState<string>("");
+  const [successData, setSuccessData] = useState<{ startTime: Date; ownerName: string; patientName: string; vetName?: string } | null>(null);
 
   // Loading state
   if (clinicLoading) {
@@ -693,9 +753,10 @@ export default function BookingPage({
               {step === "details" && slot && (
                 <StepDetails
                   slot={slot}
+                  vets={vets}
                   primaryColor={primaryColor}
                   onBack={() => setStep("date")}
-                  onNext={(p, o) => { setPatient(p); setOwner(o); setStep("confirm"); }}
+                  onNext={(p, o, v) => { setPatient(p); setOwner(o); setSelectedVetId(v || ""); setStep("confirm"); }}
                 />
               )}
               {step === "confirm" && slot && patient && owner && (
@@ -704,6 +765,8 @@ export default function BookingPage({
                   patient={patient}
                   owner={owner}
                   tenantId={clinic.id}
+                  vets={vets}
+                  selectedVetId={selectedVetId}
                   primaryColor={primaryColor}
                   onBack={() => setStep("details")}
                   onSuccess={(data) => { setSuccessData(data); setStep("success"); }}
@@ -714,6 +777,7 @@ export default function BookingPage({
                   startTime={successData.startTime}
                   ownerName={successData.ownerName}
                   patientName={successData.patientName}
+                  vetName={successData.vetName}
                   clinicName={clinic.name}
                   primaryColor={primaryColor}
                 />

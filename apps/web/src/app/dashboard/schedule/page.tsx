@@ -8,8 +8,10 @@ import { Button } from "@/components/ui/button";
 import { AppointmentStatusBadge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppointmentModal } from "@/components/appointments/AppointmentModal";
+import { AppointmentFilters, type AppointmentFiltersState } from "@/components/appointments/AppointmentFilters";
 import { trpc } from "@/lib/trpc/client";
 import { useTenant } from "@/hooks/useTenant";
+import { useAuth } from "@clerk/nextjs";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
@@ -119,28 +121,46 @@ type CalView = "timeGridWeek" | "timeGridDay" | "dayGridMonth" | "listWeek";
 
 export default function SchedulePage() {
   const { tenantId, isReady } = useTenant();
+  const { userId } = useAuth();
   const calRef = useRef<FullCalendarType>(null);
   const [view, setView] = useState<CalView>("timeGridWeek");
   const [currentTitle, setCurrentTitle] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editAppt, setEditAppt] = useState<ApptDetail | null>(null);
   const [defaultStart, setDefaultStart] = useState<Date | undefined>();
+  const [filters, setFilters] = useState<AppointmentFiltersState>({
+    vetId: null,
+    status: null,
+    dateFrom: '',
+    dateTo: '',
+  });
 
   // ✅ FIX: Memoize date range to prevent infinite refetch loop
   const { from, to } = useMemo(() => {
-    const from = new Date();
-    from.setMonth(from.getMonth() - 1);
-    const to = new Date();
-    to.setMonth(to.getMonth() + 3);
+    const from = filters.dateFrom ? new Date(filters.dateFrom) : new Date();
+    if (!filters.dateFrom) {
+      from.setMonth(from.getMonth() - 1);
+    }
+    const to = filters.dateTo ? new Date(filters.dateTo) : new Date();
+    if (!filters.dateTo) {
+      to.setMonth(to.getMonth() + 3);
+    }
     return { from, to };
-  }, []); // Empty deps = created once on mount, never changes
+  }, [filters.dateFrom, filters.dateTo]); // deps: filter dates
 
   const { data: appointments, isLoading, refetch } = trpc.appointments.listWithDetails.useQuery(
     { tenantId: tenantId!, from, to },
     { enabled: !!tenantId }
   );
 
-  const calEvents = (appointments ?? []).map((a) => toCalEvent(a as ApptDetail));
+  // Filter appointments based on selected filters
+  const filteredAppointments = (appointments ?? []).filter((a) => {
+    if (filters.vetId && a.vetId !== filters.vetId) return false;
+    if (filters.status && a.status !== filters.status) return false;
+    return true;
+  });
+
+  const calEvents = filteredAppointments.map((a) => toCalEvent(a as ApptDetail));
 
   const nav = (dir: "prev" | "next" | "today") => {
     const api = calRef.current?.getApi();
@@ -180,6 +200,24 @@ export default function SchedulePage() {
       </div>
 
       {isReady && !tenantId && <SetupBanner />}
+
+      {/* Filters */}
+      {tenantId && userId && (
+        <AppointmentFilters
+          tenantId={tenantId}
+          userId={userId}
+          filters={filters}
+          onChange={setFilters}
+          onReset={() =>
+            setFilters({
+              vetId: null,
+              status: null,
+              dateFrom: '',
+              dateTo: '',
+            })
+          }
+        />
+      )}
 
       {tenantId && (
         <div className="grid grid-cols-1 xl:grid-cols-4 gap-5">
@@ -262,13 +300,13 @@ export default function SchedulePage() {
 
           {/* Sidebar */}
           <div className="space-y-4">
-            <TodayPanel appointments={(appointments ?? []) as ApptDetail[]} onSelect={openEdit} />
+            <TodayPanel appointments={filteredAppointments as ApptDetail[]} onSelect={openEdit} />
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-100">
                 <h3 className="font-semibold text-gray-900 text-sm">Nächste Termine</h3>
               </div>
               <div className="divide-y divide-gray-50">
-                {(appointments ?? []).filter((a) => new Date(a.startTime) >= new Date()).slice(0, 6).map((a) => (
+                {filteredAppointments.filter((a) => new Date(a.startTime) >= new Date()).slice(0, 6).map((a) => (
                   <button key={a.id} onClick={() => openEdit(a as ApptDetail)} className="w-full text-left px-5 py-3 hover:bg-gray-50 transition-colors">
                     <p className="text-xs font-medium text-gray-900 truncate">{a.patientName ?? "–"} — {a.title}</p>
                     <p className="text-xs text-gray-400 mt-0.5">
@@ -276,7 +314,7 @@ export default function SchedulePage() {
                     </p>
                   </button>
                 ))}
-                {!appointments?.filter((a) => new Date(a.startTime) >= new Date()).length && (
+                {!filteredAppointments.filter((a) => new Date(a.startTime) >= new Date()).length && (
                   <p className="text-sm text-gray-400 text-center py-6">Keine Termine</p>
                 )}
               </div>
