@@ -14,22 +14,17 @@ export default function BookingsPage() {
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
 
-  // Get tenant ID from user's metadata (set in Clerk during sign-in)
+  // Get tenant ID from tRPC
+  const { data: tenantData } = trpc.admin.getTenantId.useQuery(undefined, {
+    enabled: !!userId,
+  });
+
+  // Update state when tenant data loads
   useEffect(() => {
-    const getTenantId = async () => {
-      try {
-        // Try to get from session or user metadata
-        const response = await fetch('/api/auth/tenant');
-        const data = await response.json();
-        if (data.tenantId) {
-          setTenantId(data.tenantId);
-        }
-      } catch (error) {
-        console.error('Failed to fetch tenant ID:', error);
-      }
-    };
-    getTenantId();
-  }, [userId]);
+    if (tenantData?.tenantId) {
+      setTenantId(tenantData.tenantId);
+    }
+  }, [tenantData?.tenantId]);
 
   // Fetch bookings
   const { data: bookings, isLoading: isFetching, refetch } = trpc.booking.list.useQuery(

@@ -7,6 +7,7 @@ import {
   patients,
   owners,
   voiceCalls,
+  users,
 } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
 
@@ -14,6 +15,27 @@ const DEMO_TENANT_ID = "00000000-0000-4000-8000-000000000003";
 const DEMO_TENANT_SLUG = "demo";
 
 export const adminRouter = createTRPCRouter({
+  /**
+   * Get current user's tenant ID
+   * Protected: Auth required
+   */
+  getTenantId: protectedProcedure.query(async ({ ctx }) => {
+    const [user] = await ctx.db
+      .select({ tenantId: users.tenantId })
+      .from(users)
+      .where(eq(users.id, ctx.userId!))
+      .limit(1);
+
+    if (!user) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "User not found",
+      });
+    }
+
+    return { tenantId: user.tenantId };
+  }),
+
   /**
    * Set demo tenant slug (one-time setup)
    * Protected: Admin only
