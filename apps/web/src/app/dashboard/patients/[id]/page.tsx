@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { use } from "react";
 
 const MOCK_PATIENT = {
   id: "1",
@@ -21,7 +22,8 @@ const MOCK_PATIENT = {
   ],
 };
 
-export default function PatientDetailPage({ params }: { params: { id: string } }) {
+export default function PatientDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
