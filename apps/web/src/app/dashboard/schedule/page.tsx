@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import type FullCalendarType from "@fullcalendar/react";
 import { Plus, ChevronLeft, ChevronRight, Calendar, List } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AppointmentStatusBadge } from "@/components/ui/badge";
@@ -14,8 +15,12 @@ import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import listPlugin from "@fullcalendar/list";
 
-// FullCalendar must be SSR-disabled (uses browser APIs)
-const FullCalendar = dynamic(() => import("@fullcalendar/react"), { ssr: false });
+// FullCalendar must be SSR-disabled (uses browser APIs).
+// We load our forwardRef wrapper so the ref prop is typed correctly.
+const FullCalendar = dynamic(
+  () => import("@/components/FullCalendarWrapper"),
+  { ssr: false }
+);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -114,7 +119,7 @@ type CalView = "timeGridWeek" | "timeGridDay" | "dayGridMonth" | "listWeek";
 
 export default function SchedulePage() {
   const { tenantId, isReady } = useTenant();
-  const calRef = useRef<any>(null);
+  const calRef = useRef<FullCalendarType>(null);
   const [view, setView] = useState<CalView>("timeGridWeek");
   const [currentTitle, setCurrentTitle] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
