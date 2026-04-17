@@ -54,9 +54,8 @@ export default function PatientDetailPage() {
     return <div className="text-center py-12 text-red-600">Patient not found</div>;
   }
 
-  const allergies = patient.allergies
-    ? patient.allergies.split(',').map((a) => a.trim())
-    : [];
+  const allergies: string[] = [];
+  // TODO: Allergies field will be available after DB migration
   const activeMeds = medicationsList?.filter((m) => !m.endDate) || [];
   const activeDiagnoses = diagnosisList?.filter((d) => d.status === 'active') || [];
   const latestVital = vitalsList?.[vitalsList.length - 1];

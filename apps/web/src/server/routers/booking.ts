@@ -72,7 +72,7 @@ export const bookingRouter = createTRPCRouter({
       return bookings;
     }),
 
-  /** Protected: Confirm a booking request (status stays "scheduled") */
+  /** Protected: Confirm a booking request (status = "completed" = confirmed by admin) */
   confirm: protectedProcedure
     .input(z.object({
       appointmentId: z.string().uuid(),
@@ -81,7 +81,10 @@ export const bookingRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const [appointment] = await ctx.db
         .update(appointments)
-        .set({ updatedAt: new Date() })
+        .set({
+          status: "completed", // Mark as confirmed/accepted by admin
+          updatedAt: new Date(),
+        })
         .where(
           and(
             eq(appointments.id, input.appointmentId),

@@ -30,14 +30,22 @@ export default function BookingsPage() {
 
   const confirmMutation = trpc.booking.confirm.useMutation({
     onSuccess: () => {
-      refetch();
+      void refetch();
+      setConfirmingId(null);
+    },
+    onError: (error) => {
+      console.error("❌ Confirm failed:", error);
       setConfirmingId(null);
     },
   });
 
   const rejectMutation = trpc.booking.reject.useMutation({
     onSuccess: () => {
-      refetch();
+      void refetch();
+      setRejectingId(null);
+    },
+    onError: (error) => {
+      console.error("❌ Reject failed:", error);
       setRejectingId(null);
     },
   });
@@ -60,24 +68,17 @@ export default function BookingsPage() {
 
   const handleConfirm = async (appointmentId: string) => {
     setConfirmingId(appointmentId);
-    try {
-      await confirmMutation.mutateAsync({ appointmentId, tenantId });
-    } finally {
-      setConfirmingId(null);
-    }
+    await confirmMutation.mutateAsync({ appointmentId, tenantId });
   };
 
   const handleReject = async (appointmentId: string) => {
     setRejectingId(appointmentId);
-    try {
-      await rejectMutation.mutateAsync({ appointmentId, tenantId });
-    } finally {
-      setRejectingId(null);
-    }
+    await rejectMutation.mutateAsync({ appointmentId, tenantId });
   };
 
+  // Filter bookings by status
   const pendingBookings = bookings?.filter(b => b.status === 'scheduled') || [];
-  const confirmedBookings = bookings?.filter(b => b.status === 'scheduled') || [];
+  const confirmedBookings = bookings?.filter(b => b.status === 'completed') || [];
   const rejectedBookings = bookings?.filter(b => b.status === 'cancelled') || [];
 
   const formatDateTime = (date: Date | string) => {
