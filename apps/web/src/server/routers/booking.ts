@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { eq, and, gte, lte } from "drizzle-orm";
-import { createTRPCRouter, publicProcedure } from "@/server/trpc";
+import { createTRPCRouter, publicProcedure, protectedProcedure } from "@/server/trpc";
 import { tenants, appointments, owners, patients, users } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
 
@@ -33,6 +33,101 @@ function generateDaySlots(date: Date): { start: Date; end: Date }[] {
 // ── Router ────────────────────────────────────────────────────────────────────
 
 export const bookingRouter = createTRPCRouter({
+  /** Protected: List all online booking requests (for admin dashboard) */
+  list: protectedProcedure
+    .input(z.object({ tenantId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const bookings = await ctx.db
+        .select({
+          id: appointments.id,
+          startTime: appointments.startTime,
+          endTime: appointments.endTime,
+          title: appointments.title,
+          status: appointments.status,
+          createdAt: appointments.createdAt,
+          patient: {
+            id: patients.id,
+            name: patients.name,
+            species: patients.species,
+            breed: patients.breed,
+          },
+          owner: {
+            id: owners.id,
+            firstName: owners.firstName,
+            lastName: owners.lastName,
+            email: owners.email,
+            phone: owners.phone,
+          },
+        })
+        .from(appointments)
+        .innerJoin(patients, eq(appointments.patientId, patients.id))
+        .innerJoin(owners, eq(patients.ownerId, owners.id))
+        .where(
+          and(
+            eq(appointments.tenantId, input.tenantId),
+            eq(appointments.source, "online_booking")
+          )
+        );
+
+      return bookings;
+    }),
+
+  /** Protected: Confirm a booking request (status stays "scheduled") */
+  confirm: protectedProcedure
+    .input(z.object({
+      appointmentId: z.string().uuid(),
+      tenantId: z.string().uuid(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const [appointment] = await ctx.db
+        .update(appointments)
+        .set({ updatedAt: new Date() })
+        .where(
+          and(
+            eq(appointments.id, input.appointmentId),
+            eq(appointments.tenantId, input.tenantId),
+            eq(appointments.source, "online_booking")
+          )
+        )
+        .returning();
+
+      if (!appointment) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Termin nicht gefunden" });
+      }
+
+      return { success: true, appointmentId: appointment.id };
+    }),
+
+  /** Protected: Reject a booking request (status = "cancelled") */
+  reject: protectedProcedure
+    .input(z.object({
+      appointmentId: z.string().uuid(),
+      tenantId: z.string().uuid(),
+      reason: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const [appointment] = await ctx.db
+        .update(appointments)
+        .set({
+          status: "cancelled",
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(appointments.id, input.appointmentId),
+            eq(appointments.tenantId, input.tenantId),
+            eq(appointments.source, "online_booking")
+          )
+        )
+        .returning();
+
+      if (!appointment) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Termin nicht gefunden" });
+      }
+
+      return { success: true, appointmentId: appointment.id };
+    }),
+
   /** Public: Fetch clinic info by slug for the booking widget header */
   getClinic: publicProcedure
     .input(z.object({ slug: z.string().min(1) }))

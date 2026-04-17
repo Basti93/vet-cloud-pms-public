@@ -1,12 +1,13 @@
 import { ReactNode } from "react";
 import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
-import { LayoutDashboard, Calendar, Users, Phone } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, Phone, ClipboardList } from "lucide-react";
 
 const NAV_ITEMS = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Übersicht" },
   { href: "/dashboard/schedule", icon: Calendar, label: "Terminkalender" },
   { href: "/dashboard/patients", icon: Users, label: "Patienten" },
+  { href: "/dashboard/bookings", icon: ClipboardList, label: "Buchungsanfragen" },
   { href: "/dashboard/voice", icon: Phone, label: "AI-Rezeption" },
 ];
 

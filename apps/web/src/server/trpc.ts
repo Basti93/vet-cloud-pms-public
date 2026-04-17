@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
 import { db } from "@/lib/db/client";
+import { checkRateLimit, getRateLimitInfo } from "@/lib/rateLimit";
 
 // ============================================================================
 // Context
@@ -57,6 +58,22 @@ const enforceUserIsAuthenticated = t.middleware(({ ctx, next }) => {
   return next({ ctx: { ...ctx, userId: ctx.userId } });
 });
 
+// ✅ Rate limiting: 100 requests per 60 seconds per user/IP
+const rateLimitMiddleware = t.middleware(({ ctx, next }) => {
+  // Use userId if authenticated, otherwise fall back to IP
+  const identifier = ctx.userId || ctx.headers.get("x-forwarded-for") || "unknown";
+
+  if (!checkRateLimit(identifier)) {
+    const info = getRateLimitInfo(identifier);
+    throw new TRPCError({
+      code: "TOO_MANY_REQUESTS",
+      message: `Rate limit exceeded. Reset at ${new Date(info.resetAt).toISOString()}`,
+    });
+  }
+
+  return next();
+});
+
 // ============================================================================
 // Exports
 // ============================================================================
@@ -65,9 +82,12 @@ export const createTRPCRouter = t.router;
 export const createCallerFactory = t.createCallerFactory;
 
 /** Public procedure — no auth required */
-export const publicProcedure = t.procedure.use(timingMiddleware);
+export const publicProcedure = t.procedure
+  .use(rateLimitMiddleware)
+  .use(timingMiddleware);
 
 /** Protected procedure — requires Clerk session */
 export const protectedProcedure = t.procedure
+  .use(rateLimitMiddleware)
   .use(timingMiddleware)
   .use(enforceUserIsAuthenticated);
