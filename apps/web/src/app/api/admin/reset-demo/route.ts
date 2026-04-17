@@ -29,39 +29,147 @@ async function resetDemo() {
     (DATABASE_URL.includes("?") ? "&sslmode=require" : "?sslmode=require");
   const sql = postgres(dbUrl, { max: 1 });
   const db = drizzle(sql, {
-    schema: { tenants, appointments, patients, owners, voiceCalls },
+    schema: { tenants, appointments, patients, owners, voiceCalls, users },
   });
 
   try {
     // Delete voice calls
-    const voiceCallsCount = await db
-      .delete(voiceCalls)
-      .where(eq(voiceCalls.tenantId, DEMO_TENANT_ID));
+    await db.delete(voiceCalls).where(eq(voiceCalls.tenantId, DEMO_TENANT_ID));
 
     // Delete appointments
-    const appointmentsCount = await db
+    await db
       .delete(appointments)
       .where(eq(appointments.tenantId, DEMO_TENANT_ID));
 
     // Delete patients
-    const patientsCount = await db
-      .delete(patients)
-      .where(eq(patients.tenantId, DEMO_TENANT_ID));
+    await db.delete(patients).where(eq(patients.tenantId, DEMO_TENANT_ID));
 
     // Delete owners
-    const ownersCount = await db
-      .delete(owners)
-      .where(eq(owners.tenantId, DEMO_TENANT_ID));
+    await db.delete(owners).where(eq(owners.tenantId, DEMO_TENANT_ID));
+
+    // ✅ Create sample test data
+    // Get first active vet for this tenant
+    const [vet] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(
+        eq(users.tenantId, DEMO_TENANT_ID)
+      )
+      .limit(1);
+
+    if (vet) {
+      // Create sample owners
+      const [owner1] = await db
+        .insert(owners)
+        .values({
+          tenantId: DEMO_TENANT_ID,
+          firstName: "Max",
+          lastName: "Müller",
+          email: "max.mueller@example.de",
+          phone: "+49123456789",
+          address: "Hauptstraße 42",
+          city: "Berlin",
+          postalCode: "10115",
+          country: "DE",
+        })
+        .returning();
+
+      const [owner2] = await db
+        .insert(owners)
+        .values({
+          tenantId: DEMO_TENANT_ID,
+          firstName: "Sarah",
+          lastName: "Schmidt",
+          email: "sarah.schmidt@example.de",
+          phone: "+49987654321",
+          address: "Blumenweg 15",
+          city: "Musterstadt",
+          postalCode: "80331",
+          country: "DE",
+        })
+        .returning();
+
+      // Create sample patients
+      const [patient1] = await db
+        .insert(patients)
+        .values({
+          tenantId: DEMO_TENANT_ID,
+          ownerId: owner1.id,
+          name: "Bella",
+          species: "Hund",
+          breed: "Labrador Retriever",
+          color: "Golden",
+          weight: 32000, // 32kg in grams
+        })
+        .returning();
+
+      const [patient2] = await db
+        .insert(patients)
+        .values({
+          tenantId: DEMO_TENANT_ID,
+          ownerId: owner1.id,
+          name: "Mittens",
+          species: "Katze",
+          breed: "Britisch Kurzhaar",
+          color: "Grau",
+          weight: 4500, // 4.5kg
+        })
+        .returning();
+
+      const [patient3] = await db
+        .insert(patients)
+        .values({
+          tenantId: DEMO_TENANT_ID,
+          ownerId: owner2.id,
+          name: "Luna",
+          species: "Hund",
+          breed: "Golden Retriever",
+          color: "Creme",
+          weight: 28000,
+        })
+        .returning();
+
+      // Create sample appointments
+      const now = new Date();
+      const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      tomorrow.setHours(10, 0, 0, 0);
+
+      const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      nextWeek.setHours(14, 0, 0, 0);
+
+      await db.insert(appointments).values({
+        tenantId: DEMO_TENANT_ID,
+        patientId: patient1.id,
+        vetId: vet.id,
+        startTime: tomorrow,
+        endTime: new Date(tomorrow.getTime() + 30 * 60 * 1000),
+        title: "Routineuntersuchung",
+        description: "Jährliche Kontrolluntersuchung",
+        status: "scheduled",
+        source: "manual",
+      });
+
+      await db.insert(appointments).values({
+        tenantId: DEMO_TENANT_ID,
+        patientId: patient2.id,
+        vetId: vet.id,
+        startTime: nextWeek,
+        endTime: new Date(nextWeek.getTime() + 30 * 60 * 1000),
+        title: "Zahnreinigung",
+        status: "scheduled",
+        source: "manual",
+      });
+    }
 
     await sql.end();
 
     return {
       success: true,
+      message: "Demo tenant reset and seeded with test data",
       stats: {
-        voiceCallsDeleted: 0,
-        appointmentsDeleted: 0,
-        patientsDeleted: 0,
-        ownersDeleted: 0,
+        ownersCreated: 2,
+        patientsCreated: 3,
+        appointmentsCreated: 2,
       },
     };
   } catch (error) {

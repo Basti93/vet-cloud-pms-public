@@ -13,6 +13,7 @@ import {
   patients,
   owners,
   voiceCalls,
+  users,
 } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import * as fs from "fs";
@@ -85,12 +86,135 @@ async function main() {
         .delete(owners)
         .where(eq(owners.tenantId, DEMO_TENANT_ID));
 
+      // Create sample test data
+      const [vet] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.tenantId, DEMO_TENANT_ID))
+        .limit(1);
+
+      let testDataStats = { owners: 0, patients: 0, appointments: 0 };
+
+      if (vet) {
+        // Create sample owners
+        const [owner1] = await db
+          .insert(owners)
+          .values({
+            tenantId: DEMO_TENANT_ID,
+            firstName: "Max",
+            lastName: "Müller",
+            email: "max.mueller@example.de",
+            phone: "+49123456789",
+            address: "Hauptstraße 42",
+            city: "Berlin",
+            postalCode: "10115",
+            country: "DE",
+          })
+          .returning();
+
+        const [owner2] = await db
+          .insert(owners)
+          .values({
+            tenantId: DEMO_TENANT_ID,
+            firstName: "Sarah",
+            lastName: "Schmidt",
+            email: "sarah.schmidt@example.de",
+            phone: "+49987654321",
+            address: "Blumenweg 15",
+            city: "Musterstadt",
+            postalCode: "80331",
+            country: "DE",
+          })
+          .returning();
+
+        testDataStats.owners = 2;
+
+        // Create sample patients
+        const [patient1] = await db
+          .insert(patients)
+          .values({
+            tenantId: DEMO_TENANT_ID,
+            ownerId: owner1.id,
+            name: "Bella",
+            species: "Hund",
+            breed: "Labrador Retriever",
+            color: "Golden",
+            weight: 32000,
+          })
+          .returning();
+
+        const [patient2] = await db
+          .insert(patients)
+          .values({
+            tenantId: DEMO_TENANT_ID,
+            ownerId: owner1.id,
+            name: "Mittens",
+            species: "Katze",
+            breed: "Britisch Kurzhaar",
+            color: "Grau",
+            weight: 4500,
+          })
+          .returning();
+
+        const [patient3] = await db
+          .insert(patients)
+          .values({
+            tenantId: DEMO_TENANT_ID,
+            ownerId: owner2.id,
+            name: "Luna",
+            species: "Hund",
+            breed: "Golden Retriever",
+            color: "Creme",
+            weight: 28000,
+          })
+          .returning();
+
+        testDataStats.patients = 3;
+
+        // Create sample appointments
+        const now = new Date();
+        const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+        tomorrow.setHours(10, 0, 0, 0);
+
+        const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+        nextWeek.setHours(14, 0, 0, 0);
+
+        await db.insert(appointments).values({
+          tenantId: DEMO_TENANT_ID,
+          patientId: patient1.id,
+          vetId: vet.id,
+          startTime: tomorrow,
+          endTime: new Date(tomorrow.getTime() + 30 * 60 * 1000),
+          title: "Routineuntersuchung",
+          description: "Jährliche Kontrolluntersuchung",
+          status: "scheduled",
+          source: "manual",
+        });
+
+        await db.insert(appointments).values({
+          tenantId: DEMO_TENANT_ID,
+          patientId: patient2.id,
+          vetId: vet.id,
+          startTime: nextWeek,
+          endTime: new Date(nextWeek.getTime() + 30 * 60 * 1000),
+          title: "Zahnreinigung",
+          status: "scheduled",
+          source: "manual",
+        });
+
+        testDataStats.appointments = 2;
+      }
+
       console.log(`✅ Reset complete!`);
       console.log(`📊 Deleted:`);
       console.log(`   - Voice calls: ${voiceCallsCount.count || 0}`);
       console.log(`   - Appointments: ${appointmentsCount.count || 0}`);
       console.log(`   - Patients: ${patientsCount.count || 0}`);
       console.log(`   - Owners: ${ownersCount.count || 0}`);
+      console.log(`📊 Created test data:`);
+      console.log(`   - Owners: ${testDataStats.owners}`);
+      console.log(`   - Patients: ${testDataStats.patients}`);
+      console.log(`   - Appointments: ${testDataStats.appointments}`);
     } else {
       console.log("Usage:");
       console.log("  npx tsx scripts/admin-reset.ts --set-slug    # Set demo slug once");
