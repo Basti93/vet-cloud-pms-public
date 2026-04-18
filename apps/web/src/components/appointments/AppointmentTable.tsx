@@ -13,10 +13,10 @@ type AppointmentType =
       title: string;
       status: string;
       vetId: string;
-      patientName?: string;
-      patientSpecies?: string;
-      ownerFirstName?: string;
-      ownerLastName?: string;
+      patientName?: string | null;
+      patientSpecies?: string | null;
+      ownerFirstName?: string | null;
+      ownerLastName?: string | null;
     }
   | {
       id: string;
