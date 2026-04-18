@@ -101,7 +101,7 @@ export const emailRouter = createTRPCRouter({
         // Generate confirmation token
         const confirmToken = generateConfirmationToken(
           appointment.id,
-          owner.email,
+          owner.email!,
           'confirm'
         );
 
@@ -125,7 +125,7 @@ export const emailRouter = createTRPCRouter({
         // Send confirmation email
         const result = await sendTemplateEmail(
           confirmationTemplate,
-          owner.email,
+          owner.email!,
           {
             ownerName: owner.firstName,
             patientName: patient.name,
@@ -257,7 +257,7 @@ export const emailRouter = createTRPCRouter({
         // Send cancellation email
         const result = await sendTemplateEmail(
           cancellationTemplate,
-          owner.email,
+          owner.email!,
           {
             ownerName: owner.firstName,
             patientName: patient.name,

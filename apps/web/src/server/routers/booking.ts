@@ -321,7 +321,7 @@ export const bookingRouter = createTRPCRouter({
       if (tenant && owner.email) {
         try {
           // Generate confirmation token
-          const confirmToken = generateConfirmationToken(appointment.id, owner.email, "confirm");
+          const confirmToken = generateConfirmationToken(appointment.id, owner.email!, "confirm");
           const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
           const confirmLink = buildConfirmationUrl(confirmToken, baseUrl, "confirm");
 
@@ -342,7 +342,7 @@ export const bookingRouter = createTRPCRouter({
           const fromEmail = process.env.RESEND_FROM_EMAIL || "noreply@resend.dev";
           await sendTemplateEmail(
             confirmationTemplate,
-            owner.email,
+            owner.email!,
             {
               ownerName: owner.firstName,
               patientName: patient.name,
