@@ -37,14 +37,17 @@ import {
   medications,
   vitals,
   vetSchedules,
+  roles,
+  rolePermissions,
 } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import {
   TEST_DATA,
   DEMO_TENANT_ID,
   DEMO_TENANT_SLUG,
   getTestDataStats,
 } from "./test-data";
+import { createDefaultRoles } from "@/lib/auth/permissions";
 
 async function main() {
   const DATABASE_URL = process.env.DATABASE_URL;
@@ -69,6 +72,8 @@ async function main() {
       medications,
       vitals,
       vetSchedules,
+      roles,
+      rolePermissions,
     },
   });
 
@@ -95,6 +100,19 @@ async function main() {
       console.log(`🔄 Resetting demo tenant data...`);
 
       // Delete in correct order (foreign key constraints)
+      const rolePermissionsCount = await db
+        .delete(rolePermissions)
+        .where(
+          eq(
+            rolePermissions.roleId,
+            sql`(SELECT id FROM roles WHERE tenant_id = ${DEMO_TENANT_ID})`
+          )
+        );
+
+      const rolesCount = await db
+        .delete(roles)
+        .where(eq(roles.tenantId, DEMO_TENANT_ID));
+
       const vetSchedulesCount = await db
         .delete(vetSchedules)
         .where(eq(vetSchedules.tenantId, DEMO_TENANT_ID));
@@ -131,6 +149,11 @@ async function main() {
       const usersCount = await db
         .delete(users)
         .where(eq(users.tenantId, DEMO_TENANT_ID));
+
+      // ────────────────────────────────────────────────────────────────────
+      // CREATE DEFAULT ROLES (fresh)
+      // ────────────────────────────────────────────────────────────────────
+      await createDefaultRoles(DEMO_TENANT_ID);
 
       // ────────────────────────────────────────────────────────────────────
       // CREATE USERS (fresh from TEST_DATA)
@@ -334,7 +357,10 @@ async function main() {
       console.log(`   - Appointments: ${appointmentsCount.count || 0}`);
       console.log(`   - Patients: ${patientsCount.count || 0}`);
       console.log(`   - Owners: ${ownersCount.count || 0}`);
+      console.log(`   - Roles: ${rolesCount.count || 0}`);
+      console.log(`   - Role permissions: ${rolePermissionsCount.count || 0}`);
       console.log(`📊 Created test data:`);
+      console.log(`   - Roles: Admin, Vet, Receptionist`);
       console.log(`   - Users: ${createdUsers.length} (${stats.vets} vets)`);
       console.log(`   - Vet schedules: ${stats.vetSchedules}`);
       console.log(`   - Owners: ${stats.owners}`);

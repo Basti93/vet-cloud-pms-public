@@ -10,8 +10,36 @@ import {
   smallint,
   index,
   foreignKey,
+  primaryKey,
+  unique,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+
+// ============================================================================
+// PERMISSIONS (App-defined constants, not in DB)
+// ============================================================================
+
+export const PERMISSIONS = {
+  MEDICAL_READ: "medical:read",
+  MEDICAL_CREATE: "medical:create",
+  MEDICAL_UPDATE: "medical:update",
+
+  APPOINTMENTS_READ: "appointments:read",
+  APPOINTMENTS_CREATE: "appointments:create",
+  APPOINTMENTS_UPDATE: "appointments:update",
+  APPOINTMENTS_CANCEL: "appointments:cancel",
+
+  PATIENTS_READ: "patients:read",
+  PATIENTS_CREATE: "patients:create",
+  PATIENTS_UPDATE: "patients:update",
+
+  REPORTS_READ: "reports:read",
+  REPORTS_EXPORT: "reports:export",
+
+  USERS_MANAGE: "users:manage",
+  ROLES_MANAGE: "roles:manage",
+  SETTINGS_MANAGE: "settings:manage",
+} as const;
 
 // ============================================================================
 // TENANTS (Multi-Tenancy Foundation)
@@ -59,6 +87,44 @@ export const tenants = pgTable(
 // USERS (with Clerk Integration)
 // ============================================================================
 
+// Forward declaration for circular reference
+export const roles = pgTable(
+  "roles",
+  {
+    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
+    name: varchar("name", { length: 100 }).notNull(),
+    description: text("description"),
+    isSystem: boolean("is_system").default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (table) => ({
+    tenantNameIdx: unique("roles_tenant_name_idx").on(
+      table.tenantId,
+      table.name
+    ),
+    tenantIdIdx: index("roles_tenant_id_idx").on(table.tenantId),
+  })
+);
+
+export const rolePermissions = pgTable(
+  "role_permissions",
+  {
+    roleId: uuid("role_id")
+      .notNull()
+      .references(() => roles.id, { onDelete: "cascade" }),
+    permission: varchar("permission", { length: 100 }).notNull(),
+  },
+  (table) => ({
+    pk: primaryKey(table.roleId, table.permission),
+    roleIdIdx: index("role_permissions_role_id_idx").on(table.roleId),
+  })
+);
+
 export const users = pgTable(
   "users",
   {
@@ -77,6 +143,9 @@ export const users = pgTable(
     })
       .default("staff")
       .notNull(),
+    roleId: uuid("role_id").references(() => roles.id, {
+      onDelete: "set null",
+    }),
     active: boolean("active").default(true).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .default(sql`now()`)
@@ -88,6 +157,7 @@ export const users = pgTable(
   (table) => ({
     tenantIdIdx: index("users_tenant_id_idx").on(table.tenantId),
     clerkIdIdx: index("users_clerk_id_idx").on(table.clerkId),
+    roleIdIdx: index("users_role_id_idx").on(table.roleId),
   })
 );
 

@@ -36,8 +36,11 @@ import {
   medications,
   vitals,
   vetSchedules,
+  roles,
+  rolePermissions,
 } from "../src/lib/db/schema";
 import { TEST_DATA, DEMO_TENANT_ID, getTestDataStats } from "./test-data";
+import { createDefaultRoles } from "../src/lib/auth/permissions";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
@@ -58,6 +61,8 @@ const db = drizzle(sql, {
     diagnoses,
     medications,
     vitals,
+    roles,
+    rolePermissions,
   },
 });
 
@@ -77,6 +82,13 @@ async function seed() {
 
     const tenantId = tenant?.id || DEMO_TENANT_ID;
     console.log(`  ✓ ${TEST_DATA.tenant.name}\n`);
+
+    // ────────────────────────────────────────────────────────────────────────
+    // 1b. CREATE DEFAULT ROLES
+    // ────────────────────────────────────────────────────────────────────────
+    console.log("👥 Creating default roles...");
+    await createDefaultRoles(tenantId);
+    console.log("  ✓ Default roles created (Admin, Vet, Receptionist)\n");
 
     // ────────────────────────────────────────────────────────────────────────
     // CLEANUP (remove old test data to prevent duplicates on re-runs)
