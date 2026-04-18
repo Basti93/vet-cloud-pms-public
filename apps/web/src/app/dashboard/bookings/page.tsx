@@ -130,7 +130,7 @@ export default function BookingsPage() {
     });
 
   const pendingBookings = filteredBookings.filter((b) => b.status === 'scheduled');
-  const confirmedBookings = filteredBookings.filter((b) => b.status === 'completed');
+  const confirmedBookings = filteredBookings.filter((b) => b.status === 'confirmed');
   const rejectedBookings = filteredBookings.filter((b) => b.status === 'cancelled');
   const allBookingsCount = filteredBookings.length;
 
