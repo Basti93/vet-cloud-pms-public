@@ -506,6 +506,37 @@ export const vetSchedules = pgTable(
 );
 
 // ============================================================================
+// APPOINTMENT_HOLDS (15-Minuten Slot-Reservierungen beim Online Booking)
+// ============================================================================
+
+export const appointmentHolds = pgTable(
+  "appointment_holds",
+  {
+    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    slotDatetime: timestamp("slot_datetime", { withTimezone: true }).notNull(),
+    vetId: uuid("vet_id").references(() => users.id, { onDelete: "cascade" }),
+    sessionToken: uuid("session_token").notNull().unique(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (table) => ({
+    tenantSlotIdx: index("appointment_holds_tenant_slot_idx").on(
+      table.tenantId,
+      table.slotDatetime
+    ),
+    expiresAtIdx: index("appointment_holds_expires_at_idx").on(table.expiresAt),
+    sessionTokenIdx: index("appointment_holds_session_token_idx").on(
+      table.sessionToken
+    ),
+  })
+);
+
+// ============================================================================
 // RLS Policies (für später, muss in Postgres direkt gesetzt werden)
 // ============================================================================
 

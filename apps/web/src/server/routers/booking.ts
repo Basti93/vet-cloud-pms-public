@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { eq, and, gte, lte } from "drizzle-orm";
+import { eq, and, gte, lte, lt, or, isNull } from "drizzle-orm";
 import { createTRPCRouter, publicProcedure, protectedProcedure } from "@/server/trpc";
-import { tenants, appointments, owners, patients, users } from "@/lib/db/schema";
+import { tenants, appointments, owners, patients, users, appointmentHolds } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
 import { sendTemplateEmail } from "@/lib/email/service";
 import { confirmationTemplate } from "@/lib/email/templates";
@@ -193,6 +193,26 @@ export const bookingRouter = createTRPCRouter({
         .from(appointments)
         .where(and(...conditions));
 
+      // Also filter out actively held slots (expires_at > now)
+      const holdBaseConditions = [
+        eq(appointmentHolds.tenantId, input.tenantId),
+        gte(appointmentHolds.slotDatetime, dayStart),
+        lte(appointmentHolds.slotDatetime, dayEnd),
+        gte(appointmentHolds.expiresAt, new Date()),
+      ];
+      const holdVetCondition = input.vetId
+        ? or(isNull(appointmentHolds.vetId), eq(appointmentHolds.vetId, input.vetId))
+        : undefined;
+
+      const holds = await ctx.db
+        .select({ slotDatetime: appointmentHolds.slotDatetime })
+        .from(appointmentHolds)
+        .where(
+          holdVetCondition
+            ? and(...holdBaseConditions, holdVetCondition)
+            : and(...holdBaseConditions)
+        );
+
       const allSlots = generateDaySlots(input.date);
 
       return allSlots
@@ -201,6 +221,9 @@ export const bookingRouter = createTRPCRouter({
             (a) =>
               new Date(a.startTime) < slot.end &&
               new Date(a.endTime) > slot.start
+          ) &&
+          !holds.some(
+            (h) => new Date(h.slotDatetime).getTime() === slot.start.getTime()
           )
         )
         .map((s) => ({ start: s.start, end: s.end }));
@@ -313,6 +336,16 @@ export const bookingRouter = createTRPCRouter({
         })
         .returning();
 
+      // Clean up any holds for this slot (booking succeeded)
+      await ctx.db
+        .delete(appointmentHolds)
+        .where(
+          and(
+            eq(appointmentHolds.tenantId, input.tenantId),
+            eq(appointmentHolds.slotDatetime, input.slotStart)
+          )
+        );
+
       // Send confirmation email (fire and forget, don't block response)
       const tenant = await ctx.db.query.tenants.findFirst({
         where: (t, { eq }) => eq(t.id, input.tenantId),
@@ -366,6 +399,156 @@ export const bookingRouter = createTRPCRouter({
         patientName: patient.name,
         ownerName: `${owner.firstName} ${owner.lastName}`,
         ownerEmail: owner.email,
+      };
+    }),
+
+  // ─── Slot-Hold Procedures ──────────────────────────────────────────────────
+
+  /** Public: Reserve a slot for 15 minutes — returns holdToken */
+  holdSlot: publicProcedure
+    .input(
+      z.object({
+        tenantId: z.string().uuid(),
+        slotDatetime: z.date(),
+        vetId: z.string().uuid().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const now = new Date();
+      const slotEnd = new Date(input.slotDatetime.getTime() + SLOT_DURATION_MIN * 60_000);
+
+      // 1. Cleanup expired holds (opportunistic — no separate job needed)
+      await ctx.db
+        .delete(appointmentHolds)
+        .where(lt(appointmentHolds.expiresAt, now));
+
+      // 2. Check for existing active hold on same slot (+/- vet)
+      const holdConflictBase = [
+        eq(appointmentHolds.tenantId, input.tenantId),
+        eq(appointmentHolds.slotDatetime, input.slotDatetime),
+        gte(appointmentHolds.expiresAt, now),
+      ];
+      const holdVetConflict = input.vetId
+        ? or(isNull(appointmentHolds.vetId), eq(appointmentHolds.vetId, input.vetId))
+        : undefined;
+
+      const [existingHold] = await ctx.db
+        .select({ id: appointmentHolds.id })
+        .from(appointmentHolds)
+        .where(
+          holdVetConflict
+            ? and(...holdConflictBase, holdVetConflict)
+            : and(...holdConflictBase)
+        )
+        .limit(1);
+
+      if (existingHold) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "Dieser Termin wird gerade von jemand anderem gebucht. Bitte wählen Sie einen anderen Slot.",
+        });
+      }
+
+      // 3. Check if slot is already booked
+      const bookingConflictConditions = [
+        eq(appointments.tenantId, input.tenantId),
+        lte(appointments.startTime, slotEnd),
+        gte(appointments.endTime, input.slotDatetime),
+      ];
+      if (input.vetId) {
+        bookingConflictConditions.push(eq(appointments.vetId, input.vetId));
+      }
+
+      const [alreadyBooked] = await ctx.db
+        .select({ id: appointments.id })
+        .from(appointments)
+        .where(and(...bookingConflictConditions))
+        .limit(1);
+
+      if (alreadyBooked) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "Dieser Termin ist bereits gebucht. Bitte wählen Sie einen anderen Slot.",
+        });
+      }
+
+      // 4. Create the hold (15 minutes)
+      const { randomUUID } = await import("node:crypto");
+      const sessionToken = randomUUID();
+      const expiresAt = new Date(now.getTime() + 15 * 60_000);
+
+      const [hold] = await ctx.db
+        .insert(appointmentHolds)
+        .values({
+          tenantId: input.tenantId,
+          slotDatetime: input.slotDatetime,
+          vetId: input.vetId ?? null,
+          sessionToken,
+          expiresAt,
+        })
+        .returning();
+
+      return { holdToken: hold.sessionToken, expiresAt: hold.expiresAt };
+    }),
+
+  /** Public: Release a hold (user went back or navigated away) */
+  releaseHold: publicProcedure
+    .input(z.object({ holdToken: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db
+        .delete(appointmentHolds)
+        .where(eq(appointmentHolds.sessionToken, input.holdToken));
+      return { success: true };
+    }),
+
+  /** Public: Check if a slot is available (no active hold + no booking) */
+  checkSlotAvailability: publicProcedure
+    .input(
+      z.object({
+        tenantId: z.string().uuid(),
+        slotDatetime: z.date(),
+        vetId: z.string().uuid().optional(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const now = new Date();
+      const slotEnd = new Date(input.slotDatetime.getTime() + SLOT_DURATION_MIN * 60_000);
+
+      // Check active holds
+      const holdBase = [
+        eq(appointmentHolds.tenantId, input.tenantId),
+        eq(appointmentHolds.slotDatetime, input.slotDatetime),
+        gte(appointmentHolds.expiresAt, now),
+      ];
+      const holdVet = input.vetId
+        ? or(isNull(appointmentHolds.vetId), eq(appointmentHolds.vetId, input.vetId))
+        : undefined;
+
+      const [activeHold] = await ctx.db
+        .select({ id: appointmentHolds.id })
+        .from(appointmentHolds)
+        .where(holdVet ? and(...holdBase, holdVet) : and(...holdBase))
+        .limit(1);
+
+      if (activeHold) return { available: false, reason: "held" as const };
+
+      // Check existing bookings
+      const bookingConditions = [
+        eq(appointments.tenantId, input.tenantId),
+        lte(appointments.startTime, slotEnd),
+        gte(appointments.endTime, input.slotDatetime),
+      ];
+      if (input.vetId) bookingConditions.push(eq(appointments.vetId, input.vetId));
+
+      const [booking] = await ctx.db
+        .select({ id: appointments.id })
+        .from(appointments)
+        .where(and(...bookingConditions))
+        .limit(1);
+
+      return {
+        available: !booking,
+        reason: booking ? ("booked" as const) : undefined,
       };
     }),
 

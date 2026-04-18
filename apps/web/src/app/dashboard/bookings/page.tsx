@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { trpc } from '@/lib/trpc/client';
 import { useAuth } from '@clerk/nextjs';
 import { AlertCircle, CheckCircle2, XCircle, Calendar, User } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTenant } from '@/hooks/useTenant';
+import { useCurrentVet } from '@/hooks/useCurrentVet';
 import { TableFilters, type FilterState } from '@/components/appointments/TableFilters';
 import { AppointmentTable } from '@/components/appointments/AppointmentTable';
 
@@ -13,15 +14,23 @@ export default function BookingsPage() {
   const { userId } = useAuth();
   const router = useRouter();
   const { tenantId } = useTenant();
+  const vetId = useCurrentVet();
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [filters, setFilters] = useState<FilterState>({
-    vetId: null,
+    vetId: vetId || null,
     status: null,
     dateFrom: '',
     dateTo: '',
     searchQuery: '',
   });
+
+  // Auto-set filter to current vet if they are a vet
+  useEffect(() => {
+    if (vetId && !filters.vetId) {
+      setFilters((prev) => ({ ...prev, vetId }));
+    }
+  }, [vetId]);
 
   // Fetch bookings
   const { data: bookings, isLoading: isFetching, refetch } = trpc.booking.list.useQuery(
@@ -90,9 +99,7 @@ export default function BookingsPage() {
       if (filters.status && b.status !== filters.status) return false;
 
       // Vet filter
-      if (filters.vetId && b.patient && true) {
-        // Could add vet filtering here if needed
-      }
+      if (filters.vetId && b.vetId !== filters.vetId) return false;
 
       // Search filter (patient name or owner name)
       if (filters.searchQuery) {

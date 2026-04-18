@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { trpc } from '@/lib/trpc/client';
 import { useAuth } from '@clerk/nextjs';
 import { Calendar } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTenant } from '@/hooks/useTenant';
+import { useCurrentVet } from '@/hooks/useCurrentVet';
 import { TableFilters, type FilterState } from '@/components/appointments/TableFilters';
 import { AppointmentTable } from '@/components/appointments/AppointmentTable';
 
@@ -13,12 +14,20 @@ export default function AppointmentsPage() {
   const { userId } = useAuth();
   const router = useRouter();
   const { tenantId } = useTenant();
+  const vetId = useCurrentVet();
   const [filters, setFilters] = useState<FilterState>({
-    vetId: null,
+    vetId: vetId || null,
     status: null,
     dateFrom: '',
     dateTo: '',
   });
+
+  // Auto-set filter to current vet if they are a vet
+  useEffect(() => {
+    if (vetId && !filters.vetId) {
+      setFilters((prev) => ({ ...prev, vetId }));
+    }
+  }, [vetId]);
 
   // Fetch appointments with details
   const { data: appointments, isLoading: isFetching } =

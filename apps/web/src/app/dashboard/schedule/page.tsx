@@ -11,6 +11,7 @@ import { AppointmentModal } from "@/components/appointments/AppointmentModal";
 import { TableFilters, type FilterState } from "@/components/appointments/TableFilters";
 import { trpc } from "@/lib/trpc/client";
 import { useTenant } from "@/hooks/useTenant";
+import { useCurrentVet } from "@/hooks/useCurrentVet";
 import { useAuth } from "@clerk/nextjs";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
@@ -123,6 +124,7 @@ type CalView = "timeGridWeek" | "timeGridDay" | "dayGridMonth" | "listWeek";
 export default function SchedulePage() {
   const { tenantId, isReady } = useTenant();
   const { userId } = useAuth();
+  const vetId = useCurrentVet();
   const calRef = useRef<FullCalendarType>(null);
   const [view, setView] = useState<CalView>("timeGridWeek");
   const [currentTitle, setCurrentTitle] = useState("");
@@ -130,11 +132,18 @@ export default function SchedulePage() {
   const [editAppt, setEditAppt] = useState<ApptDetail | null>(null);
   const [defaultStart, setDefaultStart] = useState<Date | undefined>();
   const [filters, setFilters] = useState<FilterState>({
-    vetId: null,
+    vetId: vetId || null,
     status: null,
     dateFrom: '',
     dateTo: '',
   });
+
+  // Auto-set filter to current vet if they are a vet
+  useEffect(() => {
+    if (vetId && !filters.vetId) {
+      setFilters((prev) => ({ ...prev, vetId }));
+    }
+  }, [vetId]);
 
   // ✅ FIX: Memoize date range to prevent infinite refetch loop
   const { from, to } = useMemo(() => {
