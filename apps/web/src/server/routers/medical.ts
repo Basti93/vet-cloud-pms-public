@@ -4,8 +4,6 @@ import { createTRPCRouter, protectedProcedure } from "@/server/trpc";
 import { diagnoses, medications, vitals, patients, users } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
 
-const DEMO_TENANT_ID = "00000000-0000-4000-8000-000000000003";
-
 async function getUserTenant(ctx: any, userId: string) {
   const [user] = await ctx.db
     .select({ tenantId: users.tenantId })
@@ -13,7 +11,14 @@ async function getUserTenant(ctx: any, userId: string) {
     .where(eq(users.clerkId, userId))
     .limit(1);
 
-  return user?.tenantId || DEMO_TENANT_ID;
+  if (!user?.tenantId) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "User not found or not assigned to a tenant",
+    });
+  }
+
+  return user.tenantId;
 }
 
 // Diagnoses router

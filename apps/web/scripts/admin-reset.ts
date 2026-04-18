@@ -140,7 +140,6 @@ async function main() {
           db
             .insert(users)
             .values({
-              tenantId: DEMO_TENANT_ID,
               ...u,
               active: true,
             })

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { trpc } from '@/lib/trpc/client';
 import { useParams } from 'next/navigation';
+import { useTenant } from '@/hooks/useTenant';
 import {
   AlertCircle,
   ChevronLeft,
@@ -20,35 +21,36 @@ import Link from 'next/link';
 export default function PatientDetailPage() {
   const params = useParams();
   const patientId = params.patientId as string;
+  const { tenantId } = useTenant();
   const [showDiagnosisForm, setShowDiagnosisForm] = useState(false);
   const [showMedicationForm, setShowMedicationForm] = useState(false);
   const [showVitalsForm, setShowVitalsForm] = useState(false);
 
-  // Get demo tenant ID
-  const DEMO_TENANT_ID = "00000000-0000-4000-8000-000000000003";
-
   // Fetch patient data
-  const { data: patients, isLoading } = trpc.patients.list.useQuery({
-    tenantId: DEMO_TENANT_ID,
-  });
+  const { data: patients, isLoading } = trpc.patients.list.useQuery(
+    {
+      tenantId: tenantId || '',
+    },
+    { enabled: !!tenantId }
+  );
   const patient = patients?.find((p) => p.id === patientId);
 
   // Fetch medical data
   const { data: diagnosisList } = trpc.medical.diagnoses.list.useQuery(
-    { patientId, tenantId: DEMO_TENANT_ID },
-    { enabled: !!patientId }
+    { patientId, tenantId: tenantId || '' },
+    { enabled: !!patientId && !!tenantId }
   );
   const { data: medicationsList } = trpc.medical.medications.list.useQuery(
-    { patientId, tenantId: DEMO_TENANT_ID },
-    { enabled: !!patientId }
+    { patientId, tenantId: tenantId || '' },
+    { enabled: !!patientId && !!tenantId }
   );
   const { data: vitalsList } = trpc.medical.vitals.list.useQuery(
-    { patientId, tenantId: DEMO_TENANT_ID },
-    { enabled: !!patientId }
+    { patientId, tenantId: tenantId || '' },
+    { enabled: !!patientId && !!tenantId }
   );
   const { data: appointmentsList } = trpc.appointments.listByPatient.useQuery(
-    { patientId, tenantId: DEMO_TENANT_ID },
-    { enabled: !!patientId }
+    { patientId, tenantId: tenantId || '' },
+    { enabled: !!patientId && !!tenantId }
   );
 
   if (isLoading) {

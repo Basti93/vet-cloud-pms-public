@@ -1,19 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { trpc } from '@/lib/trpc/client';
 import { useAuth } from '@clerk/nextjs';
 import { AlertCircle, CheckCircle2, XCircle, Calendar, User } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useTenant } from '@/hooks/useTenant';
 import { TableFilters, type FilterState } from '@/components/appointments/TableFilters';
 import { AppointmentTable } from '@/components/appointments/AppointmentTable';
 
 export default function BookingsPage() {
   const { userId } = useAuth();
   const router = useRouter();
+  const { tenantId } = useTenant();
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
-  const [tenantId, setTenantId] = useState<string | null>(null);
   const [filters, setFilters] = useState<FilterState>({
     vetId: null,
     status: null,
@@ -21,12 +22,6 @@ export default function BookingsPage() {
     dateTo: '',
     searchQuery: '',
   });
-
-  // Get tenant ID - use demo tenant as fallback for now
-  useEffect(() => {
-    const demoTenantId = '00000000-0000-4000-8000-000000000003';
-    setTenantId(demoTenantId);
-  }, [userId]);
 
   // Fetch bookings
   const { data: bookings, isLoading: isFetching, refetch } = trpc.booking.list.useQuery(

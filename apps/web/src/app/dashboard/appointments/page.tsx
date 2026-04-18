@@ -1,29 +1,24 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { trpc } from '@/lib/trpc/client';
 import { useAuth } from '@clerk/nextjs';
 import { Calendar } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useTenant } from '@/hooks/useTenant';
 import { TableFilters, type FilterState } from '@/components/appointments/TableFilters';
 import { AppointmentTable } from '@/components/appointments/AppointmentTable';
 
 export default function AppointmentsPage() {
   const { userId } = useAuth();
   const router = useRouter();
-  const [tenantId, setTenantId] = useState<string | null>(null);
+  const { tenantId } = useTenant();
   const [filters, setFilters] = useState<FilterState>({
     vetId: null,
     status: null,
     dateFrom: '',
     dateTo: '',
   });
-
-  // Get tenant ID
-  useEffect(() => {
-    const demoTenantId = '00000000-0000-4000-8000-000000000003';
-    setTenantId(demoTenantId);
-  }, [userId]);
 
   // Fetch appointments with details
   const { data: appointments, isLoading: isFetching } =

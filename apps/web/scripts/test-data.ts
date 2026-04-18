@@ -34,6 +34,7 @@ export const TEST_DATA = {
   users: [
     {
       clerkId: "user_demo_admin_001",
+      tenantId: DEMO_TENANT_ID,
       email: "admin@demo.example.com",
       firstName: "Admin",
       lastName: "User",
@@ -41,6 +42,7 @@ export const TEST_DATA = {
     },
     {
       clerkId: "user_demo_vet_001",
+      tenantId: DEMO_TENANT_ID,
       email: "vet1@demo.example.com",
       title: "Dr.",
       firstName: "Max",
@@ -49,6 +51,7 @@ export const TEST_DATA = {
     },
     {
       clerkId: "user_demo_vet_002",
+      tenantId: DEMO_TENANT_ID,
       email: "vet2@demo.example.com",
       title: "Dr.",
       firstName: "Sarah",
@@ -57,6 +60,7 @@ export const TEST_DATA = {
     },
     {
       clerkId: "user_demo_vet_003",
+      tenantId: DEMO_TENANT_ID,
       email: "vet3@demo.example.com",
       title: "Dr. med. vet.",
       firstName: "Alexander",
@@ -326,7 +330,7 @@ export const TEST_DATA = {
       vetIndex: 2, // Schmidt
       title: "Nachuntersuchung",
       description: "Demo appointment",
-      daysFromNow: 14,
+      daysFromNow: 1,
       hour: 10,
       status: "scheduled" as const,
     },
@@ -335,7 +339,7 @@ export const TEST_DATA = {
       vetIndex: 3, // Weber
       title: "Impfauffrischung",
       description: "Demo appointment",
-      daysFromNow: 16,
+      daysFromNow: 2,
       hour: 12,
       status: "scheduled" as const,
     },
@@ -344,7 +348,7 @@ export const TEST_DATA = {
       vetIndex: 1, // Mueller
       title: "Routine Checkup",
       description: "Demo appointment",
-      daysFromNow: 15,
+      daysFromNow: 3,
       hour: 9,
       status: "scheduled" as const,
     },
@@ -354,7 +358,7 @@ export const TEST_DATA = {
       vetIndex: 3, // Weber
       title: "Ohrenuntersuchung",
       description: "Demo appointment",
-      daysFromNow: 17,
+      daysFromNow: 4,
       hour: 15,
       status: "scheduled" as const,
     },
@@ -363,7 +367,7 @@ export const TEST_DATA = {
       vetIndex: 1, // Mueller
       title: "Zahnkontrolle",
       description: "Demo appointment",
-      daysFromNow: 18,
+      daysFromNow: 5,
       hour: 11,
       status: "scheduled" as const,
     },
@@ -372,7 +376,7 @@ export const TEST_DATA = {
       vetIndex: 2, // Schmidt
       title: "Ultraschalluntersuchung",
       description: "Demo appointment",
-      daysFromNow: 19,
+      daysFromNow: 6,
       hour: 14,
       status: "scheduled" as const,
     },

@@ -55,7 +55,8 @@ interface VapiWebhookEvent {
 
 function getDefaultTenantId() {
   // In production: derive from phone number or assistant mapping
-  return process.env.DEFAULT_TENANT_ID ?? null;
+  // For now: require explicit tenant configuration
+  return null;
 }
 
 function verifySignature(rawBody: string, signature: string | null): boolean {

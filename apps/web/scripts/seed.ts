@@ -25,6 +25,7 @@ if (fs.existsSync(envPath)) {
 
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
+import { eq } from "drizzle-orm";
 import {
   tenants,
   users,
@@ -86,7 +87,6 @@ async function seed() {
         db
           .insert(users)
           .values({
-            tenantId,
             ...u,
             active: true,
           })
@@ -96,7 +96,21 @@ async function seed() {
       )
     );
 
-    const createdVets = createdUsers.filter((u) => u?.role === "vet");
+    // If users already existed, fetch them from DB
+    const createdOrExistingUsers = await Promise.all(
+      createdUsers.map((u, i) => {
+        if (u) return Promise.resolve(u);
+        // User wasn't created (onConflictDoNothing), fetch from DB
+        return db
+          .select()
+          .from(users)
+          .where(eq(users.clerkId, TEST_DATA.users[i].clerkId))
+          .limit(1)
+          .then((r) => r[0]);
+      })
+    );
+
+    const createdVets = createdOrExistingUsers.filter((u) => u?.role === "vet");
     if (createdVets.length === 0) throw new Error("No vet users created");
     const vetUser = createdVets[0]!; // Use first vet as default
     console.log(`  ✓ ${createdUsers.length} users\n`);
