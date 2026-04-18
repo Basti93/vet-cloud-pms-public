@@ -80,7 +80,7 @@ export default function AppointmentsPage() {
   const stats = {
     total: filteredAppointments.length,
     scheduled: filteredAppointments.filter((a) => a.status === 'scheduled').length,
-    completed: filteredAppointments.filter((a) => a.status === 'completed' || a.status === 'confirmed').length,
+    completed: filteredAppointments.filter((a) => a.status === 'completed').length,
     cancelled: filteredAppointments.filter((a) => a.status === 'cancelled').length,
     noShow: filteredAppointments.filter((a) => a.status === 'no-show').length,
   };
