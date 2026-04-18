@@ -58,6 +58,9 @@ export class ResendProvider implements EmailProvider {
  */
 export function createResendProvider(): ResendProvider {
   const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    throw new Error('RESEND_API_KEY environment variable is required');
+  }
   const fromEmail = process.env.RESEND_FROM_EMAIL || DEFAULT_FROM_EMAIL;
   return new ResendProvider(apiKey, fromEmail);
 }
