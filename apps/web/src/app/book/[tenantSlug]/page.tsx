@@ -146,7 +146,7 @@ function StepVet({
   onSelect,
 }: {
   vets?: VetOption[];
-  vetAvailability?: { id: string; title?: string | null; firstName: string; lastName: string; hasAvailableSlots: boolean }[];
+  vetAvailability?: { id: string; title?: string | null; firstName: string | null; lastName: string | null; hasAvailableSlots: boolean }[];
   primaryColor: string;
   onSelect: (vetId: string) => void;
 }) {
