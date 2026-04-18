@@ -77,13 +77,21 @@ export function TableFilters({
   return (
     <div className="mb-6 md:mb-8">
       {/* Filter Header (Expandable) */}
-      <button
+      <div
         onClick={() => setIsExpanded(!isExpanded)}
-        className={`w-full flex items-center justify-between p-3 md:p-4 rounded-lg border-2 transition-all ${
+        className={`w-full flex items-center justify-between p-3 md:p-4 rounded-lg border-2 transition-all cursor-pointer ${
           isExpanded
             ? 'bg-indigo-50 border-indigo-300'
             : 'bg-white border-gray-200 hover:border-gray-300'
         }`}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setIsExpanded(!isExpanded);
+          }
+        }}
       >
         <div className="flex items-center gap-3 min-w-0">
           <Filter className="w-5 h-5 text-indigo-600 flex-shrink-0" />
@@ -123,7 +131,7 @@ export function TableFilters({
             }`}
           />
         </div>
-      </button>
+      </div>
 
       {/* Filter Content (Expandable) */}
       {isExpanded && (
