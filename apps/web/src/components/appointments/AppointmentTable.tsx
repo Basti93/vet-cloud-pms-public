@@ -38,8 +38,8 @@ type AppointmentType =
 
 interface Vet {
   id: string;
-  firstName: string;
-  lastName: string;
+  firstName: string | null;
+  lastName: string | null;
 }
 
 interface AppointmentTableProps {
