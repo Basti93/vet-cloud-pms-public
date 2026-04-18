@@ -150,8 +150,22 @@ async function main() {
       // ────────────────────────────────────────────────────────────────────
       // CREATE USERS (fresh from TEST_DATA)
       // ────────────────────────────────────────────────────────────────────
+      const usersToCreate = [...TEST_DATA.users];
+
+      // If DEMO_ADMIN_CLERK_ID is set, replace the first admin's clerkId with it
+      const demoAdminClerkId = process.env.DEMO_ADMIN_CLERK_ID;
+      if (demoAdminClerkId) {
+        const firstAdminIdx = usersToCreate.findIndex((u) => u.role === "admin");
+        if (firstAdminIdx !== -1) {
+          usersToCreate[firstAdminIdx] = {
+            ...usersToCreate[firstAdminIdx],
+            clerkId: demoAdminClerkId,
+          };
+        }
+      }
+
       const createdUsers = await Promise.all(
-        TEST_DATA.users.map((u) =>
+        usersToCreate.map((u) =>
           db
             .insert(users)
             .values({
