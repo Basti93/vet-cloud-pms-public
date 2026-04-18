@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { eq, and, ilike, desc } from "drizzle-orm";
 import { createTRPCRouter, protectedProcedure } from "@/server/trpc";
-import { patients, owners, users } from "@/lib/db/schema";
+import { patients, owners, users, PERMISSIONS } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
+import { requirePermission } from "@/server/trpc/middleware";
 
 async function getUserTenant(ctx: any, userId: string) {
   const [user] = await ctx.db
@@ -88,6 +89,7 @@ export const patientsRouter = createTRPCRouter({
 
   // Create patient + owner
   create: protectedProcedure
+    .use(requirePermission(PERMISSIONS.PATIENTS_CREATE))
     .input(
       z.object({
         tenantId: z.string().uuid(),

@@ -1,9 +1,10 @@
 import { z } from "zod";
 import { eq, and, gte, lte } from "drizzle-orm";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "@/server/trpc";
-import { appointments, patients, owners, users } from "@/lib/db/schema";
+import { appointments, patients, owners, users, PERMISSIONS } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
 import { verifyConfirmationToken } from "@/lib/tokens/confirmation";
+import { requirePermission } from "@/server/trpc/middleware";
 
 async function getUserTenant(ctx: any, userId: string) {
   const [user] = await ctx.db
@@ -132,6 +133,7 @@ export const appointmentsRouter = createTRPCRouter({
 
   // ── Create ─────────────────────────────────────────────────────────────────
   create: protectedProcedure
+    .use(requirePermission(PERMISSIONS.APPOINTMENTS_CREATE))
     .input(
       z.object({
         tenantId: z.string().uuid(),
@@ -156,6 +158,7 @@ export const appointmentsRouter = createTRPCRouter({
 
   // ── Update ─────────────────────────────────────────────────────────────────
   update: protectedProcedure
+    .use(requirePermission(PERMISSIONS.APPOINTMENTS_UPDATE))
     .input(
       z.object({
         id: z.string().uuid(),
@@ -225,6 +228,7 @@ export const appointmentsRouter = createTRPCRouter({
 
   // ── Delete ─────────────────────────────────────────────────────────────────
   delete: protectedProcedure
+    .use(requirePermission(PERMISSIONS.APPOINTMENTS_CANCEL))
     .input(z.object({ id: z.string().uuid(), tenantId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const userTenantId = await getUserTenant(ctx, ctx.userId!);

@@ -46,7 +46,7 @@ export async function createDefaultRoles(tenantId: string) {
     },
     {
       name: "Vet",
-      description: "Medical access + appointments",
+      description: "Medical access + appointments + patients",
       permissions: [
         PERMISSIONS.MEDICAL_READ,
         PERMISSIONS.MEDICAL_CREATE,
@@ -54,6 +54,8 @@ export async function createDefaultRoles(tenantId: string) {
         PERMISSIONS.APPOINTMENTS_READ,
         PERMISSIONS.APPOINTMENTS_UPDATE,
         PERMISSIONS.PATIENTS_READ,
+        PERMISSIONS.PATIENTS_CREATE,
+        PERMISSIONS.PATIENTS_UPDATE,
       ],
       isSystem: true,
     },
@@ -66,6 +68,7 @@ export async function createDefaultRoles(tenantId: string) {
         PERMISSIONS.APPOINTMENTS_CANCEL,
         PERMISSIONS.PATIENTS_READ,
         PERMISSIONS.PATIENTS_CREATE,
+        PERMISSIONS.PATIENTS_UPDATE,
       ],
       isSystem: true,
     },
