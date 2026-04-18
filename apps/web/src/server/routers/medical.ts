@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { createTRPCRouter, protectedProcedure } from "@/server/trpc";
-import { diagnoses, medications, vitals, patients } from "@/lib/db/schema";
+import { diagnoses, medications, vitals, patients, users } from "@/lib/db/schema";
+import { TRPCError } from "@trpc/server";
 
 // Diagnoses router
 const diagnosesRouter = createTRPCRouter({
@@ -28,12 +29,22 @@ const diagnosesRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      const [user] = await ctx.db
+        .select({ id: users.id, tenantId: users.tenantId })
+        .from(users)
+        .where(eq(users.clerkId, ctx.userId!))
+        .limit(1);
+
+      if (!user?.tenantId) {
+        throw new TRPCError({ code: "UNAUTHORIZED" });
+      }
+
       const [diagnosis] = await ctx.db
         .insert(diagnoses)
         .values({
-          tenantId: ctx.userId!,
+          tenantId: user.tenantId,
           patientId: input.patientId,
-          vetId: ctx.userId!,
+          vetId: user.id,
           title: input.title,
           description: input.description,
           icd10Code: input.icd10Code,
@@ -96,10 +107,20 @@ const medicationsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      const [user] = await ctx.db
+        .select({ id: users.id, tenantId: users.tenantId })
+        .from(users)
+        .where(eq(users.clerkId, ctx.userId!))
+        .limit(1);
+
+      if (!user?.tenantId) {
+        throw new TRPCError({ code: "UNAUTHORIZED" });
+      }
+
       const [medication] = await ctx.db
         .insert(medications)
         .values({
-          tenantId: ctx.userId!,
+          tenantId: user.tenantId,
           patientId: input.patientId,
           diagnosisId: input.diagnosisId,
           medicationName: input.medicationName,
@@ -109,7 +130,7 @@ const medicationsRouter = createTRPCRouter({
           startDate: input.startDate,
           endDate: input.endDate,
           notes: input.notes,
-          prescribedBy: ctx.userId!,
+          prescribedBy: user.id,
         })
         .returning();
 
@@ -164,12 +185,22 @@ const vitalsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      const [user] = await ctx.db
+        .select({ id: users.id, tenantId: users.tenantId })
+        .from(users)
+        .where(eq(users.clerkId, ctx.userId!))
+        .limit(1);
+
+      if (!user?.tenantId) {
+        throw new TRPCError({ code: "UNAUTHORIZED" });
+      }
+
       const [vital] = await ctx.db
         .insert(vitals)
         .values({
-          tenantId: ctx.userId!,
+          tenantId: user.tenantId,
           patientId: input.patientId,
-          recordedBy: ctx.userId!,
+          recordedBy: user.id,
           weight: input.weight,
           temperature: input.temperature,
           heartRate: input.heartRate,
