@@ -100,15 +100,7 @@ async function main() {
       console.log(`🔄 Resetting demo tenant data...`);
 
       // Delete in correct order (foreign key constraints)
-      const rolePermissionsCount = await db
-        .delete(rolePermissions)
-        .where(
-          eq(
-            rolePermissions.roleId,
-            sql`(SELECT id FROM roles WHERE tenant_id = ${DEMO_TENANT_ID})`
-          )
-        );
-
+      // Role permissions will be cascade-deleted when roles are deleted
       const rolesCount = await db
         .delete(roles)
         .where(eq(roles.tenantId, DEMO_TENANT_ID));
@@ -357,8 +349,7 @@ async function main() {
       console.log(`   - Appointments: ${appointmentsCount.count || 0}`);
       console.log(`   - Patients: ${patientsCount.count || 0}`);
       console.log(`   - Owners: ${ownersCount.count || 0}`);
-      console.log(`   - Roles: ${rolesCount.count || 0}`);
-      console.log(`   - Role permissions: ${rolePermissionsCount.count || 0}`);
+      console.log(`   - Roles (with permissions): ${rolesCount.count || 0}`);
       console.log(`📊 Created test data:`);
       console.log(`   - Roles: Admin, Vet, Receptionist`);
       console.log(`   - Users: ${createdUsers.length} (${stats.vets} vets)`);
