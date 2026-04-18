@@ -57,7 +57,7 @@ export function createEmailService(): EmailService {
 
     async getMetrics() {
       try {
-        return await provider.getMetrics?.();
+        return (await provider.getMetrics?.()) ?? null;
       } catch (error) {
         console.error('Failed to fetch metrics:', error);
         return null;
