@@ -21,6 +21,7 @@ import { users, appointments } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
 const DATABASE_URL = process.env.DATABASE_URL;
+if (!DATABASE_URL) throw new Error("DATABASE_URL is not set");
 const dbUrl = DATABASE_URL + (DATABASE_URL.includes("?") ? "&sslmode=require" : "?sslmode=require");
 const sql = postgres(dbUrl, { max: 1 });
 const db = drizzle(sql, { schema: { users, appointments } });

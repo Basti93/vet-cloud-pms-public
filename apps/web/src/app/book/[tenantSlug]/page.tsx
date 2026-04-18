@@ -1,7 +1,8 @@
 "use client";
 
-import { use, useState, useEffect } from "react";
+import { use, useState, useEffect, useRef, useCallback } from "react";
 import { trpc } from "@/lib/trpc/client";
+import { useBookingFormState } from "@/hooks/useBookingFormState";
 import { ChevronLeft, ChevronRight, Check, Phone, MapPin, Clock, Calendar, AlertCircle, Loader2, Stethoscope } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -137,6 +138,53 @@ function FieldError({ msg }: { msg?: string }) {
   return <p className="text-red-500 text-xs mt-1 flex items-center gap-1"><AlertCircle size={11} />{msg}</p>;
 }
 
+// ── Countdown Timer ───────────────────────────────────────────────────────────
+
+function CountdownTimer({ expiresAt, onExpired }: { expiresAt: Date; onExpired: () => void }) {
+  const [remaining, setRemaining] = useState(() => Math.max(0, expiresAt.getTime() - Date.now()));
+  const onExpiredRef = useRef(onExpired);
+  onExpiredRef.current = onExpired;
+
+  useEffect(() => {
+    const tick = () => {
+      const diff = Math.max(0, expiresAt.getTime() - Date.now());
+      setRemaining(diff);
+      if (diff === 0) onExpiredRef.current();
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [expiresAt]);
+
+  const minutes = Math.floor(remaining / 60_000);
+  const seconds = Math.floor((remaining % 60_000) / 1000);
+  const isUrgent = remaining > 0 && remaining < 2 * 60_000;
+
+  if (remaining === 0) {
+    return (
+      <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+        <AlertCircle size={15} className="flex-shrink-0" />
+        <span className="font-medium">Zeitfenster abgelaufen — bitte wählen Sie erneut einen Termin.</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm ${
+      isUrgent
+        ? "bg-orange-50 border border-orange-200 text-orange-700"
+        : "bg-emerald-50 border border-emerald-200 text-emerald-700"
+    }`}>
+      <Clock size={15} className="flex-shrink-0" />
+      <span>
+        Slot reserviert — noch{" "}
+        <strong>{String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}</strong>{" "}
+        Min. verfügbar
+      </span>
+    </div>
+  );
+}
+
 // ── Step 1: Vet Selection ─────────────────────────────────────────────────────
 
 function StepVet({
@@ -224,32 +272,76 @@ function StepDate({
   vets?: VetOption[];
   primaryColor: string;
   onBack: () => void;
-  onSelect: (slot: Slot) => void;
+  onSelect: (slot: Slot, holdToken: string, holdExpiresAt: Date) => void;
 }) {
   const weekdays = buildWeekdays(14);
-  // Show 5 days at a time, paginated
   const [page, setPage] = useState(0);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
 
+  // Hold state
+  const [holdToken, setHoldToken] = useState<string | null>(null);
+  const [holdExpiresAt, setHoldExpiresAt] = useState<Date | null>(null);
+  const [holdError, setHoldError] = useState<string | null>(null);
+
   const visibleDays = weekdays.slice(page * 5, page * 5 + 5);
   const maxPage = Math.ceil(weekdays.length / 5) - 1;
 
-  const { data: slots, isLoading: slotsLoading } = trpc.booking.getAvailableSlots.useQuery(
-    { tenantId, date: selectedDay!, vetId: vetId || undefined },
-    { enabled: !!selectedDay }
-  );
+  const { data: slots, isLoading: slotsLoading, refetch: refetchSlots } =
+    trpc.booking.getAvailableSlots.useQuery(
+      { tenantId, date: selectedDay!, vetId: vetId || undefined },
+      { enabled: !!selectedDay }
+    );
+
+  const holdSlotMutation = trpc.booking.holdSlot.useMutation();
+  const releaseHoldMutation = trpc.booking.releaseHold.useMutation();
 
   const handleDayClick = (d: Date) => {
     setSelectedDay(d);
     setSelectedSlot(null);
+    setHoldError(null);
+    // Release hold when switching day
+    if (holdToken) {
+      releaseHoldMutation.mutate({ holdToken });
+      setHoldToken(null);
+      setHoldExpiresAt(null);
+    }
   };
 
   const handleSlotClick = (slot: Slot) => {
+    setHoldError(null);
+    // Release previous hold before creating a new one
+    if (holdToken) {
+      releaseHoldMutation.mutate({ holdToken });
+      setHoldToken(null);
+      setHoldExpiresAt(null);
+    }
     setSelectedSlot(slot);
+
+    holdSlotMutation.mutate(
+      { tenantId, slotDatetime: slot.start, vetId: vetId || undefined },
+      {
+        onSuccess: (data) => {
+          setHoldToken(data.holdToken);
+          setHoldExpiresAt(new Date(data.expiresAt));
+        },
+        onError: (error) => {
+          setSelectedSlot(null);
+          setHoldError(error.message || "Dieser Termin ist leider nicht mehr verfügbar.");
+          void refetchSlots();
+        },
+      }
+    );
   };
 
-  const canProceed = !!selectedSlot;
+  const handleBack = () => {
+    if (holdToken) {
+      releaseHoldMutation.mutate({ holdToken });
+    }
+    onBack();
+  };
+
+  const canProceed = !!selectedSlot && !!holdToken && !holdSlotMutation.isPending;
 
   // Get vet name for display
   const getVetName = () => {
@@ -339,17 +431,21 @@ function StepDate({
               {slots.map((s) => {
                 const slotKey = new Date(s.start).toISOString();
                 const isSelected = selectedSlot && new Date(selectedSlot.start).toISOString() === slotKey;
+                const isThisLoading = holdSlotMutation.isPending && !!isSelected;
                 return (
                   <button
                     key={slotKey}
                     onClick={() => handleSlotClick({ start: new Date(s.start), end: new Date(s.end) })}
-                    className={`py-2.5 px-3 rounded-xl border-2 text-sm font-semibold transition-all ${
+                    disabled={holdSlotMutation.isPending && !isSelected}
+                    className={`py-2.5 px-3 rounded-xl border-2 text-sm font-semibold transition-all flex items-center justify-center ${
                       isSelected
                         ? "border-[var(--primary)] bg-[var(--primary)] text-white"
-                        : "border-gray-200 hover:border-[var(--primary)]/50 text-gray-700"
+                        : "border-gray-200 hover:border-[var(--primary)]/50 text-gray-700 disabled:opacity-50"
                     }`}
                   >
-                    {fmtTime(new Date(s.start))}
+                    {isThisLoading
+                      ? <Loader2 size={14} className="animate-spin" />
+                      : fmtTime(new Date(s.start))}
                   </button>
                 );
               })}
@@ -358,21 +454,37 @@ function StepDate({
         </div>
       )}
 
+      {/* Hold error */}
+      {holdError && (
+        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-700">
+          <AlertCircle size={15} className="flex-shrink-0" />
+          <span>{holdError}</span>
+        </div>
+      )}
+
       {/* CTA */}
       <div className="flex gap-3 pt-2">
         <button
-          onClick={onBack}
+          onClick={handleBack}
           className="flex items-center gap-1.5 px-4 py-3 rounded-xl border border-gray-300 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
         >
           <ChevronLeft size={15} /> Zurück
         </button>
         <button
-          onClick={() => selectedSlot && onSelect(selectedSlot)}
+          onClick={() => {
+            if (selectedSlot && holdToken && holdExpiresAt) {
+              onSelect(selectedSlot, holdToken, holdExpiresAt);
+            }
+          }}
           disabled={!canProceed}
-          className="flex-1 py-3.5 rounded-xl font-semibold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed text-white"
+          className="flex-1 py-3.5 rounded-xl font-semibold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed text-white flex items-center justify-center gap-2"
           style={{ backgroundColor: primaryColor }}
         >
-          Weiter zu den Angaben →
+          {holdSlotMutation.isPending ? (
+            <><Loader2 size={15} className="animate-spin" /> Wird reserviert…</>
+          ) : (
+            "Weiter zu den Angaben →"
+          )}
         </button>
       </div>
     </div>
@@ -385,17 +497,27 @@ function StepDetails({
   slot,
   vetName,
   primaryColor,
+  holdToken,
+  holdExpiresAt,
+  onHoldExpired,
   onBack,
   onNext,
+  initialPatient,
+  initialOwner,
 }: {
   slot: Slot;
   vetName?: string;
   primaryColor: string;
+  holdToken?: string | null;
+  holdExpiresAt?: Date | null;
+  onHoldExpired?: () => void;
   onBack: () => void;
   onNext: (patient: PatientForm, owner: OwnerForm) => void;
+  initialPatient?: PatientForm | null;
+  initialOwner?: OwnerForm | null;
 }) {
-  const [patient, setPatient] = useState<PatientForm>({ name: "", species: "Hund", breed: "", reason: "" });
-  const [owner, setOwner] = useState<OwnerForm>({ firstName: "", lastName: "", email: "", phone: "" });
+  const [patient, setPatient] = useState<PatientForm>(initialPatient ?? { name: "", species: "Hund", breed: "", reason: "" });
+  const [owner, setOwner] = useState<OwnerForm>(initialOwner ?? { firstName: "", lastName: "", email: "", phone: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const setP = (f: keyof PatientForm, v: string) => {
@@ -437,6 +559,11 @@ function StepDetails({
           {vetName && <div className="text-xs text-gray-600 mt-0.5">{vetName}</div>}
         </div>
       </div>
+
+      {/* Countdown timer — slot is reserved */}
+      {holdExpiresAt && onHoldExpired && (
+        <CountdownTimer expiresAt={holdExpiresAt} onExpired={onHoldExpired} />
+      )}
 
       {/* Patient section */}
       <div className="space-y-4">
@@ -564,6 +691,9 @@ function StepConfirm({
   vets,
   selectedVetId,
   primaryColor,
+  holdToken,
+  holdExpiresAt,
+  onHoldExpired,
   onBack,
   onSuccess,
 }: {
@@ -574,6 +704,9 @@ function StepConfirm({
   vets?: VetOption[];
   selectedVetId?: string;
   primaryColor: string;
+  holdToken?: string | null;
+  holdExpiresAt?: Date | null;
+  onHoldExpired?: () => void;
   onBack: () => void;
   onSuccess: (result: { startTime: Date; ownerName: string; patientName: string; vetName?: string }) => void;
 }) {
@@ -634,6 +767,11 @@ function StepConfirm({
         <h3 className="font-semibold text-gray-800 mb-1">Ihre Angaben im Überblick</h3>
         <p className="text-sm text-gray-500">Bitte prüfen Sie alles und bestätigen Sie den Termin.</p>
       </div>
+
+      {/* Countdown timer — slot is reserved */}
+      {holdExpiresAt && onHoldExpired && (
+        <CountdownTimer expiresAt={holdExpiresAt} onExpired={onHoldExpired} />
+      )}
 
       <div className="bg-gray-50 rounded-2xl border border-gray-200 overflow-hidden">
         {rows.map(([label, value]) => (
@@ -765,13 +903,42 @@ export default function BookingPage({
   );
 
   const suggestVetMutation = trpc.vet.suggestVet.useMutation();
+  const releaseHoldMutation = trpc.booking.releaseHold.useMutation();
+
+  // Persistent form state via localStorage
+  const { state: formState, updateField, clear: clearFormState, isLoaded } = useBookingFormState(tenantSlug);
 
   const [step, setStep] = useState<Step>("vet");
-  const [selectedVetId, setSelectedVetId] = useState<string>("");
-  const [slot, setSlot] = useState<Slot | null>(null);
-  const [patient, setPatient] = useState<PatientForm | null>(null);
-  const [owner, setOwner] = useState<OwnerForm | null>(null);
   const [successData, setSuccessData] = useState<{ startTime: Date; ownerName: string; patientName: string; vetName?: string } | null>(null);
+
+  // 15-min slot hold state
+  const [holdToken, setHoldToken] = useState<string | null>(null);
+  const [holdExpiresAt, setHoldExpiresAt] = useState<Date | null>(null);
+
+  // Derive state from formState
+  const selectedVetId = formState.vetId || "";
+  const slot = formState.date ? JSON.parse(formState.date) as Slot : null;
+  const patient = formState.patient || null;
+  const owner = formState.owner || null;
+
+  /** Called when hold expires in StepDetails or StepConfirm */
+  const handleHoldExpired = useCallback(() => {
+    setHoldToken(null);
+    setHoldExpiresAt(null);
+    updateField("date", undefined);
+    setStep("date");
+  }, [updateField]);
+
+  /** Called when navigating back from StepDetails → StepDate */
+  const handleDetailsBack = useCallback(() => {
+    if (holdToken) {
+      releaseHoldMutation.mutate({ holdToken });
+    }
+    setHoldToken(null);
+    setHoldExpiresAt(null);
+    updateField("date", undefined);
+    setStep("date");
+  }, [holdToken, releaseHoldMutation, updateField]);
 
   // Helper: Get vet display name by ID
   const getVetDisplayName = (vetId: string) => {
@@ -782,11 +949,11 @@ export default function BookingPage({
 
   // Auto-select if only one vet is available
   useEffect(() => {
-    if (step === "vet" && vets && vets.length === 1) {
-      setSelectedVetId(vets[0].id);
+    if (step === "vet" && vets && vets.length === 1 && !selectedVetId) {
+      updateField("vetId", vets[0].id);
       setStep("date");
     }
-  }, [vets, step]);
+  }, [vets, step, selectedVetId, updateField]);
 
   // Auto-suggest vet if "Automatisch zuweisen" (empty selectedVetId) and moving to date step
   useEffect(() => {
@@ -796,20 +963,20 @@ export default function BookingPage({
         {
           onSuccess: (data) => {
             if (data?.id) {
-              setSelectedVetId(data.id);
+              updateField("vetId", data.id);
             }
           },
           onError: (error) => {
             console.error("Fehler bei Tierarzt-Vorschlag:", error.message);
             // Fallback: Pick first available vet
             if (vets && vets.length > 0) {
-              setSelectedVetId(vets[0].id);
+              updateField("vetId", vets[0].id);
             }
           },
         }
       );
     }
-  }, [step, selectedVetId, clinic?.id, vets]);
+  }, [step, selectedVetId, clinic?.id, vets, updateField]);
 
   // Loading state
   if (clinicLoading) {
@@ -886,7 +1053,7 @@ export default function BookingPage({
                   vets={vets}
                   vetAvailability={vetAvailability}
                   primaryColor={primaryColor}
-                  onSelect={(vetId) => { setSelectedVetId(vetId); setStep("date"); }}
+                  onSelect={(vetId) => { updateField("vetId", vetId); setStep("date"); }}
                 />
               )}
               {step === "date" && (
@@ -896,7 +1063,12 @@ export default function BookingPage({
                   vets={vets}
                   primaryColor={primaryColor}
                   onBack={() => setStep("vet")}
-                  onSelect={(s) => { setSlot(s); setStep("details"); }}
+                  onSelect={(s, token, expiresAt) => {
+                    updateField("date", JSON.stringify(s));
+                    setHoldToken(token);
+                    setHoldExpiresAt(expiresAt);
+                    setStep("details");
+                  }}
                 />
               )}
               {step === "details" && slot && (
@@ -904,8 +1076,13 @@ export default function BookingPage({
                   slot={slot}
                   vetName={getVetDisplayName(selectedVetId)}
                   primaryColor={primaryColor}
-                  onBack={() => setStep("date")}
-                  onNext={(p, o) => { setPatient(p); setOwner(o); setStep("confirm"); }}
+                  holdToken={holdToken}
+                  holdExpiresAt={holdExpiresAt}
+                  onHoldExpired={handleHoldExpired}
+                  onBack={handleDetailsBack}
+                  onNext={(p, o) => { updateField("patient", p); updateField("owner", o); setStep("confirm"); }}
+                  initialPatient={patient}
+                  initialOwner={owner}
                 />
               )}
               {step === "confirm" && slot && patient && owner && (
@@ -917,8 +1094,11 @@ export default function BookingPage({
                   vets={vets}
                   selectedVetId={selectedVetId}
                   primaryColor={primaryColor}
+                  holdToken={holdToken}
+                  holdExpiresAt={holdExpiresAt}
+                  onHoldExpired={handleHoldExpired}
                   onBack={() => setStep("details")}
-                  onSuccess={(data) => { setSuccessData(data); setStep("success"); }}
+                  onSuccess={(data) => { clearFormState(); setSuccessData(data); setStep("success"); }}
                 />
               )}
               {step === "success" && successData && (
