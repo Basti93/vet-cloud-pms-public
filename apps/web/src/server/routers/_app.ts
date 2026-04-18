@@ -6,6 +6,7 @@ import { adminRouter } from "./admin";
 import { medicalRouter } from "./medical";
 import { vetRouter } from "./vet";
 import { emailRouter } from "./email";
+import { tenantRouter } from "./tenant";
 
 export const appRouter = createTRPCRouter({
   appointments: appointmentsRouter,
@@ -15,6 +16,7 @@ export const appRouter = createTRPCRouter({
   medical: medicalRouter,
   vet: vetRouter,
   email: emailRouter,
+  tenant: tenantRouter,
 });
 
 export type AppRouter = typeof appRouter;

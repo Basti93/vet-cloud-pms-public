@@ -58,6 +58,8 @@ export const tenants = pgTable(
     city: varchar("city", { length: 100 }),
     postalCode: varchar("postal_code", { length: 20 }),
     country: varchar("country", { length: 2 }).default("DE"),
+    tagline: varchar("tagline", { length: 255 }),
+    monogram: varchar("monogram", { length: 3 }),
     subscriptionStatus: varchar("subscription_status", {
       length: 50,
       enum: ["trial", "active", "paused", "cancelled"],
@@ -80,6 +82,12 @@ export const tenants = pgTable(
     typographyPreference: varchar("typography_preference", {
       length: 50,
       enum: ["modern", "klassisch", "klinisch", "freundlich"],
+    })
+      .default("modern")
+      .notNull(),
+    websiteTemplate: varchar("website_template", {
+      length: 50,
+      enum: ["klassik", "modern", "kompakt"],
     })
       .default("modern")
       .notNull(),
