@@ -3,7 +3,7 @@
 import { ReactNode, useState } from "react";
 import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
-import { LayoutDashboard, Calendar, Users, Phone, ClipboardList, Clock, Menu, X } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, Phone, ClipboardList, Clock, Menu, X, Settings } from "lucide-react";
 
 const NAV_ITEMS = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Übersicht" },
@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { href: "/dashboard/patients", icon: Users, label: "Patienten" },
   { href: "/dashboard/bookings", icon: ClipboardList, label: "Buchungsanfragen" },
   { href: "/dashboard/voice", icon: Phone, label: "AI-Rezeption" },
+  { href: "/dashboard/users", icon: Settings, label: "Benutzerverwaltung" },
 ];
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {

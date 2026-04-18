@@ -51,6 +51,39 @@ export const adminRouter = createTRPCRouter({
   }),
 
   /**
+   * Get current user's full details (id, role, tenantId)
+   * Protected: Auth required
+   */
+  getCurrentUser: protectedProcedure.query(async ({ ctx }) => {
+    if (!ctx.userId) {
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: "Not authenticated",
+      });
+    }
+
+    const [user] = await ctx.db
+      .select({
+        id: users.id,
+        clerkId: users.clerkId,
+        role: users.role,
+        tenantId: users.tenantId,
+      })
+      .from(users)
+      .where(eq(users.clerkId, ctx.userId))
+      .limit(1);
+
+    if (!user) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "User not found in database",
+      });
+    }
+
+    return user;
+  }),
+
+  /**
    * Set demo tenant slug (one-time setup)
    * Protected: Admin only
    */
