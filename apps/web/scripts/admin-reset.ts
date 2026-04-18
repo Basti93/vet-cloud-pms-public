@@ -68,6 +68,7 @@ async function main() {
       diagnoses,
       medications,
       vitals,
+      vetSchedules,
     },
   });
 
@@ -126,30 +127,35 @@ async function main() {
         .delete(owners)
         .where(eq(owners.tenantId, DEMO_TENANT_ID));
 
-      // Get vet user for recreating appointments
-      const [vet] = await db
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.tenantId, DEMO_TENANT_ID))
-        .limit(1);
+      // Delete old users (except keep structure, recreate fresh)
+      const usersCount = await db
+        .delete(users)
+        .where(eq(users.tenantId, DEMO_TENANT_ID));
 
-      if (!vet) {
-        throw new Error(
-          "No vet user found in demo tenant. Please run seed first."
-        );
+      // ────────────────────────────────────────────────────────────────────
+      // CREATE USERS (fresh from TEST_DATA)
+      // ────────────────────────────────────────────────────────────────────
+      const createdUsers = await Promise.all(
+        TEST_DATA.users.map((u) =>
+          db
+            .insert(users)
+            .values({
+              tenantId: DEMO_TENANT_ID,
+              ...u,
+              active: true,
+            })
+            .returning()
+            .then((r) => r[0])
+        )
+      );
+
+      const createdVets = createdUsers.filter((u) => u?.role === "vet");
+      if (createdVets.length === 0) {
+        throw new Error("No vet users created");
       }
 
-      // Get all vets for schedule creation
-      const allVets = await db
-        .select({ id: users.id })
-        .from(users)
-        .where(
-          and(
-            eq(users.tenantId, DEMO_TENANT_ID),
-            eq(users.role, "vet"),
-            eq(users.active, true)
-          )
-        );
+      const vet = createdVets[0]!; // Use first vet as default
+      const allVets = createdVets;
 
       const now = new Date();
 
@@ -267,17 +273,19 @@ async function main() {
       // CREATE INTERNAL APPOINTMENTS
       // ────────────────────────────────────────────────────────────────────
       await Promise.all(
-        TEST_DATA.internalAppointments.map(({ patientIndex, daysFromNow, hour, ...aptData }) => {
+        TEST_DATA.internalAppointments.map(({ patientIndex, vetIndex, daysFromNow, hour, ...aptData }) => {
           const startTime = new Date(
             now.getTime() + daysFromNow * 24 * 60 * 60 * 1000
           );
           startTime.setHours(hour, 0, 0, 0);
           const endTime = new Date(startTime.getTime() + 30 * 60 * 1000);
+          const appointmentVet = allVets[vetIndex];
+          if (!appointmentVet) return null;
 
           return db.insert(appointments).values({
             tenantId: DEMO_TENANT_ID,
             patientId: createdPatients[patientIndex]!.id,
-            vetId: vet.id,
+            vetId: appointmentVet.id,
             startTime,
             endTime,
             ...aptData,
@@ -290,17 +298,19 @@ async function main() {
       // CREATE ONLINE BOOKINGS
       // ────────────────────────────────────────────────────────────────────
       await Promise.all(
-        TEST_DATA.onlineBookings.map(({ patientIndex, daysFromNow, hour, ...bookingData }) => {
+        TEST_DATA.onlineBookings.map(({ patientIndex, vetIndex, daysFromNow, hour, ...bookingData }) => {
           const startTime = new Date(
             now.getTime() + daysFromNow * 24 * 60 * 60 * 1000
           );
           startTime.setHours(hour, 0, 0, 0);
           const endTime = new Date(startTime.getTime() + 30 * 60 * 1000);
+          const bookingVet = allVets[vetIndex];
+          if (!bookingVet) return null;
 
           return db.insert(appointments).values({
             tenantId: DEMO_TENANT_ID,
             patientId: createdPatients[patientIndex]!.id,
-            vetId: vet.id,
+            vetId: bookingVet.id,
             startTime,
             endTime,
             ...bookingData,
@@ -316,6 +326,7 @@ async function main() {
 
       console.log(`✅ Reset complete!`);
       console.log(`📊 Deleted:`);
+      console.log(`   - Users: ${usersCount.count || 0}`);
       console.log(`   - Vet schedules: ${vetSchedulesCount.count || 0}`);
       console.log(`   - Voice calls: ${voiceCallsCount.count || 0}`);
       console.log(`   - Medications: ${medicationsCount.count || 0}`);
@@ -325,7 +336,7 @@ async function main() {
       console.log(`   - Patients: ${patientsCount.count || 0}`);
       console.log(`   - Owners: ${ownersCount.count || 0}`);
       console.log(`📊 Created test data:`);
-      console.log(`   - Vets: ${stats.vets}`);
+      console.log(`   - Users: ${createdUsers.length} (${stats.vets} vets)`);
       console.log(`   - Vet schedules: ${stats.vetSchedules}`);
       console.log(`   - Owners: ${stats.owners}`);
       console.log(`   - Patients: ${stats.patients}`);

@@ -235,17 +235,19 @@ async function seed() {
     console.log("📅 Creating internal appointments...");
     const now = new Date();
     await Promise.all(
-      TEST_DATA.internalAppointments.map(({ patientIndex, daysFromNow, hour, ...aptData }) => {
+      TEST_DATA.internalAppointments.map(({ patientIndex, vetIndex, daysFromNow, hour, ...aptData }) => {
         const startTime = new Date(
           now.getTime() + daysFromNow * 24 * 60 * 60 * 1000
         );
         startTime.setHours(hour, 0, 0, 0);
         const endTime = new Date(startTime.getTime() + 30 * 60 * 1000);
+        const appointmentVet = createdVets[vetIndex];
+        if (!appointmentVet) return null;
 
         return db.insert(appointments).values({
           tenantId,
           patientId: createdPatients[patientIndex]!.id,
-          vetId: vetUser.id,
+          vetId: appointmentVet.id,
           startTime,
           endTime,
           ...aptData,
@@ -260,17 +262,19 @@ async function seed() {
     // ────────────────────────────────────────────────────────────────────────
     console.log("📅 Creating online bookings...");
     await Promise.all(
-      TEST_DATA.onlineBookings.map(({ patientIndex, daysFromNow, hour, ...bookingData }) => {
+      TEST_DATA.onlineBookings.map(({ patientIndex, vetIndex, daysFromNow, hour, ...bookingData }) => {
         const startTime = new Date(
           now.getTime() + daysFromNow * 24 * 60 * 60 * 1000
         );
         startTime.setHours(hour, 0, 0, 0);
         const endTime = new Date(startTime.getTime() + 30 * 60 * 1000);
+        const bookingVet = createdVets[vetIndex];
+        if (!bookingVet) return null;
 
         return db.insert(appointments).values({
           tenantId,
           patientId: createdPatients[patientIndex]!.id,
-          vetId: vetUser.id,
+          vetId: bookingVet.id,
           startTime,
           endTime,
           ...bookingData,

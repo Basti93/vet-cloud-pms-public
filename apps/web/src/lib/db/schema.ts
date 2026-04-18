@@ -68,6 +68,7 @@ export const users = pgTable(
       .references(() => tenants.id, { onDelete: "cascade" }),
     clerkId: varchar("clerk_id", { length: 255 }).notNull().unique(),
     email: varchar("email", { length: 255 }).notNull(),
+    title: varchar("title", { length: 50 }), // "Dr.", "Prof.", "Dr. med.", etc.
     firstName: varchar("first_name", { length: 100 }),
     lastName: varchar("last_name", { length: 100 }),
     role: varchar("role", {

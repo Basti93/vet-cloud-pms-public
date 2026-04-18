@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { eq, and, gte, lte } from "drizzle-orm";
-import { createTRPCRouter, protectedProcedure } from "@/server/trpc";
+import { createTRPCRouter, protectedProcedure, publicProcedure } from "@/server/trpc";
 import { appointments, patients, owners, users } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
+import { verifyConfirmationToken } from "@/lib/tokens/confirmation";
 
 export const appointmentsRouter = createTRPCRouter({
   // ── List (simple) ──────────────────────────────────────────────────────────
@@ -191,5 +192,64 @@ export const appointmentsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await ctx.db.delete(appointments).where(eq(appointments.id, input.id));
       return { success: true };
+    }),
+
+  // ── Confirm from Email Link ────────────────────────────────────────────────
+  confirmFromEmail: publicProcedure
+    .input(
+      z.object({
+        appointmentId: z.string().uuid(),
+        token: z.string(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Verify token
+      const decoded = verifyConfirmationToken(input.token);
+
+      if (!decoded) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Bestätigungslink ist ungültig oder abgelaufen",
+        });
+      }
+
+      // Verify appointment ID matches token
+      if (decoded.appointmentId !== input.appointmentId) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Bestätigungstoken stimmt nicht mit dem Termin überein",
+        });
+      }
+
+      // Verify action is confirm
+      if (decoded.action !== "confirm") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Ungültige Aktion",
+        });
+      }
+
+      // Update appointment status
+      const [updated] = await ctx.db
+        .update(appointments)
+        .set({
+          status: "confirmed",
+          updatedAt: new Date(),
+        })
+        .where(eq(appointments.id, input.appointmentId))
+        .returning();
+
+      if (!updated) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Termin nicht gefunden",
+        });
+      }
+
+      return {
+        success: true,
+        message: "Termin erfolgreich bestätigt",
+        appointmentId: updated.id,
+      };
     }),
 });

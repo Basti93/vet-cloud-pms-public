@@ -27,11 +27,12 @@ export function Badge({ variant = "default", children, className = "" }: BadgePr
 export function AppointmentStatusBadge({
   status,
 }: {
-  status: "scheduled" | "completed" | "cancelled" | "no-show" | string;
+  status: "scheduled" | "completed" | "cancelled" | "confirmed" | "no-show" | string;
 }) {
   const map: Record<string, { variant: BadgeProps["variant"]; label: string }> = {
     scheduled: { variant: "info", label: "Geplant" },
-    completed: { variant: "success", label: "Abgeschlossen" },
+    completed: { variant: "success", label: "Bestätigt" },
+    confirmed: { variant: "success", label: "Bestätigt" },
     cancelled: { variant: "danger", label: "Abgesagt" },
     "no-show": { variant: "warning", label: "Nicht erschienen" },
   };

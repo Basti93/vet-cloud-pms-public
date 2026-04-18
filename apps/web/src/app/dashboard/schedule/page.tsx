@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useMemo } from "react";
+import { useRef, useState, useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
 import type FullCalendarType from "@fullcalendar/react";
 import { Plus, ChevronLeft, ChevronRight, Calendar, List } from "lucide-react";
@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { AppointmentStatusBadge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppointmentModal } from "@/components/appointments/AppointmentModal";
-import { AppointmentFilters, type AppointmentFiltersState } from "@/components/appointments/AppointmentFilters";
+import { TableFilters, type FilterState } from "@/components/appointments/TableFilters";
 import { trpc } from "@/lib/trpc/client";
 import { useTenant } from "@/hooks/useTenant";
 import { useAuth } from "@clerk/nextjs";
@@ -29,6 +29,7 @@ const FullCalendar = dynamic(
 const STATUS_COLORS: Record<string, { bg: string; border: string }> = {
   scheduled: { bg: "#3B82F6", border: "#2563EB" },
   completed: { bg: "#10B981", border: "#059669" },
+  confirmed: { bg: "#10B981", border: "#059669" },
   cancelled: { bg: "#EF4444", border: "#DC2626" },
   "no-show": { bg: "#F59E0B", border: "#D97706" },
 };
@@ -83,26 +84,26 @@ function TodayPanel({ appointments, onSelect }: { appointments: ApptDetail[]; on
   });
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-      <div className="px-5 py-4 border-b border-gray-100">
-        <h3 className="font-semibold text-gray-900">
+      <div className="px-4 md:px-5 py-3 md:py-4 border-b border-gray-100">
+        <h3 className="font-semibold text-gray-900 text-sm md:text-base">
           Heute{" "}
           {todayAppts.length > 0 && (
-            <span className="ml-1 text-sm font-normal text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{todayAppts.length}</span>
+            <span className="ml-1 text-xs md:text-sm font-normal text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{todayAppts.length}</span>
           )}
         </h3>
         <p className="text-xs text-gray-400 mt-0.5">{today.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" })}</p>
       </div>
-      <div className="divide-y divide-gray-50">
+      <div className="divide-y divide-gray-50 max-h-96 md:max-h-none overflow-y-auto">
         {todayAppts.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-8">Keine Termine heute</p>
+          <p className="text-xs md:text-sm text-gray-400 text-center py-6 md:py-8">Keine Termine heute</p>
         ) : (
           todayAppts.map((a) => (
-            <button key={a.id} onClick={() => onSelect(a)} className="w-full text-left px-5 py-3 hover:bg-gray-50 transition-colors">
+            <button key={a.id} onClick={() => onSelect(a)} className="w-full text-left px-4 md:px-5 py-2 md:py-3 hover:bg-gray-50 transition-colors">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-medium text-sm text-gray-900">{a.patientName ?? "–"}</span>
+                <span className="font-medium text-xs md:text-sm text-gray-900 truncate">{a.patientName ?? "–"}</span>
                 <AppointmentStatusBadge status={a.status} />
               </div>
-              <p className="text-xs text-gray-500 mt-0.5">{a.title}</p>
+              <p className="text-xs text-gray-500 mt-0.5 truncate">{a.title}</p>
               <p className="text-xs text-gray-400 mt-0.5">
                 {new Date(a.startTime).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} –{" "}
                 {new Date(a.endTime).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
@@ -128,7 +129,7 @@ export default function SchedulePage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editAppt, setEditAppt] = useState<ApptDetail | null>(null);
   const [defaultStart, setDefaultStart] = useState<Date | undefined>();
-  const [filters, setFilters] = useState<AppointmentFiltersState>({
+  const [filters, setFilters] = useState<FilterState>({
     vetId: null,
     status: null,
     dateFrom: '',
@@ -179,6 +180,13 @@ export default function SchedulePage() {
   const openEdit = (a: ApptDetail) => { setEditAppt(a); setDefaultStart(undefined); setModalOpen(true); };
   const closeModal = () => { setModalOpen(false); setEditAppt(null); setDefaultStart(undefined); };
 
+  // Calculate initial date based on filters (for calendar navigation)
+  const initialDate = useMemo(() => {
+    if (filters.dateTo) return new Date(filters.dateTo);
+    if (filters.dateFrom) return new Date(filters.dateFrom);
+    return new Date();
+  }, [filters.dateTo, filters.dateFrom]);
+
   const viewButtons: { key: CalView; label: string }[] = [
     { key: "timeGridDay", label: "Tag" },
     { key: "timeGridWeek", label: "Woche" },
@@ -203,7 +211,7 @@ export default function SchedulePage() {
 
       {/* Filters */}
       {tenantId && userId && (
-        <AppointmentFilters
+        <TableFilters
           tenantId={tenantId}
           userId={userId}
           filters={filters}
@@ -220,16 +228,16 @@ export default function SchedulePage() {
       )}
 
       {tenantId && (
-        <div className="grid grid-cols-1 xl:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 md:gap-5">
           {/* Calendar area */}
-          <div className="xl:col-span-3 space-y-4">
+          <div className="lg:col-span-3 space-y-4">
             {/* Toolbar */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm px-4 py-3 flex items-center justify-between flex-wrap gap-3">
-              <div className="flex items-center gap-1">
-                <button onClick={() => nav("prev")} className="p-2 rounded-lg hover:bg-gray-100 transition-colors"><ChevronLeft size={18} /></button>
-                <button onClick={() => nav("today")} className="px-3 py-1.5 text-sm font-medium rounded-lg hover:bg-gray-100 transition-colors">Heute</button>
-                <button onClick={() => nav("next")} className="p-2 rounded-lg hover:bg-gray-100 transition-colors"><ChevronRight size={18} /></button>
-                <span className="font-semibold text-gray-900 ml-2 hidden sm:block">{currentTitle}</span>
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm px-4 py-3 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-1 min-w-0">
+                <button onClick={() => nav("prev")} className="p-2 rounded-lg hover:bg-gray-100 transition-colors flex-shrink-0"><ChevronLeft size={18} /></button>
+                <button onClick={() => nav("today")} className="px-3 py-1.5 text-sm font-medium rounded-lg hover:bg-gray-100 transition-colors flex-shrink-0">Heute</button>
+                <button onClick={() => nav("next")} className="p-2 rounded-lg hover:bg-gray-100 transition-colors flex-shrink-0"><ChevronRight size={18} /></button>
+                <span className="font-semibold text-gray-900 ml-2 hidden sm:block truncate">{currentTitle}</span>
               </div>
               <div className="flex items-center bg-gray-100 rounded-xl p-1 gap-1">
                 {viewButtons.map(({ key, label }) => (
@@ -255,8 +263,10 @@ export default function SchedulePage() {
                 <div className="p-2">
                   <FullCalendar
                     ref={calRef}
+                    key={initialDate.toISOString()}
                     plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
                     initialView={view}
+                    initialDate={initialDate}
                     events={calEvents}
                     headerToolbar={false}
                     locale="de"
@@ -299,17 +309,17 @@ export default function SchedulePage() {
           </div>
 
           {/* Sidebar */}
-          <div className="space-y-4">
+          <div className="space-y-3 md:space-y-4">
             <TodayPanel appointments={filteredAppointments as ApptDetail[]} onSelect={openEdit} />
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="px-5 py-4 border-b border-gray-100">
+              <div className="px-4 md:px-5 py-3 md:py-4 border-b border-gray-100">
                 <h3 className="font-semibold text-gray-900 text-sm">Nächste Termine</h3>
               </div>
-              <div className="divide-y divide-gray-50">
+              <div className="divide-y divide-gray-50 max-h-96 md:max-h-none overflow-y-auto">
                 {filteredAppointments.filter((a) => new Date(a.startTime) >= new Date()).slice(0, 6).map((a) => (
-                  <button key={a.id} onClick={() => openEdit(a as ApptDetail)} className="w-full text-left px-5 py-3 hover:bg-gray-50 transition-colors">
+                  <button key={a.id} onClick={() => openEdit(a as ApptDetail)} className="w-full text-left px-4 md:px-5 py-2 md:py-3 hover:bg-gray-50 transition-colors">
                     <p className="text-xs font-medium text-gray-900 truncate">{a.patientName ?? "–"} — {a.title}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">
+                    <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">
                       {new Date(a.startTime).toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                     </p>
                   </button>

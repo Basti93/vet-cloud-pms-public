@@ -35,28 +35,31 @@ export const TEST_DATA = {
     {
       clerkId: "user_demo_admin_001",
       email: "admin@demo.example.com",
-      firstName: "Dr.",
-      lastName: "Admin",
+      firstName: "Admin",
+      lastName: "User",
       role: "admin" as const,
     },
     {
       clerkId: "user_demo_vet_001",
       email: "vet1@demo.example.com",
-      firstName: "Dr.",
+      title: "Dr.",
+      firstName: "Max",
       lastName: "Mueller",
       role: "vet" as const,
     },
     {
       clerkId: "user_demo_vet_002",
       email: "vet2@demo.example.com",
-      firstName: "Dr.",
+      title: "Dr.",
+      firstName: "Sarah",
       lastName: "Schmidt",
       role: "vet" as const,
     },
     {
       clerkId: "user_demo_vet_003",
       email: "vet3@demo.example.com",
-      firstName: "Dr.",
+      title: "Dr. med. vet.",
+      firstName: "Alexander",
       lastName: "Weber",
       role: "vet" as const,
     },
@@ -257,11 +260,13 @@ export const TEST_DATA = {
 
   // ────────────────────────────────────────────────────────────────────────
   // INTERNAL APPOINTMENTS (manual)
+  // vetIndex: 1=Mueller, 2=Schmidt, 3=Weber
   // ────────────────────────────────────────────────────────────────────────
   internalAppointments: [
-    // Past (completed)
+    // Past (completed) - distributed across all vets
     {
       patientIndex: 0,
+      vetIndex: 1, // Mueller
       title: "Routineuntersuchung",
       description: "Demo appointment",
       daysFromNow: -7,
@@ -270,6 +275,7 @@ export const TEST_DATA = {
     },
     {
       patientIndex: 1,
+      vetIndex: 2, // Schmidt
       title: "Zahnreinigung",
       description: "Demo appointment",
       daysFromNow: -6,
@@ -278,6 +284,7 @@ export const TEST_DATA = {
     },
     {
       patientIndex: 2,
+      vetIndex: 3, // Weber
       title: "Impfung (Tollwut)",
       description: "Demo appointment",
       daysFromNow: -5,
@@ -286,6 +293,7 @@ export const TEST_DATA = {
     },
     {
       patientIndex: 3,
+      vetIndex: 1, // Mueller
       title: "Parasitenkontrolle",
       description: "Demo appointment",
       daysFromNow: -4,
@@ -295,6 +303,7 @@ export const TEST_DATA = {
     // No-show
     {
       patientIndex: 4,
+      vetIndex: 2, // Schmidt
       title: "Untersuchung",
       description: "Demo appointment",
       daysFromNow: -3,
@@ -304,34 +313,66 @@ export const TEST_DATA = {
     // Cancelled
     {
       patientIndex: 5,
+      vetIndex: 3, // Weber
       title: "Gesundheitscheck",
       description: "Demo appointment",
       daysFromNow: -2,
       hour: 10,
       status: "cancelled" as const,
     },
-    // Future (scheduled)
+    // Future (scheduled) - distributed across all vets with plenty of free slots
     {
       patientIndex: 0,
+      vetIndex: 2, // Schmidt
       title: "Nachuntersuchung",
       description: "Demo appointment",
-      daysFromNow: 1,
-      hour: 9,
-      status: "scheduled" as const,
-    },
-    {
-      patientIndex: 2,
-      title: "Impfauffrischung",
-      description: "Demo appointment",
-      daysFromNow: 3,
+      daysFromNow: 14,
       hour: 10,
       status: "scheduled" as const,
     },
     {
+      patientIndex: 2,
+      vetIndex: 3, // Weber
+      title: "Impfauffrischung",
+      description: "Demo appointment",
+      daysFromNow: 16,
+      hour: 12,
+      status: "scheduled" as const,
+    },
+    {
       patientIndex: 1,
+      vetIndex: 1, // Mueller
       title: "Routine Checkup",
       description: "Demo appointment",
-      daysFromNow: 7,
+      daysFromNow: 15,
+      hour: 9,
+      status: "scheduled" as const,
+    },
+    // Additional scheduled appointments - spread out even more
+    {
+      patientIndex: 3,
+      vetIndex: 3, // Weber
+      title: "Ohrenuntersuchung",
+      description: "Demo appointment",
+      daysFromNow: 17,
+      hour: 15,
+      status: "scheduled" as const,
+    },
+    {
+      patientIndex: 4,
+      vetIndex: 1, // Mueller
+      title: "Zahnkontrolle",
+      description: "Demo appointment",
+      daysFromNow: 18,
+      hour: 11,
+      status: "scheduled" as const,
+    },
+    {
+      patientIndex: 5,
+      vetIndex: 2, // Schmidt
+      title: "Ultraschalluntersuchung",
+      description: "Demo appointment",
+      daysFromNow: 19,
       hour: 14,
       status: "scheduled" as const,
     },
@@ -339,20 +380,39 @@ export const TEST_DATA = {
 
   // ────────────────────────────────────────────────────────────────────────
   // ONLINE BOOKINGS (source: "online_booking")
+  // vetIndex: 1=Mueller, 2=Schmidt, 3=Weber
   // ────────────────────────────────────────────────────────────────────────
   onlineBookings: [
     {
       patientIndex: 0, // Bella
+      vetIndex: 1, // Mueller
       title: "Ohrenbehandlung",
-      daysFromNow: 8,
+      daysFromNow: 20,
       hour: 14,
       status: "scheduled" as const,
     },
     {
       patientIndex: 2, // Luna
+      vetIndex: 2, // Schmidt
       title: "Allergie-Kontrolle",
-      daysFromNow: 10,
+      daysFromNow: 21,
       hour: 15,
+      status: "scheduled" as const,
+    },
+    {
+      patientIndex: 1, // Milo
+      vetIndex: 3, // Weber
+      title: "Zahnreinigung",
+      daysFromNow: 22,
+      hour: 11,
+      status: "scheduled" as const,
+    },
+    {
+      patientIndex: 4, // Whiskers
+      vetIndex: 1, // Mueller
+      title: "Gewichtskontrolle",
+      daysFromNow: 23,
+      hour: 10,
       status: "scheduled" as const,
     },
   ],

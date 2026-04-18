@@ -27,6 +27,7 @@ export const vetRouter = createTRPCRouter({
       const vets = await ctx.db
         .select({
           id: users.id,
+          title: users.title,
           firstName: users.firstName,
           lastName: users.lastName,
           email: users.email,
@@ -97,6 +98,7 @@ export const vetRouter = createTRPCRouter({
           createdAt: appointments.createdAt,
           vet: {
             id: users.id,
+            title: users.title,
             firstName: users.firstName,
             lastName: users.lastName,
           },
@@ -134,11 +136,12 @@ export const vetRouter = createTRPCRouter({
         endTime: z.date().optional(),
       })
     )
-    .query(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }) => {
       // Get all active vets
       const vets = await ctx.db
         .select({
           id: users.id,
+          title: users.title,
           firstName: users.firstName,
           lastName: users.lastName,
         })
@@ -186,6 +189,7 @@ export const vetRouter = createTRPCRouter({
 
           return {
             id: vet.id,
+            title: vet.title,
             firstName: vet.firstName,
             lastName: vet.lastName,
             appointmentCount: result.count || 0,

@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { ChevronLeft, ChevronRight, Check, Phone, MapPin, Clock, Calendar, AlertCircle, Loader2, Stethoscope } from "lucide-react";
 
@@ -26,6 +26,7 @@ interface OwnerForm {
 
 interface VetOption {
   id: string;
+  title?: string | null;
   firstName: string;
   lastName: string;
   appointmentCount: number;
@@ -37,6 +38,18 @@ const SPECIES_OPTIONS = [
   "Hund", "Katze", "Vogel", "Kaninchen", "Meerschweinchen",
   "Hamster", "Fisch", "Reptil", "Sonstige",
 ];
+
+/**
+ * Format vet name with title
+ * Examples: "Dr. Max Mueller", "Dr. med. vet. Alexander Weber", "Admin User"
+ */
+function formatVetName(title: string | null | undefined, firstName: string, lastName: string): string {
+  const parts = [];
+  if (title) parts.push(title);
+  if (firstName) parts.push(firstName);
+  if (lastName) parts.push(lastName);
+  return parts.join(" ");
+}
 
 function addDays(d: Date, n: number) {
   const r = new Date(d);
@@ -79,6 +92,7 @@ function fmtLong(d: Date) {
 
 function StepIndicator({ current }: { current: Step }) {
   const steps: { key: Step; label: string }[] = [
+    { key: "vet", label: "Tierarzt" },
     { key: "date", label: "Datum & Zeit" },
     { key: "details", label: "Angaben" },
     { key: "confirm", label: "Bestätigen" },
@@ -123,15 +137,93 @@ function FieldError({ msg }: { msg?: string }) {
   return <p className="text-red-500 text-xs mt-1 flex items-center gap-1"><AlertCircle size={11} />{msg}</p>;
 }
 
-// ── Step 1: Date + Time ───────────────────────────────────────────────────────
+// ── Step 1: Vet Selection ─────────────────────────────────────────────────────
 
-function StepDate({
-  tenantId,
+function StepVet({
+  vets,
+  vetAvailability,
   primaryColor,
   onSelect,
 }: {
-  tenantId: string;
+  vets?: VetOption[];
+  vetAvailability?: { id: string; title?: string | null; firstName: string; lastName: string; hasAvailableSlots: boolean }[];
   primaryColor: string;
+  onSelect: (vetId: string) => void;
+}) {
+  const handleVetClick = (vetId: string) => {
+    onSelect(vetId);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="font-semibold text-gray-800 mb-4">Wählen Sie einen Tierarzt</h3>
+        <p className="text-sm text-gray-500 mb-6">
+          Wählen Sie einen Tierarzt oder lassen Sie uns den nächsten verfügbaren Tierarzt auswählen.
+        </p>
+      </div>
+
+      {/* Auto-assign option */}
+      <button
+        onClick={() => handleVetClick("")}
+        className="w-full p-4 rounded-xl border-2 border-gray-200 hover:border-[var(--primary)] hover:bg-[var(--primary)]/5 text-left transition-all"
+      >
+        <div className="font-semibold text-gray-900">Automatisch zuweisen</div>
+        <p className="text-sm text-gray-500 mt-1">Der nächste verfügbare Tierarzt wird ausgewählt</p>
+      </button>
+
+      {/* Vet options */}
+      {vets && vets.length > 0 && (
+        <div className="space-y-3">
+          <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Verfügbare Tierärzte</div>
+          {vets.map((vet) => {
+            // Check if this vet has available slots in the next 14 days
+            const availability = vetAvailability?.find((v) => v.id === vet.id);
+            const hasAvailableSlots = availability?.hasAvailableSlots ?? true; // Default to true if not loaded yet
+            const isDisabled = !hasAvailableSlots;
+
+            return (
+              <button
+                key={vet.id}
+                onClick={() => handleVetClick(vet.id)}
+                disabled={isDisabled}
+                className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
+                  isDisabled
+                    ? "border-gray-100 bg-gray-50 cursor-not-allowed opacity-50"
+                    : "border-gray-200 hover:border-[var(--primary)] hover:bg-[var(--primary)]/5"
+                }`}
+              >
+                <div className="font-semibold text-gray-900">{formatVetName(vet.title, vet.firstName, vet.lastName)}</div>
+                {isDisabled && <p className="text-xs text-gray-400 mt-1">Keine Termine verfügbar</p>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* CTA */}
+      <p className="text-xs text-gray-400 text-center">
+        Wählen Sie einen Tierarzt, um verfügbare Termine zu sehen →
+      </p>
+    </div>
+  );
+}
+
+// ── Step 2: Date + Time ───────────────────────────────────────────────────────
+
+function StepDate({
+  tenantId,
+  vetId,
+  vets,
+  primaryColor,
+  onBack,
+  onSelect,
+}: {
+  tenantId: string;
+  vetId: string;
+  vets?: VetOption[];
+  primaryColor: string;
+  onBack: () => void;
   onSelect: (slot: Slot) => void;
 }) {
   const weekdays = buildWeekdays(14);
@@ -144,7 +236,7 @@ function StepDate({
   const maxPage = Math.ceil(weekdays.length / 5) - 1;
 
   const { data: slots, isLoading: slotsLoading } = trpc.booking.getAvailableSlots.useQuery(
-    { tenantId, date: selectedDay! },
+    { tenantId, date: selectedDay!, vetId: vetId || undefined },
     { enabled: !!selectedDay }
   );
 
@@ -159,8 +251,21 @@ function StepDate({
 
   const canProceed = !!selectedSlot;
 
+  // Get vet name for display
+  const getVetName = () => {
+    if (!vetId) return "Automatisch zugewiesen";
+    const vet = vets?.find(v => v.id === vetId);
+    return vet ? formatVetName(vet.title, vet.firstName, vet.lastName) : "Automatisch zugewiesen";
+  };
+
   return (
     <div className="space-y-6">
+      {/* Vet reminder */}
+      <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5 text-sm">
+        <Stethoscope size={15} className="text-blue-600 flex-shrink-0" />
+        <span className="text-blue-900 font-medium">{getVetName()}</span>
+      </div>
+
       {/* Day picker */}
       <div>
         <div className="flex items-center justify-between mb-3">
@@ -254,14 +359,22 @@ function StepDate({
       )}
 
       {/* CTA */}
-      <button
-        onClick={() => selectedSlot && onSelect(selectedSlot)}
-        disabled={!canProceed}
-        className="w-full py-3.5 rounded-xl font-semibold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed text-white"
-        style={{ backgroundColor: primaryColor }}
-      >
-        Weiter zu den Angaben →
-      </button>
+      <div className="flex gap-3 pt-2">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-1.5 px-4 py-3 rounded-xl border border-gray-300 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+        >
+          <ChevronLeft size={15} /> Zurück
+        </button>
+        <button
+          onClick={() => selectedSlot && onSelect(selectedSlot)}
+          disabled={!canProceed}
+          className="flex-1 py-3.5 rounded-xl font-semibold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed text-white"
+          style={{ backgroundColor: primaryColor }}
+        >
+          Weiter zu den Angaben →
+        </button>
+      </div>
     </div>
   );
 }
@@ -270,20 +383,19 @@ function StepDate({
 
 function StepDetails({
   slot,
-  vets,
+  vetName,
   primaryColor,
   onBack,
   onNext,
 }: {
   slot: Slot;
-  vets?: VetOption[];
+  vetName?: string;
   primaryColor: string;
   onBack: () => void;
-  onNext: (patient: PatientForm, owner: OwnerForm, vetId?: string) => void;
+  onNext: (patient: PatientForm, owner: OwnerForm) => void;
 }) {
   const [patient, setPatient] = useState<PatientForm>({ name: "", species: "Hund", breed: "", reason: "" });
   const [owner, setOwner] = useState<OwnerForm>({ firstName: "", lastName: "", email: "", phone: "" });
-  const [selectedVetId, setSelectedVetId] = useState<string>("");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const setP = (f: keyof PatientForm, v: string) => {
@@ -310,7 +422,7 @@ function StepDetails({
   const handleSubmit = () => {
     const e = validate();
     if (Object.keys(e).length > 0) { setErrors(e); return; }
-    onNext(patient, owner, selectedVetId || undefined);
+    onNext(patient, owner);
   };
 
   const inputClass = "w-full rounded-xl border border-gray-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40 focus:border-[var(--primary)] transition placeholder:text-gray-400";
@@ -320,9 +432,10 @@ function StepDetails({
       {/* Selected slot reminder */}
       <div className="flex items-center gap-2 bg-[var(--primary)]/5 border border-[var(--primary)]/20 rounded-xl px-4 py-3 text-sm">
         <Clock size={15} className="text-[var(--primary)] flex-shrink-0" />
-        <span className="text-gray-700">
-          <strong>{fmtLong(slot.start)}</strong>, {fmtTime(slot.start)} – {fmtTime(slot.end)} Uhr
-        </span>
+        <div className="text-gray-700">
+          <div><strong>{fmtLong(slot.start)}</strong>, {fmtTime(slot.start)} – {fmtTime(slot.end)} Uhr</div>
+          {vetName && <div className="text-xs text-gray-600 mt-0.5">{vetName}</div>}
+        </div>
       </div>
 
       {/* Patient section */}
@@ -421,26 +534,6 @@ function StepDetails({
         </div>
       </div>
 
-      {/* Vet Selection (Optional) */}
-      {vets && vets.length > 0 && (
-        <div className="space-y-4 pt-2 border-t border-gray-100">
-          <h3 className="font-semibold text-gray-800 text-sm uppercase tracking-wide pt-2">Tierarzt (optional)</h3>
-          <select
-            value={selectedVetId}
-            onChange={(e) => setSelectedVetId(e.target.value)}
-            className={inputClass + " bg-white"}
-          >
-            <option value="">— Automatisch zuweisen —</option>
-            {vets.map((vet) => (
-              <option key={vet.id} value={vet.id}>
-                Dr. {vet.firstName} {vet.lastName}
-              </option>
-            ))}
-          </select>
-          <p className="text-xs text-gray-400">Falls nicht ausgewählt, wird der nächste verfügbare Tierarzt zugewiesen.</p>
-        </div>
-      )}
-
       {/* Actions */}
       <div className="flex gap-3 pt-2">
         <button
@@ -488,7 +581,7 @@ function StepConfirm({
   const getVetName = () => {
     if (selectedVetId && vets) {
       const vet = vets.find((v) => v.id === selectedVetId);
-      return vet ? `Dr. ${vet.firstName} ${vet.lastName}` : undefined;
+      return vet ? formatVetName(vet.title, vet.firstName, vet.lastName) : undefined;
     }
     return undefined;
   };
@@ -527,7 +620,7 @@ function StepConfirm({
 
   const rows: [string, string][] = [
     ["Termin", `${fmtLong(slot.start)}, ${fmtTime(slot.start)} – ${fmtTime(slot.end)} Uhr`],
-    ...(selectedVetId && vets ? [["Tierarzt", getVetName() || "–"]] : [["Tierarzt", "Automatisch zugewiesen"]]),
+    ["Tierarzt", selectedVetId && vets ? (getVetName() || "–") : "Automatisch zugewiesen"],
     ["Tier", `${patient.name} (${patient.species}${patient.breed ? `, ${patient.breed}` : ""})`],
     ["Grund", patient.reason],
     ["Besitzer", `${owner.firstName} ${owner.lastName}`],
@@ -666,12 +759,57 @@ export default function BookingPage({
     { enabled: !!clinic?.id }
   );
 
-  const [step, setStep] = useState<Step>("date");
+  const { data: vetAvailability } = trpc.booking.getVetAvailability.useQuery(
+    { tenantId: clinic?.id || "" },
+    { enabled: !!clinic?.id }
+  );
+
+  const suggestVetMutation = trpc.vet.suggestVet.useMutation();
+
+  const [step, setStep] = useState<Step>("vet");
+  const [selectedVetId, setSelectedVetId] = useState<string>("");
   const [slot, setSlot] = useState<Slot | null>(null);
   const [patient, setPatient] = useState<PatientForm | null>(null);
   const [owner, setOwner] = useState<OwnerForm | null>(null);
-  const [selectedVetId, setSelectedVetId] = useState<string>("");
   const [successData, setSuccessData] = useState<{ startTime: Date; ownerName: string; patientName: string; vetName?: string } | null>(null);
+
+  // Helper: Get vet display name by ID
+  const getVetDisplayName = (vetId: string) => {
+    if (!vetId || !vets) return "Automatisch zugewiesen";
+    const vet = vets.find((v) => v.id === vetId);
+    return vet ? formatVetName(vet.title, vet.firstName, vet.lastName) : "Automatisch zugewiesen";
+  };
+
+  // Auto-select if only one vet is available
+  useEffect(() => {
+    if (step === "vet" && vets && vets.length === 1) {
+      setSelectedVetId(vets[0].id);
+      setStep("date");
+    }
+  }, [vets, step]);
+
+  // Auto-suggest vet if "Automatisch zuweisen" (empty selectedVetId) and moving to date step
+  useEffect(() => {
+    if (step === "date" && !selectedVetId && clinic?.id && !suggestVetMutation.isPending) {
+      suggestVetMutation.mutate(
+        { tenantId: clinic.id },
+        {
+          onSuccess: (data) => {
+            if (data?.id) {
+              setSelectedVetId(data.id);
+            }
+          },
+          onError: (error) => {
+            console.error("Fehler bei Tierarzt-Vorschlag:", error.message);
+            // Fallback: Pick first available vet
+            if (vets && vets.length > 0) {
+              setSelectedVetId(vets[0].id);
+            }
+          },
+        }
+      );
+    }
+  }, [step, selectedVetId, clinic?.id, vets]);
 
   // Loading state
   if (clinicLoading) {
@@ -743,20 +881,31 @@ export default function BookingPage({
             )}
 
             <div className="px-6 py-6">
+              {step === "vet" && (
+                <StepVet
+                  vets={vets}
+                  vetAvailability={vetAvailability}
+                  primaryColor={primaryColor}
+                  onSelect={(vetId) => { setSelectedVetId(vetId); setStep("date"); }}
+                />
+              )}
               {step === "date" && (
                 <StepDate
                   tenantId={clinic.id}
+                  vetId={selectedVetId}
+                  vets={vets}
                   primaryColor={primaryColor}
+                  onBack={() => setStep("vet")}
                   onSelect={(s) => { setSlot(s); setStep("details"); }}
                 />
               )}
               {step === "details" && slot && (
                 <StepDetails
                   slot={slot}
-                  vets={vets}
+                  vetName={getVetDisplayName(selectedVetId)}
                   primaryColor={primaryColor}
                   onBack={() => setStep("date")}
-                  onNext={(p, o, v) => { setPatient(p); setOwner(o); setSelectedVetId(v || ""); setStep("confirm"); }}
+                  onNext={(p, o) => { setPatient(p); setOwner(o); setStep("confirm"); }}
                 />
               )}
               {step === "confirm" && slot && patient && owner && (

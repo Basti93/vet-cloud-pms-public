@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { Calendar, Users, Phone, ArrowRight, Clock, CheckCircle, TrendingUp } from "lucide-react";
+import { Calendar, Users, Phone, ArrowRight, CheckCircle, TrendingUp } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { useTenant } from "@/hooks/useTenant";
-import { AppointmentStatusBadge, SpeciesIcon } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppointmentModal } from "@/components/appointments/AppointmentModal";
 import { NewPatientModal } from "@/components/patients/NewPatientModal";
+import { AppointmentTable } from "@/components/appointments/AppointmentTable";
 import { useState, useMemo } from "react";
 
 function StatCard({
@@ -66,6 +66,11 @@ export default function DashboardHome() {
 
   const { data: upcomingAppts, isLoading: upcomingLoading } = trpc.appointments.listWithDetails.useQuery(
     { tenantId: tenantId!, from: today, to: upcomingEnd },
+    { enabled: !!tenantId }
+  );
+
+  const { data: vets } = trpc.vet.list.useQuery(
+    { tenantId: tenantId! },
     { enabled: !!tenantId }
   );
 
@@ -129,62 +134,24 @@ export default function DashboardHome() {
         {/* Upcoming appointments */}
         <div className="xl:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="font-bold text-gray-900">Nächste Termine</h2>
+            <div>
+              <h2 className="font-bold text-gray-900">Nächste Termine</h2>
+              <p className="text-xs text-gray-500 mt-1">Alle bestätigten Termine (incl. Online-Buchungen)</p>
+            </div>
             <Link href="/dashboard/schedule" className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1 font-medium">
               Kalender <ArrowRight size={14} />
             </Link>
           </div>
-          <div className="divide-y divide-gray-50">
-            {upcomingLoading ? (
-              Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="px-6 py-4 flex items-center gap-4">
-                  <Skeleton className="w-10 h-10 rounded-xl flex-shrink-0" />
-                  <div className="flex-1 space-y-1.5">
-                    <Skeleton className="h-4 w-48" />
-                    <Skeleton className="h-3 w-32" />
-                  </div>
-                </div>
-              ))
-            ) : next5.length === 0 ? (
-              <div className="py-12 text-center">
-                <Calendar size={32} className="mx-auto text-gray-300 mb-3" />
-                <p className="text-gray-400 text-sm">Keine anstehenden Termine</p>
-              </div>
-            ) : (
-              next5.map((a) => {
-                const d = new Date(a.startTime);
-                const isToday = d >= todayStart && d < todayEnd;
-                return (
-                  <Link
-                    key={a.id}
-                    href="/dashboard/schedule"
-                    className="flex items-start gap-4 px-6 py-4 hover:bg-gray-50 transition-colors"
-                  >
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isToday ? "bg-blue-100" : "bg-gray-100"}`}>
-                      <span className="text-xl"><SpeciesIcon species={(a as any).patientSpecies ?? "other"} /></span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-medium text-sm text-gray-900 truncate">{(a as any).patientName ?? "—"} — {a.title}</p>
-                        <AppointmentStatusBadge status={a.status} />
-                      </div>
-                      <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
-                        <Clock size={11} />
-                        {isToday ? "Heute, " : d.toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "short" }) + ", "}
-                        {d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} Uhr
-                        {(a as any).ownerFirstName && (
-                          <span className="ml-2 text-gray-300">·</span>
-                        )}
-                        {(a as any).ownerFirstName && (
-                          <span className="ml-1">{(a as any).ownerFirstName} {(a as any).ownerLastName}</span>
-                        )}
-                      </p>
-                    </div>
-                    <ArrowRight size={14} className="text-gray-300 flex-shrink-0 mt-1" />
-                  </Link>
-                );
-              })
-            )}
+          <div className="p-6">
+            <AppointmentTable
+              items={upcomingAppts ?? []}
+              vets={vets ?? []}
+              compact={true}
+              loading={upcomingLoading}
+              todayStart={todayStart}
+              todayEnd={todayEnd}
+              showActions={false}
+            />
           </div>
         </div>
 

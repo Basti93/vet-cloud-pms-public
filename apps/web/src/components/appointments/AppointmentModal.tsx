@@ -274,6 +274,7 @@ export function AppointmentModal({
           >
             <option value="scheduled">Geplant</option>
             <option value="completed">Abgeschlossen</option>
+            <option value="confirmed">Bestätigt</option>
             <option value="cancelled">Abgesagt</option>
             <option value="no-show">Nicht erschienen</option>
           </Select>

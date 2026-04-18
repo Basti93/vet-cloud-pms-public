@@ -3,34 +3,39 @@
 import { useState, useEffect } from 'react';
 import { trpc } from '@/lib/trpc/client';
 import { useAuth } from '@clerk/nextjs';
-import { AlertCircle, CheckCircle2, XCircle, Calendar, User, Clock, Filter } from 'lucide-react';
+import { AlertCircle, CheckCircle2, XCircle, Calendar, User } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { TableFilters, type FilterState } from '@/components/appointments/TableFilters';
+import { AppointmentTable } from '@/components/appointments/AppointmentTable';
 
 export default function BookingsPage() {
   const { userId } = useAuth();
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
-  const [selectedVetId, setSelectedVetId] = useState<string | null>(null);
+  const [filters, setFilters] = useState<FilterState>({
+    vetId: null,
+    status: null,
+    dateFrom: '',
+    dateTo: '',
+    searchQuery: '',
+  });
 
   // Get tenant ID - use demo tenant as fallback for now
   useEffect(() => {
-    // For demo purposes: use demo tenant ID
-    // In production: fetch from user profile or auth token
-    const demoTenantId = "00000000-0000-4000-8000-000000000003";
+    const demoTenantId = '00000000-0000-4000-8000-000000000003';
     setTenantId(demoTenantId);
   }, [userId]);
 
-  // Fetch all vets
-  const { data: vets } = trpc.vet.list.useQuery(
+  // Fetch bookings
+  const { data: bookings, isLoading: isFetching, refetch } = trpc.booking.list.useQuery(
     { tenantId: tenantId || '' },
     { enabled: !!tenantId && !!userId }
   );
 
-  // Fetch bookings
-  const { data: bookings, isLoading: isFetching, refetch } = trpc.booking.list.useQuery(
+  // Fetch all vets
+  const { data: vets } = trpc.vet.list.useQuery(
     { tenantId: tenantId || '' },
     { enabled: !!tenantId && !!userId }
   );
@@ -41,7 +46,7 @@ export default function BookingsPage() {
       setConfirmingId(null);
     },
     onError: (error) => {
-      console.error("❌ Confirm failed:", error);
+      console.error('❌ Confirm failed:', error);
       setConfirmingId(null);
     },
   });
@@ -52,7 +57,7 @@ export default function BookingsPage() {
       setRejectingId(null);
     },
     onError: (error) => {
-      console.error("❌ Reject failed:", error);
+      console.error('❌ Reject failed:', error);
       setRejectingId(null);
     },
   });
@@ -83,59 +88,74 @@ export default function BookingsPage() {
     await rejectMutation.mutateAsync({ appointmentId, tenantId });
   };
 
-  // Filter bookings by status and vet
-  const filteredBookings = selectedVetId
-    ? bookings?.filter(b => b.patient && true) // Will filter by vet in next step
-    : bookings || [];
+  // Apply all filters and sort by date (ascending - upcoming first)
+  const filteredBookings = (bookings || [])
+    .filter((b) => {
+      // Status filter
+      if (filters.status && b.status !== filters.status) return false;
 
-  const pendingBookings = filteredBookings?.filter(b => b.status === 'scheduled') || [];
-  const confirmedBookings = filteredBookings?.filter(b => b.status === 'completed') || [];
-  const rejectedBookings = filteredBookings?.filter(b => b.status === 'cancelled') || [];
+      // Vet filter
+      if (filters.vetId && b.patient && true) {
+        // Could add vet filtering here if needed
+      }
 
-  const formatDateTime = (date: Date | string) => {
-    const d = typeof date === 'string' ? new Date(date) : date;
-    return d.toLocaleDateString('de-DE', {
-      weekday: 'short',
-      day: '2-digit',
-      month: '2-digit',
-      year: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
+      // Search filter (patient name or owner name)
+      if (filters.searchQuery) {
+        const query = filters.searchQuery.toLowerCase();
+        const patientMatch = b.patient?.name.toLowerCase().includes(query);
+        const ownerMatch = `${b.owner.firstName} ${b.owner.lastName}`
+          .toLowerCase()
+          .includes(query);
+        const emailMatch = b.owner.email.toLowerCase().includes(query);
+        if (!patientMatch && !ownerMatch && !emailMatch) return false;
+      }
+
+      // Date range filter
+      if (filters.dateFrom) {
+        const fromDate = new Date(filters.dateFrom);
+        fromDate.setHours(0, 0, 0, 0);
+        if (new Date(b.startTime) < fromDate) return false;
+      }
+      if (filters.dateTo) {
+        const toDate = new Date(filters.dateTo);
+        toDate.setHours(23, 59, 59, 999);
+        if (new Date(b.startTime) > toDate) return false;
+      }
+
+      return true;
+    })
+    .sort((a, b) => {
+      // Sort by date ascending (upcoming appointments first)
+      return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
     });
-  };
+
+  const pendingBookings = filteredBookings.filter((b) => b.status === 'scheduled');
+  const confirmedBookings = filteredBookings.filter((b) => b.status === 'completed' || b.status === 'confirmed');
+  const rejectedBookings = filteredBookings.filter((b) => b.status === 'cancelled');
+  const allBookingsCount = filteredBookings.length;
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-6">
       <div className="max-w-6xl mx-auto">
-        {/* Header with Vet Selector */}
+        {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Buchungsanfragen</h1>
-              <p className="text-gray-600">Verwalten Sie Ihre Online-Buchungen</p>
-            </div>
-            {vets && vets.length > 0 && (
-              <div className="flex items-center gap-3">
-                <Filter className="w-4 h-4 text-gray-600" />
-                <select
-                  value={selectedVetId || ''}
-                  onChange={(e) => setSelectedVetId(e.target.value || null)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="">Alle Ärzte</option>
-                  {vets.map((vet) => (
-                    <option key={vet.id} value={vet.id}>
-                      Dr. {vet.firstName} {vet.lastName} ({vet.appointmentCount})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-          </div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Buchungsanfragen</h1>
+          <p className="text-gray-600 mb-3">Online-Buchungen von Kunden, die Sie bestätigen oder ablehnen müssen</p>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <div className="bg-white rounded-lg shadow p-6 border-l-4 border-blue-400">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Gesamt</p>
+                <p className="text-2xl font-bold text-gray-900">{allBookingsCount}</p>
+              </div>
+              <Calendar className="w-8 h-8 text-blue-400" />
+            </div>
+          </div>
+
           <div className="bg-white rounded-lg shadow p-6 border-l-4 border-yellow-400">
             <div className="flex items-center justify-between">
               <div>
@@ -167,152 +187,41 @@ export default function BookingsPage() {
           </div>
         </div>
 
-        {/* Bookings List */}
-        <div className="bg-white rounded-lg shadow">
-          {isFetching ? (
-            <div className="p-8 text-center">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-              <p className="mt-4 text-gray-600">Laden...</p>
-            </div>
-          ) : bookings && bookings.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="min-w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Zeitslot</th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Patient</th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Besitzer</th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Grund</th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Status</th>
-                    <th className="px-6 py-4 text-right text-sm font-semibold text-gray-900">Aktionen</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {bookings.map((booking) => (
-                    <tr key={booking.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-gray-400" />
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">
-                              {formatDateTime(booking.startTime)}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              {new Date(booking.endTime).toLocaleTimeString('de-DE', {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
-                            <span className="text-xs font-semibold text-indigo-600">
-                              {booking.patient.species.charAt(0).toUpperCase()}
-                            </span>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">{booking.patient.name}</p>
-                            <p className="text-xs text-gray-500">
-                              {booking.patient.breed || booking.patient.species}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <User className="w-4 h-4 text-gray-400" />
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">
-                              {booking.owner.firstName} {booking.owner.lastName}
-                            </p>
-                            <p className="text-xs text-gray-500">{booking.owner.email}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <p className="text-sm text-gray-700">{booking.title}</p>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${
-                            booking.status === 'scheduled'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : booking.status === 'cancelled'
-                              ? 'bg-red-100 text-red-800'
-                              : 'bg-green-100 text-green-800'
-                          }`}
-                        >
-                          {booking.status === 'scheduled' && (
-                            <>
-                              <AlertCircle className="w-3 h-3" />
-                              Ausstehend
-                            </>
-                          )}
-                          {booking.status === 'cancelled' && (
-                            <>
-                              <XCircle className="w-3 h-3" />
-                              Abgelehnt
-                            </>
-                          )}
-                          {booking.status === 'completed' && (
-                            <>
-                              <CheckCircle2 className="w-3 h-3" />
-                              Abgeschlossen
-                            </>
-                          )}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right whitespace-nowrap">
-                        {booking.status === 'scheduled' && (
-                          <div className="flex gap-2 justify-end">
-                            <button
-                              onClick={() => handleConfirm(booking.id)}
-                              disabled={confirmingId === booking.id || confirmMutation.isPending}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium bg-green-100 text-green-700 hover:bg-green-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              {confirmingId === booking.id ? (
-                                <div className="animate-spin rounded-full h-3 w-3 border-b border-green-700" />
-                              ) : (
-                                <CheckCircle2 className="w-4 h-4" />
-                              )}
-                              Bestätigen
-                            </button>
-                            <button
-                              onClick={() => handleReject(booking.id)}
-                              disabled={rejectingId === booking.id || rejectMutation.isPending}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              {rejectingId === booking.id ? (
-                                <div className="animate-spin rounded-full h-3 w-3 border-b border-red-700" />
-                              ) : (
-                                <XCircle className="w-4 h-4" />
-                              )}
-                              Ablehnen
-                            </button>
-                          </div>
-                        )}
-                        {booking.status === 'cancelled' && (
-                          <span className="text-xs text-gray-500">Keine Aktionen</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="p-12 text-center">
-              <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-600 text-lg">Keine Buchungsanfragen</p>
-              <p className="text-gray-500 text-sm mt-1">
-                Es wurden noch keine Online-Buchungen vorgenommen.
-              </p>
-            </div>
-          )}
-        </div>
+        {/* Filter Component */}
+        <TableFilters
+          tenantId={tenantId}
+          userId={userId}
+          filters={filters}
+          onChange={setFilters}
+          onReset={() =>
+            setFilters({
+              vetId: null,
+              status: null,
+              dateFrom: '',
+              dateTo: '',
+              searchQuery: '',
+            })
+          }
+          showSearch={true}
+          statusOptions={[
+            { value: 'scheduled', label: 'Ausstehend' },
+            { value: 'completed', label: 'Bestätigt' },
+            { value: 'confirmed', label: 'Bestätigt' },
+            { value: 'cancelled', label: 'Abgelehnt' },
+          ]}
+        />
+
+        {/* Bookings List by Vet using shared component */}
+        <AppointmentTable
+          items={filteredBookings}
+          vets={vets || []}
+          loading={isFetching}
+          onConfirm={handleConfirm}
+          onReject={handleReject}
+          confirmingId={confirmingId}
+          rejectingId={rejectingId}
+          showActions={true}
+        />
       </div>
     </div>
   );

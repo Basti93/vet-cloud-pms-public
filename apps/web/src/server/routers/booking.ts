@@ -3,6 +3,9 @@ import { eq, and, gte, lte } from "drizzle-orm";
 import { createTRPCRouter, publicProcedure, protectedProcedure } from "@/server/trpc";
 import { tenants, appointments, owners, patients, users } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
+import { sendTemplateEmail } from "@/lib/email/service";
+import { confirmationTemplate } from "@/lib/email/templates";
+import { generateConfirmationToken, buildConfirmationUrl } from "@/lib/tokens/confirmation";
 
 // ── Slot generation ───────────────────────────────────────────────────────────
 
@@ -45,6 +48,7 @@ export const bookingRouter = createTRPCRouter({
           title: appointments.title,
           status: appointments.status,
           createdAt: appointments.createdAt,
+          vetId: appointments.vetId,
           patient: {
             id: patients.id,
             name: patients.name,
@@ -260,8 +264,8 @@ export const bookingRouter = createTRPCRouter({
         .where(
           and(
             eq(appointments.tenantId, input.tenantId),
-            lte(appointments.startTime, input.slotStart),
-            gte(appointments.endTime, input.slotEnd)
+            lte(appointments.startTime, input.slotEnd),
+            gte(appointments.endTime, input.slotStart)
           )
         )
         .limit(1);
@@ -309,6 +313,52 @@ export const bookingRouter = createTRPCRouter({
         })
         .returning();
 
+      // Send confirmation email (fire and forget, don't block response)
+      const tenant = await ctx.db.query.tenants.findFirst({
+        where: (t, { eq }) => eq(t.id, input.tenantId),
+      });
+
+      if (tenant) {
+        try {
+          // Generate confirmation token
+          const confirmToken = generateConfirmationToken(appointment.id, owner.email, "confirm");
+          const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+          const confirmLink = buildConfirmationUrl(confirmToken, baseUrl, "confirm");
+
+          // Format appointment date/time
+          const startDate = new Date(appointment.startTime);
+          const dateStr = startDate.toLocaleDateString("de-DE", {
+            weekday: "long",
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+          });
+          const timeStr = startDate.toLocaleTimeString("de-DE", {
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+
+          // Send email
+          const fromEmail = process.env.RESEND_FROM_EMAIL || "noreply@resend.dev";
+          await sendTemplateEmail(
+            confirmationTemplate,
+            owner.email,
+            {
+              ownerName: owner.firstName,
+              patientName: patient.name,
+              clinicName: tenant.name,
+              date: dateStr,
+              time: timeStr,
+              confirmLink,
+            },
+            `${tenant.name} <${fromEmail}>`
+          );
+        } catch (emailError) {
+          // Log error but don't fail the booking
+          console.error("Failed to send confirmation email:", emailError);
+        }
+      }
+
       return {
         appointmentId: appointment.id,
         startTime: appointment.startTime,
@@ -317,5 +367,102 @@ export const bookingRouter = createTRPCRouter({
         ownerName: `${owner.firstName} ${owner.lastName}`,
         ownerEmail: owner.email,
       };
+    }),
+
+  /** Public: Check which vets have available slots in next 14 days */
+  getVetAvailability: publicProcedure
+    .input(z.object({ tenantId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      // Get all active vets
+      const vets = await ctx.db
+        .select({
+          id: users.id,
+          title: users.title,
+          firstName: users.firstName,
+          lastName: users.lastName,
+        })
+        .from(users)
+        .where(
+          and(
+            eq(users.tenantId, input.tenantId),
+            eq(users.role, "vet"),
+            eq(users.active, true)
+          )
+        );
+
+      // Generate next 14 weekdays
+      const weekdays: Date[] = [];
+      let cursor = new Date();
+      cursor.setDate(cursor.getDate() + 1); // Start from tomorrow
+      while (weekdays.length < 14) {
+        const dayOfWeek = cursor.getDay();
+        if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Not Sunday or Saturday
+          weekdays.push(new Date(cursor));
+        }
+        cursor.setDate(cursor.getDate() + 1);
+      }
+
+      // For each vet, check if has available slots
+      const vetAvailability = await Promise.all(
+        vets.map(async (vet) => {
+          // Check all 14 weekdays for this vet
+          for (const day of weekdays) {
+            const dayStart = new Date(day);
+            dayStart.setHours(0, 0, 0, 0);
+            const dayEnd = new Date(day);
+            dayEnd.setHours(23, 59, 59, 999);
+
+            // Get booked appointments for this vet on this day
+            const booked = await ctx.db
+              .select({
+                startTime: appointments.startTime,
+                endTime: appointments.endTime,
+              })
+              .from(appointments)
+              .where(
+                and(
+                  eq(appointments.tenantId, input.tenantId),
+                  eq(appointments.vetId, vet.id),
+                  gte(appointments.startTime, dayStart),
+                  lte(appointments.startTime, dayEnd)
+                )
+              );
+
+            // Generate all slots for this day
+            const allSlots = generateDaySlots(day);
+
+            // Check if any slot is free
+            const hasFreeSlot = allSlots.some(
+              (slot) =>
+                !booked.some(
+                  (a) =>
+                    new Date(a.startTime) < slot.end &&
+                    new Date(a.endTime) > slot.start
+                )
+            );
+
+            if (hasFreeSlot) {
+              return {
+                id: vet.id,
+                title: vet.title,
+                firstName: vet.firstName,
+                lastName: vet.lastName,
+                hasAvailableSlots: true,
+              };
+            }
+          }
+
+          // If no free slot found in any of the 14 days
+          return {
+            id: vet.id,
+            title: vet.title,
+            firstName: vet.firstName,
+            lastName: vet.lastName,
+            hasAvailableSlots: false,
+          };
+        })
+      );
+
+      return vetAvailability;
     }),
 });
