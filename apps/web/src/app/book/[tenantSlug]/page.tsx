@@ -27,8 +27,8 @@ interface OwnerForm {
 interface VetOption {
   id: string;
   title?: string | null;
-  firstName: string;
-  lastName: string;
+  firstName: string | null;
+  lastName: string | null;
   appointmentCount: number;
 }
 
@@ -43,7 +43,7 @@ const SPECIES_OPTIONS = [
  * Format vet name with title
  * Examples: "Dr. Max Mueller", "Dr. med. vet. Alexander Weber", "Admin User"
  */
-function formatVetName(title: string | null | undefined, firstName: string, lastName: string): string {
+function formatVetName(title: string | null | undefined, firstName: string | null, lastName: string | null): string {
   const parts = [];
   if (title) parts.push(title);
   if (firstName) parts.push(firstName);
