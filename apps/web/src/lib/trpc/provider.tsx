@@ -5,6 +5,7 @@ import { httpBatchLink, loggerLink } from "@trpc/client";
 import { useState } from "react";
 import superjson from "superjson";
 import { trpc } from "./client";
+import { ThemeProvider } from "@/lib/theme-context";
 
 function getBaseUrl() {
   if (typeof window !== "undefined") return "";
@@ -47,7 +48,11 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <trpc.Provider client={trpcClient} queryClient={queryClient}>
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          {children}
+        </ThemeProvider>
+      </QueryClientProvider>
     </trpc.Provider>
   );
 }

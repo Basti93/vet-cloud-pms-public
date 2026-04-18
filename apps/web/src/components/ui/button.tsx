@@ -20,9 +20,9 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     ref
   ) => {
     const variants = {
-      default: "bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800 shadow-sm",
-      ghost: "text-gray-700 hover:bg-gray-100 active:bg-gray-200",
-      outline: "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 active:bg-gray-100 shadow-sm",
+      default: "bg-primary text-white hover:bg-primary-hover active:bg-primary-hover shadow-sm",
+      ghost: "text-fg hover:bg-primary-soft active:bg-muted-soft",
+      outline: "border border-[var(--color-border)] bg-surface text-primary hover:bg-primary-soft active:bg-muted-soft shadow-sm",
       destructive: "bg-red-600 text-white hover:bg-red-700 active:bg-red-800 shadow-sm",
       success: "bg-green-600 text-white hover:bg-green-700 active:bg-green-800 shadow-sm",
     };
@@ -38,7 +38,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         disabled={disabled || loading}
-        className={`inline-flex items-center justify-center gap-2 font-medium transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${variants[variant]} ${sizes[size]} ${className}`}
+        className={`inline-flex items-center justify-center gap-2 font-medium transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${variants[variant]} ${sizes[size]} ${className}`}
         {...props}
       >
         {loading && (

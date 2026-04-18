@@ -71,6 +71,19 @@ export const tenants = pgTable(
       .default("starter")
       .notNull(),
     maxUsers: smallint("max_users").default(5),
+    themePreference: varchar("theme_preference", {
+      length: 50,
+      enum: ["sage", "warmsand", "klinikblau", "bordeaux", "forest", "schiefer"],
+    })
+      .default("sage")
+      .notNull(),
+    typographyPreference: varchar("typography_preference", {
+      length: 50,
+      enum: ["modern", "klassisch", "klinisch", "freundlich"],
+    })
+      .default("modern")
+      .notNull(),
+    customWebsiteCode: text("custom_website_code"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .default(sql`now()`)
       .notNull(),
