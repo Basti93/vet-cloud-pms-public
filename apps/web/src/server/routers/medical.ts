@@ -4,18 +4,26 @@ import { createTRPCRouter, protectedProcedure } from "@/server/trpc";
 import { diagnoses, medications, vitals, patients, users } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
 
+const DEMO_TENANT_ID = "00000000-0000-4000-8000-000000000003";
+
+async function getUserTenant(ctx: any, userId: string) {
+  const [user] = await ctx.db
+    .select({ tenantId: users.tenantId })
+    .from(users)
+    .where(eq(users.clerkId, userId))
+    .limit(1);
+
+  return user?.tenantId || DEMO_TENANT_ID;
+}
+
 // Diagnoses router
 const diagnosesRouter = createTRPCRouter({
   list: protectedProcedure
     .input(z.object({ patientId: z.string().uuid(), tenantId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      const [user] = await ctx.db
-        .select({ tenantId: users.tenantId })
-        .from(users)
-        .where(eq(users.clerkId, ctx.userId!))
-        .limit(1);
+      const userTenantId = await getUserTenant(ctx, ctx.userId!);
 
-      if (!user?.tenantId || user.tenantId !== input.tenantId) {
+      if (userTenantId !== input.tenantId) {
         throw new TRPCError({ code: "FORBIDDEN" });
       }
 
@@ -87,13 +95,9 @@ const diagnosesRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const [user] = await ctx.db
-        .select({ tenantId: users.tenantId })
-        .from(users)
-        .where(eq(users.clerkId, ctx.userId!))
-        .limit(1);
+      const userTenantId = await getUserTenant(ctx, ctx.userId!);
 
-      if (!user?.tenantId || user.tenantId !== input.tenantId) {
+      if (userTenantId !== input.tenantId) {
         throw new TRPCError({ code: "FORBIDDEN" });
       }
 
@@ -120,13 +124,9 @@ const medicationsRouter = createTRPCRouter({
   list: protectedProcedure
     .input(z.object({ patientId: z.string().uuid(), tenantId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      const [user] = await ctx.db
-        .select({ tenantId: users.tenantId })
-        .from(users)
-        .where(eq(users.clerkId, ctx.userId!))
-        .limit(1);
+      const userTenantId = await getUserTenant(ctx, ctx.userId!);
 
-      if (!user?.tenantId || user.tenantId !== input.tenantId) {
+      if (userTenantId !== input.tenantId) {
         throw new TRPCError({ code: "FORBIDDEN" });
       }
 
@@ -202,13 +202,9 @@ const medicationsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const [user] = await ctx.db
-        .select({ tenantId: users.tenantId })
-        .from(users)
-        .where(eq(users.clerkId, ctx.userId!))
-        .limit(1);
+      const userTenantId = await getUserTenant(ctx, ctx.userId!);
 
-      if (!user?.tenantId || user.tenantId !== input.tenantId) {
+      if (userTenantId !== input.tenantId) {
         throw new TRPCError({ code: "FORBIDDEN" });
       }
 
@@ -235,13 +231,9 @@ const vitalsRouter = createTRPCRouter({
   list: protectedProcedure
     .input(z.object({ patientId: z.string().uuid(), tenantId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      const [user] = await ctx.db
-        .select({ tenantId: users.tenantId })
-        .from(users)
-        .where(eq(users.clerkId, ctx.userId!))
-        .limit(1);
+      const userTenantId = await getUserTenant(ctx, ctx.userId!);
 
-      if (!user?.tenantId || user.tenantId !== input.tenantId) {
+      if (userTenantId !== input.tenantId) {
         throw new TRPCError({ code: "FORBIDDEN" });
       }
 
@@ -316,13 +308,9 @@ const allergiesRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const [user] = await ctx.db
-        .select({ tenantId: users.tenantId })
-        .from(users)
-        .where(eq(users.clerkId, ctx.userId!))
-        .limit(1);
+      const userTenantId = await getUserTenant(ctx, ctx.userId!);
 
-      if (!user?.tenantId || user.tenantId !== input.tenantId) {
+      if (userTenantId !== input.tenantId) {
         throw new TRPCError({ code: "FORBIDDEN" });
       }
 
