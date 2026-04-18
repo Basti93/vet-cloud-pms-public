@@ -9,6 +9,7 @@ import { useTenant } from '@/hooks/useTenant';
 import { useCurrentVet } from '@/hooks/useCurrentVet';
 import { TableFilters, type FilterState } from '@/components/appointments/TableFilters';
 import { AppointmentTable } from '@/components/appointments/AppointmentTable';
+import { Card } from '@/components/ui/card';
 
 export default function AppointmentsPage() {
   const { userId } = useAuth();
@@ -91,7 +92,7 @@ export default function AppointmentsPage() {
 
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-6">
+    <div className="min-h-screen bg-bg p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-6">
@@ -119,26 +120,26 @@ export default function AppointmentsPage() {
 
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-          <div className="bg-white rounded-lg shadow p-4">
-            <p className="text-xs font-medium text-gray-600 mb-1">Gesamt</p>
-            <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-4 border-l-4 border-yellow-400">
-            <p className="text-xs font-medium text-gray-600 mb-1">Geplant</p>
+          <Card className="p-4">
+            <p className="text-xs font-medium text-muted mb-1">Gesamt</p>
+            <p className="text-2xl font-bold text-fg">{stats.total}</p>
+          </Card>
+          <Card className="p-4 border-l-4 border-yellow-400">
+            <p className="text-xs font-medium text-muted mb-1">Geplant</p>
             <p className="text-2xl font-bold text-yellow-600">{stats.scheduled}</p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-4 border-l-4 border-green-400">
-            <p className="text-xs font-medium text-gray-600 mb-1">Abgeschlossen</p>
+          </Card>
+          <Card className="p-4 border-l-4 border-green-400">
+            <p className="text-xs font-medium text-muted mb-1">Abgeschlossen</p>
             <p className="text-2xl font-bold text-green-600">{stats.completed}</p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-4 border-l-4 border-red-400">
-            <p className="text-xs font-medium text-gray-600 mb-1">Abgelehnt</p>
+          </Card>
+          <Card className="p-4 border-l-4 border-red-400">
+            <p className="text-xs font-medium text-muted mb-1">Abgelehnt</p>
             <p className="text-2xl font-bold text-red-600">{stats.cancelled}</p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-4 border-l-4 border-gray-400">
-            <p className="text-xs font-medium text-gray-600 mb-1">Nicht erschienen</p>
-            <p className="text-2xl font-bold text-gray-600">{stats.noShow}</p>
-          </div>
+          </Card>
+          <Card className="p-4 border-l-4 border-gray-400">
+            <p className="text-xs font-medium text-muted mb-1">Nicht erschienen</p>
+            <p className="text-2xl font-bold text-muted">{stats.noShow}</p>
+          </Card>
         </div>
 
         {/* Appointments Table */}
