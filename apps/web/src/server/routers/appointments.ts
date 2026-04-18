@@ -229,11 +229,29 @@ export const appointmentsRouter = createTRPCRouter({
         });
       }
 
+      // Get appointment to check its source
+      const [appointment] = await ctx.db
+        .select({ source: appointments.source })
+        .from(appointments)
+        .where(eq(appointments.id, input.appointmentId))
+        .limit(1);
+
+      if (!appointment) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Termin nicht gefunden",
+        });
+      }
+
+      // For online bookings, set status to "confirmed" (requires admin approval)
+      // For other appointments, set status to "completed"
+      const newStatus = appointment.source === "online_booking" ? "confirmed" : "completed";
+
       // Update appointment status
       const [updated] = await ctx.db
         .update(appointments)
         .set({
-          status: "completed",
+          status: newStatus,
           updatedAt: new Date(),
         })
         .where(eq(appointments.id, input.appointmentId))

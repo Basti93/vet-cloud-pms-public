@@ -76,7 +76,7 @@ export const bookingRouter = createTRPCRouter({
       return bookings;
     }),
 
-  /** Protected: Confirm a booking request (status = "completed" = confirmed by admin) */
+  /** Protected: Confirm a booking request (status = "confirmed" = confirmed by admin) */
   confirm: protectedProcedure
     .input(z.object({
       appointmentId: z.string().uuid(),
@@ -86,7 +86,7 @@ export const bookingRouter = createTRPCRouter({
       const [appointment] = await ctx.db
         .update(appointments)
         .set({
-          status: "completed", // Mark as confirmed/accepted by admin
+          status: "confirmed", // Mark as confirmed/accepted by admin
           updatedAt: new Date(),
         })
         .where(

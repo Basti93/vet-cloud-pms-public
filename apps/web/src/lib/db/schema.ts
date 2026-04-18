@@ -184,7 +184,7 @@ export const appointments = pgTable(
     description: text("description"),
     status: varchar("status", {
       length: 50,
-      enum: ["scheduled", "completed", "cancelled", "no-show"],
+      enum: ["scheduled", "confirmed", "completed", "cancelled", "no-show"],
     })
       .default("scheduled")
       .notNull(),

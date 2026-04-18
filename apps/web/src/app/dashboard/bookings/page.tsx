@@ -130,7 +130,7 @@ export default function BookingsPage() {
     });
 
   const pendingBookings = filteredBookings.filter((b) => b.status === 'scheduled');
-  const confirmedBookings = filteredBookings.filter((b) => b.status === 'completed');
+  const confirmedBookings = filteredBookings.filter((b) => b.status === 'confirmed');
   const rejectedBookings = filteredBookings.filter((b) => b.status === 'cancelled');
   const allBookingsCount = filteredBookings.length;
 
@@ -205,7 +205,6 @@ export default function BookingsPage() {
           showSearch={true}
           statusOptions={[
             { value: 'scheduled', label: 'Ausstehend' },
-            { value: 'completed', label: 'Bestätigt' },
             { value: 'confirmed', label: 'Bestätigt' },
             { value: 'cancelled', label: 'Abgelehnt' },
           ]}
