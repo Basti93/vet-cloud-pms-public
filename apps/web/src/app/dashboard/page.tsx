@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Calendar, Users, Phone, ArrowRight, CheckCircle, TrendingUp } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { useTenant } from "@/hooks/useTenant";
+import { useCurrentVet } from "@/hooks/useCurrentVet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppointmentModal } from "@/components/appointments/AppointmentModal";
 import { NewPatientModal } from "@/components/patients/NewPatientModal";
@@ -40,6 +41,7 @@ function StatCard({
 
 export default function DashboardHome() {
   const { tenantId } = useTenant();
+  const vetId = useCurrentVet();
   const [apptModalOpen, setApptModalOpen] = useState(false);
   const [patientModalOpen, setPatientModalOpen] = useState(false);
 
@@ -76,13 +78,21 @@ export default function DashboardHome() {
 
   const todayAppts = allAppts?.filter((a) => {
     const d = new Date(a.startTime);
-    return d >= todayStart && d < todayEnd;
+    const isToday = d >= todayStart && d < todayEnd;
+    const isMyAppointment = !vetId || a.vetId === vetId;
+    return isToday && isMyAppointment;
   }) ?? [];
 
-  const completedThisMonth = allAppts?.filter((a) => a.status === "completed").length ?? 0;
+  const completedThisMonth = allAppts?.filter((a) => {
+    const isMyAppointment = !vetId || a.vetId === vetId;
+    return a.status === "completed" && isMyAppointment;
+  }).length ?? 0;
 
   const next5 = (upcomingAppts ?? [])
-    .filter((a) => new Date(a.startTime) >= today)
+    .filter((a) => {
+      const isMyAppointment = !vetId || a.vetId === vetId;
+      return new Date(a.startTime) >= today && isMyAppointment;
+    })
     .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
     .slice(0, 5);
 
@@ -144,7 +154,7 @@ export default function DashboardHome() {
           </div>
           <div className="p-6">
             <AppointmentTable
-              items={upcomingAppts ?? []}
+              items={(upcomingAppts ?? []).filter((a) => !vetId || a.vetId === vetId)}
               vets={vets ?? []}
               compact={true}
               loading={upcomingLoading}
