@@ -233,7 +233,7 @@ export const appointmentsRouter = createTRPCRouter({
       const [updated] = await ctx.db
         .update(appointments)
         .set({
-          status: "confirmed",
+          status: "completed",
           updatedAt: new Date(),
         })
         .where(eq(appointments.id, input.appointmentId))
