@@ -917,7 +917,15 @@ export default function BookingPage({
 
   // Derive state from formState
   const selectedVetId = formState.vetId || "";
-  const slot = formState.date ? JSON.parse(formState.date) as Slot : null;
+  const slot = formState.date
+    ? (() => {
+        const parsed = JSON.parse(formState.date) as { start: string; end: string };
+        return {
+          start: new Date(parsed.start),
+          end: new Date(parsed.end),
+        };
+      })()
+    : null;
   const patient = formState.patient || null;
   const owner = formState.owner || null;
 
