@@ -106,7 +106,7 @@ export default function BookingsPage() {
         const ownerMatch = `${b.owner.firstName} ${b.owner.lastName}`
           .toLowerCase()
           .includes(query);
-        const emailMatch = b.owner.email.toLowerCase().includes(query);
+        const emailMatch = b.owner.email?.toLowerCase().includes(query);
         if (!patientMatch && !ownerMatch && !emailMatch) return false;
       }
 
