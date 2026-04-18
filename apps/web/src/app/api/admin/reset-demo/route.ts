@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import {
@@ -310,17 +311,47 @@ async function setSlug() {
 
 export async function POST(request: NextRequest) {
   try {
-    // Validate token
-    const token = request.nextUrl.searchParams.get("token");
-    const action = request.nextUrl.searchParams.get("action");
+    // Check if endpoint is configured
     const expectedToken = process.env.ADMIN_API_TOKEN;
+    if (!expectedToken) {
+      return NextResponse.json(
+        { error: "Admin API endpoint not configured" },
+        { status: 503 }
+      );
+    }
 
-    if (!token || !expectedToken || token !== expectedToken) {
+    // Get token from Authorization header
+    const authHeader = request.headers.get("authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return NextResponse.json(
+        { error: "Missing or invalid Authorization header" },
+        { status: 401 }
+      );
+    }
+
+    const token = authHeader.slice(7); // Remove "Bearer " prefix
+
+    // Use timing-safe comparison
+    try {
+      const match = timingSafeEqual(
+        Buffer.from(token),
+        Buffer.from(expectedToken)
+      );
+      if (!match) {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401 }
+        );
+      }
+    } catch {
+      // timingSafeEqual throws if lengths don't match
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
       );
     }
+
+    const action = request.nextUrl.searchParams.get("action");
 
     if (action === "reset") {
       const result = await resetDemo();

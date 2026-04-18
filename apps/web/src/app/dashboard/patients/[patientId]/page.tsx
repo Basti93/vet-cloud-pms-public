@@ -35,19 +35,19 @@ export default function PatientDetailPage() {
 
   // Fetch medical data
   const { data: diagnosisList } = trpc.medical.diagnoses.list.useQuery(
-    { patientId },
+    { patientId, tenantId: DEMO_TENANT_ID },
     { enabled: !!patientId }
   );
   const { data: medicationsList } = trpc.medical.medications.list.useQuery(
-    { patientId },
+    { patientId, tenantId: DEMO_TENANT_ID },
     { enabled: !!patientId }
   );
   const { data: vitalsList } = trpc.medical.vitals.list.useQuery(
-    { patientId },
+    { patientId, tenantId: DEMO_TENANT_ID },
     { enabled: !!patientId }
   );
   const { data: appointmentsList } = trpc.appointments.listByPatient.useQuery(
-    { patientId },
+    { patientId, tenantId: DEMO_TENANT_ID },
     { enabled: !!patientId }
   );
 

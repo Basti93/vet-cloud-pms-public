@@ -146,6 +146,7 @@ export function AppointmentModal({
     if (isEdit && editData) {
       updateAppt.mutate({
         id: editData.id,
+        tenantId,
         title: form.title,
         description: form.description || undefined,
         startTime,
@@ -169,7 +170,7 @@ export function AppointmentModal({
 
   const handleDelete = () => {
     if (!confirmDelete) { setConfirmDelete(true); return; }
-    if (editData) deleteAppt.mutate({ id: editData.id });
+    if (editData) deleteAppt.mutate({ id: editData.id, tenantId });
   };
 
   const isLoading = createAppt.isPending || updateAppt.isPending;

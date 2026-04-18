@@ -13,8 +13,20 @@ export interface ConfirmationTokenPayload {
   exp?: number;
 }
 
-const SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this';
 const TOKEN_EXPIRY = '24h'; // 24 hours
+
+function getSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret || secret === 'your-secret-key-change-this') {
+    throw new Error(
+      'JWT_SECRET environment variable must be set to a strong secret (minimum 32 characters). ' +
+      'Set a secure random value in .env or your deployment platform.'
+    );
+  }
+  return secret;
+}
+
+const SECRET = getSecret();
 
 /**
  * Generate a confirmation token for an appointment

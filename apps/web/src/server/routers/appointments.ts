@@ -74,8 +74,18 @@ export const appointmentsRouter = createTRPCRouter({
 
   // ── Single appointment with details ───────────────────────────────────────
   byId: protectedProcedure
-    .input(z.object({ id: z.string().uuid() }))
+    .input(z.object({ id: z.string().uuid(), tenantId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
+      const [user] = await ctx.db
+        .select({ tenantId: users.tenantId })
+        .from(users)
+        .where(eq(users.clerkId, ctx.userId!))
+        .limit(1);
+
+      if (!user?.tenantId || user.tenantId !== input.tenantId) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
       const rows = await ctx.db
         .select({
           id: appointments.id,
@@ -98,7 +108,7 @@ export const appointmentsRouter = createTRPCRouter({
         .from(appointments)
         .leftJoin(patients, eq(appointments.patientId, patients.id))
         .leftJoin(owners, eq(patients.ownerId, owners.id))
-        .where(eq(appointments.id, input.id))
+        .where(and(eq(appointments.id, input.id), eq(appointments.tenantId, input.tenantId)))
         .limit(1);
 
       if (!rows[0]) {
@@ -136,6 +146,7 @@ export const appointmentsRouter = createTRPCRouter({
     .input(
       z.object({
         id: z.string().uuid(),
+        tenantId: z.string().uuid(),
         title: z.string().min(1).max(255).optional(),
         description: z.string().optional(),
         startTime: z.date().optional(),
@@ -147,11 +158,21 @@ export const appointmentsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const { id, ...data } = input;
+      const [user] = await ctx.db
+        .select({ tenantId: users.tenantId })
+        .from(users)
+        .where(eq(users.clerkId, ctx.userId!))
+        .limit(1);
+
+      if (!user?.tenantId || user.tenantId !== input.tenantId) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
+      const { id, tenantId, ...data } = input;
       const [updated] = await ctx.db
         .update(appointments)
         .set({ ...data, updatedAt: new Date() })
-        .where(eq(appointments.id, id))
+        .where(and(eq(appointments.id, id), eq(appointments.tenantId, tenantId)))
         .returning();
 
       if (!updated) throw new TRPCError({ code: "NOT_FOUND" });
@@ -163,9 +184,20 @@ export const appointmentsRouter = createTRPCRouter({
     .input(
       z.object({
         patientId: z.string().uuid(),
+        tenantId: z.string().uuid(),
       })
     )
     .query(async ({ ctx, input }) => {
+      const [user] = await ctx.db
+        .select({ tenantId: users.tenantId })
+        .from(users)
+        .where(eq(users.clerkId, ctx.userId!))
+        .limit(1);
+
+      if (!user?.tenantId || user.tenantId !== input.tenantId) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
       const rows = await ctx.db
         .select({
           id: appointments.id,
@@ -180,7 +212,7 @@ export const appointmentsRouter = createTRPCRouter({
         })
         .from(appointments)
         .leftJoin(users, eq(appointments.vetId, users.id))
-        .where(eq(appointments.patientId, input.patientId))
+        .where(and(eq(appointments.patientId, input.patientId), eq(appointments.tenantId, input.tenantId)))
         .orderBy(appointments.startTime);
 
       return rows;
@@ -188,9 +220,32 @@ export const appointmentsRouter = createTRPCRouter({
 
   // ── Delete ─────────────────────────────────────────────────────────────────
   delete: protectedProcedure
-    .input(z.object({ id: z.string().uuid() }))
+    .input(z.object({ id: z.string().uuid(), tenantId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      await ctx.db.delete(appointments).where(eq(appointments.id, input.id));
+      const [user] = await ctx.db
+        .select({ tenantId: users.tenantId })
+        .from(users)
+        .where(eq(users.clerkId, ctx.userId!))
+        .limit(1);
+
+      if (!user?.tenantId || user.tenantId !== input.tenantId) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
+      const [existing] = await ctx.db
+        .select({ id: appointments.id })
+        .from(appointments)
+        .where(and(eq(appointments.id, input.id), eq(appointments.tenantId, input.tenantId)))
+        .limit(1);
+
+      if (!existing) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+
+      await ctx.db
+        .delete(appointments)
+        .where(and(eq(appointments.id, input.id), eq(appointments.tenantId, input.tenantId)));
+
       return { success: true };
     }),
 

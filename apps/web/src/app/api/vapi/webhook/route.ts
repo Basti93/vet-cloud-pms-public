@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createHmac, timingSafeEqual } from "crypto";
 import { db } from "@/lib/db/client";
 import { voiceCalls, appointments, patients, owners } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -57,15 +58,41 @@ function getDefaultTenantId() {
   return process.env.DEFAULT_TENANT_ID ?? null;
 }
 
+function verifySignature(rawBody: string, signature: string | null): boolean {
+  const secret = process.env.VAPI_WEBHOOK_SECRET;
+  if (!secret) {
+    console.warn("[Vapi] VAPI_WEBHOOK_SECRET not configured, skipping signature verification");
+    return true;
+  }
+
+  if (!signature) {
+    return false;
+  }
+
+  const computed = createHmac("sha256", secret).update(rawBody).digest("hex");
+  try {
+    return timingSafeEqual(Buffer.from(computed), Buffer.from(signature));
+  } catch {
+    return false;
+  }
+}
+
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
+  let rawBody: string;
   let body: VapiWebhookEvent;
 
   try {
-    body = await req.json();
+    rawBody = await req.text();
+    body = JSON.parse(rawBody);
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const signature = req.headers.get("x-vapi-signature");
+  if (!verifySignature(rawBody, signature)) {
+    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
   const { message } = body;

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { eq, and, ilike, desc } from "drizzle-orm";
 import { createTRPCRouter, protectedProcedure } from "@/server/trpc";
-import { patients, owners } from "@/lib/db/schema";
+import { patients, owners, users } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
 
 export const patientsRouter = createTRPCRouter({
@@ -47,13 +47,23 @@ export const patientsRouter = createTRPCRouter({
 
   // Get single patient with owner
   byId: protectedProcedure
-    .input(z.object({ id: z.string().uuid() }))
+    .input(z.object({ id: z.string().uuid(), tenantId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
+      const [user] = await ctx.db
+        .select({ tenantId: users.tenantId })
+        .from(users)
+        .where(eq(users.clerkId, ctx.userId!))
+        .limit(1);
+
+      if (!user?.tenantId || user.tenantId !== input.tenantId) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
       const result = await ctx.db
         .select()
         .from(patients)
         .leftJoin(owners, eq(patients.ownerId, owners.id))
-        .where(eq(patients.id, input.id))
+        .where(and(eq(patients.id, input.id), eq(patients.tenantId, input.tenantId)))
         .limit(1);
 
       if (!result[0]) {
