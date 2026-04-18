@@ -152,17 +152,21 @@ async function main() {
       // ────────────────────────────────────────────────────────────────────
       const usersToCreate = [...TEST_DATA.users];
 
-      // If DEMO_ADMIN_CLERK_ID is set, replace the first admin's clerkId with it
-      const demoAdminClerkId = process.env.DEMO_ADMIN_CLERK_ID;
-      if (demoAdminClerkId) {
-        const firstAdminIdx = usersToCreate.findIndex((u) => u.role === "admin");
-        if (firstAdminIdx !== -1) {
-          usersToCreate[firstAdminIdx] = {
-            ...usersToCreate[firstAdminIdx],
-            clerkId: demoAdminClerkId,
-          };
+      // Replace test clerkIds with real ones from env vars (DEMO_ADMIN_CLERK_ID, DEMO_VET_CLERK_ID, etc.)
+      const roles = ["admin", "vet", "receptionist"];
+      roles.forEach((role) => {
+        const envVarName = `DEMO_${role.toUpperCase()}_CLERK_ID`;
+        const realClerkId = process.env[envVarName];
+        if (realClerkId) {
+          const idx = usersToCreate.findIndex((u) => u.role === role);
+          if (idx !== -1) {
+            usersToCreate[idx] = {
+              ...usersToCreate[idx],
+              clerkId: realClerkId,
+            };
+          }
         }
-      }
+      });
 
       const createdUsers = await Promise.all(
         usersToCreate.map((u) =>
