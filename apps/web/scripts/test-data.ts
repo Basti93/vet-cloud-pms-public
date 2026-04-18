@@ -270,7 +270,7 @@ export const TEST_DATA = {
     // Past (completed) - distributed across all vets
     {
       patientIndex: 0,
-      vetIndex: 1, // Mueller
+      vetIndex: 0, // Mueller
       title: "Routineuntersuchung",
       description: "Demo appointment",
       daysFromNow: -7,
@@ -279,7 +279,7 @@ export const TEST_DATA = {
     },
     {
       patientIndex: 1,
-      vetIndex: 2, // Schmidt
+      vetIndex: 1, // Schmidt
       title: "Zahnreinigung",
       description: "Demo appointment",
       daysFromNow: -6,
@@ -288,7 +288,7 @@ export const TEST_DATA = {
     },
     {
       patientIndex: 2,
-      vetIndex: 3, // Weber
+      vetIndex: 2, // Weber
       title: "Impfung (Tollwut)",
       description: "Demo appointment",
       daysFromNow: -5,
@@ -307,7 +307,7 @@ export const TEST_DATA = {
     // No-show
     {
       patientIndex: 4,
-      vetIndex: 2, // Schmidt
+      vetIndex: 1, // Schmidt
       title: "Untersuchung",
       description: "Demo appointment",
       daysFromNow: -3,
@@ -317,7 +317,7 @@ export const TEST_DATA = {
     // Cancelled
     {
       patientIndex: 5,
-      vetIndex: 3, // Weber
+      vetIndex: 2, // Weber
       title: "Gesundheitscheck",
       description: "Demo appointment",
       daysFromNow: -2,
@@ -327,7 +327,7 @@ export const TEST_DATA = {
     // Future (scheduled) - distributed across all vets with plenty of free slots
     {
       patientIndex: 0,
-      vetIndex: 2, // Schmidt
+      vetIndex: 1, // Schmidt
       title: "Nachuntersuchung",
       description: "Demo appointment",
       daysFromNow: 1,
@@ -336,7 +336,7 @@ export const TEST_DATA = {
     },
     {
       patientIndex: 2,
-      vetIndex: 3, // Weber
+      vetIndex: 2, // Weber
       title: "Impfauffrischung",
       description: "Demo appointment",
       daysFromNow: 2,
@@ -355,7 +355,7 @@ export const TEST_DATA = {
     // Additional scheduled appointments - spread out even more
     {
       patientIndex: 3,
-      vetIndex: 3, // Weber
+      vetIndex: 2, // Weber
       title: "Ohrenuntersuchung",
       description: "Demo appointment",
       daysFromNow: 4,
@@ -373,7 +373,7 @@ export const TEST_DATA = {
     },
     {
       patientIndex: 5,
-      vetIndex: 2, // Schmidt
+      vetIndex: 1, // Schmidt
       title: "Ultraschalluntersuchung",
       description: "Demo appointment",
       daysFromNow: 6,
@@ -389,7 +389,7 @@ export const TEST_DATA = {
   onlineBookings: [
     {
       patientIndex: 0, // Bella
-      vetIndex: 1, // Mueller
+      vetIndex: 0, // Mueller
       title: "Ohrenbehandlung",
       daysFromNow: 20,
       hour: 14,
@@ -397,7 +397,7 @@ export const TEST_DATA = {
     },
     {
       patientIndex: 2, // Luna
-      vetIndex: 2, // Schmidt
+      vetIndex: 1, // Schmidt
       title: "Allergie-Kontrolle",
       daysFromNow: 21,
       hour: 15,
@@ -405,7 +405,7 @@ export const TEST_DATA = {
     },
     {
       patientIndex: 1, // Milo
-      vetIndex: 3, // Weber
+      vetIndex: 2, // Weber
       title: "Zahnreinigung",
       daysFromNow: 22,
       hour: 11,
@@ -413,7 +413,7 @@ export const TEST_DATA = {
     },
     {
       patientIndex: 4, // Whiskers
-      vetIndex: 1, // Mueller
+      vetIndex: 0, // Mueller
       title: "Gewichtskontrolle",
       daysFromNow: 23,
       hour: 10,
@@ -426,32 +426,32 @@ export const TEST_DATA = {
   // dayOfWeek: 0=Sun, 1=Mon, ..., 6=Sat
   // ────────────────────────────────────────────────────────────────────────
   vetSchedules: [
-    // Dr. Mueller (vetIndex 1) - Monday to Friday, 8-18
-    { vetIndex: 1, dayOfWeek: 1, startHour: 8, endHour: 18, isWorkingDay: true },
-    { vetIndex: 1, dayOfWeek: 2, startHour: 8, endHour: 18, isWorkingDay: true },
-    { vetIndex: 1, dayOfWeek: 3, startHour: 8, endHour: 18, isWorkingDay: true },
-    { vetIndex: 1, dayOfWeek: 4, startHour: 8, endHour: 18, isWorkingDay: true },
-    { vetIndex: 1, dayOfWeek: 5, startHour: 8, endHour: 18, isWorkingDay: true },
-    { vetIndex: 1, dayOfWeek: 6, startHour: 10, endHour: 14, isWorkingDay: true }, // Saturday morning
+    // Dr. Mueller (vetIndex 0) - Monday to Friday, 8-18
+    { vetIndex: 0, dayOfWeek: 1, startHour: 8, endHour: 18, isWorkingDay: true },
+    { vetIndex: 0, dayOfWeek: 2, startHour: 8, endHour: 18, isWorkingDay: true },
+    { vetIndex: 0, dayOfWeek: 3, startHour: 8, endHour: 18, isWorkingDay: true },
+    { vetIndex: 0, dayOfWeek: 4, startHour: 8, endHour: 18, isWorkingDay: true },
+    { vetIndex: 0, dayOfWeek: 5, startHour: 8, endHour: 18, isWorkingDay: true },
+    { vetIndex: 0, dayOfWeek: 6, startHour: 10, endHour: 14, isWorkingDay: true }, // Saturday morning
+    { vetIndex: 0, dayOfWeek: 0, startHour: 0, endHour: 0, isWorkingDay: false }, // Sunday off
+
+    // Dr. Schmidt (vetIndex 1) - Tuesday to Saturday, 9-17
+    { vetIndex: 1, dayOfWeek: 1, startHour: 9, endHour: 17, isWorkingDay: true },
+    { vetIndex: 1, dayOfWeek: 2, startHour: 9, endHour: 17, isWorkingDay: true },
+    { vetIndex: 1, dayOfWeek: 3, startHour: 0, endHour: 0, isWorkingDay: false }, // Wednesday off
+    { vetIndex: 1, dayOfWeek: 4, startHour: 9, endHour: 17, isWorkingDay: true },
+    { vetIndex: 1, dayOfWeek: 5, startHour: 9, endHour: 17, isWorkingDay: true },
+    { vetIndex: 1, dayOfWeek: 6, startHour: 9, endHour: 14, isWorkingDay: true }, // Saturday afternoon
     { vetIndex: 1, dayOfWeek: 0, startHour: 0, endHour: 0, isWorkingDay: false }, // Sunday off
 
-    // Dr. Schmidt (vetIndex 2) - Tuesday to Saturday, 9-17
-    { vetIndex: 2, dayOfWeek: 1, startHour: 9, endHour: 17, isWorkingDay: true },
-    { vetIndex: 2, dayOfWeek: 2, startHour: 9, endHour: 17, isWorkingDay: true },
-    { vetIndex: 2, dayOfWeek: 3, startHour: 0, endHour: 0, isWorkingDay: false }, // Wednesday off
-    { vetIndex: 2, dayOfWeek: 4, startHour: 9, endHour: 17, isWorkingDay: true },
-    { vetIndex: 2, dayOfWeek: 5, startHour: 9, endHour: 17, isWorkingDay: true },
-    { vetIndex: 2, dayOfWeek: 6, startHour: 9, endHour: 14, isWorkingDay: true }, // Saturday afternoon
+    // Dr. Weber (vetIndex 2) - Monday to Friday, 10-19 (late shift)
+    { vetIndex: 2, dayOfWeek: 1, startHour: 10, endHour: 19, isWorkingDay: true },
+    { vetIndex: 2, dayOfWeek: 2, startHour: 10, endHour: 19, isWorkingDay: true },
+    { vetIndex: 2, dayOfWeek: 3, startHour: 10, endHour: 19, isWorkingDay: true },
+    { vetIndex: 2, dayOfWeek: 4, startHour: 10, endHour: 19, isWorkingDay: true },
+    { vetIndex: 2, dayOfWeek: 5, startHour: 10, endHour: 19, isWorkingDay: true },
+    { vetIndex: 2, dayOfWeek: 6, startHour: 0, endHour: 0, isWorkingDay: false }, // Saturday off
     { vetIndex: 2, dayOfWeek: 0, startHour: 0, endHour: 0, isWorkingDay: false }, // Sunday off
-
-    // Dr. Weber (vetIndex 3) - Monday to Friday, 10-19 (late shift)
-    { vetIndex: 3, dayOfWeek: 1, startHour: 10, endHour: 19, isWorkingDay: true },
-    { vetIndex: 3, dayOfWeek: 2, startHour: 10, endHour: 19, isWorkingDay: true },
-    { vetIndex: 3, dayOfWeek: 3, startHour: 10, endHour: 19, isWorkingDay: true },
-    { vetIndex: 3, dayOfWeek: 4, startHour: 10, endHour: 19, isWorkingDay: true },
-    { vetIndex: 3, dayOfWeek: 5, startHour: 10, endHour: 19, isWorkingDay: true },
-    { vetIndex: 3, dayOfWeek: 6, startHour: 0, endHour: 0, isWorkingDay: false }, // Saturday off
-    { vetIndex: 3, dayOfWeek: 0, startHour: 0, endHour: 0, isWorkingDay: false }, // Sunday off
   ],
 };
 
