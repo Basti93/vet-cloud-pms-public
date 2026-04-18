@@ -163,6 +163,31 @@ async function main() {
         )
       );
 
+      // ────────────────────────────────────────────────────────────────────
+      // ASSIGN ROLES TO USERS
+      // ────────────────────────────────────────────────────────────────────
+      console.log("🔐 Assigning roles to users...");
+      const rolesByName = (await db.select().from(roles).where(eq(roles.tenantId, DEMO_TENANT_ID))).reduce(
+        (acc, role) => {
+          acc[role.name.toLowerCase()] = role.id;
+          return acc;
+        },
+        {} as Record<string, string>
+      );
+
+      await Promise.all(
+        createdUsers.map((u) => {
+          if (!u) return Promise.resolve(null);
+          const roleId = rolesByName[u.role.toLowerCase()];
+          if (!roleId) return Promise.resolve(null);
+          return db
+            .update(users)
+            .set({ roleId })
+            .where(eq(users.id, u.id));
+        })
+      );
+      console.log("  ✓ Roles assigned\n");
+
       const createdVets = createdUsers.filter((u) => u?.role === "vet");
       if (createdVets.length === 0) {
         throw new Error("No vet users created");
