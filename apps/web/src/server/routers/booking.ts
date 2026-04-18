@@ -318,7 +318,7 @@ export const bookingRouter = createTRPCRouter({
         where: (t, { eq }) => eq(t.id, input.tenantId),
       });
 
-      if (tenant) {
+      if (tenant && owner.email) {
         try {
           // Generate confirmation token
           const confirmToken = generateConfirmationToken(appointment.id, owner.email, "confirm");
