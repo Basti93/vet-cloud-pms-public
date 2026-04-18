@@ -79,6 +79,18 @@ async function seed() {
     console.log(`  ✓ ${TEST_DATA.tenant.name}\n`);
 
     // ────────────────────────────────────────────────────────────────────────
+    // CLEANUP (remove old test data to prevent duplicates on re-runs)
+    // ────────────────────────────────────────────────────────────────────────
+    console.log("🗑️  Cleaning up old test data...");
+    await db.delete(appointments).where(eq(appointments.tenantId, tenantId));
+    await db.delete(diagnoses).where(eq(diagnoses.tenantId, tenantId));
+    await db.delete(medications).where(eq(medications.tenantId, tenantId));
+    await db.delete(vitals).where(eq(vitals.tenantId, tenantId));
+    await db.delete(patients).where(eq(patients.tenantId, tenantId));
+    await db.delete(owners).where(eq(owners.tenantId, tenantId));
+    console.log("  ✓ Old data removed\n");
+
+    // ────────────────────────────────────────────────────────────────────────
     // 2. CREATE USERS
     // ────────────────────────────────────────────────────────────────────────
     console.log("👤 Creating users...");
