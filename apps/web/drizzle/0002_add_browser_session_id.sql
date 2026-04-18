@@ -1,0 +1,2 @@
+ALTER TABLE "appointment_holds" ADD COLUMN "browser_session_id" uuid NOT NULL;--> statement-breakpoint
+CREATE INDEX "appointment_holds_tenant_session_idx" ON "appointment_holds" USING btree ("tenant_id","browser_session_id");

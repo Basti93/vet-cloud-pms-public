@@ -518,6 +518,7 @@ export const appointmentHolds = pgTable(
       .references(() => tenants.id, { onDelete: "cascade" }),
     slotDatetime: timestamp("slot_datetime", { withTimezone: true }).notNull(),
     vetId: uuid("vet_id").references(() => users.id, { onDelete: "cascade" }),
+    browserSessionId: uuid("browser_session_id").notNull(),
     sessionToken: uuid("session_token").notNull().unique(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -525,6 +526,10 @@ export const appointmentHolds = pgTable(
       .notNull(),
   },
   (table) => ({
+    tenantSessionIdx: index("appointment_holds_tenant_session_idx").on(
+      table.tenantId,
+      table.browserSessionId
+    ),
     tenantSlotIdx: index("appointment_holds_tenant_slot_idx").on(
       table.tenantId,
       table.slotDatetime

@@ -249,6 +249,7 @@ export const bookingRouter = createTRPCRouter({
           phone: z.string().min(3).max(20),
         }),
         vetId: z.string().uuid().optional(),
+        browserSessionId: z.string().uuid(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -336,13 +337,13 @@ export const bookingRouter = createTRPCRouter({
         })
         .returning();
 
-      // Clean up any holds for this slot (booking succeeded)
+      // Clean up all holds for this browser session (booking succeeded — DSGVO: delete session data)
       await ctx.db
         .delete(appointmentHolds)
         .where(
           and(
             eq(appointmentHolds.tenantId, input.tenantId),
-            eq(appointmentHolds.slotDatetime, input.slotStart)
+            eq(appointmentHolds.browserSessionId, input.browserSessionId)
           )
         );
 
@@ -411,13 +412,24 @@ export const bookingRouter = createTRPCRouter({
         tenantId: z.string().uuid(),
         slotDatetime: z.date(),
         vetId: z.string().uuid().optional(),
+        browserSessionId: z.string().uuid(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       const now = new Date();
       const slotEnd = new Date(input.slotDatetime.getTime() + SLOT_DURATION_MIN * 60_000);
 
-      // 1. Cleanup expired holds (opportunistic — no separate job needed)
+      // 1. Delete old holds from same browser session (only 1 active hold per user)
+      await ctx.db
+        .delete(appointmentHolds)
+        .where(
+          and(
+            eq(appointmentHolds.tenantId, input.tenantId),
+            eq(appointmentHolds.browserSessionId, input.browserSessionId)
+          )
+        );
+
+      // 2. Cleanup expired holds (opportunistic — no separate job needed)
       await ctx.db
         .delete(appointmentHolds)
         .where(lt(appointmentHolds.expiresAt, now));
@@ -483,6 +495,7 @@ export const bookingRouter = createTRPCRouter({
           tenantId: input.tenantId,
           slotDatetime: input.slotDatetime,
           vetId: input.vetId ?? null,
+          browserSessionId: input.browserSessionId,
           sessionToken,
           expiresAt,
         })

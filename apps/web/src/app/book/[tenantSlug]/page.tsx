@@ -264,6 +264,7 @@ function StepDate({
   vetId,
   vets,
   primaryColor,
+  browserSessionId,
   onBack,
   onSelect,
 }: {
@@ -271,6 +272,7 @@ function StepDate({
   vetId: string;
   vets?: VetOption[];
   primaryColor: string;
+  browserSessionId: string;
   onBack: () => void;
   onSelect: (slot: Slot, holdToken: string, holdExpiresAt: Date) => void;
 }) {
@@ -319,7 +321,7 @@ function StepDate({
     setSelectedSlot(slot);
 
     holdSlotMutation.mutate(
-      { tenantId, slotDatetime: slot.start, vetId: vetId || undefined },
+      { tenantId, slotDatetime: slot.start, vetId: vetId || undefined, browserSessionId },
       {
         onSuccess: (data) => {
           setHoldToken(data.holdToken);
@@ -691,6 +693,7 @@ function StepConfirm({
   vets,
   selectedVetId,
   primaryColor,
+  browserSessionId,
   holdToken,
   holdExpiresAt,
   onHoldExpired,
@@ -704,6 +707,7 @@ function StepConfirm({
   vets?: VetOption[];
   selectedVetId?: string;
   primaryColor: string;
+  browserSessionId: string;
   holdToken?: string | null;
   holdExpiresAt?: Date | null;
   onHoldExpired?: () => void;
@@ -748,6 +752,7 @@ function StepConfirm({
         phone: owner.phone,
       },
       vetId: selectedVetId || undefined,
+      browserSessionId,
     });
   };
 
@@ -1070,6 +1075,7 @@ export default function BookingPage({
                   vetId={selectedVetId}
                   vets={vets}
                   primaryColor={primaryColor}
+                  browserSessionId={formState.browserSessionId!}
                   onBack={() => setStep("vet")}
                   onSelect={(s, token, expiresAt) => {
                     updateField("date", JSON.stringify(s));
@@ -1102,6 +1108,7 @@ export default function BookingPage({
                   vets={vets}
                   selectedVetId={selectedVetId}
                   primaryColor={primaryColor}
+                  browserSessionId={formState.browserSessionId!}
                   holdToken={holdToken}
                   holdExpiresAt={holdExpiresAt}
                   onHoldExpired={handleHoldExpired}
