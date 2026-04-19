@@ -50,6 +50,7 @@ export default async function PracticeWebsitePage({ params }: Props) {
       brandName={tenant.name}
       tagline={tenant.tagline || ''}
       monogram={tenant.monogram || tenant.name.slice(0, 2).toUpperCase()}
+      slug={tenant.slug}
       phone={tenant.phone || undefined}
       email={tenant.email || undefined}
       address={tenant.address || undefined}

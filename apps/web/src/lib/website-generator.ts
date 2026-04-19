@@ -7,6 +7,7 @@ export interface WebsiteData {
   brandName: string;
   tagline: string;
   monogram: string;
+  slug: string;
   phone?: string;
   email?: string;
   address?: string;

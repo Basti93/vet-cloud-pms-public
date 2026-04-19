@@ -6,6 +6,7 @@ interface KlassikTemplateProps {
   brandName: string;
   tagline: string;
   monogram: string;
+  slug: string;
   phone?: string;
   email?: string;
   address?: string;
@@ -16,6 +17,7 @@ export function KlassikTemplate({
   brandName,
   tagline,
   monogram,
+  slug,
   phone = '+49 123 456789',
   email = 'kontakt@praxis.de',
   address = 'Musterstraße 1',
@@ -59,20 +61,19 @@ export function KlassikTemplate({
           >
             {tagline}
           </p>
-          <button
-            className="px-8 py-3 rounded-lg text-white font-medium transition-all"
-            style={{
-              backgroundColor: 'var(--color-accent)',
-            }}
+          <a
+            href={`/book/${slug}`}
+            className="px-8 py-3 rounded-lg text-white font-medium transition-all inline-block"
+            style={{ backgroundColor: 'var(--color-accent)' }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-accent-hover)';
+              (e.currentTarget as HTMLAnchorElement).style.backgroundColor = 'var(--color-accent-hover)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-accent)';
+              (e.currentTarget as HTMLAnchorElement).style.backgroundColor = 'var(--color-accent)';
             }}
           >
             Termin buchen
-          </button>
+          </a>
         </div>
       </header>
 

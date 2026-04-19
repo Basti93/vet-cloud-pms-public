@@ -6,6 +6,7 @@ interface ModernTemplateProps {
   brandName: string;
   tagline: string;
   monogram: string;
+  slug: string;
   phone?: string;
   email?: string;
   address?: string;
@@ -16,6 +17,7 @@ export function ModernTemplate({
   brandName,
   tagline,
   monogram,
+  slug,
   phone = '+49 123 456789',
   email = 'kontakt@praxis.de',
   address = 'Musterstraße 1',
@@ -42,20 +44,19 @@ export function ModernTemplate({
               <p className="text-xs text-muted">{tagline}</p>
             </div>
           </div>
-          <button
-            className="px-6 py-2.5 rounded-lg text-white font-medium transition-all"
-            style={{
-              backgroundColor: 'var(--color-accent)',
-            }}
+          <a
+            href={`/book/${slug}`}
+            className="px-6 py-2.5 rounded-lg text-white font-medium transition-all inline-block"
+            style={{ backgroundColor: 'var(--color-accent)' }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-accent-hover)';
+              (e.currentTarget as HTMLAnchorElement).style.backgroundColor = 'var(--color-accent-hover)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-accent)';
+              (e.currentTarget as HTMLAnchorElement).style.backgroundColor = 'var(--color-accent)';
             }}
           >
             Termin buchen
-          </button>
+          </a>
         </div>
       </header>
 
@@ -79,20 +80,19 @@ export function ModernTemplate({
           <p className="text-lg text-muted mb-8">
             Wir sind Ihre vertrauenswürdige Tierarztpraxis mit modernen Einrichtungen und erfahrenem Personal.
           </p>
-          <button
+          <a
+            href={`/book/${slug}`}
             className="px-8 py-4 rounded-lg text-white font-medium inline-flex items-center gap-2 transition-all"
-            style={{
-              backgroundColor: 'var(--color-accent)',
-            }}
+            style={{ backgroundColor: 'var(--color-accent)' }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-accent-hover)';
+              (e.currentTarget as HTMLAnchorElement).style.backgroundColor = 'var(--color-accent-hover)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--color-accent)';
+              (e.currentTarget as HTMLAnchorElement).style.backgroundColor = 'var(--color-accent)';
             }}
           >
             Online Termin buchen <ArrowRight className="w-4 h-4" />
-          </button>
+          </a>
         </div>
       </section>
 

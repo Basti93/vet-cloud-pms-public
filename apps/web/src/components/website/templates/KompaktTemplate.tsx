@@ -6,6 +6,7 @@ interface KompaktTemplateProps {
   brandName: string;
   tagline: string;
   monogram: string;
+  slug: string;
   phone?: string;
   email?: string;
   address?: string;
@@ -16,6 +17,7 @@ export function KompaktTemplate({
   brandName,
   tagline,
   monogram,
+  slug,
   phone = '+49 123 456789',
   email = 'kontakt@praxis.de',
   address = 'Musterstraße 1',
