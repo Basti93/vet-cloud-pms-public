@@ -79,7 +79,7 @@ export const COLOR_PRESETS: Record<ColorPresetKey, ColorPreset> = {
     border: "oklch(92% 0.006 150)",
     borderStrong: "oklch(86% 0.008 150)",
     fg: "oklch(22% 0.01 200)",
-    muted: "oklch(48% 0.01 200)",
+    muted: "oklch(38% 0.01 200)",
     mutedSoft: "oklch(96% 0.004 150)",
   },
   warmsand: {
@@ -94,7 +94,7 @@ export const COLOR_PRESETS: Record<ColorPresetKey, ColorPreset> = {
     border: "oklch(91% 0.008 80)",
     borderStrong: "oklch(85% 0.01 80)",
     fg: "oklch(22% 0.012 60)",
-    muted: "oklch(48% 0.012 60)",
+    muted: "oklch(38% 0.012 60)",
     mutedSoft: "oklch(96% 0.006 80)",
   },
   klinikblau: {
@@ -109,7 +109,7 @@ export const COLOR_PRESETS: Record<ColorPresetKey, ColorPreset> = {
     border: "oklch(92% 0.006 240)",
     borderStrong: "oklch(86% 0.008 240)",
     fg: "oklch(22% 0.012 240)",
-    muted: "oklch(48% 0.012 240)",
+    muted: "oklch(38% 0.012 240)",
     mutedSoft: "oklch(96% 0.004 240)",
   },
   bordeaux: {
@@ -124,7 +124,7 @@ export const COLOR_PRESETS: Record<ColorPresetKey, ColorPreset> = {
     border: "oklch(91% 0.008 30)",
     borderStrong: "oklch(85% 0.01 30)",
     fg: "oklch(22% 0.012 25)",
-    muted: "oklch(48% 0.012 25)",
+    muted: "oklch(38% 0.012 25)",
     mutedSoft: "oklch(96% 0.005 30)",
   },
   forest: {
@@ -139,7 +139,7 @@ export const COLOR_PRESETS: Record<ColorPresetKey, ColorPreset> = {
     border: "oklch(91% 0.006 150)",
     borderStrong: "oklch(85% 0.008 150)",
     fg: "oklch(22% 0.012 180)",
-    muted: "oklch(48% 0.012 180)",
+    muted: "oklch(38% 0.012 180)",
     mutedSoft: "oklch(96% 0.004 150)",
   },
   schiefer: {
@@ -154,7 +154,7 @@ export const COLOR_PRESETS: Record<ColorPresetKey, ColorPreset> = {
     border: "oklch(91% 0.004 250)",
     borderStrong: "oklch(85% 0.006 250)",
     fg: "oklch(20% 0.008 250)",
-    muted: "oklch(48% 0.008 250)",
+    muted: "oklch(36% 0.008 250)",
     mutedSoft: "oklch(96% 0.002 250)",
   },
 };

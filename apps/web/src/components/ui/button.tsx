@@ -20,10 +20,10 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     ref
   ) => {
     const variants = {
-      default: "bg-[var(--color-accent)] text-[var(--color-accent-text)] hover:bg-[var(--color-accent-hover)] active:bg-[var(--color-accent-hover)] shadow-sm",
+      default: "bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] active:bg-[var(--color-accent-hover)] shadow-sm",
       ghost: "text-fg hover:bg-[var(--color-accent-soft)] active:bg-muted-soft",
-      outline: "border border-[var(--color-border)] bg-surface text-[var(--color-accent)] hover:bg-[var(--color-accent-soft)] active:bg-muted-soft shadow-sm",
-      "outline-light": "border border-white/30 bg-transparent text-white hover:bg-white/10 active:bg-white/20 shadow-sm",
+      outline: "border border-[var(--color-border)] bg-surface text-[var(--color-accent-text)] hover:bg-[var(--color-accent-soft)] active:bg-muted-soft shadow-sm",
+      "outline-light": "border border-white/50 bg-transparent text-white hover:bg-white/10 active:bg-white/20 shadow-sm",
       destructive: "bg-red-600 text-white hover:bg-red-700 active:bg-red-800 shadow-sm",
       success: "bg-green-600 text-white hover:bg-green-700 active:bg-green-800 shadow-sm",
     };
