@@ -25,6 +25,7 @@
     "@trpc/react-query": "^11",
     "@trpc/server": "^11",
     "@vapi-ai/web": "^2",
+    "@vercel/analytics": "^2.0.1",
     "drizzle-orm": "^0.40",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.400",
