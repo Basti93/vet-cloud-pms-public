@@ -1,7 +1,4 @@
 import { ClerkProvider } from "@clerk/nextjs";
-import { db } from "@/lib/db/client";
-import { tenants } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
 import {
   COLOR_PRESETS,
   TYPE_PAIRINGS,
@@ -10,35 +7,27 @@ import {
 } from "@/lib/theme";
 import { ReactNode } from "react";
 
-export default async function OnboardingLayout({ children }: { children: ReactNode }) {
-  const [demo] = await db
-    .select({
-      themePreference: tenants.themePreference,
-      typographyPreference: tenants.typographyPreference,
-    })
-    .from(tenants)
-    .where(eq(tenants.slug, "demo"))
-    .limit(1);
+// Use consistent sage brand colors (not tenant-specific, same as landing page)
+const BRAND_PRESET = COLOR_PRESETS["sage" as ColorPresetKey];
+const BRAND_TYPOGRAPHY = TYPE_PAIRINGS["modern" as TypographyPairingKey];
 
-  const preset = COLOR_PRESETS[(demo?.themePreference as ColorPresetKey) || "sage"];
-  const type = TYPE_PAIRINGS[(demo?.typographyPreference as TypographyPairingKey) || "modern"];
-
+export default function OnboardingLayout({ children }: { children: ReactNode }) {
   const themeStyle = {
-    "--color-accent": preset.accent,
-    "--color-accent-hover": preset.accentHover,
-    "--color-accent-soft": preset.accentSoft,
-    "--color-accent-text": preset.accentText,
-    "--color-bg": preset.bg,
-    "--color-surface": preset.surface,
-    "--color-border": preset.border,
-    "--color-border-strong": preset.borderStrong,
-    "--color-fg": preset.fg,
-    "--color-muted": preset.muted,
-    "--color-muted-soft": preset.mutedSoft,
-    "--font-heading": type.heading,
-    "--font-body": type.body,
-    "--font-heading-weight": String(type.headingWeight),
-    "--font-heading-tracking": type.headingTracking,
+    "--color-accent": BRAND_PRESET.accent,
+    "--color-accent-hover": BRAND_PRESET.accentHover,
+    "--color-accent-soft": BRAND_PRESET.accentSoft,
+    "--color-accent-text": BRAND_PRESET.accentText,
+    "--color-bg": BRAND_PRESET.bg,
+    "--color-surface": BRAND_PRESET.surface,
+    "--color-border": BRAND_PRESET.border,
+    "--color-border-strong": BRAND_PRESET.borderStrong,
+    "--color-fg": BRAND_PRESET.fg,
+    "--color-muted": BRAND_PRESET.muted,
+    "--color-muted-soft": BRAND_PRESET.mutedSoft,
+    "--font-heading": BRAND_TYPOGRAPHY.heading,
+    "--font-body": BRAND_TYPOGRAPHY.body,
+    "--font-heading-weight": String(BRAND_TYPOGRAPHY.headingWeight),
+    "--font-heading-tracking": BRAND_TYPOGRAPHY.headingTracking,
   } as React.CSSProperties;
 
   return (
