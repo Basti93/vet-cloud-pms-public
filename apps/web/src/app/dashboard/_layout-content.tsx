@@ -1,9 +1,11 @@
 "use client";
 
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { LayoutDashboard, Calendar, Users, Phone, ClipboardList, Clock, Menu, X, Settings } from "lucide-react";
+import { trpc } from "@/lib/trpc/client";
+import { generateCSSVariables, type ColorPresetKey, type TypographyPairingKey } from "@/lib/theme";
 
 const NAV_ITEMS = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Übersicht" },
@@ -17,21 +19,45 @@ const NAV_ITEMS = [
 
 export default function DashboardContent({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { data: tenant } = trpc.tenant.getCurrent.useQuery();
+
+  useEffect(() => {
+    const colorPreset = (tenant?.themePreference || 'sage') as ColorPresetKey;
+    const typographyPairing = (tenant?.typographyPreference || 'modern') as TypographyPairingKey;
+    const cssVariables = generateCSSVariables(colorPreset, typographyPairing);
+
+    cssVariables.split('\n').forEach((line) => {
+      const [key, value] = line.replace(/;$/, '').split(':');
+      if (key && value) {
+        document.documentElement.style.setProperty(key.trim(), value.trim());
+      }
+    });
+  }, [tenant]);
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
+    <div className="flex h-screen overflow-hidden" style={{ backgroundColor: 'var(--color-bg)' }}>
       {/* Sidebar */}
-      <aside className={`${sidebarOpen ? "w-64" : "hidden md:w-64"} md:block bg-gray-900 text-white flex flex-col flex-shrink-0 fixed md:static h-full z-40`}>
-        <div className="px-6 py-5 border-b border-gray-800">
+      <aside
+        className={`${sidebarOpen ? "w-64" : "hidden md:w-64"} md:block text-white flex flex-col flex-shrink-0 fixed md:static h-full z-40`}
+        style={{ backgroundColor: 'var(--color-accent)' }}
+      >
+        <div className="px-6 py-5 border-b" style={{ borderColor: 'var(--color-border-strong)' }}>
           <div className="flex items-center gap-2.5 justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-sm font-bold">VC</div>
+              <div
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold"
+                style={{ backgroundColor: 'var(--color-accent-soft)' }}
+              >
+                VC
+              </div>
               <div>
                 <p className="font-bold text-sm leading-tight">Vet Cloud</p>
-                <p className="text-xs text-gray-400 leading-tight">Praxisverwaltung</p>
+                <p className="text-xs leading-tight" style={{ color: 'var(--color-accent-soft)' }}>
+                  Praxisverwaltung
+                </p>
               </div>
             </div>
-            <button onClick={() => setSidebarOpen(false)} className="md:hidden p-1 hover:bg-gray-800 rounded-lg transition-colors">
+            <button onClick={() => setSidebarOpen(false)} className="md:hidden p-1 hover:opacity-80 rounded-lg transition-colors">
               <X size={20} />
             </button>
           </div>
@@ -42,17 +68,20 @@ export default function DashboardContent({ children }: { children: ReactNode }) 
               key={href}
               href={href}
               onClick={() => setSidebarOpen(false)}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-300 hover:text-white hover:bg-gray-800 transition-colors group"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-colors group"
+              style={{ color: 'var(--color-accent-soft)' }}
             >
-              <Icon size={18} className="text-gray-400 group-hover:text-white transition-colors" />
+              <Icon size={18} />
               {label}
             </Link>
           ))}
         </nav>
-        <div className="px-4 py-4 border-t border-gray-800">
+        <div className="px-4 py-4" style={{ borderColor: 'var(--color-border-strong)', borderTopWidth: '1px' }}>
           <div className="flex items-center gap-3">
             <UserButton appearance={{ elements: { avatarBox: "w-8 h-8" } }} />
-            <p className="text-xs text-gray-400">Angemeldet</p>
+            <p className="text-xs" style={{ color: 'var(--color-accent-soft)' }}>
+              Angemeldet
+            </p>
           </div>
         </div>
       </aside>
@@ -62,14 +91,31 @@ export default function DashboardContent({ children }: { children: ReactNode }) 
 
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <header className="bg-white border-b border-gray-200 px-4 md:px-8 py-4 flex items-center justify-between flex-shrink-0">
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="md:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors">
+        <header
+          className="px-4 md:px-8 py-4 flex items-center justify-between flex-shrink-0"
+          style={{
+            backgroundColor: 'var(--color-surface)',
+            borderColor: 'var(--color-border)',
+            borderBottomWidth: '1px',
+          }}
+        >
+          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="md:hidden p-2 rounded-lg transition-colors" style={{ color: 'var(--color-fg)' }}>
             {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
-          <span className="text-xs bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full font-medium">Demo-Praxis</span>
+          <span
+            className="text-xs px-2.5 py-1 rounded-full font-medium"
+            style={{
+              backgroundColor: 'var(--color-accent-soft)',
+              color: 'var(--color-accent-text)',
+            }}
+          >
+            {tenant?.name || 'Demo-Praxis'}
+          </span>
         </header>
-        <main className="flex-1 overflow-auto">
-          <div className="p-4 md:p-8">{children}</div>
+        <main className="flex-1 overflow-auto" style={{ backgroundColor: 'var(--color-bg)' }}>
+          <div className="p-4 md:p-8" style={{ color: 'var(--color-fg)' }}>
+            {children}
+          </div>
         </main>
       </div>
     </div>

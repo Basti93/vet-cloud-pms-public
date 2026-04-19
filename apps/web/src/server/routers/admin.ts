@@ -53,6 +53,7 @@ export const adminRouter = createTRPCRouter({
   /**
    * Get current user's full details (id, role, tenantId)
    * Protected: Auth required
+   * Returns null if user doesn't exist in database yet
    */
   getCurrentUser: protectedProcedure.query(async ({ ctx }) => {
     if (!ctx.userId) {
@@ -73,14 +74,7 @@ export const adminRouter = createTRPCRouter({
       .where(eq(users.clerkId, ctx.userId))
       .limit(1);
 
-    if (!user) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "User not found in database",
-      });
-    }
-
-    return user;
+    return user || null;
   }),
 
   /**

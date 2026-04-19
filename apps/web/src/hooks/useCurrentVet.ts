@@ -5,11 +5,14 @@ import { trpc } from "@/lib/trpc/client";
  * Use this on pages that should prioritize the current user's appointments.
  */
 export function useCurrentVet() {
-  const { data: currentUser } = trpc.admin.getCurrentUser.useQuery();
+  const { data: currentUser, isError } = trpc.admin.getCurrentUser.useQuery(undefined, {
+    retry: false,
+  });
 
-  if (currentUser?.role === "vet") {
-    return currentUser.id;
+  // Return null if user doesn't exist in database or is not a vet
+  if (isError || !currentUser?.role || currentUser.role !== "vet") {
+    return null;
   }
 
-  return null;
+  return currentUser.id;
 }

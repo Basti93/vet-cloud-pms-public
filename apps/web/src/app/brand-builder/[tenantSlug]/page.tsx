@@ -19,7 +19,6 @@ export default function BrandBuilderPage() {
   const [brandName, setBrandName] = useState('');
   const [tagline, setTagline] = useState('');
   const [monogram, setMonogram] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Fetch tenant data
@@ -27,6 +26,17 @@ export default function BrandBuilderPage() {
     { slug: tenantSlug },
     { enabled: !!tenantSlug }
   );
+
+  // tRPC mutation for saving theme
+  const updateThemeMutation = trpc.tenant.updateTheme.useMutation({
+    onSuccess: () => {
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    },
+    onError: (error) => {
+      console.error('Failed to save preferences:', error);
+    },
+  });
 
   // Load tenant's current theme preferences
   useEffect(() => {
@@ -41,23 +51,19 @@ export default function BrandBuilderPage() {
   }, [tenant]);
 
   const handleSave = async () => {
-    if (!isSignedIn || !userId) {
-      // User needs to sign up to save
-      // TODO: Redirect to sign-up with callback
+    if (!isSignedIn || !userId || !tenant) {
       return;
     }
 
-    setIsSaving(true);
-    try {
-      // TODO: Call API to save theme preferences
-      // For now, just simulate success
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
-    } catch (error) {
-      console.error('Failed to save preferences:', error);
-    } finally {
-      setIsSaving(false);
-    }
+    updateThemeMutation.mutate({
+      tenantId: tenant.id,
+      brandName,
+      tagline,
+      monogram,
+      themePreference: colorPreset,
+      typographyPreference: typographyPairing,
+      websiteTemplate: template,
+    });
   };
 
   if (isLoading) {
@@ -108,7 +114,7 @@ export default function BrandBuilderPage() {
               monogram={monogram}
               onMonogramChange={setMonogram}
               onSave={handleSave}
-              isSaving={isSaving}
+              isSaving={updateThemeMutation.isPending}
               canSave={isSignedIn ?? false}
               saveSuccess={saveSuccess}
             />

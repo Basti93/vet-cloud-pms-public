@@ -167,7 +167,7 @@ export function BrandSettingsForm({
       </Card>
 
       {/* Save Button */}
-      <Card className="p-6 bg-primary-soft border-primary">
+      <Card className="p-6 bg-surface border-[var(--color-border)]">
         {!canSave ? (
           <div className="text-center py-4">
             <p className="text-muted mb-4">Melden Sie sich an, um Ihre Einstellungen zu speichern</p>
@@ -187,7 +187,7 @@ export function BrandSettingsForm({
               variant="default"
               onClick={onSave}
               disabled={isSaving}
-              className="w-full"
+              className="w-full text-white font-medium"
             >
               {isSaving ? 'Speichern...' : 'Einstellungen speichern'}
             </Button>

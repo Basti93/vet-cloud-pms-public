@@ -1,3 +1,5 @@
+'use client';
+
 import { Mail, Phone, MapPin, Clock, ArrowRight } from 'lucide-react';
 
 interface ModernTemplateProps {
