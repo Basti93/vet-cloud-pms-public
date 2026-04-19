@@ -109,7 +109,7 @@ export default function BrandBuilderPage() {
               onMonogramChange={setMonogram}
               onSave={handleSave}
               isSaving={isSaving}
-              canSave={isSignedIn}
+              canSave={isSignedIn ?? false}
               saveSuccess={saveSuccess}
             />
           </div>

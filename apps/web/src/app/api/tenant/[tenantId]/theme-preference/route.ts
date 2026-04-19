@@ -3,12 +3,14 @@ import { db } from '@/lib/db/client';
 import { tenants } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 
+type Params = Promise<{ tenantId: string }>;
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: { tenantId: string } }
+  { params }: { params: Params }
 ) {
   try {
-    const { tenantId } = params;
+    const { tenantId } = await params;
 
     const tenant = await db
       .select({
