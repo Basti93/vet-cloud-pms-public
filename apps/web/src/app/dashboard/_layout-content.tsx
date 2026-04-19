@@ -3,7 +3,7 @@
 import { ReactNode, useState, useEffect } from "react";
 import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
-import { LayoutDashboard, Calendar, Users, Phone, ClipboardList, Clock, Menu, X, Settings } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, Phone, ClipboardList, Clock, Menu, X, Settings, Palette } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { generateCSSVariables, type ColorPresetKey, type TypographyPairingKey } from "@/lib/theme";
 
@@ -14,12 +14,17 @@ const NAV_ITEMS = [
   { href: "/dashboard/patients", icon: Users, label: "Patienten" },
   { href: "/dashboard/bookings", icon: ClipboardList, label: "Buchungsanfragen" },
   { href: "/dashboard/voice", icon: Phone, label: "AI-Rezeption" },
-  { href: "/dashboard/users", icon: Settings, label: "Benutzerverwaltung" },
+];
+
+const ADMIN_NAV_ITEMS = [
+  { href: "/dashboard/users", icon: Settings, label: "Benutzerverwaltung", adminOnly: true },
+  { href: "/brand-builder/demo", icon: Palette, label: "Brand Builder", adminOnly: true },
 ];
 
 export default function DashboardContent({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { data: tenant } = trpc.tenant.getCurrent.useQuery();
+  const { data: user } = trpc.admin.getCurrentUser.useQuery();
 
   useEffect(() => {
     if (!tenant) return;
@@ -76,6 +81,23 @@ export default function DashboardContent({ children }: { children: ReactNode }) 
               {label}
             </Link>
           ))}
+          {user?.role === 'admin' && (
+            <>
+              <div className="my-2" style={{ borderColor: 'var(--color-accent-soft)', borderTopWidth: '1px', opacity: 0.3 }} />
+              {ADMIN_NAV_ITEMS.map(({ href, icon: Icon, label }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  onClick={() => setSidebarOpen(false)}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-colors group"
+                  style={{ color: 'var(--color-accent-soft)' }}
+                >
+                  <Icon size={18} />
+                  {label}
+                </Link>
+              ))}
+            </>
+          )}
         </nav>
         <div className="px-4 py-4" style={{ borderColor: 'var(--color-border-strong)', borderTopWidth: '1px' }}>
           <div className="flex items-center gap-3">
