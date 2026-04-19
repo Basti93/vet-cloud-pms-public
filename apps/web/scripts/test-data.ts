@@ -26,11 +26,6 @@ export const TEST_DATA = {
     subscriptionStatus: "trial" as const,
     subscriptionPlan: "starter" as const,
     maxUsers: 5,
-    themePreference: "sage" as const,
-    typographyPreference: "modern" as const,
-    websiteTemplate: "modern" as const,
-    tagline: "Tierarztpraxis mit Leidenschaft",
-    monogram: "DP",
   },
 
   // ────────────────────────────────────────────────────────────────────────
