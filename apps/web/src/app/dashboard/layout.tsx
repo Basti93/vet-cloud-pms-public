@@ -40,18 +40,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     }
   }
 
-  // Fall back to demo tenant if user not linked
-  if (!tenant) {
-    const [demo] = await db
-      .select({
-        themePreference: tenants.themePreference,
-        typographyPreference: tenants.typographyPreference,
-      })
-      .from(tenants)
-      .where(eq(tenants.slug, "demo"))
-      .limit(1);
-    tenant = demo;
-  }
+  // No tenant found — fall back to default (globals.css sage theme)
 
   if (tenant) {
     const preset = COLOR_PRESETS[(tenant.themePreference as ColorPresetKey) || "sage"];

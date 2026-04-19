@@ -1,11 +1,10 @@
 "use client";
 
-import { ReactNode, useState, useEffect } from "react";
+import { ReactNode, useState } from "react";
 import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
-import { LayoutDashboard, Calendar, Users, Phone, ClipboardList, Clock, Menu, X, Settings, Palette } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, Phone, ClipboardList, Clock, Menu, X, Settings } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
-import { generateCSSVariables, type ColorPresetKey, type TypographyPairingKey } from "@/lib/theme";
 
 const NAV_ITEMS = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Übersicht" },
@@ -17,28 +16,13 @@ const NAV_ITEMS = [
 ];
 
 const ADMIN_NAV_ITEMS = [
-  { href: "/dashboard/users", icon: Settings, label: "Benutzerverwaltung", adminOnly: true },
-  { href: "/brand-builder/demo", icon: Palette, label: "Brand Builder", adminOnly: true },
+  { href: "/dashboard/settings", icon: Settings, label: "Praxisverwaltung", adminOnly: true },
 ];
 
 export default function DashboardContent({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { data: tenant } = trpc.tenant.getCurrent.useQuery();
-  const { data: user } = trpc.admin.getCurrentUser.useQuery();
-
-  useEffect(() => {
-    if (!tenant) return;
-    const colorPreset = (tenant.themePreference || 'sage') as ColorPresetKey;
-    const typographyPairing = (tenant.typographyPreference || 'modern') as TypographyPairingKey;
-    const cssVariables = generateCSSVariables(colorPreset, typographyPairing);
-
-    cssVariables.split('\n').forEach((line) => {
-      const [key, value] = line.replace(/;$/, '').split(':');
-      if (key && value) {
-        document.documentElement.style.setProperty(key.trim(), value.trim());
-      }
-    });
-  }, [tenant]);
+  const { data: user, isLoading: userLoading } = trpc.admin.getCurrentUser.useQuery();
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ backgroundColor: 'var(--color-bg)' }}>

@@ -50,7 +50,7 @@ export default function AppointmentsPage() {
   if (!userId) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-600">Bitte melden Sie sich an.</p>
+        <p className="text-muted">Bitte melden Sie sich an.</p>
       </div>
     );
   }
@@ -58,7 +58,7 @@ export default function AppointmentsPage() {
   if (!tenantId) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-600">Praxis-ID nicht gefunden.</p>
+        <p className="text-muted">Praxis-ID nicht gefunden.</p>
       </div>
     );
   }
@@ -92,64 +92,62 @@ export default function AppointmentsPage() {
 
 
   return (
-    <div className="min-h-screen bg-bg p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Termine</h1>
-          <p className="text-gray-600 mt-1">
-            {appointments ? `${appointments.length} Termine geladen` : 'Terminübersicht'}
-          </p>
-        </div>
-
-        {/* Filters */}
-        <TableFilters
-          tenantId={tenantId}
-          userId={userId}
-          filters={filters}
-          onChange={setFilters}
-          onReset={() =>
-            setFilters({
-              vetId: null,
-              status: null,
-              dateFrom: '',
-              dateTo: '',
-            })
-          }
-        />
-
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-          <Card className="p-4">
-            <p className="text-xs font-medium text-muted mb-1">Gesamt</p>
-            <p className="text-2xl font-bold text-fg">{stats.total}</p>
-          </Card>
-          <Card className="p-4 border-l-4 border-yellow-400">
-            <p className="text-xs font-medium text-muted mb-1">Geplant</p>
-            <p className="text-2xl font-bold text-yellow-600">{stats.scheduled}</p>
-          </Card>
-          <Card className="p-4 border-l-4 border-green-400">
-            <p className="text-xs font-medium text-muted mb-1">Abgeschlossen</p>
-            <p className="text-2xl font-bold text-green-600">{stats.completed}</p>
-          </Card>
-          <Card className="p-4 border-l-4 border-red-400">
-            <p className="text-xs font-medium text-muted mb-1">Abgelehnt</p>
-            <p className="text-2xl font-bold text-red-600">{stats.cancelled}</p>
-          </Card>
-          <Card className="p-4 border-l-4 border-gray-400">
-            <p className="text-xs font-medium text-muted mb-1">Nicht erschienen</p>
-            <p className="text-2xl font-bold text-muted">{stats.noShow}</p>
-          </Card>
-        </div>
-
-        {/* Appointments Table */}
-        <AppointmentTable
-          items={filteredAppointments}
-          vets={vets || []}
-          loading={isFetching}
-          showActions={false}
-        />
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-bold text-fg">Termine</h1>
+        <p className="text-muted mt-1">
+          {appointments ? `${appointments.length} Termine geladen` : 'Terminübersicht'}
+        </p>
       </div>
+
+      {/* Filters */}
+      <TableFilters
+        tenantId={tenantId}
+        userId={userId}
+        filters={filters}
+        onChange={setFilters}
+        onReset={() =>
+          setFilters({
+            vetId: null,
+            status: null,
+            dateFrom: '',
+            dateTo: '',
+          })
+        }
+      />
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <Card className="p-4">
+          <p className="text-xs font-medium text-muted mb-1">Gesamt</p>
+          <p className="text-2xl font-bold text-fg">{stats.total}</p>
+        </Card>
+        <Card className="p-4 border-l-4 border-yellow-400">
+          <p className="text-xs font-medium text-muted mb-1">Geplant</p>
+          <p className="text-2xl font-bold text-yellow-600">{stats.scheduled}</p>
+        </Card>
+        <Card className="p-4 border-l-4 border-green-400">
+          <p className="text-xs font-medium text-muted mb-1">Abgeschlossen</p>
+          <p className="text-2xl font-bold text-green-600">{stats.completed}</p>
+        </Card>
+        <Card className="p-4 border-l-4 border-red-400">
+          <p className="text-xs font-medium text-muted mb-1">Abgelehnt</p>
+          <p className="text-2xl font-bold text-red-600">{stats.cancelled}</p>
+        </Card>
+        <Card className="p-4 border-l-4 border-gray-400">
+          <p className="text-xs font-medium text-muted mb-1">Nicht erschienen</p>
+          <p className="text-2xl font-bold text-muted">{stats.noShow}</p>
+        </Card>
+      </div>
+
+      {/* Appointments Table */}
+      <AppointmentTable
+        items={filteredAppointments}
+        vets={vets || []}
+        loading={isFetching}
+        showActions={false}
+      />
     </div>
   );
 }

@@ -138,92 +138,54 @@ export default function BookingsPage() {
 
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-6">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Buchungsanfragen</h1>
-          <p className="text-gray-600 mb-3">Online-Buchungen von Kunden, die Sie bestätigen oder ablehnen müssen</p>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white rounded-lg shadow p-6 border-l-4 border-blue-400">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Gesamt</p>
-                <p className="text-2xl font-bold text-gray-900">{allBookingsCount}</p>
-              </div>
-              <Calendar className="w-8 h-8 text-blue-400" />
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow p-6 border-l-4 border-yellow-400">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Ausstehend</p>
-                <p className="text-2xl font-bold text-gray-900">{pendingBookings.length}</p>
-              </div>
-              <AlertCircle className="w-8 h-8 text-yellow-400" />
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow p-6 border-l-4 border-green-400">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Bestätigt</p>
-                <p className="text-2xl font-bold text-gray-900">{confirmedBookings.length}</p>
-              </div>
-              <CheckCircle2 className="w-8 h-8 text-green-400" />
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow p-6 border-l-4 border-red-400">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Abgelehnt</p>
-                <p className="text-2xl font-bold text-gray-900">{rejectedBookings.length}</p>
-              </div>
-              <XCircle className="w-8 h-8 text-red-400" />
-            </div>
-          </div>
-        </div>
-
-        {/* Filter Component */}
-        <TableFilters
-          tenantId={tenantId}
-          userId={userId}
-          filters={filters}
-          onChange={setFilters}
-          onReset={() =>
-            setFilters({
-              vetId: null,
-              status: null,
-              dateFrom: '',
-              dateTo: '',
-              searchQuery: '',
-            })
-          }
-          showSearch={true}
-          statusOptions={[
-            { value: 'scheduled', label: 'Ausstehend' },
-            { value: 'confirmed', label: 'Bestätigt' },
-            { value: 'cancelled', label: 'Abgelehnt' },
-          ]}
-        />
-
-        {/* Bookings List by Vet using shared component */}
-        <AppointmentTable
-          items={filteredBookings}
-          vets={vets || []}
-          loading={isFetching}
-          onConfirm={handleConfirm}
-          onReject={handleReject}
-          confirmingId={confirmingId}
-          rejectingId={rejectingId}
-          showActions={true}
-        />
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold text-fg">Buchungsanfragen</h1>
+        <p className="text-muted mt-1">Online-Buchungen von Kunden, die Sie bestätigen oder ablehnen müssen</p>
       </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: "Gesamt", value: allBookingsCount, icon: <Calendar size={20} />, color: "var(--color-accent)" },
+          { label: "Ausstehend", value: pendingBookings.length, icon: <AlertCircle size={20} />, color: "#d97706" },
+          { label: "Bestätigt", value: confirmedBookings.length, icon: <CheckCircle2 size={20} />, color: "#16a34a" },
+          { label: "Abgelehnt", value: rejectedBookings.length, icon: <XCircle size={20} />, color: "#dc2626" },
+        ].map(({ label, value, icon, color }) => (
+          <div key={label} className="bg-surface rounded-xl border border-border shadow-sm p-5">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-medium text-muted">{label}</p>
+              <span style={{ color }}>{icon}</span>
+            </div>
+            <p className="text-2xl font-bold text-fg">{value}</p>
+          </div>
+        ))}
+      </div>
+
+      <TableFilters
+        tenantId={tenantId}
+        userId={userId}
+        filters={filters}
+        onChange={setFilters}
+        onReset={() => setFilters({ vetId: null, status: null, dateFrom: '', dateTo: '', searchQuery: '' })}
+        showSearch={true}
+        statusOptions={[
+          { value: 'scheduled', label: 'Ausstehend' },
+          { value: 'confirmed', label: 'Bestätigt' },
+          { value: 'cancelled', label: 'Abgelehnt' },
+        ]}
+      />
+
+      <AppointmentTable
+        items={filteredBookings}
+        vets={vets || []}
+        loading={isFetching}
+        onConfirm={handleConfirm}
+        onReject={handleReject}
+        confirmingId={confirmingId}
+        rejectingId={rejectingId}
+        showActions={true}
+      />
     </div>
   );
 }

@@ -11,7 +11,7 @@
   --color-border: oklch(92% 0.006 150);
   --color-border-strong: oklch(86% 0.008 150);
   --color-fg: oklch(22% 0.01 200);
-  --color-muted: oklch(48% 0.01 200);
+  --color-muted: oklch(38% 0.01 200);
   --color-muted-soft: oklch(96% 0.004 150);
   --font-heading: ui-serif, Georgia, Garamond, "Times New Roman", serif;
   --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;

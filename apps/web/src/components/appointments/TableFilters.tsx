@@ -81,9 +81,13 @@ export function TableFilters({
         onClick={() => setIsExpanded(!isExpanded)}
         className={`w-full flex items-center justify-between p-3 md:p-4 rounded-lg border-2 transition-all cursor-pointer ${
           isExpanded
-            ? 'bg-indigo-50 border-indigo-300'
-            : 'bg-white border-gray-200 hover:border-gray-300'
+            ? 'rounded-b-none'
+            : 'bg-surface border-border hover:border-border-strong'
         }`}
+        style={isExpanded ? {
+          backgroundColor: "var(--color-accent-soft)",
+          borderColor: "var(--color-accent)",
+        } : undefined}
         role="button"
         tabIndex={0}
         onKeyDown={(e) => {
@@ -94,11 +98,11 @@ export function TableFilters({
         }}
       >
         <div className="flex items-center gap-3 min-w-0">
-          <Filter className="w-5 h-5 text-indigo-600 flex-shrink-0" />
+          <Filter className="w-5 h-5 flex-shrink-0" style={{ color: "var(--color-accent)" }} />
           <div className="text-left min-w-0">
-            <h3 className="font-semibold text-gray-900 text-sm md:text-base">Filter</h3>
+            <h3 className="font-semibold text-fg text-sm md:text-base">Filter</h3>
             {hasActiveFilters && (
-              <p className="text-xs text-indigo-600 truncate">
+              <p className="text-xs truncate" style={{ color: "var(--color-accent-text)" }}>
                 {[
                   filters.searchQuery && `Suche: "${filters.searchQuery}"`,
                   filters.vetId && 'Arzt gefiltert',
@@ -106,7 +110,7 @@ export function TableFilters({
                   (filters.dateFrom || filters.dateTo) && 'Datum gefiltert',
                 ]
                   .filter(Boolean)
-                  .join(' • ')}
+                  .join(' · ')}
               </p>
             )}
           </div>
@@ -119,14 +123,14 @@ export function TableFilters({
                 e.stopPropagation();
                 onReset();
               }}
-              className="p-2 text-gray-500 hover:text-gray-700 rounded-md hover:bg-gray-100 flex-shrink-0"
+              className="p-2 text-muted hover:text-fg rounded-md hover:bg-muted-soft flex-shrink-0"
               title="Filter zurücksetzen"
             >
               <X className="w-4 h-4" />
             </button>
           )}
           <ChevronDown
-            className={`w-5 h-5 text-gray-600 transition-transform flex-shrink-0 ${
+            className={`w-5 h-5 text-muted transition-transform flex-shrink-0 ${
               isExpanded ? 'rotate-180' : ''
             }`}
           />
@@ -135,21 +139,22 @@ export function TableFilters({
 
       {/* Filter Content (Expandable) */}
       {isExpanded && (
-        <div className="bg-white border border-t-0 border-gray-200 rounded-b-lg shadow-sm p-4 md:p-6 space-y-4 md:space-y-6">
+        <div className="bg-surface border border-t-0 border-border rounded-b-lg shadow-sm p-4 md:p-6 space-y-4 md:space-y-6">
           {/* Search */}
           {showSearch && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-muted mb-2">
                 Suche
               </label>
               <div className="relative">
-                <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                <Search className="absolute left-3 top-3 w-4 h-4 text-muted" />
                 <input
                   type="text"
                   placeholder="Name oder Email..."
                   value={filters.searchQuery || ''}
                   onChange={(e) => handleSearchChange(e.target.value)}
-                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full pl-10 pr-3 py-2 border border-border rounded-lg text-sm bg-surface text-fg focus:outline-none focus:ring-2"
+                  style={{ '--tw-ring-color': 'var(--color-accent)' } as React.CSSProperties}
                 />
               </div>
             </div>
@@ -160,13 +165,14 @@ export function TableFilters({
             {/* Vet Filter */}
             {vets && vets.length > 0 && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-muted mb-2">
                   Arzt
                 </label>
                 <select
                   value={filters.vetId || ''}
                   onChange={(e) => handleVetChange(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                  className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface text-fg focus:outline-none focus:ring-2"
+                  style={{ '--tw-ring-color': 'var(--color-accent)' } as React.CSSProperties}
                 >
                   <option value="">Alle Ärzte</option>
                   {vets.map((vet) => (
@@ -180,13 +186,14 @@ export function TableFilters({
 
             {/* Status Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-muted mb-2">
                 Status
               </label>
               <select
                 value={filters.status || ''}
                 onChange={(e) => handleStatusChange(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface text-fg focus:outline-none focus:ring-2"
+                style={{ '--tw-ring-color': 'var(--color-accent)' } as React.CSSProperties}
               >
                 <option value="">Alle Status</option>
                 {statusOptions.map((option) => (
@@ -199,27 +206,29 @@ export function TableFilters({
 
             {/* Date From */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-muted mb-2">
                 Von
               </label>
               <input
                 type="date"
                 value={filters.dateFrom}
                 onChange={(e) => handleDateFromChange(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface text-fg focus:outline-none focus:ring-2"
+                style={{ '--tw-ring-color': 'var(--color-accent)' } as React.CSSProperties}
               />
             </div>
 
             {/* Date To */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-muted mb-2">
                 Bis
               </label>
               <input
                 type="date"
                 value={filters.dateTo}
                 onChange={(e) => handleDateToChange(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface text-fg focus:outline-none focus:ring-2"
+                style={{ '--tw-ring-color': 'var(--color-accent)' } as React.CSSProperties}
               />
             </div>
           </div>

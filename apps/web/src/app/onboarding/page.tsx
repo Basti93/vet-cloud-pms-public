@@ -4,13 +4,20 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useState } from "react";
-import { CheckCircle, Mail, Building2, Users } from "lucide-react";
+import { CheckCircle, Mail, Building2, Users, Palette } from "lucide-react";
+import { COLOR_PRESETS, TYPE_PAIRINGS, type ColorPresetKey, type TypographyPairingKey } from "@/lib/theme";
+
+const THEME_OPTIONS: ColorPresetKey[] = ["sage", "warmsand", "klinikblau", "bordeaux", "forest", "schiefer"];
+const TYPOGRAPHY_OPTIONS: TypographyPairingKey[] = ["modern", "klassisch", "klinisch", "freundlich"];
 
 interface FormData {
   practiceName: string;
   address: string;
   email: string;
   phone: string;
+  monogram: string;
+  themePreference: ColorPresetKey;
+  typographyPreference: TypographyPairingKey;
   teamEmails: string[];
 }
 
@@ -23,10 +30,13 @@ export default function OnboardingPage() {
     address: "",
     email: "",
     phone: "",
+    monogram: "",
+    themePreference: "sage",
+    typographyPreference: "modern",
     teamEmails: [""],
   });
 
-  const handleInputChange = (field: keyof Omit<FormData, "teamEmails">, value: string) => {
+  const handleInputChange = (field: keyof Omit<FormData, "teamEmails">, value: string | ColorPresetKey | TypographyPairingKey) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -104,7 +114,7 @@ export default function OnboardingPage() {
             </div>
           </div>
           <div className="flex justify-between text-sm mt-3" style={{ color: 'var(--color-muted)' }}>
-            <span>Praxisinfo</span>
+            <span>Praxiseigenschaften</span>
             <span>Team einladen</span>
             <span>Bestätigung</span>
           </div>
@@ -114,11 +124,11 @@ export default function OnboardingPage() {
         {step === 1 && (
           <Card className="p-8 mb-8" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
             <div className="flex items-center gap-3 mb-6">
-              <Building2 className="w-6 h-6" style={{ color: 'var(--color-accent)' }} />
-              <h2 className="text-2xl font-bold">Praxisinformationen</h2>
+              <Palette className="w-6 h-6" style={{ color: 'var(--color-accent)' }} />
+              <h2 className="text-2xl font-bold">Praxiseigenschaften</h2>
             </div>
             <p className="mb-6" style={{ color: 'var(--color-muted)' }}>
-              Geben Sie die Grundinformationen Ihrer Tierarztpraxis ein.
+              Konfigurieren Sie Ihren Praxisnamen, Ihr Logo und das Design-Theme.
             </p>
             <div className="space-y-4">
               <div>
@@ -181,6 +191,77 @@ export default function OnboardingPage() {
                       color: 'var(--color-fg)',
                     }}
                   />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Monogramm (max. 3 Buchstaben)</label>
+                <div className="flex gap-4">
+                  <input
+                    type="text"
+                    maxLength={3}
+                    value={formData.monogram}
+                    onChange={(e) => handleInputChange('monogram', e.target.value.toUpperCase())}
+                    className="flex-1 px-4 py-2 rounded-lg border transition"
+                    style={{
+                      borderColor: 'var(--color-border)',
+                      backgroundColor: 'var(--color-bg)',
+                      color: 'var(--color-fg)',
+                    }}
+                    placeholder="z.B. DM"
+                  />
+                  <div
+                    className="w-20 h-14 rounded-lg flex items-center justify-center text-white font-bold text-lg flex-shrink-0"
+                    style={{ backgroundColor: 'var(--color-accent)' }}
+                  >
+                    {formData.monogram || "?"}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-3">Farbschema</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {THEME_OPTIONS.map((theme) => (
+                    <button
+                      key={theme}
+                      onClick={() => handleInputChange('themePreference', theme)}
+                      className={`p-3 rounded-lg border-2 transition capitalize text-xs font-medium text-white ${
+                        formData.themePreference === theme
+                          ? 'border-white'
+                          : 'border-transparent opacity-70 hover:opacity-100'
+                      }`}
+                      style={{
+                        backgroundColor: COLOR_PRESETS[theme].accent,
+                      }}
+                    >
+                      {theme}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-3">Typografie</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {TYPOGRAPHY_OPTIONS.map((typo) => (
+                    <button
+                      key={typo}
+                      onClick={() => handleInputChange('typographyPreference', typo)}
+                      className={`p-3 rounded-lg border-2 transition text-left ${
+                        formData.typographyPreference === typo
+                          ? 'border-accent'
+                          : 'border-gray-300 opacity-60 hover:opacity-100'
+                      }`}
+                      style={{
+                        borderColor:
+                          formData.typographyPreference === typo ? 'var(--color-accent)' : 'var(--color-border)',
+                        backgroundColor: 'var(--color-surface)',
+                      }}
+                    >
+                      <div className="font-semibold text-xs capitalize">{typo}</div>
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
@@ -297,6 +378,9 @@ export default function OnboardingPage() {
                 <p><strong>Adresse:</strong> {formData.address}</p>
                 <p><strong>E-Mail:</strong> {formData.email}</p>
                 {formData.phone && <p><strong>Telefon:</strong> {formData.phone}</p>}
+                {formData.monogram && <p><strong>Monogramm:</strong> {formData.monogram}</p>}
+                <p><strong>Farbschema:</strong> {formData.themePreference}</p>
+                <p><strong>Typografie:</strong> {formData.typographyPreference}</p>
                 {formData.teamEmails.some(e => e.trim()) && (
                   <p><strong>Team:</strong> {formData.teamEmails.filter(e => e.trim()).join(", ")}</p>
                 )}

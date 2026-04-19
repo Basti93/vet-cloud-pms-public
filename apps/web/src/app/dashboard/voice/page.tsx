@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import Vapi from "@vapi-ai/web";
-import { Phone, PhoneOff, Mic, MicOff, Volume2, AlertCircle } from "lucide-react";
+import { Phone, PhoneOff, Mic, MicOff, Volume2, AlertCircle, Bot, Calendar, PawPrint, Clock, Bell, Moon, Timer } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -315,8 +315,8 @@ export default function VoicePage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">AI-Rezeption</h1>
-        <p className="text-gray-600 mt-1">
+        <h1 className="text-3xl font-bold text-fg">AI-Rezeption</h1>
+        <p className="text-muted mt-1">
           KI-gestützte Telefon-Rezeption — jetzt live im Browser testen
         </p>
       </div>
@@ -339,10 +339,10 @@ export default function VoicePage() {
                     : "bg-gray-800"
                 }`}
               >
-                <span className="text-5xl">🤖</span>
+                <Bot size={48} className="text-white" />
                 {status === "active" && isSpeaking && (
                   <span className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 rounded-full border-2 border-gray-900 flex items-center justify-center">
-                    <span className="text-xs">🔊</span>
+                    <Volume2 size={12} className="text-white" />
                   </span>
                 )}
               </div>
@@ -408,19 +408,21 @@ export default function VoicePage() {
           </div>
 
           {/* Features */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
-            <h3 className="font-semibold text-gray-900">Was kann die KI?</h3>
+          <div className="bg-surface rounded-xl border border-border p-5 space-y-3">
+            <h3 className="font-semibold text-fg">Was kann die KI?</h3>
             <div className="space-y-2 text-sm">
               {[
-                ["📅", "Termine buchen und bestätigen"],
-                ["🐾", "Tiere & Halter aufnehmen"],
-                ["🕐", "Verfügbarkeit prüfen"],
-                ["🔔", "Erinnerungen ankündigen"],
-                ["🌙", "24/7 Notfallaufnahme"],
-              ].map(([icon, text]) => (
-                <div key={text} className="flex items-center gap-2 text-gray-700">
-                  <span>{icon}</span>
-                  <span>{text}</span>
+                [Calendar, "Termine buchen und bestätigen"],
+                [PawPrint, "Tiere & Halter aufnehmen"],
+                [Clock, "Verfügbarkeit prüfen"],
+                [Bell, "Erinnerungen ankündigen"],
+                [Moon, "24/7 Notfallaufnahme"],
+              ].map(([Icon, text]) => (
+                <div key={text as string} className="flex items-center gap-2 text-fg">
+                  <span style={{ color: "var(--color-accent)" }}>
+                    {typeof Icon === "function" ? <Icon size={14} /> : Icon}
+                  </span>
+                  <span>{text as string}</span>
                 </div>
               ))}
             </div>
@@ -452,19 +454,24 @@ export default function VoicePage() {
       {/* Stats row (live data TBD) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
-          { label: "Anrufe heute", value: "–", icon: "📞" },
-          { label: "Termine gebucht (KI)", value: "–", icon: "📅" },
-          { label: "Ø Gesprächszeit", value: "–", icon: "⏱️" },
-        ].map(({ label, value, icon }) => (
+          { label: "Anrufe heute", value: "–", icon: Phone },
+          { label: "Termine gebucht (KI)", value: "–", icon: Calendar },
+          { label: "Ø Gesprächszeit", value: "–", icon: Timer },
+        ].map(({ label, value, icon: Icon }) => (
           <div
             key={label}
-            className="bg-white rounded-xl border border-gray-200 p-5"
+            className="bg-surface rounded-xl border border-border p-5"
           >
             <div className="flex items-center gap-3">
-              <span className="text-2xl">{icon}</span>
+              <span
+                className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ backgroundColor: "var(--color-accent-soft)", color: "var(--color-accent)" }}
+              >
+                <Icon size={18} />
+              </span>
               <div>
-                <p className="text-sm text-gray-500">{label}</p>
-                <p className="text-2xl font-bold text-gray-900">{value}</p>
+                <p className="text-sm text-muted">{label}</p>
+                <p className="text-2xl font-bold text-fg">{value}</p>
               </div>
             </div>
           </div>

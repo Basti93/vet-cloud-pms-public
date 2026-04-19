@@ -170,7 +170,7 @@ export function AppointmentTable({
     return (
       <div className="space-y-2">
         {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="h-16 bg-gray-100 rounded-lg animate-pulse" />
+          <div key={i} className="h-16 bg-muted-soft rounded-lg animate-pulse" />
         ))}
       </div>
     );
@@ -179,8 +179,8 @@ export function AppointmentTable({
   if (items.length === 0) {
     return (
       <div className="py-12 text-center">
-        <Calendar size={32} className="mx-auto text-gray-300 mb-3" />
-        <p className="text-gray-400 text-sm">Keine Termine</p>
+        <Calendar size={32} className="mx-auto text-muted mb-3" />
+        <p className="text-muted text-sm">Keine Termine</p>
       </div>
     );
   }
@@ -203,75 +203,75 @@ export function AppointmentTable({
         const hasMore = compact && vetItems.length > 2;
 
         return (
-          <div key={vet.id} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div key={vet.id} className="bg-surface rounded-lg border border-border overflow-hidden">
             {/* Header */}
             <button
               onClick={() => toggleVetExpanded(vet.id)}
-              className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors border-b border-gray-200"
+              className="w-full flex items-center justify-between p-4 hover:bg-muted-soft transition-colors border-b border-border"
             >
               <div className="flex items-center gap-3">
                 <ChevronDown
-                  className={`w-5 h-5 text-gray-600 transition-transform ${
+                  className={`w-5 h-5 text-muted transition-transform ${
                     isExpanded ? 'rotate-180' : ''
                   }`}
                 />
                 <div className="text-left">
-                  <h3 className="font-semibold text-gray-900 text-sm">
+                  <h3 className="font-semibold text-fg text-sm">
                     Dr. {vet.firstName} {vet.lastName}
                   </h3>
-                  <p className="text-xs text-gray-500 mt-1">
-                    📋 {pending} ausstehend • ✅ {confirmed} bestätigt • ❌ {rejected} abgelehnt
+                  <p className="text-xs text-muted mt-1">
+                    {pending} ausstehend · {confirmed} bestätigt · {rejected} abgelehnt
                   </p>
                 </div>
               </div>
               <div className="text-right">
-                <p className={`font-bold text-gray-900 ${compact ? 'text-lg' : 'text-xl'}`}>
+                <p className={`font-bold text-fg ${compact ? 'text-lg' : 'text-xl'}`}>
                   {vetItems.length}
                 </p>
-                <p className="text-xs text-gray-500">Termine</p>
+                <p className="text-xs text-muted">Termine</p>
               </div>
             </button>
 
             {/* Content */}
             {isExpanded && (
-              <div className="divide-y divide-gray-100">
+              <div className="divide-y divide-border">
                 {showActions ? (
                   // Table view with action buttons (for Bookings)
                   <div className="overflow-x-auto">
                     <table className="min-w-full text-sm">
-                      <thead className="bg-gray-50">
+                      <thead className="bg-muted-soft">
                         <tr>
-                          <th className="px-4 py-3 text-left font-semibold text-gray-900">
+                          <th className="px-4 py-3 text-left font-semibold text-fg">
                             Zeitslot
                           </th>
-                          <th className="px-4 py-3 text-left font-semibold text-gray-900">
+                          <th className="px-4 py-3 text-left font-semibold text-fg">
                             Patient
                           </th>
-                          <th className="px-4 py-3 text-left font-semibold text-gray-900">
+                          <th className="px-4 py-3 text-left font-semibold text-fg">
                             Besitzer
                           </th>
-                          <th className="px-4 py-3 text-left font-semibold text-gray-900">
+                          <th className="px-4 py-3 text-left font-semibold text-fg">
                             Grund
                           </th>
-                          <th className="px-4 py-3 text-left font-semibold text-gray-900">
+                          <th className="px-4 py-3 text-left font-semibold text-fg">
                             Status
                           </th>
-                          <th className="px-4 py-3 text-right font-semibold text-gray-900">
+                          <th className="px-4 py-3 text-right font-semibold text-fg">
                             Aktionen
                           </th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-100">
+                      <tbody className="divide-y divide-border">
                         {displayItems.map((item) => (
-                          <tr key={item.id} className="hover:bg-gray-50">
+                          <tr key={item.id} className="hover:bg-muted-soft">
                             <td className="px-4 py-3 whitespace-nowrap">
                               <div className="flex items-center gap-2">
-                                <Calendar className="w-4 h-4 text-gray-400" />
+                                <Calendar className="w-4 h-4 text-muted" />
                                 <div>
-                                  <p className="font-medium text-gray-900">
+                                  <p className="font-medium text-fg">
                                     {formatFullDateTime(item.startTime)}
                                   </p>
-                                  <p className="text-xs text-gray-500">
+                                  <p className="text-xs text-muted">
                                     {new Date(item.endTime).toLocaleTimeString('de-DE', {
                                       hour: '2-digit',
                                       minute: '2-digit',
@@ -282,23 +282,24 @@ export function AppointmentTable({
                             </td>
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
-                                  <span className="text-xs font-semibold text-indigo-600">
-                                    <SpeciesIcon species={getPatientSpecies(item)} />
-                                  </span>
+                                <div
+                                  className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                                  style={{ backgroundColor: "var(--color-accent-soft)", color: "var(--color-accent)" }}
+                                >
+                                  <SpeciesIcon species={getPatientSpecies(item)} />
                                 </div>
-                                <p className="font-medium text-gray-900">{getPatientName(item)}</p>
+                                <p className="font-medium text-fg">{getPatientName(item)}</p>
                               </div>
                             </td>
                             <td className="px-4 py-3">
                               <div>
-                                <p className="font-medium text-gray-900">{getOwnerName(item)}</p>
+                                <p className="font-medium text-fg">{getOwnerName(item)}</p>
                                 {isBooking(item) && (
-                                  <p className="text-xs text-gray-500">{item.owner.email}</p>
+                                  <p className="text-xs text-muted">{item.owner.email}</p>
                                 )}
                               </div>
                             </td>
-                            <td className="px-4 py-3 text-gray-700">
+                            <td className="px-4 py-3 text-fg">
                               {getTitle(item)}
                             </td>
                             <td className="px-4 py-3">
@@ -331,7 +332,7 @@ export function AppointmentTable({
                                   </button>
                                 </div>
                               ) : (
-                                <span className="text-xs text-gray-500">Keine Aktion</span>
+                                <span className="text-xs text-muted">Keine Aktion</span>
                               )}
                             </td>
                           </tr>
@@ -341,7 +342,7 @@ export function AppointmentTable({
                   </div>
                 ) : (
                   // List view (for Dashboard compact mode)
-                  <div className="divide-y divide-gray-100">
+                  <div className="divide-y divide-border">
                     {displayItems.map((item) => {
                       const d = new Date(item.startTime);
                       const isToday = todayStart && todayEnd && d >= todayStart && d < todayEnd;
@@ -349,33 +350,35 @@ export function AppointmentTable({
                       return (
                         <div
                           key={item.id}
-                          className={`flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors ${
+                          className={`flex items-start gap-3 px-4 py-3 hover:bg-muted-soft transition-colors ${
                             compact ? 'text-xs' : 'text-sm'
                           }`}
                         >
                           <div
                             className={`rounded-lg flex items-center justify-center flex-shrink-0 ${
-                              isToday ? 'bg-blue-100' : 'bg-gray-100'
-                            } ${compact ? 'w-7 h-7' : 'w-9 h-9'}`}
+                              compact ? 'w-7 h-7' : 'w-9 h-9'
+                            }`}
+                            style={{
+                              backgroundColor: isToday ? "var(--color-accent-soft)" : "var(--color-muted-soft)",
+                              color: isToday ? "var(--color-accent)" : "var(--color-muted)",
+                            }}
                           >
-                            <span className={compact ? 'text-sm' : 'text-lg'}>
-                              <SpeciesIcon species={getPatientSpecies(item)} />
-                            </span>
+                            <SpeciesIcon species={getPatientSpecies(item)} />
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <p className="font-medium text-gray-900 truncate">
+                              <p className="font-medium text-fg truncate">
                                 {getPatientName(item)} — {getTitle(item)}
                               </p>
                             </div>
-                            <p className="text-gray-500 mt-0.5 flex items-center gap-1">
+                            <p className="text-muted mt-0.5 flex items-center gap-1">
                               {isToday ? 'Heute, ' : d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: 'short' }) + ', '}
                               {formatDateTime(item.startTime)} Uhr
                               {getOwnerName(item) && (
-                                <span className="ml-1 text-gray-300">·</span>
+                                <span className="ml-1 text-border">·</span>
                               )}
                               {getOwnerName(item) && (
-                                <span className="ml-1 text-gray-500">
+                                <span className="ml-1">
                                   {getOwnerName(item)}
                                 </span>
                               )}
@@ -388,7 +391,7 @@ export function AppointmentTable({
                 )}
 
                 {hasMore && (
-                  <div className="text-center py-3 text-sm text-blue-600 hover:text-blue-700 font-medium">
+                  <div className="text-center py-3 text-sm font-medium" style={{ color: "var(--color-accent)" }}>
                     {vetItems.length - 2} weitere Termine
                   </div>
                 )}

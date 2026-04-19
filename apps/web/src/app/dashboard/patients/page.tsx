@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Search, Plus, ChevronRight, Phone } from "lucide-react";
+import { Search, Plus, ChevronRight, Phone, PawPrint } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SpeciesIcon } from "@/components/ui/badge";
@@ -13,12 +13,12 @@ import { useTenant } from "@/hooks/useTenant";
 
 function SetupBanner() {
   return (
-    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 text-center">
-      <p className="text-amber-800 font-medium">Demo-Modus: Tenant-ID noch nicht konfiguriert</p>
-      <p className="text-amber-600 text-sm mt-1">
-        Nach <code className="bg-amber-100 px-1 rounded">npm run db:seed</code> bitte{" "}
-        <code className="bg-amber-100 px-1 rounded">NEXT_PUBLIC_DEMO_TENANT_ID</code> in{" "}
-        <code className="bg-amber-100 px-1 rounded">.env.local</code> setzen.
+    <div className="rounded-2xl p-6 text-center" style={{ backgroundColor: "#fefce8", border: "1px solid #fde68a" }}>
+      <p className="font-medium" style={{ color: "#92400e" }}>Demo-Modus: Tenant-ID noch nicht konfiguriert</p>
+      <p className="text-sm mt-1" style={{ color: "#b45309" }}>
+        Nach <code className="px-1 rounded" style={{ backgroundColor: "#fef3c7" }}>npm run db:seed</code> bitte{" "}
+        <code className="px-1 rounded" style={{ backgroundColor: "#fef3c7" }}>NEXT_PUBLIC_DEMO_TENANT_ID</code> in{" "}
+        <code className="px-1 rounded" style={{ backgroundColor: "#fef3c7" }}>.env.local</code> setzen.
       </p>
     </div>
   );
@@ -49,35 +49,38 @@ function PatientRow({
   return (
     <Link
       href={`/dashboard/patients/${patient.id}`}
-      className="flex items-center gap-4 px-6 py-4 hover:bg-blue-50/50 transition-colors group border-b border-gray-100 last:border-0"
+      className="flex items-center gap-4 px-6 py-4 hover:bg-muted-soft transition-colors group border-b border-border last:border-0"
     >
-      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center text-xl flex-shrink-0">
+      <div
+        className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+        style={{ backgroundColor: "var(--color-accent-soft)", color: "var(--color-accent)" }}
+      >
         <SpeciesIcon species={patient.species} />
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="font-semibold text-gray-900">{patient.name}</span>
+          <span className="font-semibold text-fg">{patient.name}</span>
           {!patient.active && (
-            <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Inaktiv</span>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-muted-soft text-muted">Inaktiv</span>
           )}
         </div>
-        <p className="text-sm text-gray-500 mt-0.5">
+        <p className="text-sm text-muted mt-0.5">
           {patient.species}
           {patient.breed ? ` · ${patient.breed}` : ""}
           {age !== null ? ` · ${age} J.` : ""}
         </p>
       </div>
       <div className="hidden md:block flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-700 truncate">
+        <p className="text-sm font-medium text-fg truncate">
           {patient.ownerFirstName} {patient.ownerLastName}
         </p>
         {patient.ownerPhone && (
-          <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+          <p className="text-xs text-muted flex items-center gap-1 mt-0.5">
             <Phone size={11} /> {patient.ownerPhone}
           </p>
         )}
       </div>
-      <ChevronRight size={16} className="text-gray-300 group-hover:text-blue-500 transition-colors flex-shrink-0" />
+      <ChevronRight size={16} className="text-muted group-hover:text-primary transition-colors flex-shrink-0" />
     </Link>
   );
 }
@@ -96,8 +99,8 @@ export default function PatientsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Patienten</h1>
-          <p className="text-gray-500 mt-1">
+          <h1 className="text-3xl font-bold text-fg">Patienten</h1>
+          <p className="text-muted mt-1">
             {data ? `${data.length} Patienten` : "Alle Tierpatienten Ihrer Praxis"}
           </p>
         </div>
@@ -119,16 +122,18 @@ export default function PatientsPage() {
       )}
 
       {tenantId && (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="hidden md:grid grid-cols-[2.5rem_1fr_1fr_1.5rem] gap-4 px-6 py-3 bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+        <div className="bg-surface rounded-2xl border border-border shadow-sm overflow-hidden">
+          <div className="hidden md:grid grid-cols-[2.5rem_1fr_1fr_1.5rem] gap-4 px-6 py-3 bg-bg border-b border-border text-xs font-semibold text-muted uppercase tracking-wide">
             <div /><div>Patient</div><div>Halter</div><div />
           </div>
 
           {isLoading ? (
             <TableSkeleton rows={6} />
           ) : !data?.length ? (
-            <div className="py-20 text-center text-gray-500">
-              <div className="text-5xl mb-4">🐾</div>
+            <div className="py-20 text-center text-muted">
+              <div className="flex justify-center mb-4" style={{ color: "var(--color-accent)" }}>
+                <PawPrint size={48} strokeWidth={1.5} />
+              </div>
               <p className="font-medium">
                 {search ? `Keine Ergebnisse für „${search}"` : "Noch keine Patienten angelegt"}
               </p>
