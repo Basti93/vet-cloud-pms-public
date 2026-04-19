@@ -22,8 +22,9 @@ export default function DashboardContent({ children }: { children: ReactNode }) 
   const { data: tenant } = trpc.tenant.getCurrent.useQuery();
 
   useEffect(() => {
-    const colorPreset = (tenant?.themePreference || 'sage') as ColorPresetKey;
-    const typographyPairing = (tenant?.typographyPreference || 'modern') as TypographyPairingKey;
+    if (!tenant) return;
+    const colorPreset = (tenant.themePreference || 'sage') as ColorPresetKey;
+    const typographyPairing = (tenant.typographyPreference || 'modern') as TypographyPairingKey;
     const cssVariables = generateCSSVariables(colorPreset, typographyPairing);
 
     cssVariables.split('\n').forEach((line) => {
