@@ -10,18 +10,19 @@ const intlMiddleware = createIntlMiddleware({
 export default clerkMiddleware((auth, request) => {
   const pathname = request.nextUrl.pathname;
 
-  // Skip intl middleware for public slug-based routes
+  // Skip intl middleware for public slug-based routes and root
   // These routes use tenant/practice slugs instead of locale prefixes
-  const slugPatterns = [
+  const skipPatterns = [
     /^\/book\//, // /book/[tenantSlug]
     /^\/brand-builder\//, // /brand-builder/[tenantSlug]
     /^\/[a-z0-9-]+$/, // /[practiceSlug] - root level slug (matches single segment paths)
     /^\/confirm/, // /confirm (public confirmation page)
+    /^\/$/, // / - root landing page (must not get locale prefix)
   ];
 
-  const isSlugRoute = slugPatterns.some(pattern => pattern.test(pathname));
+  const shouldSkip = skipPatterns.some(pattern => pattern.test(pathname));
 
-  if (isSlugRoute) {
+  if (shouldSkip) {
     return undefined; // Skip all middleware, route as-is
   }
 
