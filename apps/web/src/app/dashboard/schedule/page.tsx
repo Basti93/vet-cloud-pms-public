@@ -74,11 +74,11 @@ function toCalEvent(a: ApptDetail) {
 
 function SetupBanner() {
   return (
-    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 text-center">
-      <p className="text-amber-800 font-medium">Demo-Modus: Tenant-ID nicht konfiguriert</p>
-      <p className="text-amber-600 text-sm mt-1">
-        Bitte <code className="bg-amber-100 px-1 rounded">NEXT_PUBLIC_DEMO_TENANT_ID</code> in{" "}
-        <code className="bg-amber-100 px-1 rounded">.env.local</code> setzen.
+    <div className="rounded-2xl p-6 text-center" style={{ backgroundColor: 'var(--color-accent-soft)', border: '1px solid var(--color-accent)' }}>
+      <p className="font-medium" style={{ color: 'var(--color-accent)' }}>Demo-Modus: Tenant-ID nicht konfiguriert</p>
+      <p className="text-sm mt-1" style={{ color: 'var(--color-accent)' }}>
+        Bitte <code className="px-1 rounded" style={{ backgroundColor: 'var(--color-bg)', color: 'var(--color-fg)' }}>NEXT_PUBLIC_DEMO_TENANT_ID</code> in{" "}
+        <code className="px-1 rounded" style={{ backgroundColor: 'var(--color-bg)', color: 'var(--color-fg)' }}>.env.local</code> setzen.
       </p>
     </div>
   );

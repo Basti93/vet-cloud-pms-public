@@ -86,10 +86,9 @@
   border-color: var(--color-accent) !important;
 }
 
-/* Event default color */
+/* Event styling - respect status-based colors from event props */
 .fc .fc-event {
-  background-color: var(--color-accent) !important;
-  border-color: var(--color-accent) !important;
+  color: white !important;
 }
 
 /* List view styles */
@@ -104,5 +103,49 @@
 
 /* Now indicator */
 .fc .fc-now-indicator {
+  border-color: var(--color-accent) !important;
+}
+
+/* Business hours background */
+.fc .fc-bgevent {
+  background-color: var(--color-bg) !important;
+  opacity: 0.5;
+}
+
+/* Time grid styles */
+.fc .fc-timegrid-body {
+  background-color: var(--color-surface) !important;
+}
+
+.fc .fc-col-time-cell {
+  background-color: var(--color-surface) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-muted) !important;
+}
+
+/* Selection styles */
+.fc .fc-highlight {
+  background-color: var(--color-bg) !important;
+}
+
+.fc .fc-daygrid-dot {
+  background-color: var(--color-accent) !important;
+}
+
+/* Table cell styles */
+.fc th {
+  background-color: var(--color-surface) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-fg) !important;
+}
+
+.fc td {
+  border-color: var(--color-border) !important;
+}
+
+/* Disabled state */
+.fc .fc-button-primary:disabled {
+  opacity: 0.5;
+  background-color: var(--color-accent) !important;
   border-color: var(--color-accent) !important;
 }
