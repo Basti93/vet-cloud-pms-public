@@ -59,20 +59,21 @@ export function KompaktTemplate({
 
           {/* CTA Button */}
           <div className="p-6 border-b border-[var(--color-border)]">
-            <button
-              className="w-full px-6 py-3 rounded-lg text-white font-medium transition-all"
+            <a
+              href={`/book/${slug}`}
+              className="w-full px-6 py-3 rounded-lg text-white font-medium transition-all block text-center"
               style={{
                 backgroundColor: 'var(--color-accent)',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--color-accent-hover)';
+                (e.currentTarget as HTMLAnchorElement).style.backgroundColor = 'var(--color-accent-hover)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--color-accent)';
+                (e.currentTarget as HTMLAnchorElement).style.backgroundColor = 'var(--color-accent)';
               }}
             >
               Online Termin buchen
-            </button>
+            </a>
           </div>
 
           {/* Contact Info - Grid */}
