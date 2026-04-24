@@ -21,10 +21,9 @@ const translations: Record<Locale, Record<string, any>> = {
 
 export function LocaleProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(defaultLocale);
-  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    // Get locale from cookie or Accept-Language header
+    // Get locale from cookie or Accept-Language header on mount
     const cookieLocale = getCookieLocale();
     if (cookieLocale && isValidLocale(cookieLocale)) {
       setLocaleState(cookieLocale);
@@ -34,7 +33,6 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
         setLocaleState(headerLocale);
       }
     }
-    setMounted(true);
   }, []);
 
   const setLocale = (newLocale: Locale) => {
@@ -50,10 +48,6 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
     }
     return typeof value === 'string' ? value : key;
   };
-
-  if (!mounted) {
-    return <>{children}</>;
-  }
 
   return (
     <LocaleContext.Provider value={{ locale, setLocale, t }}>
