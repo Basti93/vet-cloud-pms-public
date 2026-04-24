@@ -155,6 +155,10 @@ export default function StatisticsPage() {
         <div>
           <h1 className="text-3xl font-bold text-fg">Statistiken</h1>
           <p className="text-muted mt-1">Überblick über Praxisleistung und Trends</p>
+          <p className="text-sm text-muted mt-2 max-w-2xl">
+            Verfolgen Sie wichtige Kennzahlen wie Abschlussquoten, Auslastung und Patientenwachstum.
+            Wählen Sie einen Zeitraum, um Trends zu analysieren und datengestützte Entscheidungen zu treffen.
+          </p>
         </div>
         <TimePeriodSelector selected={selectedPeriod} onChange={setSelectedPeriod} />
       </div>
