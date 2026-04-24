@@ -1,0 +1,75 @@
+{
+  "navigation": {
+    "overview": "Overview",
+    "calendar": "Calendar",
+    "appointments": "Appointments",
+    "patients": "Patients",
+    "bookings": "Booking Requests",
+    "statistics": "Statistics",
+    "settings": "Practice Management",
+    "voice": "AI Reception",
+    "beta": "Beta"
+  },
+  "dashboard": {
+    "overview": "Overview",
+    "quickActions": "Quick Actions",
+    "newAppointment": "New Appointment",
+    "newPatient": "New Patient",
+    "aiReception": "AI Reception",
+    "upcomingAppointments": "Upcoming Appointments",
+    "recentBookings": "Recent Booking Requests"
+  },
+  "statistics": {
+    "title": "Statistics",
+    "description": "Overview of practice performance and trends",
+    "subtitle": "Track key metrics such as completion rates, utilization, and patient growth. Select a time period to analyze trends and make data-driven decisions.",
+    "periodWeek": "This Week",
+    "periodMonth": "This Month",
+    "periodYear": "This Year",
+    "metrics": {
+      "totalAppointments": "Total Appointments",
+      "totalAppointmentsHint": "Total number of all appointments in the selected period",
+      "completionRate": "Completion Rate",
+      "completionRateHint": "Percentage of completed appointments (status: completed)",
+      "noShowRate": "No-Show Rate",
+      "noShowRateHint": "Percentage of patients who did not show up",
+      "conversionRate": "Online Conversion",
+      "conversionRateHint": "Percentage of confirmed online bookings",
+      "newPatients": "New Patients",
+      "newPatientsHint": "Number of new patients in this period",
+      "returningRate": "Returning Patients",
+      "returningRateHint": "Percentage of patients with 2+ appointments",
+      "emailDelivery": "Email Delivery",
+      "emailDeliveryHint": "Success rate of sent reminders",
+      "voiceAIBookings": "Voice AI Bookings",
+      "voiceAIBookingsHint": "Appointments booked via AI reception",
+      "avgDuration": "Avg Duration",
+      "avgDurationHint": "Average appointment duration",
+      "vetUtilization": "Vet Utilization",
+      "bookingSources": "Booking Sources",
+      "appointmentStatus": "Appointment Status",
+      "trend": "Trend"
+    }
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "success": "Success",
+    "save": "Save",
+    "cancel": "Cancel",
+    "close": "Close",
+    "noData": "No data available",
+    "name": "Name",
+    "total": "Total",
+    "completed": "Completed",
+    "success_message": "Successfully saved",
+    "error_message": "An error occurred"
+  },
+  "status": {
+    "scheduled": "Scheduled",
+    "confirmed": "Confirmed",
+    "completed": "Completed",
+    "cancelled": "Cancelled",
+    "noShow": "No-Show"
+  }
+}

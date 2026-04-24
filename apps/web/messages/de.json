@@ -1,0 +1,75 @@
+{
+  "navigation": {
+    "overview": "Übersicht",
+    "calendar": "Terminkalender",
+    "appointments": "Termine",
+    "patients": "Patienten",
+    "bookings": "Buchungsanfragen",
+    "statistics": "Statistiken",
+    "settings": "Praxisverwaltung",
+    "voice": "AI-Rezeption",
+    "beta": "Beta"
+  },
+  "dashboard": {
+    "overview": "Übersicht",
+    "quickActions": "Schnellaktionen",
+    "newAppointment": "Neuer Termin",
+    "newPatient": "Neuer Patient",
+    "aiReception": "AI-Rezeption",
+    "upcomingAppointments": "Kommende Termine",
+    "recentBookings": "Aktuelle Buchungsanfragen"
+  },
+  "statistics": {
+    "title": "Statistiken",
+    "description": "Überblick über Praxisleistung und Trends",
+    "subtitle": "Verfolgen Sie wichtige Kennzahlen wie Abschlussquoten, Auslastung und Patientenwachstum. Wählen Sie einen Zeitraum, um Trends zu analysieren und datengestützte Entscheidungen zu treffen.",
+    "periodWeek": "Diese Woche",
+    "periodMonth": "Dieser Monat",
+    "periodYear": "Dieses Jahr",
+    "metrics": {
+      "totalAppointments": "Termine gesamt",
+      "totalAppointmentsHint": "Gesamtanzahl aller Termine im ausgewählten Zeitraum",
+      "completionRate": "Erfolgsquote",
+      "completionRateHint": "Anteil abgeschlossener Termine (Status: abgeschlossen)",
+      "noShowRate": "Nicht erschienen",
+      "noShowRateHint": "Anteil Patienten die nicht erschienen sind",
+      "conversionRate": "Online-Conversion",
+      "conversionRateHint": "Anteil bestätigter Online-Buchungen",
+      "newPatients": "Neue Patienten",
+      "newPatientsHint": "Anzahl neuer Patienten in diesem Zeitraum",
+      "returningRate": "Rückkehrer",
+      "returningRateHint": "Anteil Patienten mit 2+ Terminen",
+      "emailDelivery": "Email-Versand",
+      "emailDeliveryHint": "Erfolgsquote versendeter Erinnerungen",
+      "voiceAIBookings": "Voice AI Bookings",
+      "voiceAIBookingsHint": "Termine gebucht über AI-Rezeption",
+      "avgDuration": "Ø Dauer",
+      "avgDurationHint": "Durchschnittliche Termin-Dauer",
+      "vetUtilization": "Ärzte - Auslastung",
+      "bookingSources": "Buchungsquellen",
+      "appointmentStatus": "Terminstatus",
+      "trend": "Trend"
+    }
+  },
+  "common": {
+    "loading": "Wird geladen...",
+    "error": "Ein Fehler ist aufgetreten",
+    "success": "Erfolgreich",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "close": "Schließen",
+    "noData": "Keine Daten verfügbar",
+    "name": "Name",
+    "total": "Gesamt",
+    "completed": "Abgeschlossen",
+    "success_message": "Erfolgreich gespeichert",
+    "error_message": "Ein Fehler ist aufgetreten"
+  },
+  "status": {
+    "scheduled": "Geplant",
+    "confirmed": "Bestätigt",
+    "completed": "Abgeschlossen",
+    "cancelled": "Abgesagt",
+    "noShow": "Nicht erschienen"
+  }
+}
