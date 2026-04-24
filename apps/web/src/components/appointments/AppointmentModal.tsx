@@ -203,19 +203,20 @@ export function AppointmentModal({
         />
 
         {/* Vet */}
-        <Select
+        <SearchableSelect
           label="Arzt *"
+          placeholder="Nach Arzt suchen…"
           value={form.vetId}
-          onChange={(e) => set("vetId", e.target.value)}
+          onChange={(value) => set("vetId", value)}
+          options={
+            vets?.map((v) => ({
+              value: v.id,
+              label: `Dr. ${v.firstName} ${v.lastName} (${v.appointmentCount} Termine)`,
+              searchText: `${v.firstName} ${v.lastName} dr doctor arzt`,
+            })) ?? []
+          }
           error={errors.vetId}
-        >
-          <option value="">— Arzt auswählen —</option>
-          {vets?.map((v) => (
-            <option key={v.id} value={v.id}>
-              Dr. {v.firstName} {v.lastName} ({v.appointmentCount} Termine)
-            </option>
-          ))}
-        </Select>
+        />
 
         {/* Title */}
         <Input
