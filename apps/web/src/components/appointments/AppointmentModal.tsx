@@ -5,6 +5,7 @@ import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { AppointmentStatusBadge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc/client";
 import { Trash2 } from "lucide-react";
@@ -185,20 +186,21 @@ export function AppointmentModal({
     >
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Patient */}
-        <Select
+        <SearchableSelect
           label="Patient *"
+          placeholder="Nach Patient oder Tierbesitzer suchen…"
           value={form.patientId}
-          onChange={(e) => set("patientId", e.target.value)}
+          onChange={(value) => set("patientId", value)}
+          options={
+            patients?.map((p) => ({
+              value: p.id,
+              label: `${p.name} (${p.species}${p.breed ? ` · ${p.breed}` : ""}) — ${p.ownerFirstName} ${p.ownerLastName}`,
+              searchText: `${p.name} ${p.ownerFirstName} ${p.ownerLastName} ${p.species} ${p.breed ?? ""}`,
+            })) ?? []
+          }
           error={errors.patientId}
           disabled={isEdit || !!preselectedPatientId}
-        >
-          <option value="">— Patient auswählen —</option>
-          {patients?.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name} ({p.species}{p.breed ? ` · ${p.breed}` : ""}) — {p.ownerFirstName} {p.ownerLastName}
-            </option>
-          ))}
-        </Select>
+        />
 
         {/* Vet */}
         <Select
