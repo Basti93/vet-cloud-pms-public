@@ -3,8 +3,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { Locale } from '@/i18n.config';
 import { locales, defaultLocale } from '@/i18n.config';
-import deMessages from '@/messages/de.json';
-import enMessages from '@/messages/en.json';
+import deMessages from '../../../messages/de.json';
+import enMessages from '../../../messages/en.json';
 
 interface LocaleContextType {
   locale: Locale;
