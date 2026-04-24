@@ -12,12 +12,12 @@ export const metadata: Metadata = {
   description: "Modern cloud-based veterinary practice management system",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const headerList = headers();
+  const headerList = await headers();
   const locale = (headerList.get("x-locale") as string) || "de";
 
   return (
