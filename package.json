@@ -14,5 +14,8 @@
     "dev": "turbo run dev --parallel",
     "build": "turbo run build",
     "lint": "turbo run lint"
+  },
+  "dependencies": {
+    "next-intl": "^4.9.1"
   }
 }

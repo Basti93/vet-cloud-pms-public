@@ -13,6 +13,7 @@ function StatCard({
   loading,
   unit,
   highlight,
+  hint,
 }: {
   label: string;
   value: string | number;
@@ -20,6 +21,7 @@ function StatCard({
   loading?: boolean;
   unit?: string;
   highlight?: "success" | "warning" | "danger";
+  hint?: string;
 }) {
   const getHighlightColor = () => {
     if (highlight === "success") return "#16a34a";
@@ -29,7 +31,7 @@ function StatCard({
   };
 
   return (
-    <div className="bg-surface rounded-2xl border border-border shadow-sm p-6">
+    <div className="bg-surface rounded-2xl border border-border shadow-sm p-6 group cursor-help relative">
       <div className="flex items-center justify-between mb-3">
         <p className="text-sm font-medium text-muted">{label}</p>
         <span
@@ -48,6 +50,11 @@ function StatCard({
           </p>
           {unit && <p className="text-sm text-muted">{unit}</p>}
         </div>
+      )}
+      {hint && (
+        <p className="text-xs text-muted mt-3 group-hover:text-fg transition-colors">
+          💡 {hint}
+        </p>
       )}
     </div>
   );
@@ -170,6 +177,7 @@ export default function StatisticsPage() {
           value={metrics?.totalAppointments ?? 0}
           icon={<Calendar size={18} />}
           loading={isLoading || metricsLoading}
+          hint="Gesamtanzahl aller Termine im ausgewählten Zeitraum"
         />
         <StatCard
           label="Erfolgsquote"
@@ -178,6 +186,7 @@ export default function StatisticsPage() {
           icon={<CheckCircle size={18} />}
           loading={isLoading || metricsLoading}
           highlight="success"
+          hint="Anteil abgeschlossener Termine (Status: abgeschlossen)"
         />
         <StatCard
           label="Nicht erschienen"
@@ -186,6 +195,7 @@ export default function StatisticsPage() {
           icon={<Activity size={18} />}
           loading={isLoading || metricsLoading}
           highlight={metrics && metrics.noShowRate > 10 ? "danger" : "warning"}
+          hint="Anteil Patienten die nicht erschienen sind"
         />
         <StatCard
           label="Online-Conversion"
@@ -194,6 +204,7 @@ export default function StatisticsPage() {
           icon={<TrendingUp size={18} />}
           loading={isLoading || metricsLoading}
           highlight="success"
+          hint="Anteil bestätigter Online-Buchungen"
         />
       </div>
 
@@ -204,6 +215,7 @@ export default function StatisticsPage() {
           value={metrics?.newPatients ?? 0}
           icon={<Users size={18} />}
           loading={isLoading || metricsLoading}
+          hint="Anzahl neuer Patienten in diesem Zeitraum"
         />
         <StatCard
           label="Rückkehrer"
@@ -211,6 +223,7 @@ export default function StatisticsPage() {
           unit="%"
           icon={<Users size={18} />}
           loading={isLoading || metricsLoading}
+          hint="Anteil Patienten mit 2+ Terminen"
         />
         <StatCard
           label="Email-Versand"
@@ -218,12 +231,14 @@ export default function StatisticsPage() {
           unit="%"
           icon={<CheckCircle size={18} />}
           loading={isLoading || metricsLoading}
+          hint="Erfolgsquote versendeter Erinnerungen"
         />
         <StatCard
           label="Voice AI Bookings"
           value={metrics?.voiceAIBookings ?? 0}
           icon={<Activity size={18} />}
           loading={isLoading || metricsLoading}
+          hint="Termine gebucht über AI-Rezeption"
         />
         <StatCard
           label="Ø Dauer"
@@ -231,6 +246,7 @@ export default function StatisticsPage() {
           unit="min"
           icon={<Calendar size={18} />}
           loading={isLoading || metricsLoading}
+          hint="Durchschnittliche Termin-Dauer"
         />
       </div>
 
