@@ -12,8 +12,11 @@ const NAV_ITEMS = [
   { href: "/dashboard/appointments", icon: Clock, label: "Termine" },
   { href: "/dashboard/patients", icon: Users, label: "Patienten" },
   { href: "/dashboard/bookings", icon: ClipboardList, label: "Buchungsanfragen" },
-  { href: "/dashboard/voice", icon: Phone, label: "AI-Rezeption" },
   { href: "/dashboard/statistics", icon: TrendingUp, label: "Statistiken" },
+];
+
+const BETA_NAV_ITEMS = [
+  { href: "/dashboard/voice", icon: Phone, label: "AI-Rezeption" },
 ];
 
 const ADMIN_NAV_ITEMS = [
@@ -53,19 +56,46 @@ export default function DashboardContent({ children }: { children: ReactNode }) 
             </button>
           </div>
         </div>
-        <nav className="flex-1 px-3 py-4 space-y-1">
-          {NAV_ITEMS.map(({ href, icon: Icon, label }) => (
-            <Link
-              key={href}
-              href={href}
-              onClick={() => setSidebarOpen(false)}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-colors group"
-              style={{ color: 'var(--color-accent-soft)' }}
+        <nav className="flex-1 px-3 py-4 space-y-4">
+          <div className="space-y-1">
+            {NAV_ITEMS.map(({ href, icon: Icon, label }) => (
+              <Link
+                key={href}
+                href={href}
+                onClick={() => setSidebarOpen(false)}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-colors group"
+                style={{ color: 'var(--color-accent-soft)' }}
+              >
+                <Icon size={18} />
+                {label}
+              </Link>
+            ))}
+          </div>
+
+          {/* Beta Section */}
+          <div className="space-y-2">
+            <p
+              className="px-3 text-xs font-semibold uppercase tracking-wider"
+              style={{ color: 'var(--color-accent-soft)', opacity: 0.6 }}
             >
-              <Icon size={18} />
-              {label}
-            </Link>
-          ))}
+              Beta
+            </p>
+            <div className="space-y-1">
+              {BETA_NAV_ITEMS.map(({ href, icon: Icon, label }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  onClick={() => setSidebarOpen(false)}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-colors group"
+                  style={{ color: 'var(--color-accent-soft)' }}
+                >
+                  <Icon size={18} />
+                  {label}
+                </Link>
+              ))}
+            </div>
+          </div>
+
           {!userLoading && (
             <>
               <div className="my-2" style={{ borderColor: 'var(--color-accent-soft)', borderTopWidth: '1px', opacity: 0.3 }} />
