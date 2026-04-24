@@ -241,7 +241,7 @@ export default function VoicePage() {
           {
             id: `${Date.now()}-booking`,
             role: "assistant",
-            text: `📅 Termin gebucht für ${params?.patientName ?? "Patient"} am ${params?.date ?? "–"} um ${params?.time ?? "–"}`,
+            text: `Termin gebucht für ${params?.patientName ?? "Patient"} am ${params?.date ?? "–"} um ${params?.time ?? "–"}`,
             timestamp: new Date(),
           },
         ]);

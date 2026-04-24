@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { trpc } from '@/lib/trpc/client';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
-import { Mail } from 'lucide-react';
+import { Mail, AlertCircle, CheckCircle } from 'lucide-react';
 
 export default function EmailSettingsPage() {
   const [isMounted, setIsMounted] = useState(false);
@@ -74,8 +74,9 @@ export default function EmailSettingsPage() {
       </div>
 
       {error && (
-        <div className="p-4 rounded-lg bg-red-100 text-red-800 text-sm">
-          ⚠️ {error}
+        <div className="p-4 rounded-lg bg-red-100 text-red-800 text-sm flex items-center gap-2">
+          <AlertCircle size={18} className="flex-shrink-0" />
+          {error}
         </div>
       )}
 

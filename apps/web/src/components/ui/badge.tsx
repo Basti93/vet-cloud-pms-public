@@ -1,3 +1,5 @@
+import { Dog, Cat, Bird, Rabbit, Squirrel, PawPrint, Zap, Fish } from "lucide-react";
+
 interface BadgeProps {
   variant?: "default" | "success" | "warning" | "danger" | "info" | "purple";
   children: React.ReactNode;
@@ -41,17 +43,19 @@ export function AppointmentStatusBadge({
   return <Badge variant={config.variant}>{config.label}</Badge>;
 }
 
-// Species → emoji
+// Species → icon mapping
 export function SpeciesIcon({ species }: { species: string }) {
-  const icons: Record<string, string> = {
-    Hund: "🐕",
-    Katze: "🐈",
-    Vogel: "🐦",
-    Kaninchen: "🐇",
-    Hamster: "🐹",
-    Meerschweinchen: "🐾",
-    Reptil: "🦎",
-    Fisch: "🐠",
+  const iconMap: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
+    Hund: Dog,
+    Katze: Cat,
+    Vogel: Bird,
+    Kaninchen: Rabbit,
+    Hamster: Squirrel,
+    Meerschweinchen: PawPrint,
+    Reptil: Zap,
+    Fisch: Fish,
   };
-  return <span>{icons[species] ?? "🐾"}</span>;
+
+  const IconComponent = iconMap[species] ?? PawPrint;
+  return <IconComponent size={16} className="inline" />;
 }
