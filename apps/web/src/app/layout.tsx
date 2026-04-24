@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { ClerkProvider } from "@clerk/nextjs";
 import { TRPCProvider } from "@/lib/trpc/provider";
+import { LocaleProvider } from "@/lib/locale/context";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
@@ -15,11 +17,16 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const headerList = headers();
+  const locale = (headerList.get("x-locale") as string) || "de";
+
   return (
     <ClerkProvider>
-      <html lang="de">
+      <html lang={locale}>
         <body>
-          <TRPCProvider>{children}</TRPCProvider>
+          <TRPCProvider>
+            <LocaleProvider>{children}</LocaleProvider>
+          </TRPCProvider>
           <Analytics />
           <SpeedInsights />
         </body>

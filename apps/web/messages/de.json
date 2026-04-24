@@ -63,7 +63,8 @@
     "total": "Gesamt",
     "completed": "Abgeschlossen",
     "success_message": "Erfolgreich gespeichert",
-    "error_message": "Ein Fehler ist aufgetreten"
+    "error_message": "Ein Fehler ist aufgetreten",
+    "loggedIn": "Angemeldet"
   },
   "status": {
     "scheduled": "Geplant",

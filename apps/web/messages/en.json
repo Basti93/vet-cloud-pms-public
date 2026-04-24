@@ -63,7 +63,8 @@
     "total": "Total",
     "completed": "Completed",
     "success_message": "Successfully saved",
-    "error_message": "An error occurred"
+    "error_message": "An error occurred",
+    "loggedIn": "Logged in"
   },
   "status": {
     "scheduled": "Scheduled",

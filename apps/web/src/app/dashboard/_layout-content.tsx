@@ -5,28 +5,43 @@ import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { LayoutDashboard, Calendar, Users, Phone, ClipboardList, Clock, Menu, X, Settings, TrendingUp } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { useLocale } from "@/lib/locale/context";
 
-const NAV_ITEMS = [
-  { href: "/dashboard", icon: LayoutDashboard, label: "Übersicht" },
-  { href: "/dashboard/schedule", icon: Calendar, label: "Terminkalender" },
-  { href: "/dashboard/appointments", icon: Clock, label: "Termine" },
-  { href: "/dashboard/patients", icon: Users, label: "Patienten" },
-  { href: "/dashboard/bookings", icon: ClipboardList, label: "Buchungsanfragen" },
-  { href: "/dashboard/statistics", icon: TrendingUp, label: "Statistiken" },
-];
+function useNavItems() {
+  const { t } = useLocale();
+  return [
+    { href: "/dashboard", icon: LayoutDashboard, labelKey: "navigation.overview" },
+    { href: "/dashboard/schedule", icon: Calendar, labelKey: "navigation.calendar" },
+    { href: "/dashboard/appointments", icon: Clock, labelKey: "navigation.appointments" },
+    { href: "/dashboard/patients", icon: Users, labelKey: "navigation.patients" },
+    { href: "/dashboard/bookings", icon: ClipboardList, labelKey: "navigation.bookings" },
+    { href: "/dashboard/statistics", icon: TrendingUp, labelKey: "navigation.statistics" },
+  ].map(item => ({ ...item, label: t(item.labelKey) }));
+}
 
-const BETA_NAV_ITEMS = [
-  { href: "/dashboard/voice", icon: Phone, label: "AI-Rezeption" },
-];
+function useBetaNavItems() {
+  const { t } = useLocale();
+  return [
+    { href: "/dashboard/voice", icon: Phone, labelKey: "navigation.voice", label: t("navigation.voice") },
+  ];
+}
 
-const ADMIN_NAV_ITEMS = [
-  { href: "/dashboard/settings", icon: Settings, label: "Praxisverwaltung", adminOnly: true },
-];
+function useAdminNavItems() {
+  const { t } = useLocale();
+  return [
+    { href: "/dashboard/settings", icon: Settings, labelKey: "navigation.settings", label: t("navigation.settings"), adminOnly: true },
+  ];
+}
 
 export default function DashboardContent({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { data: tenant } = trpc.tenant.getCurrent.useQuery();
   const { data: user, isLoading: userLoading } = trpc.admin.getCurrentUser.useQuery();
+  const { t } = useLocale();
+  const NAV_ITEMS = useNavItems();
+  const BETA_NAV_ITEMS = useBetaNavItems();
+  const ADMIN_NAV_ITEMS = useAdminNavItems();
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ backgroundColor: 'var(--color-bg)' }}>
@@ -78,7 +93,7 @@ export default function DashboardContent({ children }: { children: ReactNode }) 
               className="px-3 text-xs font-semibold uppercase tracking-wider"
               style={{ color: 'var(--color-accent-soft)', opacity: 0.6 }}
             >
-              Beta
+              {t("navigation.beta")}
             </p>
             <div className="space-y-1">
               {BETA_NAV_ITEMS.map(({ href, icon: Icon, label }) => (
@@ -118,7 +133,7 @@ export default function DashboardContent({ children }: { children: ReactNode }) 
           <div className="flex items-center gap-3">
             <UserButton appearance={{ elements: { avatarBox: "w-8 h-8" } }} />
             <p className="text-xs" style={{ color: 'var(--color-accent-soft)' }}>
-              Angemeldet
+              {t("common.loggedIn")}
             </p>
           </div>
         </div>
@@ -149,6 +164,7 @@ export default function DashboardContent({ children }: { children: ReactNode }) 
           >
             {tenant?.name || 'Demo-Praxis'}
           </span>
+          <LanguageSwitcher />
         </header>
         <main className="flex-1 overflow-auto" style={{ backgroundColor: 'var(--color-bg)' }}>
           <div className="p-4 md:p-8" style={{ color: 'var(--color-fg)' }}>

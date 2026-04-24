@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { Calendar, TrendingUp, Users, CheckCircle, Activity } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { useTenant } from "@/hooks/useTenant";
+import { useLocale } from "@/lib/locale/context";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function StatCard({
@@ -67,10 +68,12 @@ function TimePeriodSelector({
   selected: string;
   onChange: (period: string) => void;
 }) {
+  const { t } = useLocale();
+
   const periods = [
-    { id: "week", label: "Diese Woche" },
-    { id: "month", label: "Dieser Monat" },
-    { id: "year", label: "Dieses Jahr" },
+    { id: "week", label: t("statistics.periodWeek") },
+    { id: "month", label: t("statistics.periodMonth") },
+    { id: "year", label: t("statistics.periodYear") },
   ];
 
   return (
@@ -99,6 +102,7 @@ function TimePeriodSelector({
 
 export default function StatisticsPage() {
   const { tenantId } = useTenant();
+  const { t } = useLocale();
   const [selectedPeriod, setSelectedPeriod] = useState("month");
 
   const now = new Date();
@@ -160,11 +164,10 @@ export default function StatisticsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-fg">Statistiken</h1>
-          <p className="text-muted mt-1">Überblick über Praxisleistung und Trends</p>
+          <h1 className="text-3xl font-bold text-fg">{t("statistics.title")}</h1>
+          <p className="text-muted mt-1">{t("statistics.description")}</p>
           <p className="text-sm text-muted mt-2 max-w-2xl">
-            Verfolgen Sie wichtige Kennzahlen wie Abschlussquoten, Auslastung und Patientenwachstum.
-            Wählen Sie einen Zeitraum, um Trends zu analysieren und datengestützte Entscheidungen zu treffen.
+            {t("statistics.subtitle")}
           </p>
         </div>
         <TimePeriodSelector selected={selectedPeriod} onChange={setSelectedPeriod} />
@@ -173,86 +176,86 @@ export default function StatisticsPage() {
       {/* Main KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard
-          label="Termine gesamt"
+          label={t("statistics.metrics.totalAppointments")}
           value={metrics?.totalAppointments ?? 0}
           icon={<Calendar size={18} />}
           loading={isLoading || metricsLoading}
-          hint="Gesamtanzahl aller Termine im ausgewählten Zeitraum"
+          hint={t("statistics.metrics.totalAppointmentsHint")}
         />
         <StatCard
-          label="Erfolgsquote"
+          label={t("statistics.metrics.completionRate")}
           value={metrics?.completionRate ?? 0}
           unit="%"
           icon={<CheckCircle size={18} />}
           loading={isLoading || metricsLoading}
           highlight="success"
-          hint="Anteil abgeschlossener Termine (Status: abgeschlossen)"
+          hint={t("statistics.metrics.completionRateHint")}
         />
         <StatCard
-          label="Nicht erschienen"
+          label={t("statistics.metrics.noShowRate")}
           value={metrics?.noShowRate ?? 0}
           unit="%"
           icon={<Activity size={18} />}
           loading={isLoading || metricsLoading}
           highlight={metrics && metrics.noShowRate > 10 ? "danger" : "warning"}
-          hint="Anteil Patienten die nicht erschienen sind"
+          hint={t("statistics.metrics.noShowRateHint")}
         />
         <StatCard
-          label="Online-Conversion"
+          label={t("statistics.metrics.conversionRate")}
           value={metrics?.onlineConversionRate ?? 0}
           unit="%"
           icon={<TrendingUp size={18} />}
           loading={isLoading || metricsLoading}
           highlight="success"
-          hint="Anteil bestätigter Online-Buchungen"
+          hint={t("statistics.metrics.conversionRateHint")}
         />
       </div>
 
       {/* Secondary KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
         <StatCard
-          label="Neue Patienten"
+          label={t("statistics.metrics.newPatients")}
           value={metrics?.newPatients ?? 0}
           icon={<Users size={18} />}
           loading={isLoading || metricsLoading}
-          hint="Anzahl neuer Patienten in diesem Zeitraum"
+          hint={t("statistics.metrics.newPatientsHint")}
         />
         <StatCard
-          label="Rückkehrer"
+          label={t("statistics.metrics.returningRate")}
           value={metrics?.returningRate ?? 0}
           unit="%"
           icon={<Users size={18} />}
           loading={isLoading || metricsLoading}
-          hint="Anteil Patienten mit 2+ Terminen"
+          hint={t("statistics.metrics.returningRateHint")}
         />
         <StatCard
-          label="Email-Versand"
+          label={t("statistics.metrics.emailDelivery")}
           value={metrics?.emailDeliveryRate ?? 0}
           unit="%"
           icon={<CheckCircle size={18} />}
           loading={isLoading || metricsLoading}
-          hint="Erfolgsquote versendeter Erinnerungen"
+          hint={t("statistics.metrics.emailDeliveryHint")}
         />
         <StatCard
-          label="Voice AI Bookings"
+          label={t("statistics.metrics.voiceAIBookings")}
           value={metrics?.voiceAIBookings ?? 0}
           icon={<Activity size={18} />}
           loading={isLoading || metricsLoading}
-          hint="Termine gebucht über AI-Rezeption"
+          hint={t("statistics.metrics.voiceAIBookingsHint")}
         />
         <StatCard
-          label="Ø Dauer"
+          label={t("statistics.metrics.avgDuration")}
           value={metrics?.avgDuration ?? 0}
           unit="min"
           icon={<Calendar size={18} />}
           loading={isLoading || metricsLoading}
-          hint="Durchschnittliche Termin-Dauer"
+          hint={t("statistics.metrics.avgDurationHint")}
         />
       </div>
 
       {/* Vet Utilization */}
       <div className="bg-surface rounded-2xl border border-border shadow-sm p-6">
-        <h2 className="text-xl font-bold text-fg mb-4">Ärzte - Auslastung</h2>
+        <h2 className="text-xl font-bold text-fg mb-4">{t("statistics.metrics.vetUtilization")}</h2>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -305,7 +308,7 @@ export default function StatisticsPage() {
               ) : (
                 <tr>
                   <td colSpan={3} className="py-8 text-center text-muted">
-                    Keine Daten verfügbar
+                    {t("common.noData")}
                   </td>
                 </tr>
               )}
@@ -317,7 +320,7 @@ export default function StatisticsPage() {
       {/* Source Comparison */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-surface rounded-2xl border border-border shadow-sm p-6">
-          <h2 className="text-xl font-bold text-fg mb-4">Buchungsquellen</h2>
+          <h2 className="text-xl font-bold text-fg mb-4">{t("statistics.metrics.bookingSources")}</h2>
           <div className="space-y-3">
             {sourcesLoading ? (
               <Skeleton className="h-24 w-full" />
@@ -348,18 +351,18 @@ export default function StatisticsPage() {
 
         {/* Status Distribution */}
         <div className="bg-surface rounded-2xl border border-border shadow-sm p-6">
-          <h2 className="text-xl font-bold text-fg mb-4">Terminstatus</h2>
+          <h2 className="text-xl font-bold text-fg mb-4">{t("statistics.metrics.appointmentStatus")}</h2>
           <div className="space-y-3">
             {statusLoading ? (
               <Skeleton className="h-24 w-full" />
             ) : statusDist && statusDist.length > 0 ? (
               statusDist.map((status) => {
                 const statusLabels: Record<string, string> = {
-                  scheduled: "Geplant",
-                  confirmed: "Bestätigt",
-                  completed: "Abgeschlossen",
-                  cancelled: "Abgesagt",
-                  "no-show": "Nicht erschienen",
+                  scheduled: t("status.scheduled"),
+                  confirmed: t("status.confirmed"),
+                  completed: t("status.completed"),
+                  cancelled: t("status.cancelled"),
+                  "no-show": t("status.noShow"),
                 };
 
                 const statusColors: Record<string, string> = {
