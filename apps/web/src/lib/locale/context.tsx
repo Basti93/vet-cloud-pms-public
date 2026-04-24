@@ -3,6 +3,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { Locale } from '@/i18n.config';
 import { locales, defaultLocale } from '@/i18n.config';
+import deMessages from '@/messages/de.json';
+import enMessages from '@/messages/en.json';
 
 interface LocaleContextType {
   locale: Locale;
@@ -13,23 +15,9 @@ interface LocaleContextType {
 const LocaleContext = createContext<LocaleContextType | undefined>(undefined);
 
 const translations: Record<Locale, Record<string, any>> = {
-  de: {},
-  en: {},
+  de: deMessages,
+  en: enMessages,
 };
-
-// Load translations dynamically
-async function loadTranslations() {
-  try {
-    const deMessages = await import('@/messages/de.json');
-    const enMessages = await import('@/messages/en.json');
-    translations.de = deMessages.default;
-    translations.en = enMessages.default;
-  } catch (error) {
-    console.error('Failed to load translations:', error);
-  }
-}
-
-loadTranslations();
 
 export function LocaleProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(defaultLocale);
