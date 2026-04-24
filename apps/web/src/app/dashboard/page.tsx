@@ -144,7 +144,7 @@ export default function DashboardHome() {
               <button
                 onClick={() => setApptModalOpen(true)}
                 disabled={!tenantId}
-                className="w-full flex items-center gap-3 p-3.5 rounded-xl transition-colors text-left disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
+                className="w-full flex items-center gap-3 p-3.5 rounded-xl transition-all text-left cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed hover:shadow-md hover:scale-105 active:scale-95"
                 style={{ backgroundColor: "var(--color-accent-soft)" }}
               >
                 <span
@@ -162,7 +162,7 @@ export default function DashboardHome() {
               <button
                 onClick={() => setPatientModalOpen(true)}
                 disabled={!tenantId}
-                className="w-full flex items-center gap-3 p-3.5 rounded-xl transition-colors text-left disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
+                className="w-full flex items-center gap-3 p-3.5 rounded-xl transition-all text-left cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed hover:shadow-md hover:scale-105 active:scale-95"
                 style={{ backgroundColor: "var(--color-accent-soft)" }}
               >
                 <span
@@ -179,7 +179,7 @@ export default function DashboardHome() {
 
               <Link
                 href="/dashboard/voice"
-                className="w-full flex items-center gap-3 p-3.5 rounded-xl transition-colors hover:opacity-90"
+                className="w-full flex items-center gap-3 p-3.5 rounded-xl transition-all cursor-pointer hover:shadow-md hover:scale-105 active:scale-95 block"
                 style={{ backgroundColor: "var(--color-accent-soft)" }}
               >
                 <span

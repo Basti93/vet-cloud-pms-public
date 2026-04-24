@@ -3,7 +3,7 @@
 import { ReactNode, useState } from "react";
 import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
-import { LayoutDashboard, Calendar, Users, Phone, ClipboardList, Clock, Menu, X, Settings } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, Phone, ClipboardList, Clock, Menu, X, Settings, TrendingUp } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 
 const NAV_ITEMS = [
@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { href: "/dashboard/patients", icon: Users, label: "Patienten" },
   { href: "/dashboard/bookings", icon: ClipboardList, label: "Buchungsanfragen" },
   { href: "/dashboard/voice", icon: Phone, label: "AI-Rezeption" },
+  { href: "/dashboard/statistics", icon: TrendingUp, label: "Statistiken" },
 ];
 
 const ADMIN_NAV_ITEMS = [

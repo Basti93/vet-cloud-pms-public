@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { eq, and, gte, lte, lt, or, isNull } from "drizzle-orm";
 import { createTRPCRouter, publicProcedure, protectedProcedure } from "@/server/trpc";
-import { tenants, appointments, owners, patients, users, appointmentHolds, emailSettings } from "@/lib/db/schema";
+import { tenants, appointments, owners, patients, users, appointmentHolds, emailSettings, appointmentEmailLogs } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
 import { sendConfirmationEmail, sendBookingNotificationEmail } from "@/lib/email/service";
 import type { SendConfirmationEmailInput, SendBookingNotificationInput } from "@/lib/email/service";
