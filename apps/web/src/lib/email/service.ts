@@ -1,105 +1,176 @@
+import { Resend } from "resend";
+import { emailTemplates, EmailPlaceholders } from "./templates";
+
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+// Use Resend's onboarding domain for development, switch to example.com once verified
+const FROM_EMAIL = process.env.NODE_ENV === 'production'
+  ? "notifications@example.com"
+  : "onboarding@resend.dev";
+
+export interface SendConfirmationEmailInput {
+  to: string;
+  practiceName: string;
+  ownerFirstName: string;
+  patientName: string;
+  patientSpecies: string;
+  appointmentDate: string;
+  appointmentTime: string;
+  appointmentDateTime: string;
+  vetName?: string;
+}
+
+export interface SendReminderEmailInput {
+  to: string;
+  practiceName: string;
+  ownerFirstName: string;
+  patientName: string;
+  patientSpecies: string;
+  appointmentTime: string;
+  appointmentDateTime: string;
+  vetName?: string;
+}
+
+export interface SendBookingNotificationInput {
+  to: string;
+  practiceName: string;
+  ownerFirstName: string;
+  ownerLastName: string;
+  patientName: string;
+  patientSpecies: string;
+  appointmentDate: string;
+  appointmentDateTime: string;
+  vetName?: string;
+}
+
 /**
- * Email Service
- * High-level service for sending emails with template support
- * Abstracts the underlying provider implementation
+ * Send appointment confirmation email to patient owner
  */
-
-import { getEmailProvider } from './providers';
-import type { EmailService, SendEmailOptions, EmailTemplate, EmailMetrics } from './types';
-
-/**
- * Create an email service instance
- * Uses the configured provider internally
- */
-export function createEmailService(): EmailService {
-  const provider = getEmailProvider();
-
-  return {
-    async send(options: SendEmailOptions) {
-      try {
-        const result = await provider.send(options);
-        return {
-          success: true,
-          messageId: result.messageId,
-        };
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        console.error('Email send failed:', message);
-        return {
-          success: false,
-          error: message,
-        };
-      }
-    },
-
-    async sendTemplate(template: EmailTemplate, to: string, variables: Record<string, string>, from?: string) {
-      try {
-        const html = template.getHtml(variables);
-        const result = await provider.send({
-          to,
-          from,
-          subject: template.subject,
-          html,
-        });
-        return {
-          success: true,
-          messageId: result.messageId,
-        };
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        console.error('Template email send failed:', message);
-        return {
-          success: false,
-          error: message,
-        };
-      }
-    },
-
-    async getMetrics() {
-      try {
-        return (await provider.getMetrics?.()) ?? null;
-      } catch (error) {
-        console.error('Failed to fetch metrics:', error);
-        return null;
-      }
-    },
-
-    getProviderName() {
-      return provider.name;
-    },
+export async function sendConfirmationEmail(input: SendConfirmationEmailInput) {
+  const placeholders: EmailPlaceholders = {
+    practiceName: input.practiceName,
+    ownerFirstName: input.ownerFirstName,
+    patientName: input.patientName,
+    patientSpecies: input.patientSpecies,
+    appointmentDate: input.appointmentDate,
+    appointmentTime: input.appointmentTime,
+    appointmentDateTime: input.appointmentDateTime,
+    vetName: input.vetName || "Unser Team",
   };
-}
 
-// Singleton instance for use throughout the app
-let emailService: EmailService | null = null;
+  const body = emailTemplates.confirmation.render(
+    emailTemplates.confirmation.defaultBody,
+    placeholders
+  );
 
-/**
- * Get the email service singleton
- */
-export function getEmailService(): EmailService {
-  if (!emailService) {
-    emailService = createEmailService();
+  const subject = emailTemplates.confirmation.defaultSubject
+    .replace("{practiceName}", input.practiceName);
+
+  try {
+    const result = await resend.emails.send({
+      from: `${input.practiceName} <${FROM_EMAIL}>`,
+      to: input.to,
+      subject,
+      text: body,
+    });
+
+    if (result.error) {
+      console.error("Resend error:", result.error);
+      return { success: false, error: result.error };
+    }
+
+    return { success: true, messageId: result.data?.id };
+  } catch (error) {
+    console.error("Error sending confirmation email:", error);
+    return { success: false, error };
   }
-  return emailService;
 }
 
 /**
- * Helper for sending simple emails
+ * Send appointment reminder email to patient owner
  */
-export async function sendEmail(options: SendEmailOptions) {
-  const service = getEmailService();
-  return service.send(options);
+export async function sendReminderEmail(input: SendReminderEmailInput) {
+  const placeholders: EmailPlaceholders = {
+    practiceName: input.practiceName,
+    ownerFirstName: input.ownerFirstName,
+    patientName: input.patientName,
+    patientSpecies: input.patientSpecies,
+    appointmentDate: "", // Not used in reminder
+    appointmentTime: input.appointmentTime,
+    appointmentDateTime: input.appointmentDateTime,
+    vetName: input.vetName || "Unser Team",
+  };
+
+  const body = emailTemplates.reminder.render(
+    emailTemplates.reminder.defaultBody,
+    placeholders
+  );
+
+  const subject = emailTemplates.reminder.defaultSubject
+    .replace("{practiceName}", input.practiceName);
+
+  try {
+    const result = await resend.emails.send({
+      from: `${input.practiceName} <${FROM_EMAIL}>`,
+      to: input.to,
+      subject,
+      text: body,
+    });
+
+    if (result.error) {
+      console.error("Resend error:", result.error);
+      return { success: false, error: result.error };
+    }
+
+    return { success: true, messageId: result.data?.id };
+  } catch (error) {
+    console.error("Error sending reminder email:", error);
+    return { success: false, error };
+  }
 }
 
 /**
- * Helper for sending template-based emails
+ * Send booking notification to practice owner
  */
-export async function sendTemplateEmail(
-  template: EmailTemplate,
-  to: string,
-  variables: Record<string, string>,
-  from?: string
-) {
-  const service = getEmailService();
-  return service.sendTemplate(template, to, variables, from);
+export async function sendBookingNotificationEmail(input: SendBookingNotificationInput) {
+  const placeholders: EmailPlaceholders = {
+    practiceName: input.practiceName,
+    ownerFirstName: input.ownerFirstName,
+    ownerLastName: input.ownerLastName,
+    patientName: input.patientName,
+    patientSpecies: input.patientSpecies,
+    appointmentDate: input.appointmentDate,
+    appointmentTime: "", // Not in booking notification
+    appointmentDateTime: input.appointmentDateTime,
+    vetName: input.vetName || "Unzugewiesen",
+  };
+
+  const body = emailTemplates.bookingNotification.render(
+    emailTemplates.bookingNotification.defaultBody,
+    placeholders
+  );
+
+  const subject = emailTemplates.bookingNotification.defaultSubject
+    .replace("{practiceName}", input.practiceName)
+    .replace("{patientName}", input.patientName)
+    .replace("{appointmentDate}", input.appointmentDate);
+
+  try {
+    const result = await resend.emails.send({
+      from: `VetCloud PMS <${FROM_EMAIL}>`,
+      to: input.to,
+      subject,
+      text: body,
+    });
+
+    if (result.error) {
+      console.error("Resend error:", result.error);
+      return { success: false, error: result.error };
+    }
+
+    return { success: true, messageId: result.data?.id };
+  } catch (error) {
+    console.error("Error sending booking notification:", error);
+    return { success: false, error };
+  }
 }

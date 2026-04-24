@@ -1,164 +1,113 @@
 /**
- * Email Templates
- * Reusable email templates for different notification types
+ * Email Template Placeholders:
+ * {practiceName} - Praxisname
+ * {ownerFirstName} - Vorname des Besitzers
+ * {ownerLastName} - Nachname des Besitzers
+ * {patientName} - Name des Patienten
+ * {patientSpecies} - Art des Patienten (Hund, Katze, etc.)
+ * {appointmentDate} - Termin Datum (z.B. "15. März 2026")
+ * {appointmentTime} - Termin Zeit (z.B. "14:30 Uhr")
+ * {appointmentDateTime} - Voller Termin (z.B. "15. März 2026 um 14:30 Uhr")
+ * {vetName} - Name des Tierarztes
  */
 
-import type { EmailTemplate } from './types';
+interface EmailPlaceholders {
+  practiceName: string;
+  ownerFirstName: string;
+  ownerLastName?: string;
+  patientName: string;
+  patientSpecies: string;
+  appointmentDate: string;
+  appointmentTime: string;
+  appointmentDateTime: string;
+  vetName?: string;
+  confirmUrl?: string;
+  rejectUrl?: string;
+}
 
-export const confirmationTemplate: EmailTemplate = {
-  name: 'confirmation',
-  subject: 'Termin-Bestätigung erforderlich ✓',
-  getHtml: (variables) => {
-    const { patientName, clinicName, date, time, ownerName, confirmLink } = variables;
+function replacePlaceholders(template: string, placeholders: EmailPlaceholders): string {
+  let result = template;
+  Object.entries(placeholders).forEach(([key, value]) => {
+    if (value) {
+      result = result.replace(new RegExp(`\\{${key}\\}`, 'g'), value);
+    }
+  });
+  return result;
+}
 
-    return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
-    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0; text-align: center; }
-    .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
-    .info-box { background: white; padding: 20px; border-left: 4px solid #667eea; margin: 20px 0; border-radius: 4px; }
-    .button { display: inline-block; background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 4px; margin: 20px 0; font-weight: bold; }
-    .footer { text-align: center; font-size: 12px; color: #999; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>Bestätigung erforderlich</h1>
-    </div>
-    <div class="content">
-      <p>Hallo ${ownerName},</p>
+export const emailTemplates = {
+  /**
+   * Appointment Confirmation - Sent to patient owner immediately after booking
+   */
+  confirmation: {
+    defaultSubject: "Bestätigung: Ihr Termin bei {practiceName}",
+    defaultBody: `Hallo {ownerFirstName},
 
-      <p>Ihr Termin in der <strong>${clinicName}</strong> wurde angefordert:</p>
+herzlichen Dank für Ihre Terminanfrage! Wir bestätigen Ihren Termin für {patientName} am {appointmentDateTime}.
 
-      <div class="info-box">
-        <p><strong>Patient:</strong> ${patientName}</p>
-        <p><strong>Datum:</strong> ${date}</p>
-        <p><strong>Uhrzeit:</strong> ${time}</p>
-      </div>
+Termin-Details:
+• Patient: {patientName} ({patientSpecies})
+• Datum & Uhrzeit: {appointmentDateTime}
+• Praxis: {practiceName}
 
-      <p>Bitte bestätigen Sie den Termin, indem Sie auf den folgenden Link klicken:</p>
+Sollten Sie den Termin absagen müssen, bitten wir Sie, uns rechtzeitig zu benachrichtigen.
 
-      <a href="${confirmLink}" class="button">Termin bestätigen →</a>
+Beste Grüße,
+{practiceName}`,
 
-      <p style="color: #666; font-size: 14px;">
-        Der Link ist 24 Stunden lang gültig. Nach dieser Zeit müssen Sie einen neuen Termin buchen.
-      </p>
+    render: (template: string, placeholders: EmailPlaceholders): string => {
+      return replacePlaceholders(template, placeholders);
+    },
+  },
 
-      <p>Wenn Sie den Termin stornieren möchten, antworten Sie einfach auf diese E-Mail.</p>
+  /**
+   * Appointment Reminder - Sent 24 hours before appointment
+   */
+  reminder: {
+    defaultSubject: "Erinnerung: Termin morgen bei {practiceName}",
+    defaultBody: `Hallo {ownerFirstName},
 
-      <div class="footer">
-        <p>${clinicName} | Diese E-Mail wurde automatisch gesendet. Bitte nicht antworten.</p>
-      </div>
-    </div>
-  </div>
-</body>
-</html>
-    `;
+dies ist eine freundliche Erinnerung an Ihren morgigen Termin für {patientName}.
+
+Termin-Details:
+• Patient: {patientName} ({patientSpecies})
+• Uhrzeit: {appointmentTime} Uhr
+• Praxis: {practiceName}
+
+Bitte bringen Sie alle notwendigen Unterlagen mit und erscheinen Sie pünktlich.
+
+Sollten Sie den Termin nicht wahrnehmen können, bitten wir um schnellstmögliche Absage.
+
+Beste Grüße,
+{practiceName}`,
+
+    render: (template: string, placeholders: EmailPlaceholders): string => {
+      return replacePlaceholders(template, placeholders);
+    },
+  },
+
+  /**
+   * Booking Notification - Sent to practice owner when new appointment is booked
+   */
+  bookingNotification: {
+    defaultSubject: "Neue Terminanfrage: {patientName} - {appointmentDate}",
+    defaultBody: `Neue Terminanfrage eingegangen!
+
+Patient: {patientName} ({patientSpecies})
+Besitzer: {ownerFirstName} {ownerLastName}
+Datum & Uhrzeit: {appointmentDateTime}
+Tierarzt: {vetName}
+
+Kontakt:
+• Telefon: [wird via API eingefügt]
+• Email: [wird via API eingefügt]
+
+Diese Anfrage erfordert Ihre Bestätigung im Dashboard.`,
+
+    render: (template: string, placeholders: EmailPlaceholders): string => {
+      return replacePlaceholders(template, placeholders);
+    },
   },
 };
 
-export const cancellationTemplate: EmailTemplate = {
-  name: 'cancellation',
-  subject: 'Termin abgesagt',
-  getHtml: (variables) => {
-    const { patientName, clinicName, date, time, ownerName, reason } = variables;
-
-    return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
-    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background: #ff6b6b; color: white; padding: 30px; border-radius: 8px 8px 0 0; text-align: center; }
-    .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
-    .info-box { background: white; padding: 20px; border-left: 4px solid #ff6b6b; margin: 20px 0; border-radius: 4px; }
-    .footer { text-align: center; font-size: 12px; color: #999; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>Termin abgesagt</h1>
-    </div>
-    <div class="content">
-      <p>Hallo ${ownerName},</p>
-
-      <p>Ihr Termin bei <strong>${clinicName}</strong> wurde abgesagt:</p>
-
-      <div class="info-box">
-        <p><strong>Patient:</strong> ${patientName}</p>
-        <p><strong>Termin:</strong> ${date} um ${time}</p>
-        ${reason ? `<p><strong>Grund:</strong> ${reason}</p>` : ''}
-      </div>
-
-      <p>Um einen neuen Termin zu buchen, besuchen Sie bitte unsere Online-Terminbuchung.</p>
-
-      <div class="footer">
-        <p>${clinicName}</p>
-      </div>
-    </div>
-  </div>
-</body>
-</html>
-    `;
-  },
-};
-
-export const reminderTemplate: EmailTemplate = {
-  name: 'reminder',
-  subject: 'Erinnerung: Ihr Termin morgen',
-  getHtml: (variables) => {
-    const { patientName, clinicName, date, time, ownerName, address } = variables;
-
-    return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
-    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background: #4ecdc4; color: white; padding: 30px; border-radius: 8px 8px 0 0; text-align: center; }
-    .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
-    .info-box { background: white; padding: 20px; border-left: 4px solid #4ecdc4; margin: 20px 0; border-radius: 4px; }
-    .footer { text-align: center; font-size: 12px; color: #999; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>Erinnerung</h1>
-    </div>
-    <div class="content">
-      <p>Hallo ${ownerName},</p>
-
-      <p>Dies ist eine freundliche Erinnerung an Ihren morgigen Termin bei <strong>${clinicName}</strong>:</p>
-
-      <div class="info-box">
-        <p><strong>Patient:</strong> ${patientName}</p>
-        <p><strong>Zeit:</strong> ${time}</p>
-        <p><strong>Adresse:</strong> ${address}</p>
-      </div>
-
-      <p>Bitte beachten Sie, dass Sie 10 Minuten vor Ihrem Termin anwesend sein sollten.</p>
-
-      <p>Falls Sie nicht erscheinen können, teilen Sie uns bitte so schnell wie möglich mit, damit wir den Termin für einen anderen Patienten freigeben können.</p>
-
-      <div class="footer">
-        <p>${clinicName}</p>
-      </div>
-    </div>
-  </div>
-</body>
-</html>
-    `;
-  },
-};
+export { replacePlaceholders, EmailPlaceholders };

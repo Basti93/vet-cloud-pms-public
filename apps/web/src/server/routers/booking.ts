@@ -3,8 +3,9 @@ import { eq, and, gte, lte, lt, or, isNull } from "drizzle-orm";
 import { createTRPCRouter, publicProcedure, protectedProcedure } from "@/server/trpc";
 import { tenants, appointments, owners, patients, users, appointmentHolds } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
-import { sendTemplateEmail } from "@/lib/email/service";
-import { confirmationTemplate } from "@/lib/email/templates";
+// TODO: Restore email sending after email service refactor
+// import { sendTemplateEmail } from "@/lib/email/service";
+// import { confirmationTemplate } from "@/lib/email/templates";
 import { generateConfirmationToken, buildConfirmationUrl } from "@/lib/tokens/confirmation";
 
 // ── Slot generation ───────────────────────────────────────────────────────────
@@ -347,7 +348,9 @@ export const bookingRouter = createTRPCRouter({
           )
         );
 
+      // TODO: Restore email sending after email service refactor
       // Send confirmation email (fire and forget, don't block response)
+      /*
       const tenant = await ctx.db.query.tenants.findFirst({
         where: (t, { eq }) => eq(t.id, input.tenantId),
       });
@@ -392,6 +395,7 @@ export const bookingRouter = createTRPCRouter({
           console.error("Failed to send confirmation email:", emailError);
         }
       }
+      */
 
       return {
         appointmentId: appointment.id,

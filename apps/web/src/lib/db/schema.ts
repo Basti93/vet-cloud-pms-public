@@ -563,6 +563,47 @@ export const appointmentHolds = pgTable(
 );
 
 // ============================================================================
+// EMAIL_SETTINGS (Notification Configuration per Tenant)
+// ============================================================================
+
+export const emailSettings = pgTable(
+  "email_settings",
+  {
+    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .unique()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    confirmationEmailEnabled: boolean("confirmation_email_enabled").default(true).notNull(),
+    reminderEmailEnabled: boolean("reminder_email_enabled").default(true).notNull(),
+    reminderHoursBefore: smallint("reminder_hours_before").default(24).notNull(), // 24h default
+    bookingNotificationEnabled: boolean("booking_notification_enabled").default(true).notNull(),
+    senderName: varchar("sender_name", { length: 100 }).default("VetCloud PMS").notNull(),
+    confirmationSubject: varchar("confirmation_subject", { length: 255 })
+      .default("Bestätigung: Ihr Termin bei {practiceName}")
+      .notNull(),
+    confirmationBody: text("confirmation_body")
+      .default("Hallo {ownerFirstName},\n\nIhr Termin für {patientName} am {appointmentDate} um {appointmentTime} wurde bestätigt.\n\nBeste Grüße,\n{practiceName}")
+      .notNull(),
+    reminderSubject: varchar("reminder_subject", { length: 255 })
+      .default("Erinnerung: Termin morgen bei {practiceName}")
+      .notNull(),
+    reminderBody: text("reminder_body")
+      .default("Hallo {ownerFirstName},\n\nIhr Termin für {patientName} findet morgen um {appointmentTime} statt.\n\nBeste Grüße,\n{practiceName}")
+      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (table) => ({
+    tenantIdIdx: index("email_settings_tenant_id_idx").on(table.tenantId),
+  })
+);
+
+// ============================================================================
 // RLS Policies (für später, muss in Postgres direkt gesetzt werden)
 // ============================================================================
 

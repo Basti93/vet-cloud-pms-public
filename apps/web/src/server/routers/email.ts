@@ -5,289 +5,178 @@
 
 import { z } from 'zod';
 import { createTRPCRouter, protectedProcedure, publicProcedure } from '@/server/trpc';
-import { appointments, owners, patients, users } from '@/lib/db/schema';
+import { appointments, owners, patients, users, emailSettings, tenants } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
-import { sendTemplateEmail } from '@/lib/email/service';
-import { confirmationTemplate, cancellationTemplate } from '@/lib/email/templates';
+import { sendConfirmationEmail, SendConfirmationEmailInput } from '@/lib/email/service';
 import { generateConfirmationToken, buildConfirmationUrl } from '@/lib/tokens/confirmation';
+import { PERMISSIONS } from '@/lib/db/schema';
 
 export const emailRouter = createTRPCRouter({
+  // TODO: Re-implement sendConfirmationEmail and sendCancellationEmail with new email settings
+  // These will use the new sendConfirmationEmail function from the service and respect email settings
+
   /**
-   * Protected: Send confirmation email after booking
-   * Called after appointment is created in the booking flow
+   * Get email settings for a tenant
    */
-  sendConfirmationEmail: protectedProcedure
-    .input(
-      z.object({
-        appointmentId: z.string().uuid(),
-        tenantId: z.string().uuid(),
-      })
-    )
-    .mutation(async ({ ctx, input }) => {
+  getSettings: protectedProcedure
+    .input(z.object({ tenantId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
       try {
-        // Fetch appointment with related data
-        const [appointment] = await ctx.db
-          .select({
-            id: appointments.id,
-            startTime: appointments.startTime,
-            endTime: appointments.endTime,
-            title: appointments.title,
-            patientId: appointments.patientId,
-            vetId: appointments.vetId,
-          })
-          .from(appointments)
-          .where(
-            and(
-              eq(appointments.id, input.appointmentId),
-              eq(appointments.tenantId, input.tenantId)
-            )
-          );
+        // Verify user belongs to this tenant
+        const [user] = await ctx.db
+          .select({ tenantId: users.tenantId })
+          .from(users)
+          .where(eq(users.clerkId, ctx.userId!))
+          .limit(1);
 
-        if (!appointment) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'Termin nicht gefunden',
-          });
+        if (user?.tenantId !== input.tenantId) {
+          throw new TRPCError({ code: 'FORBIDDEN' });
         }
 
-        // Fetch patient
-        const [patient] = await ctx.db
-          .select({
-            id: patients.id,
-            name: patients.name,
-            ownerId: patients.ownerId,
-          })
-          .from(patients)
-          .where(eq(patients.id, appointment.patientId));
+        let [settings] = await ctx.db
+          .select()
+          .from(emailSettings)
+          .where(eq(emailSettings.tenantId, input.tenantId))
+          .limit(1);
 
-        if (!patient) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'Patient nicht gefunden',
-          });
+        // If no settings exist, create defaults
+        if (!settings) {
+          console.log('Creating default email settings for tenant:', input.tenantId);
+          const created = await ctx.db
+            .insert(emailSettings)
+            .values({
+              tenantId: input.tenantId,
+              confirmationEmailEnabled: true,
+              reminderEmailEnabled: true,
+              reminderHoursBefore: 24,
+              bookingNotificationEnabled: true,
+              senderName: 'VetCloud PMS',
+            })
+            .returning();
+
+          settings = created[0];
+          console.log('Created settings:', settings);
         }
 
-        // Fetch owner
-        const [owner] = await ctx.db
-          .select({
-            id: owners.id,
-            firstName: owners.firstName,
-            lastName: owners.lastName,
-            email: owners.email,
-          })
-          .from(owners)
-          .where(eq(owners.id, patient.ownerId));
-
-        if (!owner) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'Besitzer nicht gefunden',
-          });
-        }
-
-        // Fetch tenant info for clinic name
-        const tenant = await ctx.db.query.tenants.findFirst({
-          where: (t, { eq }) => eq(t.id, input.tenantId),
-        });
-
-        if (!tenant) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'Praxis nicht gefunden',
-          });
-        }
-
-        // Generate confirmation token
-        const confirmToken = generateConfirmationToken(
-          appointment.id,
-          owner.email!,
-          'confirm'
-        );
-
-        // Build confirmation link
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-        const confirmLink = buildConfirmationUrl(confirmToken, baseUrl, 'confirm');
-
-        // Format appointment date/time
-        const startDate = new Date(appointment.startTime);
-        const dateStr = startDate.toLocaleDateString('de-DE', {
-          weekday: 'long',
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-        });
-        const timeStr = startDate.toLocaleTimeString('de-DE', {
-          hour: '2-digit',
-          minute: '2-digit',
-        });
-
-        // Send confirmation email
-        const result = await sendTemplateEmail(
-          confirmationTemplate,
-          owner.email!,
-          {
-            ownerName: owner.firstName,
-            patientName: patient.name,
-            clinicName: tenant.name,
-            date: dateStr,
-            time: timeStr,
-            confirmLink,
-          },
-          `${tenant.name} <${process.env.RESEND_FROM_EMAIL || "noreply@resend.dev"}>`
-        );
-
-        if (!result.success) {
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: `Email konnte nicht gesendet werden: ${result.error}`,
-          });
-        }
-
-        return {
-          success: true,
-          messageId: result.messageId,
-          message: 'Bestätigungsemail gesendet',
-        };
+        return settings;
       } catch (error) {
-        console.error('Error sending confirmation email:', error);
-        if (error instanceof TRPCError) throw error;
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Fehler beim Versand der Bestätigungsemail',
-        });
+        console.error('Error in getSettings:', error);
+        throw error;
       }
     }),
 
   /**
-   * Protected: Send cancellation email
-   * Called when admin rejects a booking
+   * Update email settings for a tenant
    */
-  sendCancellationEmail: protectedProcedure
+  updateSettings: protectedProcedure
     .input(
       z.object({
-        appointmentId: z.string().uuid(),
         tenantId: z.string().uuid(),
-        reason: z.string().optional(),
+        confirmationEmailEnabled: z.boolean().optional(),
+        reminderEmailEnabled: z.boolean().optional(),
+        reminderHoursBefore: z.number().int().min(1).max(168).optional(),
+        bookingNotificationEnabled: z.boolean().optional(),
+        senderName: z.string().max(100).optional(),
+        confirmationSubject: z.string().max(255).optional(),
+        confirmationBody: z.string().optional(),
+        reminderSubject: z.string().max(255).optional(),
+        reminderBody: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      try {
-        // Fetch appointment with related data
-        const [appointment] = await ctx.db
-          .select({
-            id: appointments.id,
-            startTime: appointments.startTime,
-            endTime: appointments.endTime,
-            patientId: appointments.patientId,
-          })
-          .from(appointments)
-          .where(
-            and(
-              eq(appointments.id, input.appointmentId),
-              eq(appointments.tenantId, input.tenantId)
-            )
-          );
+      // Verify user has permission
+      const [user] = await ctx.db
+        .select({ tenantId: users.tenantId })
+        .from(users)
+        .where(eq(users.clerkId, ctx.userId!))
+        .limit(1);
 
-        if (!appointment) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'Termin nicht gefunden',
-          });
-        }
+      if (user?.tenantId !== input.tenantId) {
+        throw new TRPCError({ code: 'FORBIDDEN' });
+      }
 
-        // Fetch patient and owner
-        const [patient] = await ctx.db
-          .select({
-            id: patients.id,
-            name: patients.name,
-            ownerId: patients.ownerId,
-          })
-          .from(patients)
-          .where(eq(patients.id, appointment.patientId));
+      const { tenantId, ...updateData } = input;
 
-        if (!patient) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'Patient nicht gefunden',
-          });
-        }
+      const [existing] = await ctx.db
+        .select()
+        .from(emailSettings)
+        .where(eq(emailSettings.tenantId, tenantId))
+        .limit(1);
 
-        const [owner] = await ctx.db
-          .select({
-            id: owners.id,
-            firstName: owners.firstName,
-            lastName: owners.lastName,
-            email: owners.email,
-          })
-          .from(owners)
-          .where(eq(owners.id, patient.ownerId));
+      if (!existing) {
+        // Create if doesn't exist
+        const [created] = await ctx.db
+          .insert(emailSettings)
+          .values({ tenantId, ...updateData })
+          .returning();
+        return created;
+      }
 
-        if (!owner) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'Besitzer nicht gefunden',
-          });
-        }
+      const [updated] = await ctx.db
+        .update(emailSettings)
+        .set({ ...updateData, updatedAt: new Date() })
+        .where(eq(emailSettings.tenantId, tenantId))
+        .returning();
 
-        const tenant = await ctx.db.query.tenants.findFirst({
-          where: (t, { eq }) => eq(t.id, input.tenantId),
-        });
+      return updated;
+    }),
 
-        if (!tenant) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'Praxis nicht gefunden',
-          });
-        }
+  /**
+   * Send test confirmation email
+   */
+  sendTestEmail: protectedProcedure
+    .input(
+      z.object({
+        tenantId: z.string().uuid(),
+        recipientEmail: z.string().email(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Verify user belongs to this tenant
+      const [user] = await ctx.db
+        .select({ tenantId: users.tenantId })
+        .from(users)
+        .where(eq(users.clerkId, ctx.userId!))
+        .limit(1);
 
-        // Format appointment date/time
-        const startDate = new Date(appointment.startTime);
-        const dateStr = startDate.toLocaleDateString('de-DE', {
-          weekday: 'long',
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-        });
-        const timeStr = startDate.toLocaleTimeString('de-DE', {
-          hour: '2-digit',
-          minute: '2-digit',
-        });
+      if (user?.tenantId !== input.tenantId) {
+        throw new TRPCError({ code: 'FORBIDDEN' });
+      }
 
-        // Send cancellation email
-        const result = await sendTemplateEmail(
-          cancellationTemplate,
-          owner.email!,
-          {
-            ownerName: owner.firstName,
-            patientName: patient.name,
-            clinicName: tenant.name,
-            date: dateStr,
-            time: timeStr,
-            reason: input.reason || '',
-          },
-          `${tenant.name} <${process.env.RESEND_FROM_EMAIL || "noreply@resend.dev"}>`
-        );
+      // Get tenant name for test email
+      const [tenant] = await ctx.db
+        .select({ name: tenants.name })
+        .from(tenants)
+        .where(eq(tenants.id, input.tenantId))
+        .limit(1);
 
-        if (!result.success) {
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: `Email konnte nicht gesendet werden: ${result.error}`,
-          });
-        }
+      if (!tenant) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Praxis nicht gefunden' });
+      }
 
-        return {
-          success: true,
-          messageId: result.messageId,
-          message: 'Absageemail gesendet',
-        };
-      } catch (error) {
-        console.error('Error sending cancellation email:', error);
-        if (error instanceof TRPCError) throw error;
+      // Send test email
+      const testEmailData: SendConfirmationEmailInput = {
+        to: input.recipientEmail,
+        practiceName: tenant.name,
+        ownerFirstName: 'Max',
+        patientName: 'Bella',
+        patientSpecies: 'Hund',
+        appointmentDate: new Date().toLocaleDateString('de-DE'),
+        appointmentTime: '14:30',
+        appointmentDateTime: `${new Date().toLocaleDateString('de-DE')} um 14:30 Uhr`,
+        vetName: 'Dr. Schmidt',
+      };
+
+      const result = await sendConfirmationEmail(testEmailData);
+
+      if (!result.success) {
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: 'Fehler beim Versand der Absageemail',
+          message: `Email konnte nicht gesendet werden: ${JSON.stringify(result.error)}`,
         });
       }
+
+      return { success: true, messageId: result.messageId };
     }),
 });

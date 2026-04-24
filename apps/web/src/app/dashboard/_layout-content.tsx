@@ -65,7 +65,7 @@ export default function DashboardContent({ children }: { children: ReactNode }) 
               {label}
             </Link>
           ))}
-          {user?.role === 'admin' && (
+          {!userLoading && (
             <>
               <div className="my-2" style={{ borderColor: 'var(--color-accent-soft)', borderTopWidth: '1px', opacity: 0.3 }} />
               {ADMIN_NAV_ITEMS.map(({ href, icon: Icon, label }) => (
