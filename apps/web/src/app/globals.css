@@ -21,11 +21,88 @@
 
 .fc {
   font-family: inherit;
+  background-color: var(--color-surface) !important;
+  color: var(--color-fg) !important;
 }
+
+/* Calendar header and text colors */
+.fc .fc-col-header-cell {
+  background-color: var(--color-surface) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-fg) !important;
+}
+
+.fc .fc-daygrid-day {
+  background-color: var(--color-surface) !important;
+  border-color: var(--color-border) !important;
+}
+
+.fc .fc-daygrid-day:hover {
+  background-color: var(--color-bg) !important;
+}
+
+.fc .fc-daygrid-day-number {
+  color: var(--color-fg) !important;
+}
+
+.fc .fc-daygrid-day-frame {
+  background-color: var(--color-surface) !important;
+}
+
+.fc .fc-daygrid-day-bg {
+  background-color: var(--color-surface) !important;
+}
+
+.fc .fc-timegrid-slot {
+  border-color: var(--color-border) !important;
+}
+
+.fc .fc-timegrid-col.fc-daygrid-column {
+  border-color: var(--color-border) !important;
+}
+
+.fc .fc-col-time {
+  color: var(--color-muted) !important;
+}
+
+.fc .fc-timegrid-slot {
+  color: var(--color-muted) !important;
+}
+
+/* Button styles */
 .fc .fc-button-primary {
-  background-color: #3b82f6 \!important;
-  border-color: #3b82f6 \!important;
+  background-color: var(--color-accent) !important;
+  border-color: var(--color-accent) !important;
+  color: white !important;
 }
+
 .fc .fc-button-primary:hover {
-  background-color: #2563eb \!important;
+  background-color: var(--color-accent-hover) !important;
+  border-color: var(--color-accent-hover) !important;
+}
+
+.fc .fc-button-primary:not(:disabled).fc-button-active {
+  background-color: var(--color-accent) !important;
+  border-color: var(--color-accent) !important;
+}
+
+/* Event default color */
+.fc .fc-event {
+  background-color: var(--color-accent) !important;
+  border-color: var(--color-accent) !important;
+}
+
+/* List view styles */
+.fc .fc-list-day-cushion {
+  background-color: var(--color-bg) !important;
+}
+
+.fc .fc-list-day-text,
+.fc .fc-list-day-side-text {
+  color: var(--color-fg) !important;
+}
+
+/* Now indicator */
+.fc .fc-now-indicator {
+  border-color: var(--color-accent) !important;
 }

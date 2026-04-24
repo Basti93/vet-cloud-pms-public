@@ -27,8 +27,15 @@ const FullCalendar = dynamic(
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+// Helper to get CSS variable colors (computed at runtime)
+function getCSSColor(varName: string): string {
+  if (typeof window === "undefined") return "#3B82F6"; // SSR fallback
+  const value = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+  return value || "#3B82F6";
+}
+
 const STATUS_COLORS: Record<string, { bg: string; border: string }> = {
-  scheduled: { bg: "#3B82F6", border: "#2563EB" },
+  scheduled: { bg: "#3B82F6", border: "#2563EB" }, // Accent color fallback
   completed: { bg: "#10B981", border: "#059669" },
   confirmed: { bg: "#10B981", border: "#059669" },
   cancelled: { bg: "#EF4444", border: "#DC2626" },
@@ -84,28 +91,28 @@ function TodayPanel({ appointments, onSelect }: { appointments: ApptDetail[]; on
     return d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate();
   });
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-      <div className="px-4 md:px-5 py-3 md:py-4 border-b border-gray-100">
-        <h3 className="font-semibold text-gray-900 text-sm md:text-base">
+    <div className="rounded-2xl overflow-hidden" style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+      <div className="px-4 md:px-5 py-3 md:py-4" style={{ borderBottom: '1px solid var(--color-border)' }}>
+        <h3 className="font-semibold text-sm md:text-base" style={{ color: 'var(--color-fg)' }}>
           Heute{" "}
           {todayAppts.length > 0 && (
-            <span className="ml-1 text-xs md:text-sm font-normal text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{todayAppts.length}</span>
+            <span className="ml-1 text-xs md:text-sm font-normal px-2 py-0.5 rounded-full" style={{ backgroundColor: 'var(--color-accent-soft)', color: 'var(--color-accent-text)' }}>{todayAppts.length}</span>
           )}
         </h3>
-        <p className="text-xs text-gray-400 mt-0.5">{today.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" })}</p>
+        <p className="text-xs mt-0.5" style={{ color: 'var(--color-muted)' }}>{today.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" })}</p>
       </div>
-      <div className="divide-y divide-gray-50 max-h-96 md:max-h-none overflow-y-auto">
+      <div className="max-h-96 md:max-h-none overflow-y-auto" style={{ borderTop: '1px solid var(--color-border)' }}>
         {todayAppts.length === 0 ? (
-          <p className="text-xs md:text-sm text-gray-400 text-center py-6 md:py-8">Keine Termine heute</p>
+          <p className="text-xs md:text-sm text-center py-6 md:py-8" style={{ color: 'var(--color-muted)' }}>Keine Termine heute</p>
         ) : (
           todayAppts.map((a) => (
-            <button key={a.id} onClick={() => onSelect(a)} className="w-full text-left px-4 md:px-5 py-2 md:py-3 hover:bg-gray-50 transition-colors">
+            <button key={a.id} onClick={() => onSelect(a)} className="w-full text-left px-4 md:px-5 py-2 md:py-3 transition-colors" style={{ borderBottom: '1px solid var(--color-border)', color: 'var(--color-fg)' }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-bg)'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-medium text-xs md:text-sm text-gray-900 truncate">{a.patientName ?? "–"}</span>
+                <span className="font-medium text-xs md:text-sm truncate">{a.patientName ?? "–"}</span>
                 <AppointmentStatusBadge status={a.status} />
               </div>
-              <p className="text-xs text-gray-500 mt-0.5 truncate">{a.title}</p>
-              <p className="text-xs text-gray-400 mt-0.5">
+              <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--color-muted)' }}>{a.title}</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--color-muted)' }}>
                 {new Date(a.startTime).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} –{" "}
                 {new Date(a.endTime).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
               </p>
@@ -208,8 +215,8 @@ export default function SchedulePage() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Terminkalender</h1>
-          <p className="text-gray-500 mt-1">{appointments ? `${appointments.length} Termine geladen` : "Terminübersicht"}</p>
+          <h1 className="text-3xl font-bold" style={{ color: 'var(--color-fg)' }}>Terminkalender</h1>
+          <p className="mt-1" style={{ color: 'var(--color-muted)' }}>{appointments ? `${appointments.length} Termine geladen` : "Terminübersicht"}</p>
         </div>
         <Button onClick={() => openNew()} disabled={!tenantId}>
           <Plus size={16} /> Neuer Termin
@@ -241,19 +248,23 @@ export default function SchedulePage() {
           {/* Calendar area */}
           <div className="lg:col-span-3 space-y-4">
             {/* Toolbar */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm px-4 py-3 flex items-center justify-between gap-3">
+            <div className="rounded-2xl px-4 py-3 flex items-center justify-between gap-3" style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
               <div className="flex items-center gap-1 min-w-0">
-                <button onClick={() => nav("prev")} className="p-2 rounded-lg hover:bg-gray-100 transition-colors flex-shrink-0"><ChevronLeft size={18} /></button>
-                <button onClick={() => nav("today")} className="px-3 py-1.5 text-sm font-medium rounded-lg hover:bg-gray-100 transition-colors flex-shrink-0">Heute</button>
-                <button onClick={() => nav("next")} className="p-2 rounded-lg hover:bg-gray-100 transition-colors flex-shrink-0"><ChevronRight size={18} /></button>
-                <span className="font-semibold text-gray-900 ml-2 hidden sm:block truncate">{currentTitle}</span>
+                <button onClick={() => nav("prev")} className="p-2 rounded-lg transition-colors flex-shrink-0" style={{ color: 'var(--color-fg)' }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-bg)'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}><ChevronLeft size={18} /></button>
+                <button onClick={() => nav("today")} className="px-3 py-1.5 text-sm font-medium rounded-lg transition-colors flex-shrink-0" style={{ color: 'var(--color-fg)' }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-bg)'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>Heute</button>
+                <button onClick={() => nav("next")} className="p-2 rounded-lg transition-colors flex-shrink-0" style={{ color: 'var(--color-fg)' }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-bg)'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}><ChevronRight size={18} /></button>
+                <span className="font-semibold ml-2 hidden sm:block truncate" style={{ color: 'var(--color-fg)' }}>{currentTitle}</span>
               </div>
-              <div className="flex items-center bg-gray-100 rounded-xl p-1 gap-1">
+              <div className="flex items-center rounded-xl p-1 gap-1" style={{ backgroundColor: 'var(--color-bg)' }}>
                 {viewButtons.map(({ key, label }) => (
                   <button
                     key={key}
                     onClick={() => switchView(key)}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${view === key ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${view === key ? "shadow-sm" : ""}`}
+                    style={{
+                      backgroundColor: view === key ? 'var(--color-surface)' : 'transparent',
+                      color: view === key ? 'var(--color-fg)' : 'var(--color-muted)',
+                    }}
                   >
                     {label}
                   </button>
@@ -262,7 +273,7 @@ export default function SchedulePage() {
             </div>
 
             {/* Calendar */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="rounded-2xl overflow-hidden" style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
               {isLoading ? (
                 <div className="p-6 space-y-3">
                   <Skeleton className="h-8 w-full" />
@@ -309,7 +320,7 @@ export default function SchedulePage() {
             {/* Legend */}
             <div className="flex flex-wrap gap-4 px-1">
               {Object.entries({ scheduled: "Geplant", completed: "Abgeschlossen", cancelled: "Abgesagt", "no-show": "Nicht erschienen" }).map(([key, label]) => (
-                <div key={key} className="flex items-center gap-1.5 text-xs text-gray-500">
+                <div key={key} className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--color-muted)' }}>
                   <span className="w-3 h-3 rounded-full" style={{ backgroundColor: STATUS_COLORS[key]?.bg }} />
                   {label}
                 </div>
@@ -320,21 +331,21 @@ export default function SchedulePage() {
           {/* Sidebar */}
           <div className="space-y-3 md:space-y-4">
             <TodayPanel appointments={filteredAppointments as ApptDetail[]} onSelect={openEdit} />
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="px-4 md:px-5 py-3 md:py-4 border-b border-gray-100">
-                <h3 className="font-semibold text-gray-900 text-sm">Nächste Termine</h3>
+            <div className="rounded-2xl overflow-hidden" style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+              <div className="px-4 md:px-5 py-3 md:py-4" style={{ borderBottom: '1px solid var(--color-border)' }}>
+                <h3 className="font-semibold text-sm" style={{ color: 'var(--color-fg)' }}>Nächste Termine</h3>
               </div>
-              <div className="divide-y divide-gray-50 max-h-96 md:max-h-none overflow-y-auto">
+              <div className="max-h-96 md:max-h-none overflow-y-auto">
                 {filteredAppointments.filter((a) => new Date(a.startTime) >= new Date()).slice(0, 6).map((a) => (
-                  <button key={a.id} onClick={() => openEdit(a as ApptDetail)} className="w-full text-left px-4 md:px-5 py-2 md:py-3 hover:bg-gray-50 transition-colors">
-                    <p className="text-xs font-medium text-gray-900 truncate">{a.patientName ?? "–"} — {a.title}</p>
-                    <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">
+                  <button key={a.id} onClick={() => openEdit(a as ApptDetail)} className="w-full text-left px-4 md:px-5 py-2 md:py-3 transition-colors" style={{ borderBottom: '1px solid var(--color-border)', color: 'var(--color-fg)' }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-bg)'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
+                    <p className="text-xs font-medium truncate">{a.patientName ?? "–"} — {a.title}</p>
+                    <p className="text-xs mt-0.5 line-clamp-1" style={{ color: 'var(--color-muted)' }}>
                       {new Date(a.startTime).toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                     </p>
                   </button>
                 ))}
                 {!filteredAppointments.filter((a) => new Date(a.startTime) >= new Date()).length && (
-                  <p className="text-sm text-gray-400 text-center py-6">Keine Termine</p>
+                  <p className="text-sm text-center py-6" style={{ color: 'var(--color-muted)' }}>Keine Termine</p>
                 )}
               </div>
             </div>
