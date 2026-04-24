@@ -420,7 +420,7 @@ export default function VoicePage() {
               ].map(([Icon, text]) => (
                 <div key={text as string} className="flex items-center gap-2 text-fg">
                   <span style={{ color: "var(--color-accent)" }}>
-                    {typeof Icon === "function" ? <Icon size={14} /> : Icon}
+                    <Icon size={14} />
                   </span>
                   <span>{text as string}</span>
                 </div>
