@@ -1,11 +1,10 @@
 import { z } from "zod";
 import { eq, and, gte, lte, lt, or, isNull } from "drizzle-orm";
 import { createTRPCRouter, publicProcedure, protectedProcedure } from "@/server/trpc";
-import { tenants, appointments, owners, patients, users, appointmentHolds } from "@/lib/db/schema";
+import { tenants, appointments, owners, patients, users, appointmentHolds, emailSettings } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
-// TODO: Restore email sending after email service refactor
-// import { sendTemplateEmail } from "@/lib/email/service";
-// import { confirmationTemplate } from "@/lib/email/templates";
+import { sendConfirmationEmail, sendBookingNotificationEmail } from "@/lib/email/service";
+import type { SendConfirmationEmailInput, SendBookingNotificationInput } from "@/lib/email/service";
 import { generateConfirmationToken, buildConfirmationUrl } from "@/lib/tokens/confirmation";
 
 // ── Slot generation ───────────────────────────────────────────────────────────
@@ -101,6 +100,76 @@ export const bookingRouter = createTRPCRouter({
 
       if (!appointment) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Termin nicht gefunden" });
+      }
+
+      // Send confirmation email to patient owner
+      try {
+        // Fetch patient, owner, and practice details
+        const [patientData] = await ctx.db
+          .select({
+            patientName: patients.name,
+            patientSpecies: patients.species,
+            ownerFirstName: owners.firstName,
+            ownerEmail: owners.email,
+          })
+          .from(patients)
+          .innerJoin(owners, eq(patients.ownerId, owners.id))
+          .where(eq(patients.id, appointment.patientId))
+          .limit(1);
+
+        const [tenant] = await ctx.db
+          .select({ name: tenants.name })
+          .from(tenants)
+          .where(eq(tenants.id, input.tenantId))
+          .limit(1);
+
+        // Fetch vet name if assigned
+        const [vet] = await ctx.db
+          .select({ firstName: users.firstName, lastName: users.lastName })
+          .from(users)
+          .where(eq(users.id, appointment.vetId))
+          .limit(1);
+
+        if (patientData && patientData.ownerEmail && tenant) {
+          // Check if confirmation emails are enabled
+          const [settings] = await ctx.db
+            .select()
+            .from(emailSettings)
+            .where(eq(emailSettings.tenantId, input.tenantId))
+            .limit(1);
+
+          if (settings?.confirmationEmailEnabled !== false) {
+            const startDate = new Date(appointment.startTime);
+            const dateStr = startDate.toLocaleDateString("de-DE", {
+              weekday: "long",
+              day: "2-digit",
+              month: "2-digit",
+              year: "numeric",
+            });
+            const timeStr = startDate.toLocaleTimeString("de-DE", {
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+            const dateTimeStr = `${dateStr} um ${timeStr}`;
+
+            const emailInput: SendConfirmationEmailInput = {
+              to: patientData.ownerEmail,
+              practiceName: tenant.name,
+              ownerFirstName: patientData.ownerFirstName,
+              patientName: patientData.patientName,
+              patientSpecies: patientData.patientSpecies,
+              appointmentDate: dateStr,
+              appointmentTime: timeStr,
+              appointmentDateTime: dateTimeStr,
+              vetName: vet ? `${vet.firstName} ${vet.lastName}` : undefined,
+            };
+
+            await sendConfirmationEmail(emailInput);
+          }
+        }
+      } catch (emailError) {
+        // Log error but don't fail the booking confirmation
+        console.error("Failed to send confirmation email:", emailError);
       }
 
       return { success: true, appointmentId: appointment.id };
@@ -348,54 +417,71 @@ export const bookingRouter = createTRPCRouter({
           )
         );
 
-      // TODO: Restore email sending after email service refactor
-      // Send confirmation email (fire and forget, don't block response)
-      /*
-      const tenant = await ctx.db.query.tenants.findFirst({
-        where: (t, { eq }) => eq(t.id, input.tenantId),
-      });
+      // Send booking notification email to practice owner (fire and forget, don't block response)
+      try {
+        const [tenantData] = await ctx.db
+          .select({
+            tenantName: tenants.name,
+            tenantEmail: tenants.email,
+          })
+          .from(tenants)
+          .where(eq(tenants.id, input.tenantId))
+          .limit(1);
 
-      if (tenant && owner.email) {
-        try {
-          // Generate confirmation token
-          const confirmToken = generateConfirmationToken(appointment.id, owner.email!, "confirm");
-          const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-          const confirmLink = buildConfirmationUrl(confirmToken, baseUrl, "confirm");
+        if (tenantData && tenantData.tenantEmail) {
+          // Check if booking notifications are enabled
+          const [settings] = await ctx.db
+            .select()
+            .from(emailSettings)
+            .where(eq(emailSettings.tenantId, input.tenantId))
+            .limit(1);
 
-          // Format appointment date/time
-          const startDate = new Date(appointment.startTime);
-          const dateStr = startDate.toLocaleDateString("de-DE", {
-            weekday: "long",
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-          });
-          const timeStr = startDate.toLocaleTimeString("de-DE", {
-            hour: "2-digit",
-            minute: "2-digit",
-          });
+          if (settings?.bookingNotificationEnabled !== false) {
+            const startDate = new Date(appointment.startTime);
+            const dateStr = startDate.toLocaleDateString("de-DE", {
+              weekday: "long",
+              day: "2-digit",
+              month: "2-digit",
+              year: "numeric",
+            });
+            const timeStr = startDate.toLocaleTimeString("de-DE", {
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+            const dateTimeStr = `${dateStr} um ${timeStr}`;
 
-          // Send email
-          const fromEmail = process.env.RESEND_FROM_EMAIL || "noreply@resend.dev";
-          await sendTemplateEmail(
-            confirmationTemplate,
-            owner.email!,
-            {
-              ownerName: owner.firstName,
+            // Fetch vet name
+            let vetName = "Unzugewiesen";
+            if (vet?.id) {
+              const [vetData] = await ctx.db
+                .select({ firstName: users.firstName, lastName: users.lastName })
+                .from(users)
+                .where(eq(users.id, vet.id))
+                .limit(1);
+              if (vetData) {
+                vetName = `${vetData.firstName} ${vetData.lastName}`;
+              }
+            }
+
+            const bookingNotifInput: SendBookingNotificationInput = {
+              to: tenantData.tenantEmail,
+              practiceName: tenantData.tenantName,
+              ownerFirstName: owner.firstName,
+              ownerLastName: owner.lastName,
               patientName: patient.name,
-              clinicName: tenant.name,
-              date: dateStr,
-              time: timeStr,
-              confirmLink,
-            },
-            `${tenant.name} <${fromEmail}>`
-          );
-        } catch (emailError) {
-          // Log error but don't fail the booking
-          console.error("Failed to send confirmation email:", emailError);
+              patientSpecies: patient.species,
+              appointmentDate: dateStr,
+              appointmentDateTime: dateTimeStr,
+              vetName,
+            };
+
+            await sendBookingNotificationEmail(bookingNotifInput);
+          }
         }
+      } catch (emailError) {
+        // Log error but don't fail the booking
+        console.error("Failed to send booking notification email:", emailError);
       }
-      */
 
       return {
         appointmentId: appointment.id,
