@@ -604,6 +604,46 @@ export const emailSettings = pgTable(
 );
 
 // ============================================================================
+// APPOINTMENT_EMAIL_LOGS (Email Delivery Tracking)
+// ============================================================================
+
+export const appointmentEmailLogs = pgTable(
+  "appointment_email_logs",
+  {
+    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    appointmentId: uuid("appointment_id")
+      .notNull()
+      .references(() => appointments.id, { onDelete: "cascade" }),
+    emailType: varchar("email_type", {
+      length: 50,
+      enum: ["confirmation", "reminder", "booking_notification"],
+    }).notNull(),
+    recipientEmail: varchar("recipient_email", { length: 255 }).notNull(),
+    status: varchar("status", {
+      length: 50,
+      enum: ["sent", "failed"],
+    })
+      .default("sent")
+      .notNull(),
+    errorMessage: text("error_message"), // If status is "failed"
+    sentAt: timestamp("sent_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (table) => ({
+    tenantIdIdx: index("appointment_email_logs_tenant_id_idx").on(table.tenantId),
+    appointmentIdIdx: index("appointment_email_logs_appointment_id_idx").on(
+      table.appointmentId
+    ),
+    emailTypeIdx: index("appointment_email_logs_email_type_idx").on(table.emailType),
+    sentAtIdx: index("appointment_email_logs_sent_at_idx").on(table.sentAt),
+  })
+);
+
+// ============================================================================
 // RLS Policies (für später, muss in Postgres direkt gesetzt werden)
 // ============================================================================
 

@@ -36,6 +36,13 @@
       "when": 1777024192956,
       "tag": "0004_careless_justice",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1777059132880,
+      "tag": "0005_freezing_maestro",
+      "breakpoints": true
     }
   ]
 }
