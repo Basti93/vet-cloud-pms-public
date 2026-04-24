@@ -168,7 +168,7 @@ export const appointmentsRouter = createTRPCRouter({
         startTime: z.date().optional(),
         endTime: z.date().optional(),
         status: z
-          .enum(["scheduled", "completed", "cancelled", "no-show"])
+          .enum(["scheduled", "confirmed", "completed", "cancelled", "no-show"])
           .optional(),
         vetId: z.string().uuid().optional(),
       })
