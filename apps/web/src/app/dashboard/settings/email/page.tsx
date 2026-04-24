@@ -13,15 +13,13 @@ export default function EmailSettingsPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Get current tenant
-  const tenant = trpc.tenant.getCurrent.useQuery(undefined, {
-    onError: (err) => setError(`Tenant error: ${err.message}`),
-  });
+  const tenant = trpc.tenant.getCurrent.useQuery();
 
   // Get email settings with cache key to help with invalidation
   const utils = trpc.useUtils();
   const emailSettings = trpc.email.getSettings.useQuery(
     { tenantId: tenant.data?.id || '' },
-    { enabled: !!tenant.data?.id, onError: (err) => setError(`Settings error: ${err.message}`) }
+    { enabled: !!tenant.data?.id }
   );
 
   const updateSettingsMutation = trpc.email.updateSettings.useMutation({

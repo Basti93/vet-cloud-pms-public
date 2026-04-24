@@ -110,4 +110,5 @@ Diese Anfrage erfordert Ihre Bestätigung im Dashboard.`,
   },
 };
 
-export { replacePlaceholders, EmailPlaceholders };
+export { replacePlaceholders };
+export type { EmailPlaceholders };
