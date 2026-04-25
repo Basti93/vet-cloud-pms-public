@@ -4,7 +4,7 @@ export default clerkMiddleware();
 
 export const config = {
   matcher: [
-    // Exclude static files and _next routes, but include everything else
-    '/((?!_next|.*\\..*|static|public).*)',
+    // Match all routes except static files and Next.js internals
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.png|.*\\.jpg|.*\\.jpeg|.*\\.gif|.*\\.svg).*)',
   ],
 };
