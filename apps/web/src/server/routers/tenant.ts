@@ -2,6 +2,7 @@ import { createTRPCRouter, publicProcedure, protectedProcedure } from "@/server/
 import { z } from "zod";
 import { tenants, users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { randomUUID } from "crypto";
 
 // Helper function to generate a unique slug from tenant name
 async function generateUniqueSlug(
@@ -80,15 +81,34 @@ export const tenantRouter = createTRPCRouter({
         .returning();
 
       // Associate current user with the new tenant as admin
-      // Admin users are also listed as vets in the booking system
-      await ctx.db
+      const [updatedAdmin] = await ctx.db
         .update(users)
         .set({
           tenantId: newTenant.id,
-          role: "admin", // First user to create a tenant is an admin (and can act as vet)
+          role: "admin",
           updatedAt: new Date(),
         })
-        .where(eq(users.clerkId, ctx.userId));
+        .where(eq(users.clerkId, ctx.userId))
+        .returning();
+
+      if (!updatedAdmin) {
+        throw new Error("Failed to update user");
+      }
+
+      // Create a default vet user so booking works immediately
+      // The vet is separate and editable by the admin
+      await ctx.db.insert(users).values({
+        id: randomUUID(),
+        tenantId: newTenant.id,
+        clerkId: `vet-placeholder-${newTenant.id}`, // Non-real Clerk ID for placeholder vet
+        email: currentUser.email,
+        firstName: updatedAdmin.firstName || "Dr.",
+        lastName: updatedAdmin.lastName || "Tierarzt",
+        title: "Dr.",
+        role: "vet",
+        slotDurationMin: 30,
+        active: true,
+      });
 
       return {
         id: newTenant.id,

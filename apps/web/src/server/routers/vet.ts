@@ -24,7 +24,6 @@ export const vetRouter = createTRPCRouter({
   list: protectedProcedure
     .input(z.object({ tenantId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      // Import or function: get the 'or' operator for query
       const vets = await ctx.db
         .select({
           id: users.id,
@@ -38,8 +37,7 @@ export const vetRouter = createTRPCRouter({
         .where(
           and(
             eq(users.tenantId, input.tenantId),
-            // Include both 'vet' role AND 'admin' role (practice owner is the vet)
-            or(eq(users.role, "vet"), eq(users.role, "admin")),
+            eq(users.role, "vet"),
             eq(users.active, true)
           )
         );
@@ -139,7 +137,7 @@ export const vetRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Get all active vets (including practice owner/admin)
+      // Get all active vets
       const vets = await ctx.db
         .select({
           id: users.id,
@@ -151,8 +149,7 @@ export const vetRouter = createTRPCRouter({
         .where(
           and(
             eq(users.tenantId, input.tenantId),
-            // Include both 'vet' role AND 'admin' role (practice owner is the vet)
-            or(eq(users.role, "vet"), eq(users.role, "admin")),
+            eq(users.role, "vet"),
             eq(users.active, true)
           )
         );
