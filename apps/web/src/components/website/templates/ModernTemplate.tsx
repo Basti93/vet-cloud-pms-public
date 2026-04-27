@@ -11,6 +11,7 @@ interface ModernTemplateProps {
   email?: string;
   address?: string;
   city?: string;
+  hours?: Array<{ day: string; time: string }>;
 }
 
 export function ModernTemplate({
@@ -22,6 +23,7 @@ export function ModernTemplate({
   email = 'kontakt@praxis.de',
   address = 'Musterstraße 1',
   city = 'Musterstadt',
+  hours = [{ day: 'Mo–Fr', time: '08:00–18:00' }],
 }: ModernTemplateProps) {
   return (
     <div className="min-h-screen bg-bg text-fg">
@@ -172,10 +174,10 @@ export function ModernTemplate({
                 <Clock className="w-6 h-6 flex-shrink-0" style={{ color: 'var(--color-accent)' }} />
                 <div>
                   <p className="font-bold mb-3">Öffnungszeiten</p>
-                  <div className="space-y-2 text-muted">
-                    <p>Montag - Freitag: 08:00 - 18:00 Uhr</p>
-                    <p>Samstag: 09:00 - 13:00 Uhr</p>
-                    <p>Sonntag: Geschlossen</p>
+                  <div className="space-y-1 text-muted">
+                    {hours.map((h, i) => (
+                      <p key={i}>{h.day}: {h.time}</p>
+                    ))}
                   </div>
                 </div>
               </div>

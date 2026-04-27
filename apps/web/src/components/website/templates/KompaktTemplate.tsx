@@ -11,6 +11,7 @@ interface KompaktTemplateProps {
   email?: string;
   address?: string;
   city?: string;
+  hours?: Array<{ day: string; time: string }>;
 }
 
 export function KompaktTemplate({
@@ -22,6 +23,7 @@ export function KompaktTemplate({
   email = 'kontakt@praxis.de',
   address = 'Musterstraße 1',
   city = 'Musterstadt',
+  hours = [{ day: 'Mo–Fr', time: '08:00–18:00' }],
 }: KompaktTemplateProps) {
   return (
     <div className="min-h-screen bg-bg p-4 sm:p-6 flex items-center justify-center">
@@ -124,9 +126,9 @@ export function KompaktTemplate({
               <div>
                 <p className="text-xs text-muted font-medium">Öffnungszeiten</p>
                 <p className="font-bold text-sm">
-                  Mo–Fr: 08:00–18:00
-                  <br />
-                  Sa: 09:00–13:00
+                  {hours.map((h, i) => (
+                    <span key={i}>{h.day}: {h.time}{i < hours.length - 1 ? <br /> : null}</span>
+                  ))}
                 </p>
               </div>
             </div>

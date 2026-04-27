@@ -13,6 +13,7 @@ import { trpc } from "@/lib/trpc/client";
 import { useTenant } from "@/hooks/useTenant";
 import { useCurrentVet } from "@/hooks/useCurrentVet";
 import { useAuth } from "@clerk/nextjs";
+import { toFullCalendarBusinessHours, DEFAULT_OPENING_HOURS } from "@/lib/schedule-types";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
@@ -132,6 +133,11 @@ export default function SchedulePage() {
   const { tenantId, isReady } = useTenant();
   const { userId } = useAuth();
   const vetId = useCurrentVet();
+  const practiceHoursQuery = trpc.schedule.getPracticeHours.useQuery(
+    { tenantId: tenantId! },
+    { enabled: !!tenantId }
+  );
+  const businessHours = toFullCalendarBusinessHours(practiceHoursQuery.data ?? DEFAULT_OPENING_HOURS);
   const calRef = useRef<FullCalendarType>(null);
   const [view, setView] = useState<CalView>("timeGridWeek");
   const [currentTitle, setCurrentTitle] = useState("");
@@ -304,7 +310,7 @@ export default function SchedulePage() {
                     datesSet={(info) => setCurrentTitle(info.view.title)}
                     slotLabelFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
                     eventTimeFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
-                    businessHours={{ daysOfWeek: [1, 2, 3, 4, 5], startTime: "08:00", endTime: "18:00" }}
+                    businessHours={businessHours}
                     noEventsText="Keine Termine in diesem Zeitraum"
                     eventContent={(info) => (
                       <div className="px-1.5 py-0.5 overflow-hidden cursor-pointer">

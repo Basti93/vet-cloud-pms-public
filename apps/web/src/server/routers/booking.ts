@@ -1,36 +1,95 @@
 import { z } from "zod";
 import { eq, and, gte, lte, lt, or, isNull } from "drizzle-orm";
 import { createTRPCRouter, publicProcedure, protectedProcedure } from "@/server/trpc";
-import { tenants, appointments, owners, patients, users, appointmentHolds, emailSettings, appointmentEmailLogs } from "@/lib/db/schema";
+import { tenants, appointments, owners, patients, users, appointmentHolds, emailSettings, appointmentEmailLogs, vetSchedules, vetAbsences } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
 import { sendConfirmationEmail, sendBookingNotificationEmail } from "@/lib/email/service";
 import type { SendConfirmationEmailInput, SendBookingNotificationInput } from "@/lib/email/service";
 import { generateConfirmationToken, buildConfirmationUrl } from "@/lib/tokens/confirmation";
+import { DEFAULT_OPENING_HOURS, type DaySchedule, type TimeRange } from "@/lib/schedule-types";
+import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import type * as schema from "@/lib/db/schema";
 
 // ── Slot generation ───────────────────────────────────────────────────────────
 
 const SLOT_DURATION_MIN = 30;
-const BUSINESS_START_HOUR = 8;  // 08:00
-const BUSINESS_END_HOUR = 18;   // last slot starts 17:30, ends 18:00
 
-function generateDaySlots(date: Date): { start: Date; end: Date }[] {
-  const dayOfWeek = date.getDay(); // 0=Sun, 6=Sat
-  if (dayOfWeek === 0 || dayOfWeek === 6) return [];
+type Db = PostgresJsDatabase<typeof schema>;
 
+/** Generate 30-min booking slots across multiple time ranges, respecting minute precision. */
+function generateSlotsFromRanges(date: Date, ranges: TimeRange[]): { start: Date; end: Date }[] {
   const now = new Date();
   const slots: { start: Date; end: Date }[] = [];
 
-  for (let hour = BUSINESS_START_HOUR; hour < BUSINESS_END_HOUR; hour++) {
-    for (let min = 0; min < 60; min += SLOT_DURATION_MIN) {
+  for (const range of ranges) {
+    let totalMin = range.startHour * 60 + range.startMin;
+    const endTotalMin = range.endHour * 60 + range.endMin;
+
+    while (totalMin + SLOT_DURATION_MIN <= endTotalMin) {
       const start = new Date(date);
-      start.setHours(hour, min, 0, 0);
+      start.setHours(Math.floor(totalMin / 60), totalMin % 60, 0, 0);
       const end = new Date(start.getTime() + SLOT_DURATION_MIN * 60_000);
-      if (start > now) {
-        slots.push({ start, end });
-      }
+      if (start > now) slots.push({ start, end });
+      totalMin += SLOT_DURATION_MIN;
     }
   }
   return slots;
+}
+
+async function getVetSlotsForDay(
+  db: Db,
+  tenantId: string,
+  vetId: string,
+  date: Date
+): Promise<{ start: Date; end: Date }[]> {
+  const dayOfWeek = date.getDay();
+  const dateStr = date.toISOString().slice(0, 10);
+
+  // 1. Check vet absence first (fastest exit)
+  const [absence] = await db
+    .select({ id: vetAbsences.id })
+    .from(vetAbsences)
+    .where(
+      and(
+        eq(vetAbsences.tenantId, tenantId),
+        eq(vetAbsences.vetId, vetId),
+        lte(vetAbsences.startDate, dateStr),
+        gte(vetAbsences.endDate, dateStr)
+      )
+    )
+    .limit(1);
+
+  if (absence) return [];
+
+  // 2. Check vet's own schedule for this day
+  const [vetSchedule] = await db
+    .select({ slots: vetSchedules.slots })
+    .from(vetSchedules)
+    .where(
+      and(
+        eq(vetSchedules.tenantId, tenantId),
+        eq(vetSchedules.vetId, vetId),
+        eq(vetSchedules.dayOfWeek, dayOfWeek)
+      )
+    )
+    .limit(1);
+
+  if (vetSchedule) {
+    // Vet has an explicit schedule for this day — use it (empty slots = day off)
+    return generateSlotsFromRanges(date, vetSchedule.slots as TimeRange[]);
+  }
+
+  // 3. No vet schedule → fall back to practice opening hours
+  const [tenant] = await db
+    .select({ openingHours: tenants.openingHours })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
+
+  const practiceDay = ((tenant?.openingHours as DaySchedule[] | null) ?? DEFAULT_OPENING_HOURS)
+    .find((h) => h.dayOfWeek === dayOfWeek);
+
+  return generateSlotsFromRanges(date, practiceDay?.slots ?? []);
 }
 
 // ── Router ────────────────────────────────────────────────────────────────────
@@ -283,7 +342,23 @@ export const bookingRouter = createTRPCRouter({
             : and(...holdBaseConditions)
         );
 
-      const allSlots = generateDaySlots(input.date);
+      // Use schedule-aware slot generation (requires vetId for per-vet hours)
+      // If no vetId, fall back to practice hours only
+      let allSlots: { start: Date; end: Date }[];
+      if (input.vetId) {
+        allSlots = await getVetSlotsForDay(ctx.db, input.tenantId, input.vetId, input.date);
+      } else {
+        // No vet selected: use practice opening hours
+        const dayOfWeek = input.date.getDay();
+        const [tenant] = await ctx.db
+          .select({ openingHours: tenants.openingHours })
+          .from(tenants)
+          .where(eq(tenants.id, input.tenantId))
+          .limit(1);
+        const practiceDay = ((tenant?.openingHours as DaySchedule[] | null) ?? DEFAULT_OPENING_HOURS)
+          .find((h) => h.dayOfWeek === dayOfWeek);
+        allSlots = generateSlotsFromRanges(input.date, practiceDay?.slots ?? []);
+      }
 
       return allSlots
         .filter((slot) =>
@@ -676,34 +751,30 @@ export const bookingRouter = createTRPCRouter({
           )
         );
 
-      // Generate next 14 weekdays
-      const weekdays: Date[] = [];
+      // Generate next 28 calendar days (enough to find working days per vet's schedule)
+      const nextDays: Date[] = [];
       let cursor = new Date();
-      cursor.setDate(cursor.getDate() + 1); // Start from tomorrow
-      while (weekdays.length < 14) {
-        const dayOfWeek = cursor.getDay();
-        if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Not Sunday or Saturday
-          weekdays.push(new Date(cursor));
-        }
+      cursor.setDate(cursor.getDate() + 1);
+      for (let i = 0; i < 28; i++) {
+        nextDays.push(new Date(cursor));
         cursor.setDate(cursor.getDate() + 1);
       }
 
-      // For each vet, check if has available slots
+      // For each vet, check if they have any available slots in the next 28 days
       const vetAvailability = await Promise.all(
         vets.map(async (vet) => {
-          // Check all 14 weekdays for this vet
-          for (const day of weekdays) {
+          for (const day of nextDays) {
+            // Schedule-aware: checks practice hours, vet schedule, absences
+            const allSlots = await getVetSlotsForDay(ctx.db, input.tenantId, vet.id, day);
+            if (allSlots.length === 0) continue;
+
             const dayStart = new Date(day);
             dayStart.setHours(0, 0, 0, 0);
             const dayEnd = new Date(day);
             dayEnd.setHours(23, 59, 59, 999);
 
-            // Get booked appointments for this vet on this day
             const booked = await ctx.db
-              .select({
-                startTime: appointments.startTime,
-                endTime: appointments.endTime,
-              })
+              .select({ startTime: appointments.startTime, endTime: appointments.endTime })
               .from(appointments)
               .where(
                 and(
@@ -714,10 +785,6 @@ export const bookingRouter = createTRPCRouter({
                 )
               );
 
-            // Generate all slots for this day
-            const allSlots = generateDaySlots(day);
-
-            // Check if any slot is free
             const hasFreeSlot = allSlots.some(
               (slot) =>
                 !booked.some(
@@ -728,24 +795,11 @@ export const bookingRouter = createTRPCRouter({
             );
 
             if (hasFreeSlot) {
-              return {
-                id: vet.id,
-                title: vet.title,
-                firstName: vet.firstName,
-                lastName: vet.lastName,
-                hasAvailableSlots: true,
-              };
+              return { id: vet.id, title: vet.title, firstName: vet.firstName, lastName: vet.lastName, hasAvailableSlots: true };
             }
           }
 
-          // If no free slot found in any of the 14 days
-          return {
-            id: vet.id,
-            title: vet.title,
-            firstName: vet.firstName,
-            lastName: vet.lastName,
-            hasAvailableSlots: false,
-          };
+          return { id: vet.id, title: vet.title, firstName: vet.firstName, lastName: vet.lastName, hasAvailableSlots: false };
         })
       );
 

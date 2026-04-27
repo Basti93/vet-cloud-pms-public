@@ -15,14 +15,26 @@ export const TEST_DATA = {
   // ────────────────────────────────────────────────────────────────────────
   tenant: {
     id: DEMO_TENANT_ID,
-    name: "Demo Praxis",
+    name: "Tierarztpraxis Demo",
     slug: DEMO_TENANT_SLUG,
     email: "demo@example.com",
-    phone: "+49 123 456789",
-    address: "Musterstraße 1",
-    city: "Musterstadt",
-    postalCode: "12345",
+    phone: "+49 30 123456",
+    address: "Schönhauser Allee 42",
+    city: "Berlin",
+    postalCode: "10435",
     country: "DE",
+    tagline: "Ihre Tierarztpraxis in Berlin-Prenzlauer Berg",
+    monogram: "TP",
+    themePreference: "sage" as const,
+    typographyPreference: "modern" as const,
+    websiteTemplate: "klassik" as const,
+    openingHours: [
+      { dayOfWeek: 1, slots: [{ startHour: 9, startMin: 0, endHour: 11, endMin: 30 }, { startHour: 16, startMin: 0, endHour: 19, endMin: 0 }] },
+      { dayOfWeek: 2, slots: [{ startHour: 15, startMin: 0, endHour: 18, endMin: 0 }] },
+      { dayOfWeek: 3, slots: [{ startHour: 9, startMin: 0, endHour: 11, endMin: 30 }, { startHour: 16, startMin: 0, endHour: 19, endMin: 0 }] },
+      { dayOfWeek: 4, slots: [{ startHour: 9, startMin: 0, endHour: 11, endMin: 30 }, { startHour: 16, startMin: 0, endHour: 19, endMin: 0 }] },
+      { dayOfWeek: 5, slots: [{ startHour: 9, startMin: 0, endHour: 12, endMin: 0 }] },
+    ],
     subscriptionStatus: "trial" as const,
     subscriptionPlan: "starter" as const,
     maxUsers: 5,
@@ -422,36 +434,42 @@ export const TEST_DATA = {
   ],
 
   // ────────────────────────────────────────────────────────────────────────
-  // VET SCHEDULES (indexed by vetIndex in users array: 1=Mueller, 2=Schmidt, 3=Weber)
+  // VET SCHEDULES (vetIndex = index in createdVets: 0=Mueller, 1=Schmidt, 2=Weber)
   // dayOfWeek: 0=Sun, 1=Mon, ..., 6=Sat
+  // Omit days that are closed (no entry = uses practice opening hours fallback)
   // ────────────────────────────────────────────────────────────────────────
   vetSchedules: [
-    // Dr. Mueller (vetIndex 0) - Monday to Friday, 8-18
-    { vetIndex: 0, dayOfWeek: 1, startHour: 8, endHour: 18, isWorkingDay: true },
-    { vetIndex: 0, dayOfWeek: 2, startHour: 8, endHour: 18, isWorkingDay: true },
-    { vetIndex: 0, dayOfWeek: 3, startHour: 8, endHour: 18, isWorkingDay: true },
-    { vetIndex: 0, dayOfWeek: 4, startHour: 8, endHour: 18, isWorkingDay: true },
-    { vetIndex: 0, dayOfWeek: 5, startHour: 8, endHour: 18, isWorkingDay: true },
-    { vetIndex: 0, dayOfWeek: 6, startHour: 10, endHour: 14, isWorkingDay: true }, // Saturday morning
-    { vetIndex: 0, dayOfWeek: 0, startHour: 0, endHour: 0, isWorkingDay: false }, // Sunday off
+    // Dr. Mueller — Mo–Fr 8–18, Sa 10–14
+    { vetIndex: 0, dayOfWeek: 1, slots: [{ startHour: 8, startMin: 0, endHour: 18, endMin: 0 }] },
+    { vetIndex: 0, dayOfWeek: 2, slots: [{ startHour: 8, startMin: 0, endHour: 18, endMin: 0 }] },
+    { vetIndex: 0, dayOfWeek: 3, slots: [{ startHour: 8, startMin: 0, endHour: 18, endMin: 0 }] },
+    { vetIndex: 0, dayOfWeek: 4, slots: [{ startHour: 8, startMin: 0, endHour: 18, endMin: 0 }] },
+    { vetIndex: 0, dayOfWeek: 5, slots: [{ startHour: 8, startMin: 0, endHour: 18, endMin: 0 }] },
+    { vetIndex: 0, dayOfWeek: 6, slots: [{ startHour: 10, startMin: 0, endHour: 14, endMin: 0 }] },
 
-    // Dr. Schmidt (vetIndex 1) - Tuesday to Saturday, 9-17
-    { vetIndex: 1, dayOfWeek: 1, startHour: 9, endHour: 17, isWorkingDay: true },
-    { vetIndex: 1, dayOfWeek: 2, startHour: 9, endHour: 17, isWorkingDay: true },
-    { vetIndex: 1, dayOfWeek: 3, startHour: 0, endHour: 0, isWorkingDay: false }, // Wednesday off
-    { vetIndex: 1, dayOfWeek: 4, startHour: 9, endHour: 17, isWorkingDay: true },
-    { vetIndex: 1, dayOfWeek: 5, startHour: 9, endHour: 17, isWorkingDay: true },
-    { vetIndex: 1, dayOfWeek: 6, startHour: 9, endHour: 14, isWorkingDay: true }, // Saturday afternoon
-    { vetIndex: 1, dayOfWeek: 0, startHour: 0, endHour: 0, isWorkingDay: false }, // Sunday off
+    // Dr. Schmidt — Mo/Di/Do/Fr 9–17, Mi closed, Sa 9–14
+    { vetIndex: 1, dayOfWeek: 1, slots: [{ startHour: 9, startMin: 0, endHour: 17, endMin: 0 }] },
+    { vetIndex: 1, dayOfWeek: 2, slots: [{ startHour: 9, startMin: 0, endHour: 17, endMin: 0 }] },
+    { vetIndex: 1, dayOfWeek: 3, slots: [] }, // Wednesday off
+    { vetIndex: 1, dayOfWeek: 4, slots: [{ startHour: 9, startMin: 0, endHour: 17, endMin: 0 }] },
+    { vetIndex: 1, dayOfWeek: 5, slots: [{ startHour: 9, startMin: 0, endHour: 17, endMin: 0 }] },
+    { vetIndex: 1, dayOfWeek: 6, slots: [{ startHour: 9, startMin: 0, endHour: 14, endMin: 0 }] },
 
-    // Dr. Weber (vetIndex 2) - Monday to Friday, 10-19 (late shift)
-    { vetIndex: 2, dayOfWeek: 1, startHour: 10, endHour: 19, isWorkingDay: true },
-    { vetIndex: 2, dayOfWeek: 2, startHour: 10, endHour: 19, isWorkingDay: true },
-    { vetIndex: 2, dayOfWeek: 3, startHour: 10, endHour: 19, isWorkingDay: true },
-    { vetIndex: 2, dayOfWeek: 4, startHour: 10, endHour: 19, isWorkingDay: true },
-    { vetIndex: 2, dayOfWeek: 5, startHour: 10, endHour: 19, isWorkingDay: true },
-    { vetIndex: 2, dayOfWeek: 6, startHour: 0, endHour: 0, isWorkingDay: false }, // Saturday off
-    { vetIndex: 2, dayOfWeek: 0, startHour: 0, endHour: 0, isWorkingDay: false }, // Sunday off
+    // Dr. Weber — Mo–Fr 10–19 (Spätdienst)
+    { vetIndex: 2, dayOfWeek: 1, slots: [{ startHour: 10, startMin: 0, endHour: 19, endMin: 0 }] },
+    { vetIndex: 2, dayOfWeek: 2, slots: [{ startHour: 10, startMin: 0, endHour: 19, endMin: 0 }] },
+    { vetIndex: 2, dayOfWeek: 3, slots: [{ startHour: 10, startMin: 0, endHour: 19, endMin: 0 }] },
+    { vetIndex: 2, dayOfWeek: 4, slots: [{ startHour: 10, startMin: 0, endHour: 19, endMin: 0 }] },
+    { vetIndex: 2, dayOfWeek: 5, slots: [{ startHour: 10, startMin: 0, endHour: 19, endMin: 0 }] },
+  ],
+
+  // ────────────────────────────────────────────────────────────────────────
+  // VET ABSENCES (vetIndex = index in createdVets: 0=Mueller, 1=Schmidt, 2=Weber)
+  // ────────────────────────────────────────────────────────────────────────
+  vetAbsences: [
+    { vetIndex: 0, startDate: "2026-05-04", endDate: "2026-05-08", type: "vacation" as const, note: "Urlaub" },
+    { vetIndex: 1, startDate: "2026-04-28", endDate: "2026-04-29", type: "sick" as const, note: null },
+    { vetIndex: 2, startDate: "2026-05-19", endDate: "2026-05-29", type: "vacation" as const, note: "Urlaub" },
   ],
 };
 
@@ -472,5 +490,6 @@ export function getTestDataStats() {
       TEST_DATA.internalAppointments.length + TEST_DATA.onlineBookings.length,
     vets: TEST_DATA.users.filter((u) => u.role === "vet").length,
     vetSchedules: TEST_DATA.vetSchedules.length,
+    vetAbsences: TEST_DATA.vetAbsences.length,
   };
 }

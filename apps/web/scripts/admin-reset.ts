@@ -37,6 +37,7 @@ import {
   medications,
   vitals,
   vetSchedules,
+  vetAbsences,
   roles,
   rolePermissions,
 } from "@/lib/db/schema";
@@ -72,6 +73,7 @@ async function main() {
       medications,
       vitals,
       vetSchedules,
+      vetAbsences,
       roles,
       rolePermissions,
     },
@@ -99,11 +101,35 @@ async function main() {
     } else if (command === "--reset") {
       console.log(`🔄 Resetting demo tenant data...`);
 
+      // Update tenant profile + opening hours
+      const t = TEST_DATA.tenant;
+      await db
+        .update(tenants)
+        .set({
+          name: t.name,
+          email: t.email,
+          phone: t.phone,
+          address: t.address,
+          city: t.city,
+          tagline: t.tagline,
+          monogram: t.monogram,
+          themePreference: t.themePreference,
+          typographyPreference: t.typographyPreference,
+          websiteTemplate: t.websiteTemplate,
+          openingHours: t.openingHours,
+          updatedAt: new Date(),
+        })
+        .where(eq(tenants.id, DEMO_TENANT_ID));
+
       // Delete in correct order (foreign key constraints)
       // Role permissions will be cascade-deleted when roles are deleted
       const rolesCount = await db
         .delete(roles)
         .where(eq(roles.tenantId, DEMO_TENANT_ID));
+
+      const vetAbsencesCount = await db
+        .delete(vetAbsences)
+        .where(eq(vetAbsences.tenantId, DEMO_TENANT_ID));
 
       const vetSchedulesCount = await db
         .delete(vetSchedules)
@@ -227,9 +253,25 @@ async function main() {
             tenantId: DEMO_TENANT_ID,
             vetId: vetForSchedule.id,
             dayOfWeek: schedule.dayOfWeek,
-            startHour: schedule.startHour,
-            endHour: schedule.endHour,
-            isWorkingDay: schedule.isWorkingDay,
+            slots: schedule.slots,
+          });
+        })
+      );
+
+      // ────────────────────────────────────────────────────────────────────
+      // CREATE VET ABSENCES
+      // ────────────────────────────────────────────────────────────────────
+      await Promise.all(
+        TEST_DATA.vetAbsences.map((absence) => {
+          const vetForAbsence = allVets[absence.vetIndex];
+          if (!vetForAbsence) return null;
+          return db.insert(vetAbsences).values({
+            tenantId: DEMO_TENANT_ID,
+            vetId: vetForAbsence.id,
+            startDate: absence.startDate,
+            endDate: absence.endDate,
+            type: absence.type,
+            note: absence.note ?? null,
           });
         })
       );
@@ -384,6 +426,7 @@ async function main() {
       console.log(`✅ Reset complete!`);
       console.log(`📊 Deleted:`);
       console.log(`   - Users: ${usersCount.count || 0}`);
+      console.log(`   - Vet absences: ${vetAbsencesCount.count || 0}`);
       console.log(`   - Vet schedules: ${vetSchedulesCount.count || 0}`);
       console.log(`   - Voice calls: ${voiceCallsCount.count || 0}`);
       console.log(`   - Medications: ${medicationsCount.count || 0}`);
@@ -397,6 +440,7 @@ async function main() {
       console.log(`   - Roles: Admin, Vet, Receptionist`);
       console.log(`   - Users: ${createdUsers.length} (${stats.vets} vets)`);
       console.log(`   - Vet schedules: ${stats.vetSchedules}`);
+      console.log(`   - Vet absences: ${stats.vetAbsences}`);
       console.log(`   - Owners: ${stats.owners}`);
       console.log(`   - Patients: ${stats.patients}`);
       console.log(

@@ -8,6 +8,7 @@ import {
   jsonb,
   varchar,
   smallint,
+  date,
   index,
   foreignKey,
   primaryKey,
@@ -92,6 +93,9 @@ export const tenants = pgTable(
       .default("modern")
       .notNull(),
     customWebsiteCode: text("custom_website_code"),
+    // Opening hours: array of 7 entries (index 0=Sun … 6=Sat)
+    // Each: { isOpen: boolean, startHour: number, endHour: number }
+    openingHours: jsonb("opening_hours"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .default(sql`now()`)
       .notNull(),
@@ -506,9 +510,8 @@ export const vetSchedules = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     dayOfWeek: smallint("day_of_week").notNull(), // 0 = Sunday, 1 = Monday, etc.
-    startHour: smallint("start_hour").notNull(), // 8
-    endHour: smallint("end_hour").notNull(), // 18
-    isWorkingDay: boolean("is_working_day").default(true).notNull(), // false = off
+    // Array of { startHour, startMin, endHour, endMin } — empty = day off
+    slots: jsonb("slots").notNull().default(sql`'[]'::jsonb`),
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .default(sql`now()`)
@@ -523,6 +526,42 @@ export const vetSchedules = pgTable(
       table.vetId
     ),
     dayIdx: index("vet_schedules_day_idx").on(table.dayOfWeek),
+  })
+);
+
+// ============================================================================
+// VET_ABSENCES (Urlaub, Krankmeldung, sonstige Abwesenheiten)
+// ============================================================================
+
+export const vetAbsences = pgTable(
+  "vet_absences",
+  {
+    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    vetId: uuid("vet_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    startDate: date("start_date").notNull(),
+    endDate: date("end_date").notNull(),
+    type: varchar("type", {
+      length: 20,
+      enum: ["vacation", "sick", "other"],
+    })
+      .default("vacation")
+      .notNull(),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (table) => ({
+    tenantVetIdx: index("vet_absences_tenant_vet_idx").on(table.tenantId, table.vetId),
+    dateRangeIdx: index("vet_absences_date_range_idx").on(table.startDate, table.endDate),
   })
 );
 

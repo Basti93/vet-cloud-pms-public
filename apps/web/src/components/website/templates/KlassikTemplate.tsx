@@ -11,6 +11,7 @@ interface KlassikTemplateProps {
   email?: string;
   address?: string;
   city?: string;
+  hours?: Array<{ day: string; time: string }>;
 }
 
 export function KlassikTemplate({
@@ -22,6 +23,7 @@ export function KlassikTemplate({
   email = 'kontakt@praxis.de',
   address = 'Musterstraße 1',
   city = 'Musterstadt',
+  hours = [{ day: 'Mo–Fr', time: '08:00–18:00' }],
 }: KlassikTemplateProps) {
   return (
     <div className="min-h-screen bg-bg text-fg">
@@ -140,18 +142,12 @@ export function KlassikTemplate({
             Öffnungszeiten
           </h2>
           <div className="space-y-4 text-center">
-            <div>
-              <p className="font-bold text-lg">Montag - Freitag</p>
-              <p className="text-muted">08:00 - 18:00 Uhr</p>
-            </div>
-            <div>
-              <p className="font-bold text-lg">Samstag</p>
-              <p className="text-muted">09:00 - 13:00 Uhr</p>
-            </div>
-            <div>
-              <p className="font-bold text-lg">Sonntag</p>
-              <p className="text-muted">Geschlossen</p>
-            </div>
+            {hours.map((h, i) => (
+              <div key={i}>
+                <p className="font-bold text-lg">{h.day}</p>
+                <p className="text-muted">{h.time}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>

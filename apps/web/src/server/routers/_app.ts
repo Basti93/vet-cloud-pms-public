@@ -8,6 +8,7 @@ import { vetRouter } from "./vet";
 import { emailRouter } from "./email";
 import { tenantRouter } from "./tenant";
 import { statisticsRouter } from "./statistics";
+import { scheduleRouter } from "./schedule";
 
 export const appRouter = createTRPCRouter({
   appointments: appointmentsRouter,
@@ -19,6 +20,7 @@ export const appRouter = createTRPCRouter({
   email: emailRouter,
   tenant: tenantRouter,
   statistics: statisticsRouter,
+  schedule: scheduleRouter,
 });
 
 export type AppRouter = typeof appRouter;

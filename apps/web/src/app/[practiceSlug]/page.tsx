@@ -3,6 +3,7 @@ import { tenants } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { type WebsiteTemplateKey } from '@/lib/theme';
 import { getTemplateComponent } from '@/lib/website-generator';
+import { openingHoursToDisplayRows, DEFAULT_OPENING_HOURS, type DaySchedule } from '@/lib/schedule-types';
 
 interface Props {
   params: Promise<{ practiceSlug: string }>;
@@ -25,6 +26,7 @@ export default async function PracticeWebsitePage({ params }: Props) {
       themePreference: tenants.themePreference,
       typographyPreference: tenants.typographyPreference,
       websiteTemplate: tenants.websiteTemplate,
+      openingHours: tenants.openingHours,
     })
     .from(tenants)
     .where(eq(tenants.slug, practiceSlug))
@@ -45,6 +47,10 @@ export default async function PracticeWebsitePage({ params }: Props) {
     (tenant.websiteTemplate as WebsiteTemplateKey) || 'modern'
   );
 
+  const hours = openingHoursToDisplayRows(
+    (tenant.openingHours as DaySchedule[] | null) ?? DEFAULT_OPENING_HOURS
+  );
+
   return (
     <TemplateComponent
       brandName={tenant.name}
@@ -55,6 +61,7 @@ export default async function PracticeWebsitePage({ params }: Props) {
       email={tenant.email || undefined}
       address={tenant.address || undefined}
       city={tenant.city || undefined}
+      hours={hours}
     />
   );
 }

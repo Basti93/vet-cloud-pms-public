@@ -36,6 +36,7 @@ import {
   medications,
   vitals,
   vetSchedules,
+  vetAbsences,
   roles,
   rolePermissions,
 } from "../src/lib/db/schema";
@@ -73,14 +74,30 @@ async function seed() {
     // ────────────────────────────────────────────────────────────────────────
     // 1. CREATE TENANT
     // ────────────────────────────────────────────────────────────────────────
-    console.log("📍 Creating tenant...");
-    const [tenant] = await db
+    console.log("📍 Creating/updating tenant...");
+    const t = TEST_DATA.tenant;
+    await db
       .insert(tenants)
-      .values(TEST_DATA.tenant)
-      .onConflictDoNothing()
-      .returning();
+      .values(t)
+      .onConflictDoUpdate({
+        target: tenants.id,
+        set: {
+          name: t.name,
+          email: t.email,
+          phone: t.phone,
+          address: t.address,
+          city: t.city,
+          tagline: t.tagline,
+          monogram: t.monogram,
+          themePreference: t.themePreference,
+          typographyPreference: t.typographyPreference,
+          websiteTemplate: t.websiteTemplate,
+          openingHours: t.openingHours,
+          updatedAt: new Date(),
+        },
+      });
 
-    const tenantId = tenant?.id || DEMO_TENANT_ID;
+    const tenantId = DEMO_TENANT_ID;
     console.log(`  ✓ ${TEST_DATA.tenant.name}\n`);
 
     // ────────────────────────────────────────────────────────────────────────
@@ -196,9 +213,7 @@ async function seed() {
             tenantId,
             vetId: vet.id,
             dayOfWeek: schedule.dayOfWeek,
-            startHour: schedule.startHour,
-            endHour: schedule.endHour,
-            isWorkingDay: schedule.isWorkingDay,
+            slots: schedule.slots,
           })
           .returning()
           .then((r) => r[0]);
@@ -207,8 +222,27 @@ async function seed() {
     console.log(`  ✓ ${createdSchedules.filter(Boolean).length} vet schedules\n`);
 
     // ────────────────────────────────────────────────────────────────────────
+    // 2c. CREATE VET ABSENCES
+    // ────────────────────────────────────────────────────────────────────────
+    console.log("🏖️  Creating vet absences...");
+    await Promise.all(
+      TEST_DATA.vetAbsences.map((absence) => {
+        const vet = createdVets[absence.vetIndex];
+        if (!vet) return null;
+        return db.insert(vetAbsences).values({
+          tenantId,
+          vetId: vet.id,
+          startDate: absence.startDate,
+          endDate: absence.endDate,
+          type: absence.type,
+          note: absence.note ?? null,
+        });
+      })
+    );
+    console.log(`  ✓ ${TEST_DATA.vetAbsences.length} vet absences\n`);
+
+    // ────────────────────────────────────────────────────────────────────────
     // 3. CREATE OWNERS
-    // (skipping 2c on purpose - schedules are in 2b)
     // ────────────────────────────────────────────────────────────────────────
     console.log("👨‍👩‍👧 Creating owners...");
     const createdOwners = await Promise.all(
@@ -374,6 +408,7 @@ async function seed() {
     console.log(`  • Tenant: ${TEST_DATA.tenant.name}`);
     console.log(`  • Users: ${createdUsers.length} (${stats.vets} vets)`);
     console.log(`  • Vet schedules: ${stats.vetSchedules}`);
+    console.log(`  • Vet absences: ${stats.vetAbsences}`);
     console.log(`  • Owners: ${stats.owners}`);
     console.log(`  • Patients: ${stats.patients}`);
     console.log(`  • Diagnoses: ${stats.diagnoses}`);
