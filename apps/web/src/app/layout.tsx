@@ -10,6 +10,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Vet Cloud PMS",
   description: "Modern cloud-based veterinary practice management system",
+  robots: "noindex",
 };
 
 export default async function RootLayout({

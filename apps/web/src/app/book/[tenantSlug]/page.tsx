@@ -3,6 +3,7 @@
 import { use, useState, useEffect, useRef, useCallback } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { useBookingFormState } from "@/hooks/useBookingFormState";
+import { COLOR_PRESETS, type ColorPresetKey } from "@/lib/theme";
 import { ChevronLeft, ChevronRight, Check, Phone, MapPin, Clock, Calendar, AlertCircle, Loader2, Stethoscope, PawPrint } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -891,8 +892,15 @@ export default function BookingPage({
   const { tenantSlug } = use(params);
   const { color } = use(searchParams);
 
-  // Primary colour: URL param ?color=3B82F6 (without #), default blue
-  const primaryColor = color ? `#${color.replace(/^#/, "")}` : "#3B82F6";
+  // Load tenant theme
+  const { data: tenantTheme } = trpc.tenant.getBySlug.useQuery({ slug: tenantSlug });
+
+  // Compute primary color from theme or fallback to URL param
+  const primaryColor = tenantTheme?.themePreference
+    ? COLOR_PRESETS[(tenantTheme.themePreference as ColorPresetKey) || "sage"].accent
+    : color
+      ? `#${color.replace(/^#/, "")}`
+      : "#3B82F6";
 
   const { data: clinic, isLoading: clinicLoading, error: clinicError } =
     trpc.booking.getClinic.useQuery({ slug: tenantSlug });
