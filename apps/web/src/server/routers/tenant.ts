@@ -95,20 +95,8 @@ export const tenantRouter = createTRPCRouter({
         throw new Error("Failed to update user");
       }
 
-      // Create a default vet user so booking works immediately
-      // The vet is separate and editable by the admin
-      await ctx.db.insert(users).values({
-        id: randomUUID(),
-        tenantId: newTenant.id,
-        clerkId: `vet-placeholder-${newTenant.id}`, // Non-real Clerk ID for placeholder vet
-        email: currentUser.email,
-        firstName: updatedAdmin.firstName || "Dr.",
-        lastName: updatedAdmin.lastName || "Tierarzt",
-        title: "Dr.",
-        role: "vet",
-        slotDurationMin: 30,
-        active: true,
-      });
+      // Note: The admin user themselves is the vet for bookings
+      // They can add additional vets (staff with role "vet") later
 
       // Initialize feature flags for this tenant (all disabled by default)
       await ctx.db.insert(featureFlags).values({
@@ -260,6 +248,38 @@ export const tenantRouter = createTRPCRouter({
       await ctx.db.update(tenants).set(updateData).where(eq(tenants.id, user.tenantId));
 
       return { success: true };
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ tenantId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      // Get current user's role and tenantId
+      const [user] = await ctx.db
+        .select({ tenantId: users.tenantId, role: users.role })
+        .from(users)
+        .where(eq(users.clerkId, ctx.userId))
+        .limit(1);
+
+      if (!user || user.role !== "admin") {
+        throw new Error("Only admins can delete a practice");
+      }
+
+      if (user.tenantId !== input.tenantId) {
+        throw new Error("Can only delete your own practice");
+      }
+
+      // Delete the tenant (cascades delete all related data)
+      const [deletedTenant] = await ctx.db
+        .delete(tenants)
+        .where(eq(tenants.id, input.tenantId))
+        .returning();
+
+      if (!deletedTenant) {
+        throw new Error("Practice not found");
+      }
+
+      console.log(`Practice deleted: ${deletedTenant.slug} (${deletedTenant.id})`);
+      return { success: true, deletedSlug: deletedTenant.slug };
     }),
 
   getFeatureFlags: protectedProcedure.query(async ({ ctx }) => {

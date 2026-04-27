@@ -24,6 +24,7 @@ export const vetRouter = createTRPCRouter({
   list: protectedProcedure
     .input(z.object({ tenantId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
+      // Include both vet and admin roles - admins can be booked as vets
       const vets = await ctx.db
         .select({
           id: users.id,
@@ -37,7 +38,7 @@ export const vetRouter = createTRPCRouter({
         .where(
           and(
             eq(users.tenantId, input.tenantId),
-            eq(users.role, "vet"),
+            or(eq(users.role, "vet"), eq(users.role, "admin")),
             eq(users.active, true)
           )
         );
@@ -137,7 +138,7 @@ export const vetRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Get all active vets
+      // Get all active vets and admins (admins can be booked as vets)
       const vets = await ctx.db
         .select({
           id: users.id,
@@ -149,7 +150,7 @@ export const vetRouter = createTRPCRouter({
         .where(
           and(
             eq(users.tenantId, input.tenantId),
-            eq(users.role, "vet"),
+            or(eq(users.role, "vet"), eq(users.role, "admin")),
             eq(users.active, true)
           )
         );
