@@ -2,6 +2,7 @@ import { createTRPCRouter, publicProcedure, protectedProcedure } from "@/server/
 import { z } from "zod";
 import { tenants, users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { randomUUID } from "crypto";
 
 // Helper function to generate a unique slug from tenant name
 async function generateUniqueSlug(
@@ -88,6 +89,28 @@ export const tenantRouter = createTRPCRouter({
           updatedAt: new Date(),
         })
         .where(eq(users.clerkId, ctx.userId));
+
+      // Create a default vet for the practice so booking works immediately
+      // Get the current user to use their info as the vet
+      const [adminUser] = await ctx.db
+        .select()
+        .from(users)
+        .where(eq(users.clerkId, ctx.userId));
+
+      if (adminUser) {
+        await ctx.db.insert(users).values({
+          id: randomUUID(),
+          tenantId: newTenant.id,
+          clerkId: `vet-${newTenant.id}`, // Placeholder clerk ID for default vet
+          email: currentUser.email,
+          firstName: adminUser.firstName || "Standard",
+          lastName: adminUser.lastName || "Tierarzt",
+          title: "Dr.",
+          role: "vet",
+          slotDurationMin: 30,
+          active: true,
+        });
+      }
 
       return {
         id: newTenant.id,
