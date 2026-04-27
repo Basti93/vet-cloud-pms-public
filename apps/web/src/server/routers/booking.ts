@@ -16,8 +16,28 @@ const SLOT_DURATION_MIN = 30;
 
 type Db = PostgresJsDatabase<typeof schema>;
 
-/** Generate 30-min booking slots across multiple time ranges, respecting minute precision. */
-function generateSlotsFromRanges(date: Date, ranges: TimeRange[]): { start: Date; end: Date }[] {
+/**
+ * Convert a local date+time in a given IANA timezone to a UTC Date.
+ * Uses Intl (built-in, no extra deps) and correctly handles DST.
+ */
+function zonedToUtc(localDateStr: string, hour: number, min: number, timezone: string): Date {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  // Build a pseudo-UTC date using the local hour/min values
+  const pseudo = new Date(`${localDateStr}T${pad(hour)}:${pad(min)}:00Z`);
+  // What does that UTC instant look like in the target timezone?
+  const inTz = new Date(
+    pseudo.toLocaleString('sv', { timeZone: timezone }).replace(' ', 'T') + 'Z'
+  );
+  // Offset = difference between the two interpretations
+  return new Date(pseudo.getTime() + (pseudo.getTime() - inTz.getTime()));
+}
+
+/** Generate 30-min booking slots across multiple time ranges using the practice timezone. */
+function generateSlotsFromRanges(
+  localDateStr: string,
+  ranges: TimeRange[],
+  timezone: string
+): { start: Date; end: Date }[] {
   const now = new Date();
   const slots: { start: Date; end: Date }[] = [];
 
@@ -26,8 +46,7 @@ function generateSlotsFromRanges(date: Date, ranges: TimeRange[]): { start: Date
     const endTotalMin = range.endHour * 60 + range.endMin;
 
     while (totalMin + SLOT_DURATION_MIN <= endTotalMin) {
-      const start = new Date(date);
-      start.setHours(Math.floor(totalMin / 60), totalMin % 60, 0, 0);
+      const start = zonedToUtc(localDateStr, Math.floor(totalMin / 60), totalMin % 60, timezone);
       const end = new Date(start.getTime() + SLOT_DURATION_MIN * 60_000);
       if (start > now) slots.push({ start, end });
       totalMin += SLOT_DURATION_MIN;
@@ -42,10 +61,21 @@ async function getVetSlotsForDay(
   vetId: string,
   date: Date
 ): Promise<{ start: Date; end: Date }[]> {
-  const dayOfWeek = date.getDay();
-  const dateStr = date.toISOString().slice(0, 10);
+  // Fetch tenant timezone + opening hours once (used in fallback path)
+  const [tenant] = await db
+    .select({ openingHours: tenants.openingHours, timezone: tenants.timezone })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
 
-  // 1. Check vet absence first (fastest exit)
+  const timezone = tenant?.timezone ?? 'Europe/Berlin';
+
+  // Compute date string and dayOfWeek in the practice's local timezone
+  const localDateStr = date.toLocaleDateString('sv', { timeZone: timezone }); // YYYY-MM-DD
+  const localDate = new Date(localDateStr + 'T12:00:00Z'); // noon UTC to avoid DST edge cases
+  const dayOfWeek = localDate.getUTCDay();
+
+  // 1. Check vet absence first
   const [absence] = await db
     .select({ id: vetAbsences.id })
     .from(vetAbsences)
@@ -53,8 +83,8 @@ async function getVetSlotsForDay(
       and(
         eq(vetAbsences.tenantId, tenantId),
         eq(vetAbsences.vetId, vetId),
-        lte(vetAbsences.startDate, dateStr),
-        gte(vetAbsences.endDate, dateStr)
+        lte(vetAbsences.startDate, localDateStr),
+        gte(vetAbsences.endDate, localDateStr)
       )
     )
     .limit(1);
@@ -75,21 +105,14 @@ async function getVetSlotsForDay(
     .limit(1);
 
   if (vetSchedule) {
-    // Vet has an explicit schedule for this day — use it (empty slots = day off)
-    return generateSlotsFromRanges(date, vetSchedule.slots as TimeRange[]);
+    return generateSlotsFromRanges(localDateStr, vetSchedule.slots as TimeRange[], timezone);
   }
 
   // 3. No vet schedule → fall back to practice opening hours
-  const [tenant] = await db
-    .select({ openingHours: tenants.openingHours })
-    .from(tenants)
-    .where(eq(tenants.id, tenantId))
-    .limit(1);
-
   const practiceDay = ((tenant?.openingHours as DaySchedule[] | null) ?? DEFAULT_OPENING_HOURS)
     .find((h) => h.dayOfWeek === dayOfWeek);
 
-  return generateSlotsFromRanges(date, practiceDay?.slots ?? []);
+  return generateSlotsFromRanges(localDateStr, practiceDay?.slots ?? [], timezone);
 }
 
 // ── Router ────────────────────────────────────────────────────────────────────
@@ -349,15 +372,18 @@ export const bookingRouter = createTRPCRouter({
         allSlots = await getVetSlotsForDay(ctx.db, input.tenantId, input.vetId, input.date);
       } else {
         // No vet selected: use practice opening hours
-        const dayOfWeek = input.date.getDay();
         const [tenant] = await ctx.db
-          .select({ openingHours: tenants.openingHours })
+          .select({ openingHours: tenants.openingHours, timezone: tenants.timezone })
           .from(tenants)
           .where(eq(tenants.id, input.tenantId))
           .limit(1);
+        const timezone = tenant?.timezone ?? 'Europe/Berlin';
+        const localDateStr = input.date.toLocaleDateString('sv', { timeZone: timezone });
+        const localDate = new Date(localDateStr + 'T12:00:00Z');
+        const dayOfWeek = localDate.getUTCDay();
         const practiceDay = ((tenant?.openingHours as DaySchedule[] | null) ?? DEFAULT_OPENING_HOURS)
           .find((h) => h.dayOfWeek === dayOfWeek);
-        allSlots = generateSlotsFromRanges(input.date, practiceDay?.slots ?? []);
+        allSlots = generateSlotsFromRanges(localDateStr, practiceDay?.slots ?? [], timezone);
       }
 
       return allSlots
