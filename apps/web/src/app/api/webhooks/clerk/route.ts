@@ -104,10 +104,16 @@ export async function POST(req: Request) {
 
       console.log(`User created: ${clerkId} (${email})`);
       return NextResponse.json({ success: true });
-    } catch (error) {
-      console.error("Error handling user.created webhook:", error);
+    } catch (error: any) {
+      console.error("Error handling user.created webhook:", {
+        message: error?.message,
+        code: error?.code,
+        detail: error?.detail,
+        stack: error?.stack,
+        fullError: JSON.stringify(error, null, 2)
+      });
       return NextResponse.json(
-        { error: "Internal server error" },
+        { error: "Internal server error", details: error?.message },
         { status: 500 }
       );
     }
