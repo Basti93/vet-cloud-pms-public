@@ -1,6 +1,6 @@
 import { createTRPCRouter, publicProcedure, protectedProcedure } from "@/server/trpc";
 import { z } from "zod";
-import { tenants, users } from "@/lib/db/schema";
+import { tenants, users, featureFlags } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
@@ -108,6 +108,13 @@ export const tenantRouter = createTRPCRouter({
         role: "vet",
         slotDurationMin: 30,
         active: true,
+      });
+
+      // Initialize feature flags for this tenant (all disabled by default)
+      await ctx.db.insert(featureFlags).values({
+        id: randomUUID(),
+        tenantId: newTenant.id,
+        aiReceptionEnabled: false, // Disabled by default
       });
 
       return {
@@ -251,6 +258,82 @@ export const tenantRouter = createTRPCRouter({
       if (input.websiteTemplate !== undefined) updateData.websiteTemplate = input.websiteTemplate;
 
       await ctx.db.update(tenants).set(updateData).where(eq(tenants.id, user.tenantId));
+
+      return { success: true };
+    }),
+
+  getFeatureFlags: protectedProcedure.query(async ({ ctx }) => {
+    // Get current user's tenant
+    const [user] = await ctx.db
+      .select({ tenantId: users.tenantId })
+      .from(users)
+      .where(eq(users.clerkId, ctx.userId))
+      .limit(1);
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Get feature flags for this tenant
+    const [flags] = await ctx.db
+      .select({
+        aiReceptionEnabled: featureFlags.aiReceptionEnabled,
+      })
+      .from(featureFlags)
+      .where(eq(featureFlags.tenantId, user.tenantId))
+      .limit(1);
+
+    // Return default flags if none exist yet
+    return {
+      aiReceptionEnabled: flags?.aiReceptionEnabled ?? false,
+    };
+  }),
+
+  updateFeatureFlags: protectedProcedure
+    .input(
+      z.object({
+        aiReceptionEnabled: z.boolean().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Get current user's tenant and role
+      const [user] = await ctx.db
+        .select({ tenantId: users.tenantId, role: users.role })
+        .from(users)
+        .where(eq(users.clerkId, ctx.userId))
+        .limit(1);
+
+      if (!user || user.role !== "admin") {
+        throw new Error("Only admins can update feature flags");
+      }
+
+      // Check if feature flags exist for this tenant
+      const [existing] = await ctx.db
+        .select({ id: featureFlags.id })
+        .from(featureFlags)
+        .where(eq(featureFlags.tenantId, user.tenantId))
+        .limit(1);
+
+      const updateData: any = {};
+      if (input.aiReceptionEnabled !== undefined) {
+        updateData.aiReceptionEnabled = input.aiReceptionEnabled;
+      }
+      updateData.updatedAt = new Date();
+
+      if (existing) {
+        // Update existing
+        await ctx.db
+          .update(featureFlags)
+          .set(updateData)
+          .where(eq(featureFlags.tenantId, user.tenantId));
+      } else {
+        // Create new
+        await ctx.db.insert(featureFlags).values({
+          id: randomUUID(),
+          tenantId: user.tenantId,
+          ...updateData,
+        });
+      }
 
       return { success: true };
     }),

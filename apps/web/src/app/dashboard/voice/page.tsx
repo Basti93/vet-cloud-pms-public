@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import Vapi from "@vapi-ai/web";
 import { Phone, PhoneOff, Mic, MicOff, Volume2, AlertCircle, Bot, Calendar, PawPrint, Clock, Bell, Moon, Timer } from "lucide-react";
+import { trpc } from "@/lib/trpc/client";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -144,6 +145,7 @@ function TranscriptPanel({ entries }: { entries: TranscriptEntry[] }) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function VoicePage() {
+  const { data: featureFlags, isLoading: flagsLoading } = trpc.tenant.getFeatureFlags.useQuery();
   const vapiRef = useRef<Vapi | null>(null);
   const [status, setStatus] = useState<CallStatus>("idle");
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -153,6 +155,23 @@ export default function VoicePage() {
   const [callDuration, setCallDuration] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Feature flag check
+  if (!flagsLoading && !featureFlags?.aiReceptionEnabled) {
+    return (
+      <div className="flex items-center justify-center min-h-screen p-6 bg-gray-50">
+        <div className="max-w-md text-center">
+          <div className="flex justify-center mb-4">
+            <div className="p-3 bg-amber-100 rounded-full">
+              <AlertCircle size={32} className="text-amber-600" />
+            </div>
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Feature nicht aktiviert</h1>
+          <p className="text-gray-600 mb-6">Die KI-Rezeption ist für diese Praxis nicht aktiviert. Bitte kontaktieren Sie den Administrator.</p>
+        </div>
+      </div>
+    );
+  }
 
   // ── Init Vapi ──────────────────────────────────────────────────────────────
 

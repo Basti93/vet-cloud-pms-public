@@ -38,6 +38,7 @@ export default function DashboardContent({ children }: { children: ReactNode }) 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { data: tenant } = trpc.tenant.getCurrent.useQuery();
   const { data: user, isLoading: userLoading } = trpc.admin.getCurrentUser.useQuery();
+  const { data: featureFlags } = trpc.tenant.getFeatureFlags.useQuery();
   const { t } = useLocale();
   const NAV_ITEMS = useNavItems();
   const BETA_NAV_ITEMS = useBetaNavItems();
@@ -87,29 +88,31 @@ export default function DashboardContent({ children }: { children: ReactNode }) 
             ))}
           </div>
 
-          {/* Beta Section */}
-          <div className="space-y-2">
-            <p
-              className="px-3 text-xs font-semibold uppercase tracking-wider"
-              style={{ color: 'var(--color-accent-soft)', opacity: 0.6 }}
-            >
-              {t("navigation.beta")}
-            </p>
-            <div className="space-y-1">
-              {BETA_NAV_ITEMS.map(({ href, icon: Icon, label }) => (
-                <Link
-                  key={href}
-                  href={href}
-                  onClick={() => setSidebarOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-colors group"
-                  style={{ color: 'var(--color-accent-soft)' }}
-                >
-                  <Icon size={18} />
-                  {label}
-                </Link>
-              ))}
+          {/* Beta Section - Only show if features are enabled */}
+          {featureFlags?.aiReceptionEnabled && (
+            <div className="space-y-2">
+              <p
+                className="px-3 text-xs font-semibold uppercase tracking-wider"
+                style={{ color: 'var(--color-accent-soft)', opacity: 0.6 }}
+              >
+                {t("navigation.beta")}
+              </p>
+              <div className="space-y-1">
+                {BETA_NAV_ITEMS.map(({ href, icon: Icon, label }) => (
+                  <Link
+                    key={href}
+                    href={href}
+                    onClick={() => setSidebarOpen(false)}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-colors group"
+                    style={{ color: 'var(--color-accent-soft)' }}
+                  >
+                    <Icon size={18} />
+                    {label}
+                  </Link>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {!userLoading && (
             <>

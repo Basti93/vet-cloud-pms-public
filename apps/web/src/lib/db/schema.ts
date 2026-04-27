@@ -685,6 +685,31 @@ export const appointmentEmailLogs = pgTable(
 );
 
 // ============================================================================
+// FEATURE_FLAGS (Per-Tenant Feature Toggle)
+// ============================================================================
+
+export const featureFlags = pgTable(
+  "feature_flags",
+  {
+    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .unique()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    aiReceptionEnabled: boolean("ai_reception_enabled").default(false).notNull(), // Vapi integration
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (table) => ({
+    tenantIdIdx: index("feature_flags_tenant_id_idx").on(table.tenantId),
+  })
+);
+
+// ============================================================================
 // RLS Policies (für später, muss in Postgres direkt gesetzt werden)
 // ============================================================================
 
