@@ -48,27 +48,26 @@ export const tenantRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Get current user to retrieve their email
+      // Get current user and their placeholder tenant
       const [currentUser] = await ctx.db
-        .select({ email: users.email })
+        .select({ email: users.email, tenantId: users.tenantId })
         .from(users)
         .where(eq(users.clerkId, ctx.userId))
         .limit(1);
 
-      if (!currentUser) {
-        throw new Error("User not found");
+      if (!currentUser || !currentUser.tenantId) {
+        throw new Error("User not found or has no placeholder tenant");
       }
 
-      // Generate unique slug
+      // Generate unique slug for the practice name
       const slug = await generateUniqueSlug(ctx.db, input.name);
 
-      // Create new tenant with sensible defaults
-      const [newTenant] = await ctx.db
-        .insert(tenants)
-        .values({
+      // Update placeholder tenant with actual practice details
+      const [updatedTenant] = await ctx.db
+        .update(tenants)
+        .set({
           name: input.name,
           slug,
-          email: currentUser.email,
           country: "DE",
           timezone: "Europe/Berlin",
           subscriptionStatus: "trial",
@@ -77,56 +76,38 @@ export const tenantRouter = createTRPCRouter({
           themePreference: "sage",
           typographyPreference: "modern",
           websiteTemplate: "modern",
+          updatedAt: new Date(),
         })
+        .where(eq(tenants.id, currentUser.tenantId))
         .returning();
 
-      // Get the old placeholder tenant (created by webhook during sign-up)
-      const [oldTenant] = await ctx.db
-        .select({ id: users.tenantId })
-        .from(users)
-        .where(eq(users.clerkId, ctx.userId))
-        .limit(1);
-
-      // Associate current user with the new tenant as admin
-      const [updatedAdmin] = await ctx.db
+      // Update user role to admin
+      await ctx.db
         .update(users)
         .set({
-          tenantId: newTenant.id,
           role: "admin",
           updatedAt: new Date(),
         })
-        .where(eq(users.clerkId, ctx.userId))
-        .returning();
+        .where(eq(users.clerkId, ctx.userId));
 
-      if (!updatedAdmin) {
-        throw new Error("Failed to update user");
+      // Initialize feature flags for this tenant (if not already created)
+      // Try insert, ignore if already exists
+      try {
+        await ctx.db.insert(featureFlags).values({
+          id: randomUUID(),
+          tenantId: currentUser.tenantId,
+          aiReceptionEnabled: false, // Disabled by default
+        });
+      } catch (error) {
+        // Feature flags already exist, that's fine
       }
 
-      // Delete the placeholder tenant (created by webhook) if it exists and is different
-      if (oldTenant?.id && oldTenant.id !== newTenant.id) {
-        try {
-          await ctx.db.delete(tenants).where(eq(tenants.id, oldTenant.id));
-          console.log(`Deleted placeholder tenant: ${oldTenant.id}`);
-        } catch (error) {
-          console.error("Error deleting placeholder tenant:", error);
-          // Don't fail the entire operation if cleanup fails
-        }
-      }
-
-      // Note: The admin user themselves is the vet for bookings
-      // They can add additional vets (staff with role "vet") later
-
-      // Initialize feature flags for this tenant (all disabled by default)
-      await ctx.db.insert(featureFlags).values({
-        id: randomUUID(),
-        tenantId: newTenant.id,
-        aiReceptionEnabled: false, // Disabled by default
-      });
+      console.log(`Practice created: ${updatedTenant.slug} (${updatedTenant.id})`);
 
       return {
-        id: newTenant.id,
-        name: newTenant.name,
-        slug: newTenant.slug,
+        id: updatedTenant.id,
+        name: updatedTenant.name,
+        slug: updatedTenant.slug,
       };
     }),
   getBySlug: publicProcedure
