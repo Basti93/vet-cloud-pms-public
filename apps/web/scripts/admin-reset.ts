@@ -464,6 +464,7 @@ async function main() {
     process.exit(1);
   } finally {
     await sql.end();
+    process.exit(0);
   }
 }
 
