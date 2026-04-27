@@ -8,6 +8,8 @@ const isPublicRoute = createRouteMatcher([
   '/impressum(.*)',  // Legal notice
   '/datenschutz(.*)',  // Privacy policy
   '/api/webhooks/clerk',  // Clerk webhooks (use Svix signature verification)
+  '/api/trpc/booking(.*)',  // Public booking tRPC endpoints
+  '/api/trpc/tenant(.*)',  // Public tenant endpoints
   '/',
 ]);
 
