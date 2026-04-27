@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db/client";
 import { users, tenants } from "@/lib/db/schema";
 import { randomUUID } from "crypto";
+import { eq } from "drizzle-orm";
 
 export async function POST(req: Request) {
   // Get the Svix headers for verification
@@ -56,6 +57,18 @@ export async function POST(req: Request) {
           { error: "User email required" },
           { status: 400 }
         );
+      }
+
+      // Check if user already exists (idempotency)
+      const existingUser = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.clerkId, clerkId))
+        .limit(1);
+
+      if (existingUser.length > 0) {
+        console.log(`User already exists: ${clerkId} (${email})`);
+        return NextResponse.json({ success: true, alreadyExists: true });
       }
 
       // Create a temporary tenant for this user (they'll create their practice tenant on onboarding)
