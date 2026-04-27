@@ -80,6 +80,13 @@ export const tenantRouter = createTRPCRouter({
         })
         .returning();
 
+      // Get the old placeholder tenant (created by webhook during sign-up)
+      const [oldTenant] = await ctx.db
+        .select({ id: users.tenantId })
+        .from(users)
+        .where(eq(users.clerkId, ctx.userId))
+        .limit(1);
+
       // Associate current user with the new tenant as admin
       const [updatedAdmin] = await ctx.db
         .update(users)
@@ -93,6 +100,17 @@ export const tenantRouter = createTRPCRouter({
 
       if (!updatedAdmin) {
         throw new Error("Failed to update user");
+      }
+
+      // Delete the placeholder tenant (created by webhook) if it exists and is different
+      if (oldTenant?.id && oldTenant.id !== newTenant.id) {
+        try {
+          await ctx.db.delete(tenants).where(eq(tenants.id, oldTenant.id));
+          console.log(`Deleted placeholder tenant: ${oldTenant.id}`);
+        } catch (error) {
+          console.error("Error deleting placeholder tenant:", error);
+          // Don't fail the entire operation if cleanup fails
+        }
       }
 
       // Note: The admin user themselves is the vet for bookings
