@@ -16,6 +16,11 @@
     "lint": "turbo run lint"
   },
   "dependencies": {
-    "next-intl": "^4.9.1"
+    "@vercel/analytics": "1.1.4",
+    "@vercel/speed-insights": "1.0.4",
+    "drizzle-kit": "^0.18.1",
+    "drizzle-orm": "0.45.2",
+    "next-intl": "^4.9.2",
+    "svix": "^1.92.2"
   }
 }
