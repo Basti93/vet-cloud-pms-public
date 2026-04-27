@@ -26,7 +26,8 @@
 import * as fs from "fs";
 import * as path from "path";
 import postgres from "postgres";
-import fetch from "node-fetch";
+
+// fetch is built-in to Node.js 18+
 
 // Load .env.local
 const envPath = path.resolve(process.cwd(), ".env.local");
@@ -114,7 +115,7 @@ async function deletePraxis() {
       console.log("🔐 Deleting users from Clerk...");
       for (const u of tenantUsers) {
         try {
-          const response = await (fetch as any)(
+          const response = await fetch(
             `https://api.clerk.com/v1/users/${u.clerk_id}`,
             {
               method: "DELETE",
