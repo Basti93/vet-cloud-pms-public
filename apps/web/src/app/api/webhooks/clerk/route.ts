@@ -6,6 +6,34 @@ import { users, tenants } from "@/lib/db/schema";
 import { randomUUID } from "crypto";
 import { eq } from "drizzle-orm";
 
+// Helper function to generate a unique slug
+async function generateUniqueSlug(baseName: string): Promise<string> {
+  let slug = baseName
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .trim();
+
+  if (!slug) slug = "temp-user";
+
+  let finalSlug = slug;
+  let counter = 1;
+  while (true) {
+    const existing = await db
+      .select({ id: tenants.id })
+      .from(tenants)
+      .where(eq(tenants.slug, finalSlug))
+      .limit(1);
+
+    if (!existing.length) break;
+    finalSlug = `${slug}-${counter}`;
+    counter++;
+  }
+
+  return finalSlug;
+}
+
 export async function POST(req: Request) {
   // Get the Svix headers for verification
   const headersList = await headers();
@@ -73,6 +101,8 @@ export async function POST(req: Request) {
 
       // Create a temporary tenant for this user (they'll create their practice tenant on onboarding)
       const tempTenantId = randomUUID();
+      const placeholderName = `${firstName || "User"} ${lastName || "Placeholder"}`;
+      const uniqueSlug = await generateUniqueSlug(`temp-${placeholderName}`);
 
       // Create the user record in the database
       // Note: tenantId will be set by the onboarding flow when they create their practice
@@ -82,7 +112,7 @@ export async function POST(req: Request) {
         .values({
           id: tempTenantId,
           name: `Placeholder for ${firstName || "User"}`,
-          slug: `temp-${clerkId.slice(0, 8)}`,
+          slug: uniqueSlug,
           email,
           country: "DE",
           timezone: "Europe/Berlin",
