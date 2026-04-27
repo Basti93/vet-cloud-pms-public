@@ -5,16 +5,7 @@
  *   - Reset nightly: npx tsx scripts/admin-reset.ts --reset
  */
 
-import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import {
-  tenants,
-  appointments,
-  patients,
-  owners,
-  voiceCalls,
-} from "../apps/web/src/lib/db/schema";
-import { eq } from "drizzle-orm";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -47,20 +38,21 @@ async function main() {
     DATABASE_URL +
     (DATABASE_URL.includes("?") ? "&sslmode=require" : "?sslmode=require");
   const sql = postgres(dbUrl, { max: 1 });
-  const db = drizzle(sql, { schema: { tenants, appointments, patients, owners, voiceCalls } });
 
   const command = process.argv[2];
 
   try {
     if (command === "--set-slug") {
       console.log(`🔄 Setting demo tenant slug to "${DEMO_TENANT_SLUG}"...`);
-      const [tenant] = await db
-        .update(tenants)
-        .set({ slug: DEMO_TENANT_SLUG })
-        .where(eq(tenants.id, DEMO_TENANT_ID))
-        .returning();
 
-      if (!tenant) {
+      const result = await sql`
+        UPDATE tenants
+        SET slug = ${DEMO_TENANT_SLUG}
+        WHERE id = ${DEMO_TENANT_ID}
+        RETURNING slug
+      `;
+
+      if (!result.length) {
         throw new Error("Demo tenant not found");
       }
 
@@ -69,28 +61,32 @@ async function main() {
     } else if (command === "--reset") {
       console.log(`🔄 Resetting demo tenant data...`);
 
-      const voiceCallsCount = await db
-        .delete(voiceCalls)
-        .where(eq(voiceCalls.tenantId, DEMO_TENANT_ID));
+      const voiceCallsResult = await sql`
+        DELETE FROM voice_calls
+        WHERE tenant_id = ${DEMO_TENANT_ID}
+      `;
 
-      const appointmentsCount = await db
-        .delete(appointments)
-        .where(eq(appointments.tenantId, DEMO_TENANT_ID));
+      const appointmentsResult = await sql`
+        DELETE FROM appointments
+        WHERE tenant_id = ${DEMO_TENANT_ID}
+      `;
 
-      const patientsCount = await db
-        .delete(patients)
-        .where(eq(patients.tenantId, DEMO_TENANT_ID));
+      const patientsResult = await sql`
+        DELETE FROM patients
+        WHERE tenant_id = ${DEMO_TENANT_ID}
+      `;
 
-      const ownersCount = await db
-        .delete(owners)
-        .where(eq(owners.tenantId, DEMO_TENANT_ID));
+      const ownersResult = await sql`
+        DELETE FROM owners
+        WHERE tenant_id = ${DEMO_TENANT_ID}
+      `;
 
       console.log(`✅ Reset complete!`);
       console.log(`📊 Deleted:`);
-      console.log(`   - Voice calls: ${voiceCallsCount.count || 0}`);
-      console.log(`   - Appointments: ${appointmentsCount.count || 0}`);
-      console.log(`   - Patients: ${patientsCount.count || 0}`);
-      console.log(`   - Owners: ${ownersCount.count || 0}`);
+      console.log(`   - Voice calls: ${voiceCallsResult.count || 0}`);
+      console.log(`   - Appointments: ${appointmentsResult.count || 0}`);
+      console.log(`   - Patients: ${patientsResult.count || 0}`);
+      console.log(`   - Owners: ${ownersResult.count || 0}`);
     } else {
       console.log("Usage:");
       console.log("  npx tsx scripts/admin-reset.ts --set-slug    # Set demo slug once");
