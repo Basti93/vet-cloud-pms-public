@@ -3,11 +3,16 @@
 /**
  * Delete a practice (praxis) by UUID
  *
- * Usage: npx ts-node scripts/delete-praxis.ts <tenant-uuid>
+ * Usage: npx ts-node scripts/delete-praxis.ts <tenant-uuid> [--force]
+ *
+ * Environment variables:
+ *   DATABASE_URL - PostgreSQL connection string (required)
+ *   CLERK_SECRET_KEY - Clerk API key for user deletion (optional, but recommended)
  *
  * This will:
  * 1. Find the practice by UUID
- * 2. Delete all related data (cascade):
+ * 2. Delete all Clerk users associated with this practice
+ * 3. Delete all related database data (cascade):
  *    - Users (vet, staff, reception)
  *    - Appointments
  *    - Patients
@@ -15,12 +20,13 @@
  *    - Email settings
  *    - Feature flags
  *    - All other related records
- * 3. Delete the practice tenant itself
+ * 4. Delete the practice tenant itself
  */
 
 import * as fs from "fs";
 import * as path from "path";
 import postgres from "postgres";
+import fetch from "node-fetch";
 
 // Load .env.local
 const envPath = path.resolve(process.cwd(), ".env.local");
@@ -74,9 +80,18 @@ async function deletePraxis() {
     const { name, slug } = tenant[0];
     console.log(`📋 Found practice: "${name}" (slug: ${slug})`);
     console.log("");
+
+    // Get users that will be deleted from Clerk
+    const tenantUsers = await sql`
+      SELECT clerk_id, email, first_name, last_name FROM users WHERE tenant_id = ${tenantUuid}
+    `;
+
     console.log("⚠️  This will DELETE:");
     console.log("   - The practice and all settings");
-    console.log("   - All users (admin, vets, staff)");
+    console.log(`   - ${tenantUsers.length} user(s):`);
+    tenantUsers.forEach((u: any) => {
+      console.log(`     • ${u.first_name} ${u.last_name} (${u.email})`);
+    });
     console.log("   - All appointments and bookings");
     console.log("   - All patients and owners");
     console.log("   - All email settings and logs");
@@ -93,15 +108,56 @@ async function deletePraxis() {
 
     console.log("🗑️  Deleting practice...");
 
+    // Delete from Clerk first (before deleting from database)
+    const clerkSecretKey = process.env.CLERK_SECRET_KEY;
+    if (clerkSecretKey && tenantUsers.length > 0) {
+      console.log("🔐 Deleting users from Clerk...");
+      for (const u of tenantUsers) {
+        try {
+          const response = await (fetch as any)(
+            `https://api.clerk.com/v1/users/${u.clerk_id}`,
+            {
+              method: "DELETE",
+              headers: {
+                Authorization: `Bearer ${clerkSecretKey}`,
+              },
+            }
+          );
+          if (response.ok || response.status === 404) {
+            console.log(`   ✓ Deleted ${u.first_name} ${u.last_name} from Clerk`);
+          } else {
+            console.warn(
+              `   ⚠️  Failed to delete ${u.first_name} ${u.last_name} from Clerk (${response.status})`
+            );
+          }
+        } catch (error: any) {
+          console.warn(
+            `   ⚠️  Error deleting ${u.first_name} ${u.last_name} from Clerk: ${error.message}`
+          );
+        }
+      }
+      console.log("");
+    } else if (tenantUsers.length > 0) {
+      console.log(
+        "⚠️  CLERK_SECRET_KEY not set - skipping Clerk user deletion"
+      );
+      console.log("   Users will remain in Clerk but be orphaned");
+      console.log("");
+    }
+
     // Delete the tenant (all related data cascades)
     const result = await sql`
       DELETE FROM tenants WHERE id = ${tenantUuid}
     `;
 
     console.log(`✅ Practice deleted: "${name}" (${tenantUuid})`);
-    console.log(`   ${result.count} record(s) affected`);
+    console.log(`   ${result.count} record(s) affected in database`);
     console.log("");
-    console.log("All related data has been automatically removed.");
+    if (clerkSecretKey) {
+      console.log("All related data and Clerk users have been removed.");
+    } else {
+      console.log("Database data removed. Set CLERK_SECRET_KEY to also remove Clerk users.");
+    }
 
   } catch (error: any) {
     console.error("❌ Error deleting practice:", error.message);

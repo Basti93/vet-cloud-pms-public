@@ -268,6 +268,33 @@ export const tenantRouter = createTRPCRouter({
         throw new Error("Can only delete your own practice");
       }
 
+      // Get all users in this tenant to delete from Clerk
+      const tenantUsers = await ctx.db
+        .select({ clerkId: users.clerkId })
+        .from(users)
+        .where(eq(users.tenantId, input.tenantId));
+
+      // Delete from Clerk (best effort - continue even if Clerk deletion fails)
+      const clerkSecretKey = process.env.CLERK_SECRET_KEY;
+      if (clerkSecretKey && tenantUsers.length > 0) {
+        try {
+          for (const u of tenantUsers) {
+            const response = await fetch(`https://api.clerk.com/v1/users/${u.clerkId}`, {
+              method: "DELETE",
+              headers: {
+                Authorization: `Bearer ${clerkSecretKey}`,
+              },
+            });
+            if (!response.ok && response.status !== 404) {
+              console.error(`Failed to delete Clerk user ${u.clerkId}:`, response.statusText);
+            }
+          }
+        } catch (error) {
+          console.error("Error deleting Clerk users:", error);
+          // Don't fail the entire operation if Clerk deletion fails
+        }
+      }
+
       // Delete the tenant (cascades delete all related data)
       const [deletedTenant] = await ctx.db
         .delete(tenants)
