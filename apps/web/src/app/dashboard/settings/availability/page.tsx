@@ -194,10 +194,15 @@ export default function AvailabilityPage() {
   const upsertVetDay = trpc.schedule.upsertVetDaySchedule.useMutation({
     onSuccess: () => utils.schedule.getVetSchedules.invalidate({ tenantId }),
   });
+  const updateVetSlotDuration = trpc.schedule.updateVetSlotDuration.useMutation({
+    onSuccess: () => utils.schedule.getVetSchedules.invalidate({ tenantId }),
+  });
   const [expandedVet, setExpandedVet] = useState<string | null>(null);
   const [vetSaved, setVetSaved] = useState<string | null>(null);
+  const [durationSaved, setDurationSaved] = useState<string | null>(null);
   // vetEdits: vetId → dayOfWeek → DaySchedule
   const [vetEdits, setVetEdits] = useState<Record<string, Record<number, DaySchedule>>>({});
+  const [durationEdits, setDurationEdits] = useState<Record<string, number>>({});
 
   function getVetDay(vetId: string, dayOfWeek: number, serverSchedule: { dayOfWeek: number; slots: TimeRange[] }[]): DaySchedule {
     if (vetEdits[vetId]?.[dayOfWeek]) return vetEdits[vetId][dayOfWeek];
@@ -339,8 +344,46 @@ export default function AvailabilityPage() {
                 </button>
 
                 {expandedVet === vet.id && (
-                  <div className="px-4 pb-4 pt-1 space-y-1"
+                  <div className="px-4 pb-4 pt-1 space-y-4"
                     style={{ borderTopWidth: 1, borderColor: 'var(--color-border)' }}>
+                    <div>
+                      <label className="text-xs font-medium block mb-2" style={{ color: 'var(--color-muted)' }}>
+                        Terminminimaldauer (Minuten)
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min="5"
+                          max="480"
+                          step="5"
+                          value={durationEdits[vet.id] ?? vet.slotDurationMin ?? 30}
+                          onChange={(e) => setDurationEdits({ ...durationEdits, [vet.id]: parseInt(e.target.value) || 30 })}
+                          className="w-20 text-sm border rounded px-2 py-1"
+                          style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)', color: 'var(--color-fg)' }}
+                        />
+                        <button
+                          onClick={() => {
+                            updateVetSlotDuration.mutate({
+                              tenantId,
+                              vetId: vet.id,
+                              slotDurationMin: durationEdits[vet.id] ?? vet.slotDurationMin ?? 30,
+                            });
+                            setDurationSaved(vet.id);
+                            setTimeout(() => setDurationSaved(null), 2000);
+                          }}
+                          disabled={updateVetSlotDuration.isPending}
+                          className="px-3 py-1 rounded-lg text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                          style={{ backgroundColor: 'var(--color-accent)' }}
+                        >
+                          {updateVetSlotDuration.isPending ? 'Wird gespeichert…' : 'Speichern'}
+                        </button>
+                        {durationSaved === vet.id && (
+                          <span className="flex items-center gap-1.5 text-sm text-green-600">
+                            <CheckCircle size={15} /> Gespeichert
+                          </span>
+                        )}
+                      </div>
+                    </div>
                     <div className="divide-y" style={{ borderColor: 'var(--color-border)' }}>
                       {DAY_ORDER.map((dayOfWeek) => (
                         <DayRow
@@ -350,14 +393,14 @@ export default function AvailabilityPage() {
                         />
                       ))}
                     </div>
-                    <div className="flex items-center gap-3 pt-3">
+                    <div className="flex items-center gap-3 pt-1">
                       <button
                         onClick={() => saveVetSchedule(vet.id, schedule)}
                         disabled={upsertVetDay.isPending}
                         className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
                         style={{ backgroundColor: 'var(--color-accent)' }}
                       >
-                        {upsertVetDay.isPending ? 'Wird gespeichert…' : 'Speichern'}
+                        {upsertVetDay.isPending ? 'Wird gespeichert…' : 'Arbeitszeiten speichern'}
                       </button>
                       {vetSaved === vet.id && (
                         <span className="flex items-center gap-1.5 text-sm text-green-600">

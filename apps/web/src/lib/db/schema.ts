@@ -173,6 +173,7 @@ export const users = pgTable(
       onDelete: "set null",
     }),
     active: boolean("active").default(true).notNull(),
+    slotDurationMin: integer("slot_duration_min").default(30).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .default(sql`now()`)
       .notNull(),

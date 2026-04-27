@@ -12,8 +12,6 @@ import type * as schema from "@/lib/db/schema";
 
 // ── Slot generation ───────────────────────────────────────────────────────────
 
-const SLOT_DURATION_MIN = 30;
-
 type Db = PostgresJsDatabase<typeof schema>;
 
 /**
@@ -32,11 +30,12 @@ function zonedToUtc(localDateStr: string, hour: number, min: number, timezone: s
   return new Date(pseudo.getTime() + (pseudo.getTime() - inTz.getTime()));
 }
 
-/** Generate 30-min booking slots across multiple time ranges using the practice timezone. */
+/** Generate booking slots across multiple time ranges using the practice timezone. */
 function generateSlotsFromRanges(
   localDateStr: string,
   ranges: TimeRange[],
-  timezone: string
+  timezone: string,
+  slotDurationMin: number = 30
 ): { start: Date; end: Date }[] {
   const now = new Date();
   const slots: { start: Date; end: Date }[] = [];
@@ -45,11 +44,11 @@ function generateSlotsFromRanges(
     let totalMin = range.startHour * 60 + range.startMin;
     const endTotalMin = range.endHour * 60 + range.endMin;
 
-    while (totalMin + SLOT_DURATION_MIN <= endTotalMin) {
+    while (totalMin + slotDurationMin <= endTotalMin) {
       const start = zonedToUtc(localDateStr, Math.floor(totalMin / 60), totalMin % 60, timezone);
-      const end = new Date(start.getTime() + SLOT_DURATION_MIN * 60_000);
+      const end = new Date(start.getTime() + slotDurationMin * 60_000);
       if (start > now) slots.push({ start, end });
-      totalMin += SLOT_DURATION_MIN;
+      totalMin += slotDurationMin;
     }
   }
   return slots;
@@ -61,14 +60,21 @@ async function getVetSlotsForDay(
   vetId: string,
   date: Date
 ): Promise<{ start: Date; end: Date }[]> {
-  // Fetch tenant timezone + opening hours once (used in fallback path)
+  // Fetch tenant timezone + opening hours, and vet's slot duration
   const [tenant] = await db
     .select({ openingHours: tenants.openingHours, timezone: tenants.timezone })
     .from(tenants)
     .where(eq(tenants.id, tenantId))
     .limit(1);
 
+  const [vet] = await db
+    .select({ slotDurationMin: users.slotDurationMin })
+    .from(users)
+    .where(eq(users.id, vetId))
+    .limit(1);
+
   const timezone = tenant?.timezone ?? 'Europe/Berlin';
+  const slotDurationMin = vet?.slotDurationMin ?? 30;
 
   // Compute date string and dayOfWeek in the practice's local timezone
   const localDateStr = date.toLocaleDateString('sv', { timeZone: timezone }); // YYYY-MM-DD
@@ -105,14 +111,14 @@ async function getVetSlotsForDay(
     .limit(1);
 
   if (vetSchedule) {
-    return generateSlotsFromRanges(localDateStr, vetSchedule.slots as TimeRange[], timezone);
+    return generateSlotsFromRanges(localDateStr, vetSchedule.slots as TimeRange[], timezone, slotDurationMin);
   }
 
   // 3. No vet schedule → fall back to practice opening hours
   const practiceDay = ((tenant?.openingHours as DaySchedule[] | null) ?? DEFAULT_OPENING_HOURS)
     .find((h) => h.dayOfWeek === dayOfWeek);
 
-  return generateSlotsFromRanges(localDateStr, practiceDay?.slots ?? [], timezone);
+  return generateSlotsFromRanges(localDateStr, practiceDay?.slots ?? [], timezone, slotDurationMin);
 }
 
 // ── Router ────────────────────────────────────────────────────────────────────
@@ -371,7 +377,7 @@ export const bookingRouter = createTRPCRouter({
       if (input.vetId) {
         allSlots = await getVetSlotsForDay(ctx.db, input.tenantId, input.vetId, input.date);
       } else {
-        // No vet selected: use practice opening hours
+        // No vet selected: use practice opening hours (30min default, no per-vet duration)
         const [tenant] = await ctx.db
           .select({ openingHours: tenants.openingHours, timezone: tenants.timezone })
           .from(tenants)
@@ -383,7 +389,7 @@ export const bookingRouter = createTRPCRouter({
         const dayOfWeek = localDate.getUTCDay();
         const practiceDay = ((tenant?.openingHours as DaySchedule[] | null) ?? DEFAULT_OPENING_HOURS)
           .find((h) => h.dayOfWeek === dayOfWeek);
-        allSlots = generateSlotsFromRanges(localDateStr, practiceDay?.slots ?? [], timezone);
+        allSlots = generateSlotsFromRanges(localDateStr, practiceDay?.slots ?? [], timezone, 30);
       }
 
       return allSlots
@@ -608,7 +614,19 @@ export const bookingRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const now = new Date();
-      const slotEnd = new Date(input.slotDatetime.getTime() + SLOT_DURATION_MIN * 60_000);
+
+      // Fetch vet's slot duration if specified, otherwise default to 30 min
+      let slotDurationMin = 30;
+      if (input.vetId) {
+        const [vet] = await ctx.db
+          .select({ slotDurationMin: users.slotDurationMin })
+          .from(users)
+          .where(eq(users.id, input.vetId))
+          .limit(1);
+        if (vet) slotDurationMin = vet.slotDurationMin;
+      }
+
+      const slotEnd = new Date(input.slotDatetime.getTime() + slotDurationMin * 60_000);
 
       // 1. Delete old holds from same browser session (only 1 active hold per user)
       await ctx.db
@@ -716,7 +734,19 @@ export const bookingRouter = createTRPCRouter({
     )
     .query(async ({ ctx, input }) => {
       const now = new Date();
-      const slotEnd = new Date(input.slotDatetime.getTime() + SLOT_DURATION_MIN * 60_000);
+
+      // Fetch vet's slot duration if specified, otherwise default to 30 min
+      let slotDurationMin = 30;
+      if (input.vetId) {
+        const [vet] = await ctx.db
+          .select({ slotDurationMin: users.slotDurationMin })
+          .from(users)
+          .where(eq(users.id, input.vetId))
+          .limit(1);
+        if (vet) slotDurationMin = vet.slotDurationMin;
+      }
+
+      const slotEnd = new Date(input.slotDatetime.getTime() + slotDurationMin * 60_000);
 
       // Check active holds
       const holdBase = [

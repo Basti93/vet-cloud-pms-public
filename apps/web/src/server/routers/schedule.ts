@@ -59,6 +59,7 @@ export const scheduleRouter = createTRPCRouter({
           lastName: users.lastName,
           title: users.title,
           role: users.role,
+          slotDurationMin: users.slotDurationMin,
         })
         .from(users)
         .where(and(eq(users.tenantId, input.tenantId), eq(users.active, true)));
@@ -112,6 +113,20 @@ export const scheduleRouter = createTRPCRouter({
           notes: input.notes ?? null,
         });
       }
+      return { success: true };
+    }),
+
+  updateVetSlotDuration: protectedProcedure
+    .input(z.object({
+      tenantId: z.string().uuid(),
+      vetId: z.string().uuid(),
+      slotDurationMin: z.number().int().min(5).max(480),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db
+        .update(users)
+        .set({ slotDurationMin: input.slotDurationMin, updatedAt: new Date() })
+        .where(and(eq(users.id, input.vetId), eq(users.tenantId, input.tenantId)));
       return { success: true };
     }),
 
