@@ -51,7 +51,12 @@ if (!dbUrl) {
 }
 
 async function deletePraxis() {
-  const sql = postgres(dbUrl);
+  // Ensure SSL mode is set for secure connections
+  const url = dbUrl + (dbUrl.includes("?") ? "&sslmode=require" : "?sslmode=require");
+  const sql = postgres(url, {
+    ssl: "require",
+    transform: postgres.camelCase
+  });
 
   try {
     console.log(`🔍 Looking up practice: ${tenantUuid}`);
