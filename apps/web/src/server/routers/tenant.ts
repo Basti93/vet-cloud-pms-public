@@ -3,7 +3,98 @@ import { z } from "zod";
 import { tenants, users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
+// Helper function to generate a unique slug from tenant name
+async function generateUniqueSlug(
+  db: any,
+  baseName: string
+): Promise<string> {
+  // Convert to lowercase, remove special chars, replace spaces with hyphens
+  let slug = baseName
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, "") // Remove special characters
+    .replace(/\s+/g, "-") // Replace spaces with hyphens
+    .replace(/-+/g, "-") // Replace multiple hyphens with single
+    .trim();
+
+  if (!slug) slug = "practice"; // Fallback if name becomes empty
+
+  // Check if slug exists, and if so, append a random suffix
+  let finalSlug = slug;
+  let counter = 1;
+  while (true) {
+    const existing = await db
+      .select({ id: tenants.id })
+      .from(tenants)
+      .where(eq(tenants.slug, finalSlug))
+      .limit(1);
+
+    if (!existing.length) {
+      break;
+    }
+
+    finalSlug = `${slug}-${counter}`;
+    counter++;
+  }
+
+  return finalSlug;
+}
+
 export const tenantRouter = createTRPCRouter({
+  create: protectedProcedure
+    .input(
+      z.object({
+        name: z.string().min(1).max(255),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Get current user to retrieve their email
+      const [currentUser] = await ctx.db
+        .select({ email: users.email })
+        .from(users)
+        .where(eq(users.clerkId, ctx.userId))
+        .limit(1);
+
+      if (!currentUser) {
+        throw new Error("User not found");
+      }
+
+      // Generate unique slug
+      const slug = await generateUniqueSlug(ctx.db, input.name);
+
+      // Create new tenant with sensible defaults
+      const [newTenant] = await ctx.db
+        .insert(tenants)
+        .values({
+          name: input.name,
+          slug,
+          email: currentUser.email,
+          country: "DE",
+          timezone: "Europe/Berlin",
+          subscriptionStatus: "trial",
+          subscriptionPlan: "starter",
+          maxUsers: 5,
+          themePreference: "sage",
+          typographyPreference: "modern",
+          websiteTemplate: "modern",
+        })
+        .returning();
+
+      // Associate current user with the new tenant
+      await ctx.db
+        .update(users)
+        .set({
+          tenantId: newTenant.id,
+          role: "admin", // First user to create a tenant is an admin
+          updatedAt: new Date(),
+        })
+        .where(eq(users.clerkId, ctx.userId));
+
+      return {
+        id: newTenant.id,
+        name: newTenant.name,
+        slug: newTenant.slug,
+      };
+    }),
   getBySlug: publicProcedure
     .input(z.object({ slug: z.string() }))
     .query(async ({ ctx, input }) => {

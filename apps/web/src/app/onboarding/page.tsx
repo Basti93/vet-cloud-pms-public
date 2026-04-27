@@ -4,63 +4,37 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useState } from "react";
-import { CheckCircle, Mail, Building2, Users, Palette } from "lucide-react";
-import { COLOR_PRESETS, TYPE_PAIRINGS, type ColorPresetKey, type TypographyPairingKey } from "@/lib/theme";
-
-const THEME_OPTIONS: ColorPresetKey[] = ["sage", "warmsand", "klinikblau", "bordeaux", "forest", "schiefer"];
-const TYPOGRAPHY_OPTIONS: TypographyPairingKey[] = ["modern", "klassisch", "klinisch", "freundlich"];
-
-interface FormData {
-  practiceName: string;
-  address: string;
-  email: string;
-  phone: string;
-  monogram: string;
-  themePreference: ColorPresetKey;
-  typographyPreference: TypographyPairingKey;
-  teamEmails: string[];
-}
+import { CheckCircle, Building2, Loader2 } from "lucide-react";
+import { trpc } from "@/lib/trpc/client";
 
 export default function OnboardingPage() {
   const { user } = useUser();
   const router = useRouter();
-  const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState<FormData>({
-    practiceName: "",
-    address: "",
-    email: "",
-    phone: "",
-    monogram: "",
-    themePreference: "sage",
-    typographyPreference: "modern",
-    teamEmails: [""],
+  const [practiceName, setPracticeName] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+
+  const createTenant = trpc.tenant.create.useMutation({
+    onSuccess: () => {
+      setShowSuccess(true);
+      setTimeout(() => {
+        router.push("/dashboard");
+      }, 1500);
+    },
+    onError: (error) => {
+      alert("Fehler beim Erstellen der Praxis: " + error.message);
+      setIsSubmitting(false);
+    }
   });
 
-  const handleInputChange = (field: keyof Omit<FormData, "teamEmails">, value: string | ColorPresetKey | TypographyPairingKey) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!practiceName.trim()) return;
 
-  const handleTeamEmailChange = (index: number, value: string) => {
-    const newEmails = [...formData.teamEmails];
-    newEmails[index] = value;
-    setFormData(prev => ({ ...prev, teamEmails: newEmails }));
-  };
-
-  const addTeamEmail = () => {
-    setFormData(prev => ({ ...prev, teamEmails: [...prev.teamEmails, ""] }));
-  };
-
-  const removeTeamEmail = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      teamEmails: prev.teamEmails.filter((_, i) => i !== index),
-    }));
-  };
-
-  const handleComplete = async () => {
-    // TODO: Submit formData to API
-    // For now, just show success message
-    setStep(3);
+    setIsSubmitting(true);
+    await createTenant.mutateAsync({
+      name: practiceName,
+    });
   };
 
   const handleSkip = () => {
@@ -69,331 +43,84 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--color-bg)', color: 'var(--color-fg)' }}>
-      <div className="max-w-3xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md mx-auto py-12 px-4 sm:px-6">
         {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold mb-2">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold mb-2">
             Willkommen, {user?.firstName || "Nutzer"}!
           </h1>
-          <p className="text-xl" style={{ color: 'var(--color-muted)' }}>
-            Lassen Sie uns Ihre Tierarztpraxis einrichten.
+          <p style={{ color: 'var(--color-muted)' }}>
+            Erstellen Sie Ihre Tierarztpraxis in 30 Sekunden.
           </p>
         </div>
 
-        {/* Progress Indicator */}
-        <div className="mb-12">
-          <div className="flex items-center gap-4">
-            <div className={`flex items-center justify-center w-10 h-10 rounded-full font-bold transition ${
-              step >= 1
-                ? 'text-white'
-                : 'text-fg'
-            }`} style={{
-              backgroundColor: step >= 1 ? 'var(--color-accent)' : 'var(--color-border)',
-            }}>
-              {step > 1 ? <CheckCircle className="w-6 h-6" /> : '1'}
-            </div>
-            <div className="flex-1 h-1" style={{ backgroundColor: step > 1 ? 'var(--color-accent)' : 'var(--color-border)' }} />
-            <div className={`flex items-center justify-center w-10 h-10 rounded-full font-bold transition ${
-              step >= 2
-                ? 'text-white'
-                : 'text-fg'
-            }`} style={{
-              backgroundColor: step >= 2 ? 'var(--color-accent)' : 'var(--color-border)',
-            }}>
-              {step > 2 ? <CheckCircle className="w-6 h-6" /> : '2'}
-            </div>
-            <div className="flex-1 h-1" style={{ backgroundColor: step > 2 ? 'var(--color-accent)' : 'var(--color-border)' }} />
-            <div className={`flex items-center justify-center w-10 h-10 rounded-full font-bold transition ${
-              step >= 3
-                ? 'text-white'
-                : 'text-fg'
-            }`} style={{
-              backgroundColor: step >= 3 ? 'var(--color-accent)' : 'var(--color-border)',
-            }}>
-              {step > 3 ? <CheckCircle className="w-6 h-6" /> : '3'}
-            </div>
-          </div>
-          <div className="flex justify-between text-sm mt-3" style={{ color: 'var(--color-muted)' }}>
-            <span>Praxiseigenschaften</span>
-            <span>Team einladen</span>
-            <span>Bestätigung</span>
-          </div>
-        </div>
-
-        {/* Step 1: Praxisinfo */}
-        {step === 1 && (
-          <Card className="p-8 mb-8" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+        {!showSuccess ? (
+          <Card className="p-8" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
             <div className="flex items-center gap-3 mb-6">
-              <Palette className="w-6 h-6" style={{ color: 'var(--color-accent)' }} />
-              <h2 className="text-2xl font-bold">Praxiseigenschaften</h2>
+              <Building2 className="w-6 h-6" style={{ color: 'var(--color-accent)' }} />
+              <h2 className="text-2xl font-bold">Praxisnamen eingeben</h2>
             </div>
-            <p className="mb-6" style={{ color: 'var(--color-muted)' }}>
-              Konfigurieren Sie Ihren Praxisnamen, Ihr Logo und das Design-Theme.
-            </p>
-            <div className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-6">
               <div>
                 <label className="block text-sm font-medium mb-2">Praxisname*</label>
                 <input
                   type="text"
                   placeholder="z.B. Tierarztpraxis Dr. Müller"
-                  value={formData.practiceName}
-                  onChange={(e) => handleInputChange('practiceName', e.target.value)}
-                  className="w-full px-4 py-2 rounded-lg border transition"
+                  value={practiceName}
+                  onChange={(e) => setPracticeName(e.target.value)}
+                  disabled={isSubmitting}
+                  className="w-full px-4 py-3 rounded-lg border transition text-base"
                   style={{
                     borderColor: 'var(--color-border)',
                     backgroundColor: 'var(--color-bg)',
                     color: 'var(--color-fg)',
                   }}
+                  autoFocus
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">Adresse*</label>
-                <input
-                  type="text"
-                  placeholder="z.B. Musterstraße 123, 10115 Berlin"
-                  value={formData.address}
-                  onChange={(e) => handleInputChange('address', e.target.value)}
-                  className="w-full px-4 py-2 rounded-lg border transition"
-                  style={{
-                    borderColor: 'var(--color-border)',
-                    backgroundColor: 'var(--color-bg)',
-                    color: 'var(--color-fg)',
-                  }}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">E-Mail*</label>
-                  <input
-                    type="email"
-                    placeholder="praxis@example.de"
-                    value={formData.email}
-                    onChange={(e) => handleInputChange('email', e.target.value)}
-                    className="w-full px-4 py-2 rounded-lg border transition"
-                    style={{
-                      borderColor: 'var(--color-border)',
-                      backgroundColor: 'var(--color-bg)',
-                      color: 'var(--color-fg)',
-                    }}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Telefon</label>
-                  <input
-                    type="tel"
-                    placeholder="+49 30 123456"
-                    value={formData.phone}
-                    onChange={(e) => handleInputChange('phone', e.target.value)}
-                    className="w-full px-4 py-2 rounded-lg border transition"
-                    style={{
-                      borderColor: 'var(--color-border)',
-                      backgroundColor: 'var(--color-bg)',
-                      color: 'var(--color-fg)',
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">Monogramm (max. 3 Buchstaben)</label>
-                <div className="flex gap-4">
-                  <input
-                    type="text"
-                    maxLength={3}
-                    value={formData.monogram}
-                    onChange={(e) => handleInputChange('monogram', e.target.value.toUpperCase())}
-                    className="flex-1 px-4 py-2 rounded-lg border transition"
-                    style={{
-                      borderColor: 'var(--color-border)',
-                      backgroundColor: 'var(--color-bg)',
-                      color: 'var(--color-fg)',
-                    }}
-                    placeholder="z.B. DM"
-                  />
-                  <div
-                    className="w-20 h-14 rounded-lg flex items-center justify-center text-white font-bold text-lg flex-shrink-0"
-                    style={{ backgroundColor: 'var(--color-accent)' }}
-                  >
-                    {formData.monogram || "?"}
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-3">Farbschema</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {THEME_OPTIONS.map((theme) => (
-                    <button
-                      key={theme}
-                      onClick={() => handleInputChange('themePreference', theme)}
-                      className={`p-3 rounded-lg border-2 transition capitalize text-xs font-medium text-white ${
-                        formData.themePreference === theme
-                          ? 'border-white'
-                          : 'border-transparent opacity-70 hover:opacity-100'
-                      }`}
-                      style={{
-                        backgroundColor: COLOR_PRESETS[theme].accent,
-                      }}
-                    >
-                      {theme}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-3">Typografie</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {TYPOGRAPHY_OPTIONS.map((typo) => (
-                    <button
-                      key={typo}
-                      onClick={() => handleInputChange('typographyPreference', typo)}
-                      className={`p-3 rounded-lg border-2 transition text-left ${
-                        formData.typographyPreference === typo
-                          ? 'border-accent'
-                          : 'border-gray-300 opacity-60 hover:opacity-100'
-                      }`}
-                      style={{
-                        borderColor:
-                          formData.typographyPreference === typo ? 'var(--color-accent)' : 'var(--color-border)',
-                        backgroundColor: 'var(--color-surface)',
-                      }}
-                    >
-                      <div className="font-semibold text-xs capitalize">{typo}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <div className="flex gap-4 mt-8">
-              <Button
-                variant="default"
-                size="lg"
-                onClick={() => setStep(2)}
-                disabled={!formData.practiceName || !formData.address || !formData.email}
-                className="flex-1"
-              >
-                Weiter
-              </Button>
-              <Button
-                variant="ghost"
-                size="lg"
-                onClick={handleSkip}
-                className="flex-1"
-              >
-                Überspringen
-              </Button>
-            </div>
-          </Card>
-        )}
-
-        {/* Step 2: Team einladen */}
-        {step === 2 && (
-          <Card className="p-8 mb-8" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
-            <div className="flex items-center gap-3 mb-6">
-              <Users className="w-6 h-6" style={{ color: 'var(--color-accent)' }} />
-              <h2 className="text-2xl font-bold">Team einladen (Optional)</h2>
-            </div>
-            <p className="mb-6" style={{ color: 'var(--color-muted)' }}>
-              Laden Sie Ihre Mitarbeiter ein, damit sie gemeinsam mit Ihnen arbeiten können.
-            </p>
-            <div className="space-y-3">
-              {formData.teamEmails.map((email, index) => (
-                <div key={index} className="flex gap-2">
-                  <input
-                    type="email"
-                    placeholder="team@example.de"
-                    value={email}
-                    onChange={(e) => handleTeamEmailChange(index, e.target.value)}
-                    className="flex-1 px-4 py-2 rounded-lg border transition"
-                    style={{
-                      borderColor: 'var(--color-border)',
-                      backgroundColor: 'var(--color-bg)',
-                      color: 'var(--color-fg)',
-                    }}
-                  />
-                  {formData.teamEmails.length > 1 && (
-                    <Button
-                      variant="ghost"
-                      onClick={() => removeTeamEmail(index)}
-                    >
-                      Entfernen
-                    </Button>
+              <div className="flex gap-3">
+                <Button
+                  type="submit"
+                  size="lg"
+                  disabled={!practiceName.trim() || isSubmitting}
+                  className="flex-1"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Wird erstellt...
+                    </>
+                  ) : (
+                    "Praxis erstellen"
                   )}
-                </div>
-              ))}
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={addTeamEmail}
-              className="mt-4"
-            >
-              + Weiteres Mitglied
-            </Button>
-            <div className="flex gap-4 mt-8">
-              <Button
-                variant="default"
-                size="lg"
-                onClick={handleComplete}
-                className="flex-1"
-              >
-                Anfrage einreichen
-              </Button>
-              <Button
-                variant="ghost"
-                size="lg"
-                onClick={() => setStep(1)}
-                className="flex-1"
-              >
-                Zurück
-              </Button>
-            </div>
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="lg"
+                  onClick={handleSkip}
+                  disabled={isSubmitting}
+                  className="flex-1"
+                >
+                  Überspringen
+                </Button>
+              </div>
+            </form>
           </Card>
-        )}
-
-        {/* Step 3: Bestätigung */}
-        {step === 3 && (
+        ) : (
           <Card className="p-8 text-center" style={{ backgroundColor: 'var(--color-accent-soft)', borderColor: 'var(--color-accent)' }}>
             <div className="flex justify-center mb-6">
               <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: 'var(--color-accent)' }}>
                 <CheckCircle className="w-8 h-8 text-white" />
               </div>
             </div>
-            <h2 className="text-2xl font-bold mb-3">Anfrage eingereicht!</h2>
-            <p className="mb-2" style={{ color: 'var(--color-fg)' }}>
-              Ihre Anfrage zur Praxiserstellung wurde erfolgreich eingereicht.
+            <h2 className="text-2xl font-bold mb-3">Praxis erstellt!</h2>
+            <p style={{ color: 'var(--color-muted)' }}>
+              <strong>{practiceName}</strong> wurde erfolgreich erstellt.
             </p>
-            <p className="mb-8" style={{ color: 'var(--color-muted)' }}>
-              Unser Admin-Team wird Ihre Praxis <strong>{formData.practiceName}</strong> in Kürze bestätigen.
-              Sie erhalten eine E-Mail an <strong>{formData.email}</strong> sobald alles bereit ist.
+            <p className="text-sm mt-2" style={{ color: 'var(--color-muted)' }}>
+              Sie werden zum Dashboard weitergeleitet...
             </p>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-8 text-left" style={{ backgroundColor: 'var(--color-accent-soft)', borderColor: 'var(--color-accent)' }}>
-              <h3 className="font-semibold mb-3 flex items-center gap-2">
-                <Mail className="w-5 h-5" style={{ color: 'var(--color-accent)' }} />
-                Zusammenfassung
-              </h3>
-              <div className="space-y-2 text-sm" style={{ color: 'var(--color-fg)' }}>
-                <p><strong>Praxisname:</strong> {formData.practiceName}</p>
-                <p><strong>Adresse:</strong> {formData.address}</p>
-                <p><strong>E-Mail:</strong> {formData.email}</p>
-                {formData.phone && <p><strong>Telefon:</strong> {formData.phone}</p>}
-                {formData.monogram && <p><strong>Monogramm:</strong> {formData.monogram}</p>}
-                <p><strong>Farbschema:</strong> {formData.themePreference}</p>
-                <p><strong>Typografie:</strong> {formData.typographyPreference}</p>
-                {formData.teamEmails.some(e => e.trim()) && (
-                  <p><strong>Team:</strong> {formData.teamEmails.filter(e => e.trim()).join(", ")}</p>
-                )}
-              </div>
-            </div>
-            <Button
-              variant="default"
-              size="lg"
-              onClick={() => router.push("/sign-in")}
-              className="w-full"
-            >
-              Zum Login
-            </Button>
           </Card>
         )}
       </div>
