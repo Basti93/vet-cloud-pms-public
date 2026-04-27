@@ -5,6 +5,8 @@ const isPublicRoute = createRouteMatcher([
   '/sign-in(.*)',
   '/sign-up(.*)',
   '/book(.*)',  // Public booking pages
+  '/impressum(.*)',  // Legal notice
+  '/datenschutz(.*)',  // Privacy policy
   '/api/webhooks/clerk',  // Clerk webhooks (use Svix signature verification)
   '/',
 ]);
