@@ -3,10 +3,8 @@ import { emailTemplates, EmailPlaceholders } from "./templates";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Use Resend's onboarding domain for development, switch to example.com once verified
-const FROM_EMAIL = process.env.NODE_ENV === 'production'
-  ? "notifications@example.com"
-  : "onboarding@resend.dev";
+// Use configured FROM_EMAIL or default to Resend's onboarding domain for testing
+const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
 
 export interface SendConfirmationEmailInput {
   to: string;
