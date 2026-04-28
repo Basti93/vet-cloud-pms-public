@@ -33,7 +33,12 @@ export async function GET(
     }>;
   }
 ) {
-  const { tenantSlug, vetId } = await params;
+  let { tenantSlug, vetId } = await params;
+
+  // Remove .ics extension if present (URL might be /api/calendar/demo/vetId.ics)
+  if (vetId.endsWith('.ics')) {
+    vetId = vetId.slice(0, -4);
+  }
 
   // Get token from query string
   const token = request.nextUrl.searchParams.get('token');
@@ -204,9 +209,16 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error('Calendar ICS generation error:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : '';
+    console.error('Calendar ICS generation error:', {
+      message: errorMessage,
+      stack: errorStack,
+      tenantSlug,
+      vetId,
+    });
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', details: errorMessage },
       { status: 500 }
     );
   }

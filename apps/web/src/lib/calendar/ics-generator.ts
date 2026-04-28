@@ -1,5 +1,3 @@
-import ICalendarGenerator from 'ical-generator';
-
 export interface ICalEventData {
   appointment: any;
   patient: any & { owner: any };
@@ -15,6 +13,7 @@ export interface ICalEventData {
  * @param events Array of appointments with related data
  * @param clinicEmail Email address for organizer
  * @param clinicDomain Domain for generating unique event UIDs
+ * @param clinicName Clinic name
  * @returns iCal format string (text/calendar)
  */
 export function generateAppointmentICS(
@@ -23,15 +22,13 @@ export function generateAppointmentICS(
   clinicDomain: string,
   clinicName: string
 ): string {
-  // @ts-ignore - ical-generator TypeScript types are not properly exported
-  const cal = new ICalendarGenerator({
-    prodId: {
-      company: 'Vet Cloud',
-      product: 'Appointment Calendar',
-      language: 'de',
-    },
-    timezone: 'Europe/Berlin', // Default, will be specified per event
-  });
+  const lines: string[] = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    `PRODID:-//Vet Cloud//Appointment Calendar//DE`,
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+  ];
 
   // Add events
   events.forEach((event) => {
@@ -39,7 +36,6 @@ export function generateAppointmentICS(
       appointment,
       patient,
       veterinarian,
-      clinicName,
       clinicAddress,
       clinicCity,
       practiceTimezone,
@@ -47,26 +43,19 @@ export function generateAppointmentICS(
 
     // Build event summary: "PatientName (Species) - VetName"
     const patientDisplay = `${patient.name} (${patient.species || 'unknown'})`;
-    const vetDisplay = [
-      veterinarian.title,
-      veterinarian.firstName,
-      veterinarian.lastName,
-    ]
+    const vetDisplay = [veterinarian.title, veterinarian.firstName, veterinarian.lastName]
       .filter(Boolean)
       .join(' ');
-
     const summary = `${patientDisplay} - ${vetDisplay}`;
 
     // Build location
-    const locationParts = [clinicName, clinicAddress, clinicCity]
-      .filter(Boolean);
+    const locationParts = [clinicName, clinicAddress, clinicCity].filter(Boolean);
     const location = locationParts.join(', ');
 
-    // Build description with rich context
+    // Build description
     const ownerName = `${patient.owner.firstName} ${patient.owner.lastName}`;
     const ownerPhone = patient.owner.phone || '';
-    const appointmentReason = appointment.title || 'Termine';
-
+    const appointmentReason = appointment.title || 'Termin';
     const description = [
       `Haustier: ${patientDisplay}`,
       patient.breed ? `Rasse: ${patient.breed}` : '',
@@ -75,10 +64,10 @@ export function generateAppointmentICS(
       ownerPhone ? `Telefon: ${ownerPhone}` : '',
     ]
       .filter(Boolean)
-      .join('\n');
+      .join('\\n');
 
-    // Map appointment status to iCal STATUS
-    const statusMap: Record<string, 'CONFIRMED' | 'CANCELLED' | 'TENTATIVE'> = {
+    // Map appointment status
+    const statusMap: Record<string, string> = {
       scheduled: 'CONFIRMED',
       confirmed: 'CONFIRMED',
       completed: 'CONFIRMED',
@@ -87,39 +76,49 @@ export function generateAppointmentICS(
     };
     const icalStatus = statusMap[appointment.status] || 'TENTATIVE';
 
-    // Add event to calendar
-    cal.createEvent({
-      id: `appt-${appointment.id}@${clinicDomain}`,
-      summary,
-      description,
-      location,
-      start: new Date(appointment.startTime),
-      end: new Date(appointment.endTime),
-      timezone: practiceTimezone,
-      organizer: {
-        name: clinicName,
-        email: clinicEmail,
-      },
-      attendees: [
-        {
-          name: ownerName,
-          email: patient.owner.email || '',
-          rsvp: true,
-          partstat: 'NEEDS-ACTION',
-        },
-      ],
-      status: icalStatus,
-      created: new Date(appointment.createdAt),
-      lastModified: new Date(appointment.updatedAt),
-      sequence: 0, // Increment on updates for sync tracking
-      // Add Microsoft Outlook specific fields
-      busystatus: 'BUSY',
-      transp: 'OPAQUE', // Opaque = busy, Transparent = free
-      url: undefined, // Could link to clinic website
-    });
+    // Format dates for iCal (YYYYMMDDTHHMMSSZ format)
+    const startTime = new Date(appointment.startTime);
+    const endTime = new Date(appointment.endTime);
+    const createdTime = new Date(appointment.createdAt);
+    const modifiedTime = new Date(appointment.updatedAt);
+
+    const formatDate = (date: Date) =>
+      date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+
+    lines.push(
+      'BEGIN:VEVENT',
+      `UID:appt-${appointment.id}@${clinicDomain}`,
+      `DTSTAMP:${formatDate(createdTime)}`,
+      `DTSTART:${formatDate(startTime)}`,
+      `DTEND:${formatDate(endTime)}`,
+      `CREATED:${formatDate(createdTime)}`,
+      `LAST-MODIFIED:${formatDate(modifiedTime)}`,
+      `SUMMARY:${escapeText(summary)}`,
+      `DESCRIPTION:${escapeText(description)}`,
+      `LOCATION:${escapeText(location)}`,
+      `STATUS:${icalStatus}`,
+      `SEQUENCE:0`,
+      `ORGANIZER;CN=${escapeText(clinicName)}:mailto:${clinicEmail}`,
+      `ATTENDEE;CN=${escapeText(ownerName)};RSVP=TRUE:mailto:${patient.owner.email || ''}`,
+      'TRANSP:OPAQUE',
+      'END:VEVENT'
+    );
   });
 
-  return cal.toString();
+  lines.push('END:VCALENDAR', '');
+  return lines.join('\r\n');
+}
+
+/**
+ * Escape special characters in iCal text fields
+ */
+function escapeText(text: string): string {
+  return text
+    .replace(/\\/g, '\\\\')
+    .replace(/,/g, '\\,')
+    .replace(/;/g, '\\;')
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '');
 }
 
 /**
