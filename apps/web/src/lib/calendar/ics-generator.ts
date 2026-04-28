@@ -137,9 +137,11 @@ export function getTZID(ianaTimezone: string): string {
  * @returns true if valid structure
  */
 export function validateICalFormat(icsContent: string): boolean {
+  const trimmed = icsContent.trim();
   return (
-    icsContent.startsWith('BEGIN:VCALENDAR') &&
-    icsContent.includes('BEGIN:VEVENT') &&
-    icsContent.endsWith('END:VCALENDAR\n')
+    trimmed.startsWith('BEGIN:VCALENDAR') &&
+    trimmed.includes('BEGIN:VEVENT') &&
+    trimmed.includes('END:VEVENT') &&
+    trimmed.endsWith('END:VCALENDAR')
   );
 }
