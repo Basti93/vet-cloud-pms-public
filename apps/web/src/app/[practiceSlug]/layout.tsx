@@ -1,6 +1,7 @@
 import { db } from '@/lib/db/client';
 import { tenants } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
+import { PracticeLayoutWrapper } from '@/components/PracticeLayoutWrapper';
 import {
   COLOR_PRESETS,
   TYPE_PAIRINGS,
@@ -25,12 +26,11 @@ export default async function PracticeLayout({ children, params }: Props) {
     .where(eq(tenants.slug, practiceSlug))
     .limit(1);
 
-  const preset = tenant
-    ? COLOR_PRESETS[(tenant.themePreference as ColorPresetKey) || 'sage']
-    : COLOR_PRESETS.sage;
-  const type = tenant
-    ? TYPE_PAIRINGS[(tenant.typographyPreference as TypographyPairingKey) || 'modern']
-    : TYPE_PAIRINGS.modern;
+  const colorPreset = (tenant?.themePreference as ColorPresetKey) || 'sage';
+  const typographyPairing = (tenant?.typographyPreference as TypographyPairingKey) || 'modern';
+
+  const preset = COLOR_PRESETS[colorPreset];
+  const type = TYPE_PAIRINGS[typographyPairing];
 
   const style = {
     '--color-accent': preset.accent,
@@ -50,5 +50,13 @@ export default async function PracticeLayout({ children, params }: Props) {
     '--font-heading-tracking': type.headingTracking,
   } as React.CSSProperties;
 
-  return <div style={style}>{children}</div>;
+  return (
+    <PracticeLayoutWrapper
+      colorPreset={colorPreset}
+      typographyPairing={typographyPairing}
+      style={style}
+    >
+      {children}
+    </PracticeLayoutWrapper>
+  );
 }
