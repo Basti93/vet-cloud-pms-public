@@ -382,7 +382,7 @@ function StepDate({
       {/* Day picker */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-gray-800">Tag auswählen</h3>
+          <h3 style={{ fontFamily: "var(--heading-font)", fontWeight: "var(--heading-weight)", letterSpacing: "var(--heading-tracking)" }} className="text-gray-800">Tag auswählen</h3>
           <div className="flex items-center gap-1">
             <button
               onClick={() => setPage((p) => Math.max(0, p - 1))}
@@ -433,7 +433,7 @@ function StepDate({
       {/* Time slots */}
       {selectedDay && (
         <div>
-          <h3 className="font-semibold text-gray-800 mb-3">
+          <h3 style={{ fontFamily: "var(--heading-font)", fontWeight: "var(--heading-weight)", letterSpacing: "var(--heading-tracking)" }} className="text-gray-800 mb-3">
             Uhrzeit wählen — {fmtDate(selectedDay)}
           </h3>
           {slotsLoading ? (
@@ -590,7 +590,7 @@ function StepDetails({
 
       {/* Patient section */}
       <div className="space-y-4">
-        <h3 className="font-semibold text-gray-800 text-sm uppercase tracking-wide">{t("booking.patient")}</h3>
+        <h3 style={{ fontFamily: "var(--heading-font)", fontWeight: "var(--heading-weight)", letterSpacing: "var(--heading-tracking)" }} className="text-gray-800 text-sm uppercase">{t("booking.patient")}</h3>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -643,7 +643,7 @@ function StepDetails({
 
       {/* Owner section */}
       <div className="space-y-4 pt-2 border-t border-gray-100">
-        <h3 className="font-semibold text-gray-800 text-sm uppercase tracking-wide pt-2">{t("booking.owner")}</h3>
+        <h3 style={{ fontFamily: "var(--heading-font)", fontWeight: "var(--heading-weight)", letterSpacing: "var(--heading-tracking)" }} className="text-gray-800 text-sm uppercase pt-2">{t("booking.owner")}</h3>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -789,7 +789,7 @@ function StepConfirm({
   return (
     <div className="space-y-5">
       <div>
-        <h3 className="font-semibold text-gray-800 mb-1">Ihre Angaben im Überblick</h3>
+        <h3 style={{ fontFamily: "var(--heading-font)", fontWeight: "var(--heading-weight)", letterSpacing: "var(--heading-tracking)" }} className="text-gray-800 mb-1">Ihre Angaben im Überblick</h3>
         <p className="text-sm text-gray-500">Bitte prüfen Sie alles und bestätigen Sie den Termin.</p>
       </div>
 
@@ -869,7 +869,7 @@ function SuccessScreen({
         <Check size={28} style={{ color: primaryColor }} strokeWidth={2.5} />
       </div>
       <div>
-        <h2 className="text-xl font-bold text-gray-900">Termin angefragt!</h2>
+        <h2 style={{ fontFamily: "var(--heading-font)", fontWeight: "var(--heading-weight)", letterSpacing: "var(--heading-tracking)" }} className="text-xl text-gray-900">Termin angefragt!</h2>
         <p className="text-gray-500 mt-1.5 text-sm">
           Vielen Dank, {ownerName.split(" ")[0]}. Ihre Anfrage für {patientName} wurde erfolgreich übermittelt.
         </p>
@@ -1097,7 +1097,7 @@ export default function BookingPage({
           <div className="w-full max-w-xl bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
             {step !== "success" && (
               <div className="px-6 py-5 border-b border-gray-100">
-                <h2 className="font-bold text-gray-900 mb-4">{t("booking.title")}</h2>
+                <h2 style={{ fontFamily: "var(--heading-font)", fontWeight: "var(--heading-weight)", letterSpacing: "var(--heading-tracking)" }} className="text-gray-900 mb-4">{t("booking.title")}</h2>
                 <StepIndicator current={step} />
               </div>
             )}
