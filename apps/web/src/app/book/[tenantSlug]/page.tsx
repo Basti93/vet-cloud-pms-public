@@ -95,11 +95,11 @@ function fmtLong(d: Date) {
 
 function StepIndicator({ current }: { current: Step }) {
   const { t } = useLocale();
-  const steps: { key: Step; labelKey: string; abbr: string }[] = [
-    { key: "vet", labelKey: "booking.steps.vet", abbr: "T" },
-    { key: "date", labelKey: "booking.steps.date", abbr: "D" },
-    { key: "details", labelKey: "booking.steps.details", abbr: "A" },
-    { key: "confirm", labelKey: "booking.steps.confirm", abbr: "B" },
+  const steps: { key: Step; labelKey: string }[] = [
+    { key: "vet", labelKey: "booking.steps.vet" },
+    { key: "date", labelKey: "booking.steps.date" },
+    { key: "details", labelKey: "booking.steps.details" },
+    { key: "confirm", labelKey: "booking.steps.confirm" },
   ];
   const idx = steps.findIndex((s) => s.key === current);
 
@@ -122,9 +122,8 @@ function StepIndicator({ current }: { current: Step }) {
               >
                 {done ? <Check size={11} strokeWidth={3} /> : i + 1}
               </div>
-              <span className={`text-xs sm:text-sm font-medium whitespace-nowrap ${active ? "text-gray-900" : done ? "text-gray-500" : "text-gray-400"}`}>
-                <span className="sm:hidden">{s.abbr}</span>
-                <span className="hidden sm:inline">{t(s.labelKey)}</span>
+              <span className={`hidden sm:inline text-xs sm:text-sm font-medium whitespace-nowrap ${active ? "text-gray-900" : done ? "text-gray-500" : "text-gray-400"}`}>
+                {t(s.labelKey)}
               </span>
             </div>
             {i < steps.length - 1 && (
