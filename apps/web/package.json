@@ -17,6 +17,7 @@
     "db:seed": "npx tsx scripts/seed.ts"
   },
   "dependencies": {
+    "@clerk/localizations": "^1",
     "@clerk/nextjs": "^7",
     "@fullcalendar/daygrid": "^6",
     "@fullcalendar/interaction": "^6",
