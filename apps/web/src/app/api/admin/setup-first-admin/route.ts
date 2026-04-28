@@ -4,6 +4,8 @@ import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { clerkClient } from "@clerk/nextjs/server";
 
+export const dynamic = "force-dynamic";
+
 export async function POST() {
   try {
     const demoTenantId = process.env.DEMO_TENANT_ID;

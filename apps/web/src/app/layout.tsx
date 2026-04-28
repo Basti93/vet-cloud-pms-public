@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { ClerkProvider } from "@clerk/nextjs";
+import { ClerkProviderWrapper } from "@/components/ClerkProviderWrapper";
 import { TRPCProvider } from "@/lib/trpc/provider";
 import { LocaleProvider } from "@/lib/locale/context";
 import { Analytics } from "@vercel/analytics/next";
@@ -23,7 +23,7 @@ export default async function RootLayout({
   const locale = (headerList.get("x-locale") as string) || "de";
 
   return (
-    <ClerkProvider>
+    <ClerkProviderWrapper>
       <html lang="de">
         <body>
           <EnvironmentBanner />
@@ -34,6 +34,6 @@ export default async function RootLayout({
           <SpeedInsights />
         </body>
       </html>
-    </ClerkProvider>
+    </ClerkProviderWrapper>
   );
 }

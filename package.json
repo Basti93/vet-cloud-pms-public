@@ -17,6 +17,7 @@
     "lint": "turbo run lint"
   },
   "dependencies": {
+    "@clerk/localizations": "^4.5.5",
     "@vercel/analytics": "1.1.4",
     "@vercel/speed-insights": "1.0.4",
     "drizzle-kit": "^0.18.1",
