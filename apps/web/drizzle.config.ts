@@ -34,4 +34,3 @@ export default {
   strict: true,
   verbose: true,
 };
-# test
