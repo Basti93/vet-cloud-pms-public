@@ -162,8 +162,16 @@ export async function GET(
       tenantData.name
     );
 
+    console.log('Generated ICS content:', {
+      length: icsContent.length,
+      startsWithBEGIN: icsContent.startsWith('BEGIN:VCALENDAR'),
+      endsWithEND: icsContent.trim().endsWith('END:VCALENDAR'),
+      preview: icsContent.substring(0, 200),
+    });
+
     // Validate format
     if (!validateICalFormat(icsContent)) {
+      console.log('ICS validation failed');
       await logAudit(
         tokenId,
         tenantData.id,
@@ -174,7 +182,7 @@ export async function GET(
         0
       );
       return NextResponse.json(
-        { error: 'Failed to generate valid iCal format' },
+        { error: 'Failed to generate valid iCal format', debug: { length: icsContent.length, preview: icsContent.substring(0, 100) } },
         { status: 500 }
       );
     }

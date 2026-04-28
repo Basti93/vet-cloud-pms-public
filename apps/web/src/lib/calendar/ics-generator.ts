@@ -138,10 +138,10 @@ export function getTZID(ianaTimezone: string): string {
  */
 export function validateICalFormat(icsContent: string): boolean {
   const trimmed = icsContent.trim();
+  // Valid calendar has BEGIN:VCALENDAR and END:VCALENDAR
+  // May or may not have events (empty calendar is valid)
   return (
     trimmed.startsWith('BEGIN:VCALENDAR') &&
-    trimmed.includes('BEGIN:VEVENT') &&
-    trimmed.includes('END:VEVENT') &&
     trimmed.endsWith('END:VCALENDAR')
   );
 }
