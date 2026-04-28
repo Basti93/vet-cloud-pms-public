@@ -56,11 +56,13 @@ export default function PracticePage() {
     address: "",
     city: "",
     postalCode: "",
+    allowedEmbeddingDomains: [] as string[],
   });
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
+  const [newDomain, setNewDomain] = useState("");
 
   useEffect(() => {
     if (tenant) {
@@ -71,6 +73,7 @@ export default function PracticePage() {
         address: tenant.address || "",
         city: tenant.city || "",
         postalCode: tenant.postalCode || "",
+        allowedEmbeddingDomains: ((tenant as any).allowedEmbeddingDomains as string[]) || [],
       });
     }
   }, [tenant]);
@@ -256,6 +259,92 @@ export default function PracticePage() {
             </div>
           </div>
         )}
+      </Card>
+
+      {/* Allowed embedding domains */}
+      <Card className="p-6" style={{ borderColor: "var(--color-border)" }}>
+        <h2 className="text-base font-semibold mb-4">Erlaubte Einbindungsdomänen</h2>
+        <p style={{ color: "var(--color-muted)" }} className="text-sm mb-4">
+          Nur diese Domains dürfen die Buchungs-Widget einbinden. Lassen Sie leer, um von überall zuzulassen.
+        </p>
+
+        <div className="space-y-3">
+          {form.allowedEmbeddingDomains.length > 0 && (
+            <div className="space-y-2">
+              {form.allowedEmbeddingDomains.map((domain, idx) => (
+                <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg" style={{ backgroundColor: "var(--color-bg)" }}>
+                  <span className="flex-1 text-sm">{domain}</span>
+                  <button
+                    onClick={() => setForm(prev => ({
+                      ...prev,
+                      allowedEmbeddingDomains: prev.allowedEmbeddingDomains.filter((_, i) => i !== idx)
+                    }))}
+                    className="text-red-500 text-sm hover:underline"
+                  >
+                    Entfernen
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newDomain}
+              onChange={(e) => setNewDomain(e.target.value)}
+              placeholder="z.B. tierarzt-praxis.de, www.tierarzt-praxis.de"
+              className="flex-1 px-3 py-2 rounded-lg border text-sm"
+              style={{
+                borderColor: "var(--color-border)",
+                backgroundColor: "var(--color-bg)",
+                color: "var(--color-fg)",
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && newDomain.trim()) {
+                  setForm(prev => ({
+                    ...prev,
+                    allowedEmbeddingDomains: [...prev.allowedEmbeddingDomains, newDomain.trim()]
+                  }));
+                  setNewDomain("");
+                }
+              }}
+            />
+            <button
+              onClick={() => {
+                if (newDomain.trim()) {
+                  setForm(prev => ({
+                    ...prev,
+                    allowedEmbeddingDomains: [...prev.allowedEmbeddingDomains, newDomain.trim()]
+                  }));
+                  setNewDomain("");
+                }
+              }}
+              className="px-3 py-2 rounded-lg text-sm font-medium"
+              style={{ backgroundColor: "var(--color-accent)", color: "white" }}
+            >
+              Hinzufügen
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 pt-4 border-t" style={{ borderColor: "var(--color-border)" }}>
+          <button
+            onClick={handleSave}
+            disabled={update.isPending}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium"
+            style={{ backgroundColor: "var(--color-accent)", color: "white" }}
+          >
+            <Save size={14} />
+            {update.isPending ? "Wird gespeichert..." : "Speichern"}
+          </button>
+          {saveSuccess && (
+            <span className="flex items-center gap-1.5 text-sm mt-2" style={{ color: "#166534" }}>
+              <CheckCircle size={14} />
+              Gespeichert
+            </span>
+          )}
+        </div>
       </Card>
 
       {/* Danger Zone */}

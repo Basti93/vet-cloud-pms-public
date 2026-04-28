@@ -97,6 +97,8 @@ export const tenants = pgTable(
     // Opening hours: array of 7 entries (index 0=Sun … 6=Sat)
     // Each: { isOpen: boolean, startHour: number, endHour: number }
     openingHours: jsonb("opening_hours"),
+    // Allowed domains for embedding the booking widget (array of domain strings)
+    allowedEmbeddingDomains: jsonb("allowed_embedding_domains"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .default(sql`now()`)
       .notNull(),

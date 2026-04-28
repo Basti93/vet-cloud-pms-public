@@ -310,6 +310,7 @@ export const bookingRouter = createTRPCRouter({
           themePreference: tenants.themePreference,
           typographyPreference: tenants.typographyPreference,
           websiteTemplate: tenants.websiteTemplate,
+          allowedEmbeddingDomains: tenants.allowedEmbeddingDomains,
         })
         .from(tenants)
         .where(eq(tenants.slug, input.slug))
@@ -318,6 +319,34 @@ export const bookingRouter = createTRPCRouter({
       if (!tenant) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Praxis nicht gefunden" });
       }
+
+      // Check domain restrictions if configured
+      const allowedDomains = (tenant.allowedEmbeddingDomains as string[] | null) || [];
+      if (allowedDomains.length > 0) {
+        const referer = ctx.headers.get("referer");
+        const origin = ctx.headers.get("origin");
+        const requestDomain = referer || origin;
+
+        if (requestDomain) {
+          try {
+            const url = new URL(requestDomain);
+            const hostname = url.hostname;
+            const isAllowed = allowedDomains.some(domain =>
+              hostname === domain || hostname === `www.${domain}` || domain === `www.${hostname}`
+            );
+
+            if (!isAllowed) {
+              throw new TRPCError({
+                code: "FORBIDDEN",
+                message: "Diese Domain ist nicht autorisiert, das Buchungs-Widget einzubinden"
+              });
+            }
+          } catch (err) {
+            if (err instanceof TRPCError) throw err;
+          }
+        }
+      }
+
       return tenant;
     }),
 

@@ -1048,6 +1048,14 @@ export default function BookingPage({
           --heading-weight: ${typography.headingWeight};
           --heading-tracking: ${typography.headingTracking};
         }
+        body {
+          font-family: var(--body-font);
+        }
+        h1, h2, h3, h4, h5, h6 {
+          font-family: var(--heading-font);
+          font-weight: var(--heading-weight);
+          letter-spacing: var(--heading-tracking);
+        }
       `}</style>
 
       <div className="min-h-screen bg-gray-50 flex flex-col">
