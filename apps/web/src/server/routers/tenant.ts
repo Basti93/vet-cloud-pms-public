@@ -309,30 +309,41 @@ export const tenantRouter = createTRPCRouter({
     }),
 
   getFeatureFlags: protectedProcedure.query(async ({ ctx }) => {
-    // Get current user's tenant
-    const [user] = await ctx.db
-      .select({ tenantId: users.tenantId })
-      .from(users)
-      .where(eq(users.clerkId, ctx.userId))
-      .limit(1);
+    try {
+      // Get current user's tenant
+      const [user] = await ctx.db
+        .select({ tenantId: users.tenantId })
+        .from(users)
+        .where(eq(users.clerkId, ctx.userId))
+        .limit(1);
 
-    if (!user) {
-      throw new Error("User not found");
+      if (!user) {
+        // Return default flags if user not found in DB (e.g., webhook not processed yet)
+        return {
+          aiReceptionEnabled: false,
+        };
+      }
+
+      // Get feature flags for this tenant
+      const [flags] = await ctx.db
+        .select({
+          aiReceptionEnabled: featureFlags.aiReceptionEnabled,
+        })
+        .from(featureFlags)
+        .where(eq(featureFlags.tenantId, user.tenantId))
+        .limit(1);
+
+      // Return default flags if none exist yet
+      return {
+        aiReceptionEnabled: flags?.aiReceptionEnabled ?? false,
+      };
+    } catch (error) {
+      // Log error and return safe defaults
+      console.error("Error fetching feature flags:", error);
+      return {
+        aiReceptionEnabled: false,
+      };
     }
-
-    // Get feature flags for this tenant
-    const [flags] = await ctx.db
-      .select({
-        aiReceptionEnabled: featureFlags.aiReceptionEnabled,
-      })
-      .from(featureFlags)
-      .where(eq(featureFlags.tenantId, user.tenantId))
-      .limit(1);
-
-    // Return default flags if none exist yet
-    return {
-      aiReceptionEnabled: flags?.aiReceptionEnabled ?? false,
-    };
   }),
 
   updateFeatureFlags: protectedProcedure
