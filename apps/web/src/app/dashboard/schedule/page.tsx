@@ -3,7 +3,8 @@
 import { useRef, useState, useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
 import type FullCalendarType from "@fullcalendar/react";
-import { Plus, ChevronLeft, ChevronRight, Calendar, List } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, Calendar, List, Share2 } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { AppointmentStatusBadge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -224,9 +225,16 @@ export default function SchedulePage() {
           <h1 className="text-3xl font-bold" style={{ color: 'var(--color-fg)' }}>Terminkalender</h1>
           <p className="mt-1" style={{ color: 'var(--color-muted)' }}>{appointments ? `${appointments.length} Termine geladen` : "Terminübersicht"}</p>
         </div>
-        <Button onClick={() => openNew()} disabled={!tenantId}>
-          <Plus size={16} /> Neuer Termin
-        </Button>
+        <div className="flex gap-2">
+          <Link href="/dashboard/settings/calendar-sync">
+            <Button variant="outline">
+              <Share2 size={16} /> Kalender Export
+            </Button>
+          </Link>
+          <Button onClick={() => openNew()} disabled={!tenantId}>
+            <Plus size={16} /> Neuer Termin
+          </Button>
+        </div>
       </div>
 
       {isReady && !tenantId && <SetupBanner />}

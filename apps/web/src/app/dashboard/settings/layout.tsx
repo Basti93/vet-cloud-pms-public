@@ -3,13 +3,14 @@
 import { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Palette, Users, ArrowLeft, Building2, Mail, CalendarClock } from "lucide-react";
+import { Palette, Users, ArrowLeft, Building2, Mail, CalendarClock, Calendar } from "lucide-react";
 
 const TABS = [
   { href: "/dashboard/settings/practice", label: "Praxis", icon: Building2 },
   { href: "/dashboard/settings/appearance", label: "Erscheinungsbild", icon: Palette },
   { href: "/dashboard/settings/email", label: "E-Mails", icon: Mail },
   { href: "/dashboard/settings/availability", label: "Verfügbarkeit", icon: CalendarClock },
+  { href: "/dashboard/settings/calendar-sync", label: "Kalender Export", icon: Calendar },
   { href: "/dashboard/settings/team", label: "Team & Benutzer", icon: Users },
 ];
 
