@@ -102,15 +102,15 @@ function StepIndicator({ current }: { current: Step }) {
   const idx = steps.findIndex((s) => s.key === current);
 
   return (
-    <div className="flex items-center gap-0">
+    <div className="flex items-center gap-0 min-w-0 overflow-x-auto">
       {steps.map((s, i) => {
         const done = i < idx;
         const active = i === idx;
         return (
-          <div key={s.key} className="flex items-center">
+          <div key={s.key} className="flex items-center flex-shrink-0">
             <div className="flex items-center gap-2">
               <div
-                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 transition-all ${
                   done
                     ? "bg-[var(--primary)] text-white"
                     : active
@@ -120,12 +120,12 @@ function StepIndicator({ current }: { current: Step }) {
               >
                 {done ? <Check size={12} strokeWidth={3} /> : i + 1}
               </div>
-              <span className={`text-sm font-medium hidden sm:block ${active ? "text-gray-900" : done ? "text-gray-500" : "text-gray-400"}`}>
+              <span className={`text-xs sm:text-sm font-medium hidden sm:block flex-shrink-0 max-w-xs ${active ? "text-gray-900" : done ? "text-gray-500" : "text-gray-400"}`}>
                 {s.label}
               </span>
             </div>
             {i < steps.length - 1 && (
-              <div className={`w-8 sm:w-16 h-0.5 mx-2 transition-colors ${done ? "bg-[var(--primary)]" : "bg-gray-200"}`} />
+              <div className={`w-4 sm:w-8 h-0.5 mx-1 sm:mx-2 flex-shrink-0 transition-colors ${done ? "bg-[var(--primary)]" : "bg-gray-200"}`} />
             )}
           </div>
         );
@@ -1066,7 +1066,7 @@ export default function BookingPage({
               className="w-12 h-12 rounded-2xl flex items-center justify-center text-white font-bold text-lg flex-shrink-0"
               style={{ backgroundColor: primaryColor }}
             >
-              {clinic.name.charAt(0).toUpperCase()}
+              {clinic.monogram || clinic.name.charAt(0).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
               <h1 className="font-bold text-gray-900 text-lg leading-tight">{clinic.name}</h1>

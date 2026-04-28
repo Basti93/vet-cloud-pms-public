@@ -58,12 +58,12 @@ export default function DashboardContent({ children }: { children: ReactNode }) 
                 className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold"
                 style={{ backgroundColor: 'var(--color-accent-soft)' }}
               >
-                VC
+                {tenant?.monogram || tenant?.name?.charAt(0).toUpperCase() || 'VC'}
               </div>
               <div>
-                <p className="font-bold text-sm leading-tight">Vet Cloud</p>
+                <p className="font-bold text-sm leading-tight">{tenant?.name || 'Vet Cloud'}</p>
                 <p className="text-xs leading-tight" style={{ color: 'var(--color-accent-soft)' }}>
-                  Praxisverwaltung
+                  {tenant?.name ? 'Praxis' : 'Praxisverwaltung'}
                 </p>
               </div>
             </div>
