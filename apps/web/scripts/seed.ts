@@ -425,4 +425,12 @@ async function seed() {
   }
 }
 
-seed();
+seed()
+  .catch((err) => {
+    console.error("❌ Seed process error:", err);
+    process.exit(1);
+  })
+  .then(() => {
+    process.exit(0);
+  });
+
