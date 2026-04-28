@@ -4,6 +4,7 @@ import { use, useState, useEffect, useRef, useCallback } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { useBookingFormState } from "@/hooks/useBookingFormState";
 import { ChevronLeft, ChevronRight, Check, Phone, MapPin, Clock, Calendar, AlertCircle, Loader2, Stethoscope, PawPrint } from "lucide-react";
+import { COLOR_PRESETS, type ColorPresetKey } from "@/lib/theme";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -355,9 +356,24 @@ function StepDate({
   return (
     <div className="space-y-6">
       {/* Vet reminder */}
-      <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5 text-sm">
-        <Stethoscope size={15} className="text-blue-600 flex-shrink-0" />
-        <span className="text-blue-900 font-medium">{getVetName()}</span>
+      <div
+        className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm border"
+        style={{
+          backgroundColor: `${primaryColor}15`,
+          borderColor: `${primaryColor}40`,
+        }}
+      >
+        <Stethoscope
+          size={15}
+          className="flex-shrink-0"
+          style={{ color: primaryColor }}
+        />
+        <span
+          className="font-medium"
+          style={{ color: primaryColor }}
+        >
+          {getVetName()}
+        </span>
       </div>
 
       {/* Day picker */}
@@ -883,20 +899,18 @@ function SuccessScreen({
 
 export default function BookingPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ tenantSlug: string }>;
-  searchParams: Promise<{ color?: string }>;
 }) {
   const { tenantSlug } = use(params);
-  const { color } = use(searchParams);
-
-  // Primary color: theme is set by server-side layout
-  // Fallback to ?color param or default blue if needed
-  const primaryColor = color ? `#${color.replace(/^#/, "")}` : "#3B82F6";
 
   const { data: clinic, isLoading: clinicLoading, error: clinicError } =
     trpc.booking.getClinic.useQuery({ slug: tenantSlug });
+
+  // Extract primary color from tenant theme
+  const primaryColor = clinic
+    ? COLOR_PRESETS[(clinic.themePreference as ColorPresetKey) || "sage"].accent
+    : "oklch(55% 0.11 240)"; // Fallback to klinikblau
 
   const { data: vets } = trpc.vet.list.useQuery(
     { tenantId: clinic?.id || "" },
