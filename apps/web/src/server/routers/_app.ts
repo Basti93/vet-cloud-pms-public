@@ -9,6 +9,7 @@ import { emailRouter } from "./email";
 import { tenantRouter } from "./tenant";
 import { statisticsRouter } from "./statistics";
 import { scheduleRouter } from "./schedule";
+import { calendarRouter } from "./calendar";
 
 export const appRouter = createTRPCRouter({
   appointments: appointmentsRouter,
@@ -21,6 +22,7 @@ export const appRouter = createTRPCRouter({
   tenant: tenantRouter,
   statistics: statisticsRouter,
   schedule: scheduleRouter,
+  calendar: calendarRouter,
 });
 
 export type AppRouter = typeof appRouter;

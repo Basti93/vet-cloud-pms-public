@@ -712,6 +712,63 @@ export const featureFlags = pgTable(
 );
 
 // ============================================================================
+// CALENDAR ACCESS & SYNC
+// ============================================================================
+
+export const calendarAccessTokens = pgTable(
+  "calendar_access_tokens",
+  {
+    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    vetId: uuid("vet_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    token: text("token").notNull().unique(), // UUID token for access
+    isActive: boolean("is_active").default(true).notNull(),
+    description: varchar("description", { length: 255 }), // "Google Calendar", "Outlook", etc
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+    createdBy: uuid("created_by"), // User ID who created this token
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }), // NULL while active
+  },
+  (table) => ({
+    tenantVetIdx: index("calendar_tokens_tenant_vet_idx").on(table.tenantId, table.vetId),
+    tenantIdIdx: index("calendar_tokens_tenant_id_idx").on(table.tenantId),
+    tokenUniqueIdx: unique("calendar_tokens_token_unique").on(table.token),
+  })
+);
+
+export const calendarAccessAudit = pgTable(
+  "calendar_access_audit",
+  {
+    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+    tokenId: uuid("token_id").references(() => calendarAccessTokens.id, { onDelete: "cascade" }),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    veterinarianId: uuid("veterinarian_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    accessedAt: timestamp("accessed_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+    ipAddress: varchar("ip_address", { length: 45 }), // IPv6 support
+    userAgent: text("user_agent"),
+    eventCount: integer("event_count").default(0), // Number of events in response
+    httpStatus: integer("http_status"), // 200, 304, 401, etc
+  },
+  (table) => ({
+    tenantIdIdx: index("calendar_audit_tenant_id_idx").on(table.tenantId),
+    tokenIdIdx: index("calendar_audit_token_id_idx").on(table.tokenId),
+    accessedAtIdx: index("calendar_audit_accessed_at_idx").on(table.accessedAt),
+  })
+);
+
+// ============================================================================
 // RLS Policies (für später, muss in Postgres direkt gesetzt werden)
 // ============================================================================
 
