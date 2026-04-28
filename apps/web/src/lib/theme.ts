@@ -9,6 +9,7 @@ export interface ColorPreset {
   label: string;
   sub: string;
   accent: string;
+  accentHex: string; // Hex equivalent for favicon
   accentHover: string;
   accentSoft: string;
   accentText: string;
@@ -71,6 +72,7 @@ export const COLOR_PRESETS: Record<ColorPresetKey, ColorPreset> = {
     label: "Sage",
     sub: "Ruhig & klinisch",
     accent: "oklch(55% 0.10 165)",
+    accentHex: "#5a9b7f",
     accentHover: "oklch(50% 0.10 165)",
     accentSoft: "oklch(95% 0.025 165)",
     accentText: "oklch(35% 0.08 165)",
@@ -86,6 +88,7 @@ export const COLOR_PRESETS: Record<ColorPresetKey, ColorPreset> = {
     label: "Warm Sand",
     sub: "Erdig & warm",
     accent: "oklch(58% 0.10 70)",
+    accentHex: "#d49a5a",
     accentHover: "oklch(53% 0.10 70)",
     accentSoft: "oklch(95% 0.025 70)",
     accentText: "oklch(38% 0.08 70)",
@@ -101,6 +104,7 @@ export const COLOR_PRESETS: Record<ColorPresetKey, ColorPreset> = {
     label: "Klinik Blau",
     sub: "Vertrauen & Medizin",
     accent: "oklch(55% 0.11 240)",
+    accentHex: "#4a7bc9",
     accentHover: "oklch(50% 0.11 240)",
     accentSoft: "oklch(95% 0.025 240)",
     accentText: "oklch(35% 0.09 240)",
@@ -116,6 +120,7 @@ export const COLOR_PRESETS: Record<ColorPresetKey, ColorPreset> = {
     label: "Bordeaux",
     sub: "Premium & boutique",
     accent: "oklch(48% 0.13 25)",
+    accentHex: "#a63f46",
     accentHover: "oklch(43% 0.13 25)",
     accentSoft: "oklch(95% 0.025 25)",
     accentText: "oklch(35% 0.10 25)",
@@ -131,6 +136,7 @@ export const COLOR_PRESETS: Record<ColorPresetKey, ColorPreset> = {
     label: "Forest",
     sub: "Tief & natürlich",
     accent: "oklch(45% 0.10 150)",
+    accentHex: "#3d7956",
     accentHover: "oklch(40% 0.10 150)",
     accentSoft: "oklch(94% 0.025 150)",
     accentText: "oklch(32% 0.08 150)",
@@ -146,6 +152,7 @@ export const COLOR_PRESETS: Record<ColorPresetKey, ColorPreset> = {
     label: "Schiefer",
     sub: "Pures Neutral",
     accent: "oklch(45% 0.02 250)",
+    accentHex: "#6b7280",
     accentHover: "oklch(40% 0.02 250)",
     accentSoft: "oklch(95% 0.005 250)",
     accentText: "oklch(30% 0.015 250)",
