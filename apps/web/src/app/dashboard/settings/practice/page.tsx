@@ -243,7 +243,7 @@ export default function PracticePage() {
                   onClick={() => setEmbedType("iframe")}
                   className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
                     embedType === "iframe"
-                      ? "text-white"
+                      ? "text-gray-900"
                       : "text-gray-600"
                   }`}
                   style={{
@@ -256,7 +256,7 @@ export default function PracticePage() {
                   onClick={() => setEmbedType("modal")}
                   className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
                     embedType === "modal"
-                      ? "text-white"
+                      ? "text-gray-900"
                       : "text-gray-600"
                   }`}
                   style={{

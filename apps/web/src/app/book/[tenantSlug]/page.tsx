@@ -210,7 +210,7 @@ function StepVet({
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="font-semibold text-gray-800 mb-4">{t("booking.selectVet")}</h3>
+        <h3 style={{ fontFamily: "var(--heading-font)", fontWeight: "var(--heading-weight)", letterSpacing: "var(--heading-tracking)" }} className="text-gray-800 mb-4">{t("booking.selectVet")}</h3>
         <p className="text-sm text-gray-500 mb-6">
           {t("booking.selectVetDescription")}
         </p>
@@ -221,14 +221,14 @@ function StepVet({
         onClick={() => handleVetClick("")}
         className="w-full p-4 rounded-xl border-2 border-gray-200 hover:border-[var(--primary)] hover:bg-[var(--primary)]/5 text-left transition-all"
       >
-        <div className="font-semibold text-gray-900">{t("booking.autoAssign")}</div>
+        <div style={{ fontFamily: "var(--heading-font)", fontWeight: "var(--heading-weight)", letterSpacing: "var(--heading-tracking)" }} className="text-gray-900">{t("booking.autoAssign")}</div>
         <p className="text-sm text-gray-500 mt-1">{t("booking.autoAssignDescription")}</p>
       </button>
 
       {/* Vet options */}
       {vets && vets.length > 0 && (
         <div className="space-y-3">
-          <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">{t("booking.availableVets")}</div>
+          <div style={{ fontFamily: "var(--heading-font)", fontWeight: "var(--heading-weight)", letterSpacing: "var(--heading-tracking)" }} className="text-xs text-gray-500 uppercase tracking-wide">{t("booking.availableVets")}</div>
           {vets.map((vet) => {
             // Check if this vet has available slots in the next 14 days
             const availability = vetAvailability?.find((v) => v.id === vet.id);
@@ -246,7 +246,7 @@ function StepVet({
                     : "border-gray-200 hover:border-[var(--primary)] hover:bg-[var(--primary)]/5"
                 }`}
               >
-                <div className="font-semibold text-gray-900">{formatVetName(vet.title, vet.firstName, vet.lastName)}</div>
+                <div style={{ fontFamily: "var(--heading-font)", fontWeight: "var(--heading-weight)", letterSpacing: "var(--heading-tracking)" }} className="text-gray-900">{formatVetName(vet.title, vet.firstName, vet.lastName)}</div>
                 {isDisabled && <p className="text-xs text-gray-400 mt-1">{t("booking.noSlots")}</p>}
               </button>
             );
