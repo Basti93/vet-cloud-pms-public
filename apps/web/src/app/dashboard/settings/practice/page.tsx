@@ -5,7 +5,7 @@ import { trpc } from "@/lib/trpc/client";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Globe, ExternalLink, CheckCircle, Save, Trash2, AlertTriangle } from "lucide-react";
+import { Globe, ExternalLink, CheckCircle, Save, Trash2, AlertTriangle, ChevronDown } from "lucide-react";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -60,6 +60,7 @@ export default function PracticePage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (tenant) {
@@ -194,6 +195,67 @@ export default function PracticePage() {
             </span>
           )}
         </div>
+      </Card>
+
+      {/* How to include booking */}
+      <Card className="p-6" style={{ borderColor: "var(--color-border)" }}>
+        <button
+          onClick={() => setExpandedSections(prev => ({ ...prev, booking: !prev.booking }))}
+          className="w-full flex items-center justify-between gap-3 hover:opacity-75 transition-opacity"
+        >
+          <h2 className="text-base font-semibold">Wie binde ich die Online-Terminbuchung ein?</h2>
+          <ChevronDown
+            size={20}
+            style={{
+              transform: expandedSections.booking ? "rotate(180deg)" : "rotate(0deg)",
+              transition: "transform 0.2s",
+            }}
+          />
+        </button>
+
+        {expandedSections.booking && (
+          <div className="mt-4 pt-4 border-t" style={{ borderColor: "var(--color-border)" }}>
+            <div className="space-y-4 text-sm">
+              <div>
+                <p className="font-medium mb-2">Schritt 1: Kopieren Sie den Buchungslink</p>
+                <p style={{ color: "var(--color-muted)" }} className="mb-2">
+                  Verwenden Sie folgenden Link, um die Online-Terminbuchung auf Ihrer Website einzubinden:
+                </p>
+                <code
+                  className="block px-3 py-2 rounded bg-gray-100 text-xs font-mono"
+                  style={{ backgroundColor: "var(--color-bg)", color: "var(--color-accent)" }}
+                >
+                  {typeof window !== "undefined" && tenant?.slug
+                    ? `${window.location.origin}/book/${tenant.slug}`
+                    : "Ihr Buchungslink wird hier angezeigt"}
+                </code>
+              </div>
+
+              <div>
+                <p className="font-medium mb-2">Schritt 2: Integrieren Sie den Link</p>
+                <ul style={{ color: "var(--color-muted)" }} className="space-y-1.5 list-disc list-inside">
+                  <li><strong>Als Link:</strong> Fügen Sie den Link mit Text wie "Online buchen" auf Ihrer Website ein</li>
+                  <li><strong>In einem Button:</strong> Erstellen Sie einen ansprechenden Button mit diesem Link</li>
+                  <li><strong>Im Kontaktbereich:</strong> Ergänzen Sie Ihren Kontaktbereich um die Onlinebuchung</li>
+                  <li><strong>In Signaturen:</strong> Ergänzen Sie E-Mail-Signaturen und Telefonnachrich­ten</li>
+                </ul>
+              </div>
+
+              <div>
+                <p className="font-medium mb-2">Schritt 3: Testen Sie die Buchung</p>
+                <p style={{ color: "var(--color-muted)" }}>
+                  Navigieren Sie zur URL und probieren Sie eine Testbuchung. Überprüfen Sie, ob Ihre Praxisfarben, Name und Kontaktdaten korrekt angezeigt werden.
+                </p>
+              </div>
+
+              <div className="p-3 rounded" style={{ backgroundColor: "var(--color-accent-soft)" }}>
+                <p style={{ color: "var(--color-muted)", fontSize: "0.875rem" }}>
+                  <strong>💡 Tipp:</strong> Der Buchungslink nutzt automatisch Ihre Praxisinformationen und das Farbschema aus Ihren Einstellungen.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* Danger Zone */}
