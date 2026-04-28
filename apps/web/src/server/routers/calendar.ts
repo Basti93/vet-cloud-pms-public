@@ -27,9 +27,11 @@ export const calendarRouter = createTRPCRouter({
         throw new Error("User not found");
       }
 
-      // Only vets can generate calendar tokens
-      if (currentUser.role !== "vet") {
-        throw new Error("Only veterinarians can generate calendar tokens");
+      // Only vets (and admins who act as vets) can generate calendar tokens
+      if (currentUser.role !== "vet" && currentUser.role !== "admin") {
+        const error = new Error("Only veterinarians can generate calendar tokens");
+        (error as any).code = "VET_ONLY";
+        throw error;
       }
 
       // Generate non-guessable UUID token
