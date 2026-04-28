@@ -5,7 +5,7 @@ import { trpc } from "@/lib/trpc/client";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Globe, ExternalLink, CheckCircle, Save, Trash2, AlertTriangle, ChevronDown } from "lucide-react";
+import { Globe, ExternalLink, CheckCircle, Save, Trash2, AlertTriangle, ChevronDown, Copy, Check } from "lucide-react";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -46,6 +46,10 @@ function TextInput({
 export default function PracticePage() {
   const router = useRouter();
   const { data: tenant } = trpc.tenant.getCurrent.useQuery();
+  const { data: embedCode } = trpc.booking.getEmbedCode.useQuery(
+    { slug: tenant?.slug || "" },
+    { enabled: !!tenant?.slug }
+  );
   const update = trpc.tenant.update.useMutation();
   const deletePractice = trpc.tenant.delete.useMutation();
 
@@ -63,6 +67,8 @@ export default function PracticePage() {
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
   const [newDomain, setNewDomain] = useState("");
+  const [embedType, setEmbedType] = useState<"iframe" | "modal">("iframe");
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (tenant) {
@@ -93,6 +99,14 @@ export default function PracticePage() {
   const websiteUrl = tenant?.slug
     ? `${typeof window !== "undefined" ? window.location.origin : ""}/${tenant.slug}`
     : null;
+
+  const handleCopyCode = (code: string, index: number) => {
+    navigator.clipboard.writeText(code);
+    setCopiedIndex(index);
+    setTimeout(() => setCopiedIndex(null), 2000);
+  };
+
+  const currentEmbedCode = embedCode ? (embedType === "iframe" ? embedCode.iframeCode : embedCode.modalCode) : "";
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -217,43 +231,79 @@ export default function PracticePage() {
         </button>
 
         {expandedSections.booking && (
-          <div className="mt-4 pt-4 border-t" style={{ borderColor: "var(--color-border)" }}>
-            <div className="space-y-4 text-sm">
-              <div>
-                <p className="font-medium mb-2">Schritt 1: Kopieren Sie den Buchungslink</p>
-                <p style={{ color: "var(--color-muted)" }} className="mb-2">
-                  Verwenden Sie folgenden Link, um die Online-Terminbuchung auf Ihrer Website einzubinden:
-                </p>
-                <code
-                  className="block px-3 py-2 rounded bg-gray-100 text-xs font-mono"
-                  style={{ backgroundColor: "var(--color-bg)", color: "var(--color-accent)" }}
+          <div className="mt-4 pt-4 border-t space-y-4" style={{ borderColor: "var(--color-border)" }}>
+            <div className="text-sm">
+              <p style={{ color: "var(--color-muted)" }} className="mb-3">
+                Wählen Sie eine Einbindungsmethode und kopieren Sie den Code für Ihre Website:
+              </p>
+
+              {/* Embed type selector */}
+              <div className="flex gap-2 mb-4">
+                <button
+                  onClick={() => setEmbedType("iframe")}
+                  className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                    embedType === "iframe"
+                      ? "text-white"
+                      : "text-gray-600"
+                  }`}
+                  style={{
+                    backgroundColor: embedType === "iframe" ? "var(--primary)" : "var(--color-bg)",
+                  }}
                 >
-                  {typeof window !== "undefined" && tenant?.slug
-                    ? `${window.location.origin}/book/${tenant.slug}`
-                    : "Ihr Buchungslink wird hier angezeigt"}
-                </code>
+                  iframe (Eingebettet)
+                </button>
+                <button
+                  onClick={() => setEmbedType("modal")}
+                  className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                    embedType === "modal"
+                      ? "text-white"
+                      : "text-gray-600"
+                  }`}
+                  style={{
+                    backgroundColor: embedType === "modal" ? "var(--primary)" : "var(--color-bg)",
+                  }}
+                >
+                  Modal (Popup-Dialog)
+                </button>
               </div>
 
-              <div>
-                <p className="font-medium mb-2">Schritt 2: Integrieren Sie den Link</p>
-                <ul style={{ color: "var(--color-muted)" }} className="space-y-1.5 list-disc list-inside">
-                  <li><strong>Als Link:</strong> Fügen Sie den Link mit Text wie "Online buchen" auf Ihrer Website ein</li>
-                  <li><strong>In einem Button:</strong> Erstellen Sie einen ansprechenden Button mit diesem Link</li>
-                  <li><strong>Im Kontaktbereich:</strong> Ergänzen Sie Ihren Kontaktbereich um die Onlinebuchung</li>
-                  <li><strong>In Signaturen:</strong> Ergänzen Sie E-Mail-Signaturen und Telefonnachrich­ten</li>
-                </ul>
-              </div>
+              {/* Code display */}
+              {currentEmbedCode && (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium" style={{ color: "var(--color-muted)" }}>
+                    {embedType === "iframe"
+                      ? "Fügen Sie diesen Code an der gewünschten Stelle Ihrer Website ein:"
+                      : "Fügen Sie diesen Code am Ende Ihres HTML (vor </body>) ein:"}
+                  </p>
+                  <div className="relative">
+                    <pre
+                      className="px-3 py-3 rounded-lg text-xs overflow-x-auto"
+                      style={{
+                        backgroundColor: "var(--color-bg)",
+                        color: "var(--color-accent)",
+                        fontFamily: "monospace",
+                      }}
+                    >
+                      {currentEmbedCode}
+                    </pre>
+                    <button
+                      onClick={() => handleCopyCode(currentEmbedCode, 0)}
+                      className="absolute top-2 right-2 p-2 rounded hover:opacity-75 transition-opacity"
+                      style={{ backgroundColor: "var(--color-bg)", color: "var(--color-accent)" }}
+                    >
+                      {copiedIndex === 0 ? (
+                        <Check size={14} style={{ color: "#16a34a" }} />
+                      ) : (
+                        <Copy size={14} />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
 
-              <div>
-                <p className="font-medium mb-2">Schritt 3: Testen Sie die Buchung</p>
+              <div className="mt-4 p-3 rounded text-xs" style={{ backgroundColor: "var(--color-accent-soft)" }}>
                 <p style={{ color: "var(--color-muted)" }}>
-                  Navigieren Sie zur URL und probieren Sie eine Testbuchung. Überprüfen Sie, ob Ihre Praxisfarben, Name und Kontaktdaten korrekt angezeigt werden.
-                </p>
-              </div>
-
-              <div className="p-3 rounded" style={{ backgroundColor: "var(--color-accent-soft)" }}>
-                <p style={{ color: "var(--color-muted)", fontSize: "0.875rem" }}>
-                  <strong>💡 Tipp:</strong> Der Buchungslink nutzt automatisch Ihre Praxisinformationen und das Farbschema aus Ihren Einstellungen.
+                  <strong>💡 Tipp:</strong> Der Code nutzt automatisch Ihre Praxisinformationen, den Buchungslink und das Farbschema aus Ihren Einstellungen.
                 </p>
               </div>
             </div>

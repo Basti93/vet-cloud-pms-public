@@ -901,4 +901,55 @@ export const bookingRouter = createTRPCRouter({
 
       return vetAvailability;
     }),
+
+  getEmbedCode: publicProcedure
+    .input(z.object({ slug: z.string().min(1) }))
+    .query(({ input }) => {
+      const bookingUrl = `https://${getMainDomain()}/book/${input.slug}`;
+
+      const iframeCode = `<iframe src="${bookingUrl}" width="100%" height="600" frameborder="0" style="border:none;border-radius:8px" allow="payment"></iframe>`;
+
+      const modalCode = `<div id="vet-cloud-booking"></div>
+<script>
+  (function() {
+    const button = document.createElement('button');
+    button.textContent = 'Termin buchen';
+    button.style.cssText = 'padding:10px 20px;background:#007bff;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px';
+    button.onmouseover = () => button.style.background = '#0056b3';
+    button.onmouseout = () => button.style.background = '#007bff';
+
+    button.onclick = () => {
+      const modal = document.createElement('div');
+      modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:10000';
+
+      const container = document.createElement('div');
+      container.style.cssText = 'width:90%;height:90%;max-width:600px;background:white;border-radius:8px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,0.2);display:flex;flex-direction:column';
+
+      const closeBtn = document.createElement('button');
+      closeBtn.textContent = '✕';
+      closeBtn.style.cssText = 'position:absolute;top:10px;right:10px;background:none;border:none;font-size:24px;cursor:pointer;color:#666;width:32px;height:32px';
+      closeBtn.onclick = () => document.body.removeChild(modal);
+
+      const iframe = document.createElement('iframe');
+      iframe.src = '${bookingUrl}';
+      iframe.style.cssText = 'width:100%;height:100%;border:none;flex:1';
+
+      container.appendChild(closeBtn);
+      container.appendChild(iframe);
+      modal.appendChild(container);
+      modal.onclick = (e) => e.target === modal && document.body.removeChild(modal);
+      document.body.appendChild(modal);
+    };
+
+    const container = document.getElementById('vet-cloud-booking');
+    if (container) container.appendChild(button);
+  })();
+<\/script>`;
+
+      return {
+        iframeCode,
+        modalCode,
+        bookingUrl,
+      };
+    }),
 });
