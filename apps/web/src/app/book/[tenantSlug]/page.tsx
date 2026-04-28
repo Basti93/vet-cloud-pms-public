@@ -3,6 +3,7 @@
 import { use, useState, useEffect, useRef, useCallback } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { useBookingFormState } from "@/hooks/useBookingFormState";
+import { useLocale } from "@/lib/locale/context";
 import { ChevronLeft, ChevronRight, Check, Phone, MapPin, Clock, Calendar, AlertCircle, Loader2, Stethoscope, PawPrint } from "lucide-react";
 import { COLOR_PRESETS, TYPE_PAIRINGS, type ColorPresetKey, type TypographyPairingKey } from "@/lib/theme";
 
@@ -93,11 +94,12 @@ function fmtLong(d: Date) {
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function StepIndicator({ current }: { current: Step }) {
-  const steps: { key: Step; label: string }[] = [
-    { key: "vet", label: "Tierarzt" },
-    { key: "date", label: "Datum & Zeit" },
-    { key: "details", label: "Angaben" },
-    { key: "confirm", label: "Bestätigen" },
+  const { t } = useLocale();
+  const steps: { key: Step; labelKey: string }[] = [
+    { key: "vet", labelKey: "booking.steps.vet" },
+    { key: "date", labelKey: "booking.steps.date" },
+    { key: "details", labelKey: "booking.steps.details" },
+    { key: "confirm", labelKey: "booking.steps.confirm" },
   ];
   const idx = steps.findIndex((s) => s.key === current);
 
@@ -121,7 +123,7 @@ function StepIndicator({ current }: { current: Step }) {
                 {done ? <Check size={12} strokeWidth={3} /> : i + 1}
               </div>
               <span className={`text-xs sm:text-sm font-medium hidden sm:block flex-shrink-0 max-w-xs ${active ? "text-gray-900" : done ? "text-gray-500" : "text-gray-400"}`}>
-                {s.label}
+                {t(s.labelKey)}
               </span>
             </div>
             {i < steps.length - 1 && (
@@ -199,6 +201,7 @@ function StepVet({
   primaryColor: string;
   onSelect: (vetId: string) => void;
 }) {
+  const { t } = useLocale();
   const handleVetClick = (vetId: string) => {
     onSelect(vetId);
   };
@@ -206,9 +209,9 @@ function StepVet({
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="font-semibold text-gray-800 mb-4">Wählen Sie einen Tierarzt</h3>
+        <h3 className="font-semibold text-gray-800 mb-4">{t("booking.selectVet")}</h3>
         <p className="text-sm text-gray-500 mb-6">
-          Wählen Sie einen Tierarzt oder lassen Sie uns den nächsten verfügbaren Tierarzt auswählen.
+          {t("booking.selectVetDescription")}
         </p>
       </div>
 
@@ -217,14 +220,14 @@ function StepVet({
         onClick={() => handleVetClick("")}
         className="w-full p-4 rounded-xl border-2 border-gray-200 hover:border-[var(--primary)] hover:bg-[var(--primary)]/5 text-left transition-all"
       >
-        <div className="font-semibold text-gray-900">Automatisch zuweisen</div>
-        <p className="text-sm text-gray-500 mt-1">Der nächste verfügbare Tierarzt wird ausgewählt</p>
+        <div className="font-semibold text-gray-900">{t("booking.autoAssign")}</div>
+        <p className="text-sm text-gray-500 mt-1">{t("booking.autoAssignDescription")}</p>
       </button>
 
       {/* Vet options */}
       {vets && vets.length > 0 && (
         <div className="space-y-3">
-          <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Verfügbare Tierärzte</div>
+          <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">{t("booking.availableVets")}</div>
           {vets.map((vet) => {
             // Check if this vet has available slots in the next 14 days
             const availability = vetAvailability?.find((v) => v.id === vet.id);
@@ -243,7 +246,7 @@ function StepVet({
                 }`}
               >
                 <div className="font-semibold text-gray-900">{formatVetName(vet.title, vet.firstName, vet.lastName)}</div>
-                {isDisabled && <p className="text-xs text-gray-400 mt-1">Keine Termine verfügbar</p>}
+                {isDisabled && <p className="text-xs text-gray-400 mt-1">{t("booking.noSlots")}</p>}
               </button>
             );
           })}
@@ -252,7 +255,7 @@ function StepVet({
 
       {/* CTA */}
       <p className="text-xs text-gray-400 text-center">
-        Wählen Sie einen Tierarzt, um verfügbare Termine zu sehen →
+        {t("booking.selectVetHint")}
       </p>
     </div>
   );
@@ -522,6 +525,7 @@ function StepDetails({
   onNext,
   initialPatient,
   initialOwner,
+  t,
 }: {
   slot: Slot;
   vetName?: string;
@@ -533,6 +537,7 @@ function StepDetails({
   onNext: (patient: PatientForm, owner: OwnerForm) => void;
   initialPatient?: PatientForm | null;
   initialOwner?: OwnerForm | null;
+  t: (key: string) => string;
 }) {
   const [patient, setPatient] = useState<PatientForm>(initialPatient ?? { name: "", species: "Hund", breed: "", reason: "" });
   const [owner, setOwner] = useState<OwnerForm>(initialOwner ?? { firstName: "", lastName: "", email: "", phone: "" });
@@ -549,13 +554,13 @@ function StepDetails({
 
   const validate = () => {
     const e: Record<string, string> = {};
-    if (!patient.name.trim()) e.name = "Name des Tieres ist erforderlich";
-    if (!patient.reason.trim()) e.reason = "Grund des Besuchs ist erforderlich";
-    if (!owner.firstName.trim()) e.firstName = "Vorname ist erforderlich";
-    if (!owner.lastName.trim()) e.lastName = "Nachname ist erforderlich";
-    if (!owner.email.trim()) e.email = "E-Mail ist erforderlich";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(owner.email)) e.email = "Ungültige E-Mail-Adresse";
-    if (!owner.phone.trim()) e.phone = "Telefonnummer ist erforderlich";
+    if (!patient.name.trim()) e.name = t("booking.errors.petName");
+    if (!patient.reason.trim()) e.reason = t("booking.errors.reason");
+    if (!owner.firstName.trim()) e.firstName = t("booking.errors.firstName");
+    if (!owner.lastName.trim()) e.lastName = t("booking.errors.lastName");
+    if (!owner.email.trim()) e.email = t("booking.errors.email");
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(owner.email)) e.email = t("booking.errors.emailInvalid");
+    if (!owner.phone.trim()) e.phone = t("booking.errors.phone");
     return e;
   };
 
@@ -585,15 +590,15 @@ function StepDetails({
 
       {/* Patient section */}
       <div className="space-y-4">
-        <h3 className="font-semibold text-gray-800 text-sm uppercase tracking-wide">Ihr Tier</h3>
+        <h3 className="font-semibold text-gray-800 text-sm uppercase tracking-wide">{t("booking.patient")}</h3>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">
-            Name des Tieres <span className="text-red-500">*</span>
+            {t("booking.petName")} <span className="text-red-500">*</span>
           </label>
           <input
             className={inputClass}
-            placeholder="z.B. Bello, Luna, Minka…"
+            placeholder={t("booking.petNamePlaceholder")}
             value={patient.name}
             onChange={(e) => setP("name", e.target.value)}
           />
@@ -602,7 +607,7 @@ function StepDetails({
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Tierart <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">{t("booking.species")} <span className="text-red-500">*</span></label>
             <select
               className={inputClass + " bg-white"}
               value={patient.species}
@@ -612,10 +617,10 @@ function StepDetails({
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Rasse (optional)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">{t("booking.breed")}</label>
             <input
               className={inputClass}
-              placeholder="z.B. Labrador"
+              placeholder={t("booking.breedPlaceholder")}
               value={patient.breed}
               onChange={(e) => setP("breed", e.target.value)}
             />
@@ -624,11 +629,11 @@ function StepDetails({
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">
-            Grund des Besuchs <span className="text-red-500">*</span>
+            {t("booking.reason")} <span className="text-red-500">*</span>
           </label>
           <input
             className={inputClass}
-            placeholder="z.B. Jährliche Impfung, Vorsorgeuntersuchung, Zahnkontrolle…"
+            placeholder={t("booking.reasonPlaceholder")}
             value={patient.reason}
             onChange={(e) => setP("reason", e.target.value)}
           />
@@ -638,40 +643,39 @@ function StepDetails({
 
       {/* Owner section */}
       <div className="space-y-4 pt-2 border-t border-gray-100">
-        <h3 className="font-semibold text-gray-800 text-sm uppercase tracking-wide pt-2">Ihre Kontaktdaten</h3>
+        <h3 className="font-semibold text-gray-800 text-sm uppercase tracking-wide pt-2">{t("booking.owner")}</h3>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Vorname <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">{t("booking.firstName")} <span className="text-red-500">*</span></label>
             <input className={inputClass} placeholder="Max" value={owner.firstName} onChange={(e) => setO("firstName", e.target.value)} />
             <FieldError msg={errors.firstName} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Nachname <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">{t("booking.lastName")} <span className="text-red-500">*</span></label>
             <input className={inputClass} placeholder="Mustermann" value={owner.lastName} onChange={(e) => setO("lastName", e.target.value)} />
             <FieldError msg={errors.lastName} />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">E-Mail <span className="text-red-500">*</span></label>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">{t("booking.email")} <span className="text-red-500">*</span></label>
           <input
             type="email"
             className={inputClass}
-            placeholder="max.mustermann@beispiel.de"
+            placeholder={t("booking.emailPlaceholder")}
             value={owner.email}
             onChange={(e) => setO("email", e.target.value)}
           />
           <FieldError msg={errors.email} />
-          <p className="text-xs text-gray-400 mt-1">Termin-Bestätigung wird an diese Adresse gesendet</p>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">Telefon <span className="text-red-500">*</span></label>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">{t("booking.phone")} <span className="text-red-500">*</span></label>
           <input
             type="tel"
             className={inputClass}
-            placeholder="+49 123 456789"
+            placeholder={t("booking.phonePlaceholder")}
             value={owner.phone}
             onChange={(e) => setO("phone", e.target.value)}
           />
@@ -685,14 +689,14 @@ function StepDetails({
           onClick={onBack}
           className="flex items-center gap-1.5 px-4 py-3 rounded-xl border border-gray-300 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
         >
-          <ChevronLeft size={15} /> Zurück
+          <ChevronLeft size={15} /> {t("booking.buttons.back")}
         </button>
         <button
           onClick={handleSubmit}
           className="flex-1 py-3 rounded-xl font-semibold text-sm text-white transition-all"
           style={{ backgroundColor: primaryColor }}
         >
-          Weiter zur Bestätigung →
+          {t("booking.buttons.next")} →
         </button>
       </div>
     </div>
@@ -903,6 +907,7 @@ export default function BookingPage({
   params: Promise<{ tenantSlug: string }>;
 }) {
   const { tenantSlug } = use(params);
+  const { t } = useLocale();
 
   const { data: clinic, isLoading: clinicLoading, error: clinicError } =
     trpc.booking.getClinic.useQuery({ slug: tenantSlug });
@@ -1027,10 +1032,9 @@ export default function BookingPage({
           <div className="mb-4 flex justify-center">
             <PawPrint size={64} className="text-gray-400" />
           </div>
-          <h1 className="text-xl font-bold text-gray-900 mb-2">Praxis nicht gefunden</h1>
+          <h1 className="text-xl font-bold text-gray-900 mb-2">{t("booking.notFound")}</h1>
           <p className="text-gray-500 text-sm">
-            Die angeforderte Tierarztpraxis konnte nicht gefunden werden.<br />
-            Bitte überprüfen Sie den Link.
+            {t("booking.notFoundDescription")}
           </p>
         </div>
       </div>
@@ -1092,7 +1096,7 @@ export default function BookingPage({
           <div className="w-full max-w-xl bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
             {step !== "success" && (
               <div className="px-6 py-5 border-b border-gray-100">
-                <h2 className="font-bold text-gray-900 mb-4">Online-Terminbuchung</h2>
+                <h2 className="font-bold text-gray-900 mb-4">{t("booking.title")}</h2>
                 <StepIndicator current={step} />
               </div>
             )}
@@ -1134,6 +1138,7 @@ export default function BookingPage({
                   onNext={(p, o) => { updateField("patient", p); updateField("owner", o); setStep("confirm"); }}
                   initialPatient={patient}
                   initialOwner={owner}
+                  t={t}
                 />
               )}
               {step === "confirm" && slot && patient && owner && (

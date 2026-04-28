@@ -72,5 +72,70 @@
     "completed": "Completed",
     "cancelled": "Cancelled",
     "noShow": "No-Show"
+  },
+  "booking": {
+    "title": "Online Appointment Booking",
+    "notFound": "Practice not found",
+    "notFoundDescription": "The requested veterinary practice could not be found. Please check the link.",
+    "steps": {
+      "vet": "Veterinarian",
+      "date": "Date & Time",
+      "details": "Details",
+      "confirm": "Confirm"
+    },
+    "selectVet": "Select a Veterinarian",
+    "selectVetDescription": "Select a veterinarian or let us select the next available one.",
+    "autoAssign": "Auto-assign",
+    "autoAssignDescription": "The next available veterinarian will be selected",
+    "availableVets": "Available Veterinarians",
+    "noSlots": "No appointments available",
+    "selectVetHint": "Select a veterinarian to see available appointments →",
+    "slotReserved": "Slot reserved — ",
+    "minAvailable": "minutes left",
+    "slotExpired": "Time slot expired — please select an appointment again.",
+    "patient": "Your Pet",
+    "petName": "Pet Name",
+    "petNamePlaceholder": "e.g. Buddy, Luna, Whiskers…",
+    "species": "Species",
+    "breed": "Breed",
+    "breedPlaceholder": "e.g. Labrador",
+    "reason": "Reason for Visit",
+    "reasonPlaceholder": "e.g. Annual vaccination, check-up, dental cleaning…",
+    "owner": "Your Contact Information",
+    "firstName": "First Name",
+    "lastName": "Last Name",
+    "email": "Email",
+    "emailPlaceholder": "max@example.com",
+    "phone": "Phone Number",
+    "phonePlaceholder": "+1 234 567 8900",
+    "selectedSlot": "Selected Appointment:",
+    "vetName": "Veterinarian",
+    "errors": {
+      "petName": "Pet name is required",
+      "reason": "Reason for visit is required",
+      "firstName": "First name is required",
+      "lastName": "Last name is required",
+      "email": "Email is required",
+      "emailInvalid": "Invalid email address",
+      "phone": "Phone number is required"
+    },
+    "buttons": {
+      "back": "Back",
+      "next": "Next",
+      "confirm": "Book Appointment",
+      "selectDate": "Select Date & Time"
+    },
+    "confirmation": {
+      "title": "Confirm Booking",
+      "patient": "Your Pet",
+      "owner": "Your Information",
+      "slot": "Appointment"
+    },
+    "success": {
+      "title": "Appointment Successfully Booked!",
+      "message": "Your booking request has been received.",
+      "confirmation": "You will receive a confirmation email shortly.",
+      "button": "Book Another"
+    }
   }
 }

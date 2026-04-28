@@ -72,5 +72,70 @@
     "completed": "Abgeschlossen",
     "cancelled": "Abgesagt",
     "noShow": "Nicht erschienen"
+  },
+  "booking": {
+    "title": "Online-Terminbuchung",
+    "notFound": "Praxis nicht gefunden",
+    "notFoundDescription": "Die angeforderte Tierarztpraxis konnte nicht gefunden werden. Bitte überprüfen Sie den Link.",
+    "steps": {
+      "vet": "Tierarzt",
+      "date": "Datum & Zeit",
+      "details": "Angaben",
+      "confirm": "Bestätigen"
+    },
+    "selectVet": "Wählen Sie einen Tierarzt",
+    "selectVetDescription": "Wählen Sie einen Tierarzt oder lassen Sie uns den nächsten verfügbaren Tierarzt auswählen.",
+    "autoAssign": "Automatisch zuweisen",
+    "autoAssignDescription": "Der nächste verfügbare Tierarzt wird ausgewählt",
+    "availableVets": "Verfügbare Tierärzte",
+    "noSlots": "Keine Termine verfügbar",
+    "selectVetHint": "Wählen Sie einen Tierarzt, um verfügbare Termine zu sehen →",
+    "slotReserved": "Slot reserviert — noch",
+    "minAvailable": "Min. verfügbar",
+    "slotExpired": "Zeitfenster abgelaufen — bitte wählen Sie erneut einen Termin.",
+    "patient": "Ihr Tier",
+    "petName": "Name des Tieres",
+    "petNamePlaceholder": "z.B. Bello, Luna, Minka…",
+    "species": "Tierart",
+    "breed": "Rasse",
+    "breedPlaceholder": "z.B. Labrador",
+    "reason": "Grund des Besuchs",
+    "reasonPlaceholder": "z.B. Jährliche Impfung, Vorsorgeuntersuchung, Zahnkontrolle…",
+    "owner": "Ihre Kontaktdaten",
+    "firstName": "Vorname",
+    "lastName": "Nachname",
+    "email": "E-Mail",
+    "emailPlaceholder": "max@example.de",
+    "phone": "Telefonnummer",
+    "phonePlaceholder": "+49 30 123456",
+    "selectedSlot": "Ausgewählter Termin:",
+    "vetName": "Tierarzt",
+    "errors": {
+      "petName": "Name des Tieres ist erforderlich",
+      "reason": "Grund des Besuchs ist erforderlich",
+      "firstName": "Vorname ist erforderlich",
+      "lastName": "Nachname ist erforderlich",
+      "email": "E-Mail ist erforderlich",
+      "emailInvalid": "Ungültige E-Mail-Adresse",
+      "phone": "Telefonnummer ist erforderlich"
+    },
+    "buttons": {
+      "back": "Zurück",
+      "next": "Weiter",
+      "confirm": "Termin buchen",
+      "selectDate": "Datum & Zeit auswählen"
+    },
+    "confirmation": {
+      "title": "Buchung bestätigen",
+      "patient": "Ihr Tier",
+      "owner": "Ihre Daten",
+      "slot": "Termin"
+    },
+    "success": {
+      "title": "Termin erfolgreich gebucht!",
+      "message": "Ihre Buchungsanfrage wurde erhalten.",
+      "confirmation": "Sie erhalten in Kürze eine Bestätigungs-E-Mail.",
+      "button": "Neue Buchung"
+    }
   }
 }
