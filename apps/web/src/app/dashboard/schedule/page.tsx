@@ -226,7 +226,7 @@ export default function SchedulePage() {
           <p className="mt-1" style={{ color: 'var(--color-muted)' }}>{appointments ? `${appointments.length} Termine geladen` : "Terminübersicht"}</p>
         </div>
         <div className="flex gap-2">
-          <Link href="/dashboard/settings/calendar-sync">
+          <Link href="/dashboard/calendar">
             <Button variant="outline">
               <Share2 size={16} /> Kalender Export
             </Button>

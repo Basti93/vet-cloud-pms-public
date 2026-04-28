@@ -5,7 +5,6 @@ import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { AlertCircle, Copy, Check, Trash2, Info } from "lucide-react";
-import { useAuth } from "@clerk/nextjs";
 
 const formatDateTime = (date: Date | string) => {
   const d = typeof date === "string" ? new Date(date) : date;
@@ -19,7 +18,7 @@ const formatDateTime = (date: Date | string) => {
   });
 };
 
-export default function CalendarSyncPage() {
+export default function CalendarExportPage() {
   const [copiedTokenId, setCopiedTokenId] = useState<string | null>(null);
   const [showInstructions, setShowInstructions] = useState(true);
 
@@ -60,12 +59,9 @@ export default function CalendarSyncPage() {
   if (error?.message?.includes("veterinarian")) {
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Kalender Export & Sync</h1>
-          <p className="text-gray-600 mt-2">
-            Diese Funktion ist nur für Tierärzte verfügbar.
-          </p>
-        </div>
+        <p className="text-gray-600">
+          Diese Funktion ist nur für Tierärzte verfügbar.
+        </p>
 
         <Card className="border-blue-200 bg-blue-50 p-6">
           <div className="flex items-start gap-3">
@@ -84,10 +80,9 @@ export default function CalendarSyncPage() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
+      {/* Description */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Kalender Export & Sync</h1>
-        <p className="text-gray-600 mt-2">
+        <p className="text-gray-600">
           Synchronisieren Sie Ihre Termine mit Google Calendar, Outlook, Apple Calendar und anderen Kalender-Apps.
         </p>
       </div>
