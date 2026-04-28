@@ -4,7 +4,8 @@ import { useState } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { AlertCircle, Copy, Check, Trash2 } from "lucide-react";
+import { AlertCircle, Copy, Check, Trash2, Info } from "lucide-react";
+import { useAuth } from "@clerk/nextjs";
 
 const formatDateTime = (date: Date | string) => {
   const d = typeof date === "string" ? new Date(date) : date;
@@ -22,7 +23,7 @@ export default function CalendarSyncPage() {
   const [copiedTokenId, setCopiedTokenId] = useState<string | null>(null);
   const [showInstructions, setShowInstructions] = useState(true);
 
-  const { data: tokens, isLoading } = trpc.calendar.listTokens.useQuery();
+  const { data: tokens, isLoading, error } = trpc.calendar.listTokens.useQuery();
   const generateTokenMutation = trpc.calendar.generateToken.useMutation({
     onSuccess: () => {
       refetchTokens();
@@ -54,6 +55,32 @@ export default function CalendarSyncPage() {
       revokeTokenMutation.mutate({ tokenId });
     }
   };
+
+  // Check if user doesn't have permission (non-vet)
+  if (error?.message?.includes("veterinarian")) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Kalender Export & Sync</h1>
+          <p className="text-gray-600 mt-2">
+            Diese Funktion ist nur für Tierärzte verfügbar.
+          </p>
+        </div>
+
+        <Card className="border-blue-200 bg-blue-50 p-6">
+          <div className="flex items-start gap-3">
+            <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="font-semibold text-blue-900 mb-1">Nur für Tierärzte</h3>
+              <p className="text-sm text-blue-800">
+                Kalender-Export ist eine persönliche Funktion für Tierärzte zur Synchronisierung ihrer Termine mit externen Kalender-Apps. Ihre Rolle erlaubt keinen Zugriff auf diese Funktion.
+              </p>
+            </div>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
