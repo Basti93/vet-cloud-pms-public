@@ -4,7 +4,7 @@ import { use, useState, useEffect, useRef, useCallback } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { useBookingFormState } from "@/hooks/useBookingFormState";
 import { ChevronLeft, ChevronRight, Check, Phone, MapPin, Clock, Calendar, AlertCircle, Loader2, Stethoscope, PawPrint } from "lucide-react";
-import { COLOR_PRESETS, type ColorPresetKey } from "@/lib/theme";
+import { COLOR_PRESETS, TYPE_PAIRINGS, type ColorPresetKey, type TypographyPairingKey } from "@/lib/theme";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -907,10 +907,14 @@ export default function BookingPage({
   const { data: clinic, isLoading: clinicLoading, error: clinicError } =
     trpc.booking.getClinic.useQuery({ slug: tenantSlug });
 
-  // Extract primary color from tenant theme
+  // Extract theme settings from tenant
   const primaryColor = clinic
     ? COLOR_PRESETS[(clinic.themePreference as ColorPresetKey) || "sage"].accent
     : "oklch(55% 0.11 240)"; // Fallback to klinikblau
+
+  const typography = clinic
+    ? TYPE_PAIRINGS[(clinic.typographyPreference as TypographyPairingKey) || "modern"]
+    : TYPE_PAIRINGS.modern;
 
   const { data: vets } = trpc.vet.list.useQuery(
     { tenantId: clinic?.id || "" },
@@ -1035,8 +1039,16 @@ export default function BookingPage({
 
   return (
     <>
-      {/* Inject CSS variable for primary colour */}
-      <style>{`:root { --primary: ${primaryColor}; }`}</style>
+      {/* Inject CSS variables for theme */}
+      <style>{`
+        :root {
+          --primary: ${primaryColor};
+          --heading-font: ${typography.heading};
+          --body-font: ${typography.body};
+          --heading-weight: ${typography.headingWeight};
+          --heading-tracking: ${typography.headingTracking};
+        }
+      `}</style>
 
       <div className="min-h-screen bg-gray-50 flex flex-col">
         {/* Clinic header */}

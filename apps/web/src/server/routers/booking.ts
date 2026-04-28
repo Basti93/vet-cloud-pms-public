@@ -309,6 +309,7 @@ export const bookingRouter = createTRPCRouter({
           postalCode: tenants.postalCode,
           themePreference: tenants.themePreference,
           typographyPreference: tenants.typographyPreference,
+          websiteTemplate: tenants.websiteTemplate,
         })
         .from(tenants)
         .where(eq(tenants.slug, input.slug))
