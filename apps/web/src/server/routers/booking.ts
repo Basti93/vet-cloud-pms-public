@@ -7,6 +7,7 @@ import { sendConfirmationEmail, sendBookingNotificationEmail } from "@/lib/email
 import type { SendConfirmationEmailInput, SendBookingNotificationInput } from "@/lib/email/service";
 import { generateConfirmationToken, buildConfirmationUrl } from "@/lib/tokens/confirmation";
 import { DEFAULT_OPENING_HOURS, type DaySchedule, type TimeRange } from "@/lib/schedule-types";
+import { getMainDomain } from "@/lib/env";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import type * as schema from "@/lib/db/schema";
 
@@ -323,6 +324,8 @@ export const bookingRouter = createTRPCRouter({
 
       // Check domain restrictions if configured
       const allowedDomains = (tenant.allowedEmbeddingDomains as string[] | null) || [];
+      const mainDomain = getMainDomain();
+
       if (allowedDomains.length > 0) {
         const referer = ctx.headers.get("referer");
         const origin = ctx.headers.get("origin");
@@ -332,7 +335,10 @@ export const bookingRouter = createTRPCRouter({
           try {
             const url = new URL(requestDomain);
             const hostname = url.hostname;
-            const isAllowed = allowedDomains.some(domain =>
+
+            // Always allow main domain, plus any configured domains
+            const allAllowedDomains = [...new Set([mainDomain, ...allowedDomains])];
+            const isAllowed = allAllowedDomains.some(domain =>
               hostname === domain || hostname === `www.${domain}` || domain === `www.${hostname}`
             );
 

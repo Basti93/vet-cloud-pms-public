@@ -22,3 +22,7 @@ export function getEnvironmentLabel(): string {
   }
   return "Unknown";
 }
+
+export function getMainDomain(): string {
+  return process.env.NEXT_PUBLIC_MAIN_DOMAIN || "example.com";
+}
