@@ -8,6 +8,7 @@
     "packages/*"
   ],
   "devDependencies": {
+    "husky": "^9.1.7",
     "turbo": "^1.13.0"
   },
   "scripts": {
