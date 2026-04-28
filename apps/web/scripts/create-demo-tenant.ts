@@ -3,6 +3,7 @@ import postgres from "postgres";
 import path from "path";
 import fs from "fs";
 import { tenants } from "../src/lib/db/schema";
+import { DEMO_TENANT_ID } from "./test-data";
 
 const envPath = path.resolve(process.cwd(), ".env.local");
 if (fs.existsSync(envPath)) {
@@ -27,17 +28,17 @@ const db = drizzle(sql, { schema: { tenants } });
 
 async function createDemoTenant() {
   try {
-    // Use raw SQL to avoid schema validation for missing columns
-    const tenantId = "671d60e1-c1ea-4e2e-9204-42e3f2eb3de6";
+    // Use the authoritative DEMO_TENANT_ID from test-data.ts
     const result = await sql`
       INSERT INTO tenants (id, name, slug, email, phone, address, city, postal_code, country, subscription_status, subscription_plan, max_users)
-      VALUES (${tenantId}::uuid, 'Demo Praxis', 'demo', 'demo@example.com', '+49 123 456789', 'Musterstraße 1', 'Musterstadt', '12345', 'DE', 'trial', 'starter', 5)
+      VALUES (${DEMO_TENANT_ID}::uuid, 'Demo Praxis', 'demo', 'demo@example.com', '+49 123 456789', 'Musterstraße 1', 'Musterstadt', '12345', 'DE', 'trial', 'starter', 5)
       ON CONFLICT DO NOTHING
       RETURNING *;
     `;
     const result_typed = result as any;
 
     console.log("✅ Demo Tenant created:", result_typed[0]?.name || "already exists");
+    console.log("   Tenant ID:", DEMO_TENANT_ID);
   } catch (error) {
     console.error("❌ Error:", error);
     process.exit(1);
