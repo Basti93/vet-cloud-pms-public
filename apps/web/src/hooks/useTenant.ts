@@ -1,32 +1,30 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs";
+import { trpc } from "@/lib/trpc/client";
 
 /**
- * Returns the current tenant ID.
+ * Returns the current tenant ID from the database.
  *
- * Priority:
- *  1. Clerk publicMetadata.tenantId  (set during onboarding)
- *  2. NEXT_PUBLIC_DEMO_TENANT_ID     (for local dev / demos)
+ * The tenantId is fetched from the users table based on the current Clerk user.
+ * If the user hasn't completed onboarding, no tenantId will be available.
  *
  * Usage:
  *   const { tenantId, isReady } = useTenant();
  *   if (!tenantId) return <OnboardingRequired />;
  */
 export function useTenant() {
-  const { user, isLoaded } = useUser();
+  const { user, isLoaded: clerkLoaded } = useUser();
 
-  const tenantIdFromClerk =
-    (user?.publicMetadata?.tenantId as string | undefined) ?? null;
-
-  const tenantIdFromEnv =
-    process.env.NEXT_PUBLIC_DEMO_TENANT_ID?.trim() || null;
-
-  const tenantId = tenantIdFromClerk ?? tenantIdFromEnv;
+  // Fetch current tenant from database via TRPC
+  const { data: tenant, isLoading: tenantLoading } = trpc.tenant.getCurrent.useQuery(
+    undefined,
+    { enabled: !!user && clerkLoaded }
+  );
 
   return {
-    tenantId,
-    isReady: isLoaded,
-    isOnboarded: !!tenantId,
+    tenantId: tenant?.id ?? null,
+    isReady: clerkLoaded && !tenantLoading,
+    isOnboarded: !!tenant?.id,
   };
 }
