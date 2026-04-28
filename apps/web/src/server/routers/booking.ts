@@ -308,6 +308,7 @@ export const bookingRouter = createTRPCRouter({
           address: tenants.address,
           city: tenants.city,
           postalCode: tenants.postalCode,
+          tagline: tenants.tagline,
           themePreference: tenants.themePreference,
           typographyPreference: tenants.typographyPreference,
           websiteTemplate: tenants.websiteTemplate,
