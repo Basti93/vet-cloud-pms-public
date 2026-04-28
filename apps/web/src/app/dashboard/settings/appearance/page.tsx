@@ -2,13 +2,15 @@
 
 import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc/client";
+import { useTheme } from "@/lib/theme-context";
 import { BrandSettingsForm } from "@/components/brand/BrandSettingsForm";
 import { BrandPreview } from "@/components/brand/BrandPreview";
 import { ColorPresetKey, TypographyPairingKey, WebsiteTemplateKey } from "@/lib/theme";
 
 export default function AppearancePage() {
-  const [colorPreset, setColorPreset] = useState<ColorPresetKey>("sage");
-  const [typographyPairing, setTypographyPairing] = useState<TypographyPairingKey>("modern");
+  const { colorPreset, setColorPreset, typographyPairing, setTypographyPairing } = useTheme();
+  const [localColorPreset, setLocalColorPreset] = useState<ColorPresetKey>(colorPreset);
+  const [localTypographyPairing, setLocalTypographyPairing] = useState<TypographyPairingKey>(typographyPairing);
   const [template, setTemplate] = useState<WebsiteTemplateKey>("modern");
   const [brandName, setBrandName] = useState("");
   const [tagline, setTagline] = useState("");
@@ -26,21 +28,35 @@ export default function AppearancePage() {
 
   useEffect(() => {
     if (tenant) {
-      setColorPreset((tenant.themePreference as ColorPresetKey) || "sage");
-      setTypographyPairing((tenant.typographyPreference as TypographyPairingKey) || "modern");
+      const newColorPreset = (tenant.themePreference as ColorPresetKey) || "sage";
+      const newTypographyPairing = (tenant.typographyPreference as TypographyPairingKey) || "modern";
+      setLocalColorPreset(newColorPreset);
+      setLocalTypographyPairing(newTypographyPairing);
+      setColorPreset(newColorPreset);
+      setTypographyPairing(newTypographyPairing);
       setBrandName(tenant.name || "");
       setTagline(tenant.tagline || "");
       setMonogram(tenant.monogram || "");
     }
-  }, [tenant]);
+  }, [tenant, setColorPreset, setTypographyPairing]);
+
+  const handleColorPresetChange = (preset: ColorPresetKey) => {
+    setLocalColorPreset(preset);
+    setColorPreset(preset);
+  };
+
+  const handleTypographyChange = (pairing: TypographyPairingKey) => {
+    setLocalTypographyPairing(pairing);
+    setTypographyPairing(pairing);
+  };
 
   const handleSave = () => {
     updateTheme.mutate({
       name: brandName,
       tagline,
       monogram,
-      themePreference: colorPreset,
-      typographyPreference: typographyPairing,
+      themePreference: localColorPreset,
+      typographyPreference: localTypographyPairing,
       websiteTemplate: template,
     });
   };
@@ -48,10 +64,10 @@ export default function AppearancePage() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
       <BrandSettingsForm
-        colorPreset={colorPreset}
-        onColorPresetChange={setColorPreset}
-        typographyPairing={typographyPairing}
-        onTypographyPairingChange={setTypographyPairing}
+        colorPreset={localColorPreset}
+        onColorPresetChange={handleColorPresetChange}
+        typographyPairing={localTypographyPairing}
+        onTypographyPairingChange={handleTypographyChange}
         template={template}
         onTemplateChange={setTemplate}
         brandName={brandName}
@@ -66,8 +82,8 @@ export default function AppearancePage() {
         saveSuccess={saveSuccess}
       />
       <BrandPreview
-        colorPreset={colorPreset}
-        typographyPairing={typographyPairing}
+        colorPreset={localColorPreset}
+        typographyPairing={localTypographyPairing}
         template={template}
         brandName={brandName}
         tagline={tagline}

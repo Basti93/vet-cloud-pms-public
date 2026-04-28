@@ -26,29 +26,31 @@ export function DynamicFavicon() {
     const blob = new Blob([svgString], { type: 'image/svg+xml' });
     const url = URL.createObjectURL(blob);
 
-    // Update favicon
-    let link = document.querySelector("link[rel='icon']") as HTMLLinkElement;
-    if (link) {
-      if (link.href.startsWith('blob:')) URL.revokeObjectURL(link.href);
-      link.href = url;
-    } else {
-      link = document.createElement('link');
-      link.rel = 'icon';
-      link.href = url;
-      document.head.appendChild(link);
-    }
+    // Update favicon - remove all existing icon links first
+    document.querySelectorAll("link[rel='icon'], link[rel='shortcut icon']").forEach((link) => {
+      const href = (link as HTMLLinkElement).href;
+      if (href.startsWith('blob:')) URL.revokeObjectURL(href);
+      link.remove();
+    });
 
-    // Update apple-touch-icon for iOS
-    let appleLink = document.querySelector("link[rel='apple-touch-icon']") as HTMLLinkElement;
-    if (appleLink) {
-      if (appleLink.href.startsWith('blob:')) URL.revokeObjectURL(appleLink.href);
-      appleLink.href = url;
-    } else {
-      appleLink = document.createElement('link');
-      appleLink.rel = 'apple-touch-icon';
-      appleLink.href = url;
-      document.head.appendChild(appleLink);
-    }
+    // Add new favicon
+    const link = document.createElement('link');
+    link.rel = 'icon';
+    link.href = url;
+    document.head.appendChild(link);
+
+    // Update apple-touch-icon for iOS - remove existing first
+    document.querySelectorAll("link[rel='apple-touch-icon']").forEach((appleLink) => {
+      const href = (appleLink as HTMLLinkElement).href;
+      if (href.startsWith('blob:')) URL.revokeObjectURL(href);
+      appleLink.remove();
+    });
+
+    // Add new apple touch icon
+    const appleLink = document.createElement('link');
+    appleLink.rel = 'apple-touch-icon';
+    appleLink.href = url;
+    document.head.appendChild(appleLink);
 
     // Cleanup
     return () => {
