@@ -19,6 +19,17 @@
   --font-heading-tracking: -0.01em;
 }
 
+/* Apply theme fonts globally */
+* {
+  font-family: var(--font-body);
+}
+
+h1, h2, h3, h4, h5, h6, [role="heading"] {
+  font-family: var(--font-heading);
+  font-weight: var(--font-heading-weight);
+  letter-spacing: var(--font-heading-tracking);
+}
+
 .fc {
   font-family: inherit;
   background-color: var(--color-surface) !important;
