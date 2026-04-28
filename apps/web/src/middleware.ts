@@ -10,6 +10,7 @@ const isPublicRoute = createRouteMatcher([
   '/api/webhooks/clerk',  // Clerk webhooks (use Svix signature verification)
   '/api/trpc/booking(.*)',  // Public booking tRPC endpoints
   '/api/trpc/tenant(.*)',  // Public tenant endpoints
+  '/api/calendar(.*)',  // Calendar export (token-protected, not user-authenticated)
   '/',
 ]);
 
