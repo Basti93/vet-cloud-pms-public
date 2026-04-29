@@ -2,6 +2,8 @@
 
 import { ReactNode } from 'react';
 import { ThemeProvider } from '@/lib/theme-context';
+import { DemoFavicon } from '@/components/DemoFavicon';
+import { COLOR_PRESETS } from '@/lib/theme';
 import type { ColorPresetKey, TypographyPairingKey } from '@/lib/theme';
 
 interface Props {
@@ -17,11 +19,14 @@ export function PracticeLayoutWrapper({
   typographyPairing,
   style,
 }: Props) {
+  const hexColor = COLOR_PRESETS[colorPreset].accentHex;
+
   return (
     <ThemeProvider
       initialColorPreset={colorPreset}
       initialTypographyPairing={typographyPairing}
     >
+      <DemoFavicon hexColor={hexColor} />
       <div style={style}>{children}</div>
     </ThemeProvider>
   );
