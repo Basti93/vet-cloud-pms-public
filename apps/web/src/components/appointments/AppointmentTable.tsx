@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { ChevronDown, Calendar, Loader2 } from 'lucide-react';
 import { SpeciesIcon } from '@/components/ui/badge';
 
@@ -54,6 +55,7 @@ interface AppointmentTableProps {
   todayStart?: Date;
   todayEnd?: Date;
   showActions?: boolean;
+  onAppointmentClick?: (item: AppointmentType) => void;
 }
 
 function isBooking(item: AppointmentType): item is AppointmentType & {
@@ -134,7 +136,9 @@ export function AppointmentTable({
   todayStart,
   todayEnd,
   showActions = false,
+  onAppointmentClick,
 }: AppointmentTableProps) {
+  const router = useRouter();
   const [expandedVets, setExpandedVets] = useState<Set<string>>(
     new Set(vets.map((v) => v.id))
   );
@@ -263,7 +267,17 @@ export function AppointmentTable({
                       </thead>
                       <tbody className="divide-y divide-border">
                         {displayItems.map((item) => (
-                          <tr key={item.id} className="hover:bg-muted-soft">
+                          <tr
+                            key={item.id}
+                            className="hover:bg-muted-soft cursor-pointer transition-colors"
+                            onClick={() => {
+                              if (onAppointmentClick) {
+                                onAppointmentClick(item);
+                              } else {
+                                router.push(`/dashboard/schedule?appointment=${item.id}`);
+                              }
+                            }}
+                          >
                             <td className="px-4 py-3 whitespace-nowrap">
                               <div className="flex items-center gap-2">
                                 <Calendar className="w-4 h-4 text-muted" />
@@ -311,7 +325,10 @@ export function AppointmentTable({
                               {item.status === 'scheduled' ? (
                                 <div className="flex items-center justify-end gap-2">
                                   <button
-                                    onClick={() => onConfirm?.(item.id)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onConfirm?.(item.id);
+                                    }}
                                     disabled={confirmingId === item.id || rejectingId !== null}
                                     className="inline-flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-600 rounded-md hover:bg-green-100 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium transition-colors"
                                   >
@@ -321,7 +338,10 @@ export function AppointmentTable({
                                     Bestätigen
                                   </button>
                                   <button
-                                    onClick={() => onReject?.(item.id)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onReject?.(item.id);
+                                    }}
                                     disabled={rejectingId === item.id || confirmingId !== null}
                                     className="inline-flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-600 rounded-md hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium transition-colors"
                                   >
@@ -391,9 +411,16 @@ export function AppointmentTable({
                 )}
 
                 {hasMore && (
-                  <div className="text-center py-3 text-sm font-medium" style={{ color: "var(--color-accent)" }}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push("/dashboard/schedule");
+                    }}
+                    className="w-full text-center py-3 text-sm font-medium cursor-pointer hover:bg-muted-soft transition-colors"
+                    style={{ color: "var(--color-accent)" }}
+                  >
                     {vetItems.length - 2} weitere Termine
-                  </div>
+                  </button>
                 )}
               </div>
             )}

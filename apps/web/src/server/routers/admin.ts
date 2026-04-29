@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { eq, inArray, isNull, and } from "drizzle-orm";
 import { createTRPCRouter, protectedProcedure } from "@/server/trpc";
 import {
   tenants,
@@ -13,6 +13,7 @@ import {
   medications,
   vitals,
   roles,
+  userRoles,
   PERMISSIONS,
 } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
@@ -67,6 +68,7 @@ export const adminRouter = createTRPCRouter({
       .select({
         id: users.id,
         clerkId: users.clerkId,
+        firstName: users.firstName,
         role: users.role,
         tenantId: users.tenantId,
       })
@@ -189,6 +191,7 @@ export const adminRouter = createTRPCRouter({
     .use(requirePermission(PERMISSIONS.USERS_MANAGE))
     .input(z.object({ tenantId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
+      // Verify current user is in this tenant
       const [currentUser] = await ctx.db
         .select({ tenantId: users.tenantId })
         .from(users)
@@ -202,28 +205,47 @@ export const adminRouter = createTRPCRouter({
         });
       }
 
-      return await ctx.db
+      // Get all users in the tenant
+      const allUsers = await ctx.db
         .select({
           id: users.id,
           clerkId: users.clerkId,
           email: users.email,
           firstName: users.firstName,
           lastName: users.lastName,
-          role: users.role,
-          roleId: users.roleId,
-          roleName: roles.name,
           active: users.active,
           createdAt: users.createdAt,
         })
         .from(users)
-        .leftJoin(roles, eq(users.roleId, roles.id))
         .where(eq(users.tenantId, input.tenantId))
         .orderBy(users.email);
+
+      // For each user, fetch all their assigned roles
+      const usersWithRoles = await Promise.all(
+        allUsers.map(async (user) => {
+          const assignedRoles = await ctx.db
+            .select({
+              id: roles.id,
+              name: roles.name,
+            })
+            .from(userRoles)
+            .innerJoin(roles, eq(userRoles.roleId, roles.id))
+            .where(eq(userRoles.userId, user.id));
+
+          return {
+            ...user,
+            roles: assignedRoles,
+          };
+        })
+      );
+
+      return usersWithRoles;
     }),
 
   /**
-   * Assign a role to a user
+   * Assign a role to a user (supports multiple roles per user)
    * Protected: USERS_MANAGE permission
+   * Idempotent: assigning the same role twice returns success
    */
   assignRole: protectedProcedure
     .use(requirePermission(PERMISSIONS.USERS_MANAGE))
@@ -235,8 +257,9 @@ export const adminRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      // Verify current user is admin in the target tenant
       const [currentUser] = await ctx.db
-        .select({ tenantId: users.tenantId })
+        .select({ tenantId: users.tenantId, id: users.id })
         .from(users)
         .where(eq(users.clerkId, ctx.userId!))
         .limit(1);
@@ -245,6 +268,20 @@ export const adminRouter = createTRPCRouter({
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "Cannot assign roles in other tenants",
+        });
+      }
+
+      // Verify target user is in the same tenant
+      const [targetUser] = await ctx.db
+        .select({ id: users.id, tenantId: users.tenantId })
+        .from(users)
+        .where(eq(users.id, input.userId))
+        .limit(1);
+
+      if (!targetUser || targetUser.tenantId !== input.tenantId) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "User not found in this tenant",
         });
       }
 
@@ -262,20 +299,105 @@ export const adminRouter = createTRPCRouter({
         });
       }
 
-      const [updated] = await ctx.db
-        .update(users)
-        .set({ roleId: input.roleId })
-        .where(eq(users.id, input.userId) && eq(users.tenantId, input.tenantId))
-        .returning();
+      // Try to insert, handle unique constraint violation
+      try {
+        await ctx.db.insert(userRoles).values({
+          userId: input.userId,
+          roleId: input.roleId,
+          assignedBy: currentUser!.id,
+        });
+        return { success: true, message: "Role assigned" };
+      } catch (error: any) {
+        // Unique constraint violation means role already assigned
+        if (error.code === "23505" || error.message?.includes("unique")) {
+          return { success: true, message: "Role already assigned" };
+        }
+        throw error;
+      }
+    }),
 
-      if (!updated) {
+  /**
+   * Remove a role from a user
+   * Protected: USERS_MANAGE permission
+   * Constraints:
+   *   - User must always have at least one role
+   *   - Cannot remove the last Admin role from the tenant (prevents lockout)
+   */
+  removeUserRole: protectedProcedure
+    .use(requirePermission(PERMISSIONS.USERS_MANAGE))
+    .input(
+      z.object({
+        tenantId: z.string().uuid(),
+        userId: z.string().uuid(),
+        roleId: z.string().uuid(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Verify current user is admin in the target tenant
+      const [currentUser] = await ctx.db
+        .select({ tenantId: users.tenantId, id: users.id })
+        .from(users)
+        .where(eq(users.clerkId, ctx.userId!))
+        .limit(1);
+
+      if (currentUser?.tenantId !== input.tenantId) {
         throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "User not found in this tenant",
+          code: "FORBIDDEN",
+          message: "Cannot manage roles in other tenants",
         });
       }
 
-      return updated;
+      // Get user's current roles
+      const userRolesList = await ctx.db
+        .select({ roleId: userRoles.roleId })
+        .from(userRoles)
+        .where(eq(userRoles.userId, input.userId));
+
+      // Prevent removing all roles (user must have at least one)
+      if (userRolesList.length === 1) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "User must have at least one role",
+        });
+      }
+
+      // Check if this is an Admin role removal
+      const [roleToRemove] = await ctx.db
+        .select({ name: roles.name })
+        .from(roles)
+        .where(eq(roles.id, input.roleId))
+        .limit(1);
+
+      if (roleToRemove?.name === "Admin") {
+        // Count how many users in this tenant have the Admin role
+        const adminCount = await ctx.db
+          .select({ count: userRoles.userId })
+          .from(userRoles)
+          .innerJoin(roles, eq(userRoles.roleId, roles.id))
+          .where(
+            and(
+              eq(roles.name, "Admin"),
+              eq(roles.tenantId, input.tenantId)
+            )
+          );
+
+        if (adminCount.length <= 1) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Cannot remove the last Admin role from the tenant. At least one admin must remain.",
+          });
+        }
+      }
+
+      // Delete the role assignment
+      await ctx.db
+        .delete(userRoles)
+        .where(
+          eq(userRoles.userId, input.userId) &&
+          eq(userRoles.roleId, input.roleId)
+        );
+
+      return { success: true, message: "Role removed" };
     }),
 
   /**

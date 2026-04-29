@@ -16,16 +16,21 @@ function StatCard({
   value,
   icon,
   loading,
+  description,
 }: {
   label: string;
   value: string | number;
   icon: React.ReactNode;
   loading?: boolean;
+  description?: string;
 }) {
   return (
     <div className="bg-surface rounded-2xl border border-border shadow-sm p-6">
       <div className="flex items-center justify-between mb-3">
-        <p className="text-sm font-medium text-muted">{label}</p>
+        <div>
+          <p className="text-sm font-medium text-muted">{label}</p>
+          {description && <p className="text-xs text-muted mt-1">{description}</p>}
+        </div>
         <span
           className="w-9 h-9 rounded-xl flex items-center justify-center"
           style={{ backgroundColor: "var(--color-accent-soft)", color: "var(--color-accent)" }}
@@ -47,6 +52,7 @@ export default function DashboardHome() {
   const vetId = useCurrentVet();
   const [apptModalOpen, setApptModalOpen] = useState(false);
   const [patientModalOpen, setPatientModalOpen] = useState(false);
+  const { data: currentUser } = trpc.admin.getCurrentUser.useQuery();
 
   const { today, todayStart, todayEnd, monthStart, monthEnd, upcomingEnd } = useMemo(() => {
     const today = new Date();
@@ -94,17 +100,43 @@ export default function DashboardHome() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-fg">Übersicht</h1>
+        <h1 className="text-3xl font-bold text-fg">
+          Hallo {currentUser?.firstName || "Willkommen"}!
+        </h1>
         <p className="text-muted mt-1">
           {today.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
         </p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatCard label="Termine heute" value={todayAppts.length} icon={<Calendar size={18} />} loading={isLoading} />
-        <StatCard label="Patienten gesamt" value={patients?.length ?? 0} icon={<Users size={18} />} loading={isLoading} />
-        <StatCard label="Abgeschlossen (Monat)" value={completedThisMonth} icon={<CheckCircle size={18} />} loading={isLoading} />
-        <StatCard label="Termine (Monat)" value={allAppts?.length ?? 0} icon={<TrendingUp size={18} />} loading={isLoading} />
+        <StatCard
+          label="Termine heute"
+          value={todayAppts.length}
+          icon={<Calendar size={18} />}
+          loading={isLoading}
+          description={vetId ? "Nur meine Termine" : "Alle Tierärzte"}
+        />
+        <StatCard
+          label="Patienten gesamt"
+          value={patients?.length ?? 0}
+          icon={<Users size={18} />}
+          loading={isLoading}
+          description="Alle Patienten der Praxis"
+        />
+        <StatCard
+          label="Abgeschlossen (Monat)"
+          value={completedThisMonth}
+          icon={<CheckCircle size={18} />}
+          loading={isLoading}
+          description={vetId ? "Nur meine" : "Alle Tierärzte"}
+        />
+        <StatCard
+          label="Termine (Monat)"
+          value={allAppts?.length ?? 0}
+          icon={<TrendingUp size={18} />}
+          loading={isLoading}
+          description={vetId ? "Nur meine Termine" : "Alle Tierärzte"}
+        />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">

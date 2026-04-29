@@ -3,7 +3,7 @@
 import { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Palette, Users, ArrowLeft, Building2, Mail, CalendarClock } from "lucide-react";
+import { Palette, Users, Building2, Mail, CalendarClock } from "lucide-react";
 
 const TABS = [
   { href: "/dashboard/settings/practice", label: "Praxis", icon: Building2 },
@@ -20,15 +20,6 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link
-          href="/dashboard"
-          className="flex items-center gap-1.5 text-sm hover:opacity-70 transition-opacity"
-          style={{ color: "var(--color-muted)" }}
-        >
-          <ArrowLeft size={16} />
-          Dashboard
-        </Link>
-        <span style={{ color: "var(--color-border)" }}>/</span>
         <h1 className="text-2xl font-bold">Praxisverwaltung</h1>
       </div>
 
