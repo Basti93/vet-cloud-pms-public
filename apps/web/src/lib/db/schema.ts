@@ -165,12 +165,18 @@ export const users = pgTable(
     title: varchar("title", { length: 50 }), // "Dr.", "Prof.", "Dr. med.", etc.
     firstName: varchar("first_name", { length: 100 }),
     lastName: varchar("last_name", { length: 100 }),
+    // DEPRECATED (Phase 8): Use userRoles join table instead.
+    // Kept for backwards-compatibility with old code.
+    // Will be removed in future migration after all code updated.
     role: varchar("role", {
       length: 50,
       enum: ["admin", "vet", "staff", "reception"],
     })
       .default("staff")
       .notNull(),
+    // DEPRECATED (Phase 8): Use userRoles join table instead.
+    // Kept for backwards-compatibility during migration.
+    // Will be removed in future migration.
     roleId: uuid("role_id").references(() => roles.id, {
       onDelete: "set null",
     }),
@@ -187,6 +193,34 @@ export const users = pgTable(
     tenantIdIdx: index("users_tenant_id_idx").on(table.tenantId),
     clerkIdIdx: index("users_clerk_id_idx").on(table.clerkId),
     roleIdIdx: index("users_role_id_idx").on(table.roleId),
+  })
+);
+
+// ============================================================================
+// USER ROLES (Many-to-Many: Users ↔ Roles)
+// ============================================================================
+
+export const userRoles = pgTable(
+  "user_roles",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    roleId: uuid("role_id")
+      .notNull()
+      .references(() => roles.id, { onDelete: "cascade" }),
+    assignedAt: timestamp("assigned_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+    assignedBy: uuid("assigned_by").references(() => users.id, {
+      onDelete: "set null",
+    }), // Who assigned this role (for audit trail)
+  },
+  (table) => ({
+    pk: primaryKey(table.userId, table.roleId),
+    userIdIdx: index("user_roles_user_id_idx").on(table.userId),
+    roleIdIdx: index("user_roles_role_id_idx").on(table.roleId),
+    assignedByIdx: index("user_roles_assigned_by_idx").on(table.assignedBy),
   })
 );
 
