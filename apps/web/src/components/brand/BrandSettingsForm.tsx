@@ -49,9 +49,9 @@ export function BrandSettingsForm({
 }: BrandSettingsFormProps) {
   return (
     <div className="space-y-6">
-      {/* Brand Name */}
+      {/* Brand Identity */}
       <Card className="p-6">
-        <h3 className="text-lg font-semibold text-fg mb-4">Praxisinformationen</h3>
+        <h3 className="text-lg font-semibold text-fg mb-4">Markenidentität</h3>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-fg mb-2">Praxisname</label>
