@@ -1,9 +1,8 @@
 "use client";
 
 import { ReactNode, useMemo, useEffect, useState } from "react";
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Palette, Users, ArrowLeft, Building2, Mail, CalendarClock, User } from "lucide-react";
+import { Palette, Users, Building2, Mail, CalendarClock, User } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { PERMISSIONS } from "@/lib/db/schema";
 import { Tabs } from "@/components/ui/tabs";
@@ -42,15 +41,6 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
     <div className="space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
-        <Link
-          href="/dashboard"
-          className="flex items-center gap-1.5 text-sm hover:opacity-70 transition-opacity"
-          style={{ color: "var(--color-muted)" }}
-        >
-          <ArrowLeft size={16} />
-          <span className="hidden sm:inline">Dashboard</span>
-        </Link>
-        <span style={{ color: "var(--color-border)" }} className="hidden sm:inline">/</span>
         <h1 className="text-lg sm:text-2xl font-bold">Praxisverwaltung</h1>
       </div>
 
