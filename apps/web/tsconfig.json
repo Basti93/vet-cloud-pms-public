@@ -31,6 +31,13 @@
     "allowJs": true,
     "isolatedModules": true
   },
+  "ts-node": {
+    "compilerOptions": {
+      "module": "CommonJS"
+    },
+    "transpileOnly": true,
+    "esm": true
+  },
   "include": [
     "next-env.d.ts",
     "**/*.ts",
