@@ -17,12 +17,13 @@ interface BrandSettingsFormProps {
   onTypographyPairingChange: (pairing: TypographyPairingKey) => void;
   template: WebsiteTemplateKey;
   onTemplateChange: (template: WebsiteTemplateKey) => void;
-  brandName: string;
-  onBrandNameChange: (name: string) => void;
-  tagline: string;
-  onTaglineChange: (tagline: string) => void;
-  monogram: string;
-  onMonogramChange: (monogram: string) => void;
+  brandName?: string;
+  onBrandNameChange?: (name: string) => void;
+  tagline?: string;
+  onTaglineChange?: (tagline: string) => void;
+  monogram?: string;
+  onMonogramChange?: (monogram: string) => void;
+  showBrandingFields?: boolean;
   onSave: () => void;
   isSaving: boolean;
   canSave: boolean;
@@ -36,12 +37,13 @@ export function BrandSettingsForm({
   onTypographyPairingChange,
   template,
   onTemplateChange,
-  brandName,
-  onBrandNameChange,
-  tagline,
-  onTaglineChange,
-  monogram,
-  onMonogramChange,
+  brandName = "",
+  onBrandNameChange = () => {},
+  tagline = "",
+  onTaglineChange = () => {},
+  monogram = "",
+  onMonogramChange = () => {},
+  showBrandingFields = true,
   onSave,
   isSaving,
   canSave,
@@ -49,44 +51,46 @@ export function BrandSettingsForm({
 }: BrandSettingsFormProps) {
   return (
     <div className="space-y-6">
-      {/* Brand Identity */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold text-fg mb-4">Markenidentität</h3>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-fg mb-2">Praxisname</label>
-            <input
-              type="text"
-              value={brandName}
-              onChange={(e) => onBrandNameChange(e.target.value)}
-              className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              maxLength={100}
-            />
+      {/* Brand Identity - Optional */}
+      {showBrandingFields && (
+        <Card className="p-6">
+          <h3 className="text-lg font-semibold text-fg mb-4">Branding</h3>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-fg mb-2">Praxisname</label>
+              <input
+                type="text"
+                value={brandName}
+                onChange={(e) => onBrandNameChange(e.target.value)}
+                className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                maxLength={100}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-fg mb-2">Tagline</label>
+              <input
+                type="text"
+                value={tagline}
+                onChange={(e) => onTaglineChange(e.target.value)}
+                className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="z.B. Ihre Tierarztpraxis vor Ort"
+                maxLength={200}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-fg mb-2">Monogramm</label>
+              <input
+                type="text"
+                value={monogram}
+                onChange={(e) => onMonogramChange(e.target.value.slice(0, 3).toUpperCase())}
+                className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="z.B. MP"
+                maxLength={3}
+              />
+            </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-fg mb-2">Tagline</label>
-            <input
-              type="text"
-              value={tagline}
-              onChange={(e) => onTaglineChange(e.target.value)}
-              className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="z.B. Ihre Tierarztpraxis vor Ort"
-              maxLength={200}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-fg mb-2">Monogramm</label>
-            <input
-              type="text"
-              value={monogram}
-              onChange={(e) => onMonogramChange(e.target.value.slice(0, 3).toUpperCase())}
-              className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="z.B. MP"
-              maxLength={3}
-            />
-          </div>
-        </div>
-      </Card>
+        </Card>
+      )}
 
       {/* Color Preset */}
       <Card className="p-6">

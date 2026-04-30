@@ -60,6 +60,8 @@ export default function PracticePage() {
     address: "",
     city: "",
     postalCode: "",
+    tagline: "",
+    monogram: "",
     allowedEmbeddingDomains: [] as string[],
   });
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -79,6 +81,8 @@ export default function PracticePage() {
         address: tenant.address || "",
         city: tenant.city || "",
         postalCode: tenant.postalCode || "",
+        tagline: tenant.tagline || "",
+        monogram: tenant.monogram || "",
         allowedEmbeddingDomains: ((tenant as any).allowedEmbeddingDomains as string[]) || [],
       });
     }
@@ -195,6 +199,18 @@ export default function PracticePage() {
             <div className="col-span-2">
               <Field label="Stadt">
                 <TextInput value={form.city} onChange={set("city")} placeholder="Berlin" />
+              </Field>
+            </div>
+          </div>
+
+          <div className="border-t pt-4 mt-4" style={{ borderColor: "var(--color-border)" }}>
+            <h3 className="text-sm font-medium mb-4" style={{ color: "var(--color-fg)" }}>Branding</h3>
+            <div className="space-y-4">
+              <Field label="Tagline (optional)">
+                <TextInput value={form.tagline} onChange={set("tagline")} placeholder="z.B. Ihre Tierarztpraxis vor Ort" />
+              </Field>
+              <Field label="Monogramm (optional)">
+                <TextInput value={form.monogram.slice(0, 3)} onChange={(v) => set("monogram")(v.slice(0, 3).toUpperCase())} placeholder="z.B. DM" />
               </Field>
             </div>
           </div>

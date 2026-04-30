@@ -12,9 +12,6 @@ export default function AppearancePage() {
   const [localColorPreset, setLocalColorPreset] = useState<ColorPresetKey>(colorPreset);
   const [localTypographyPairing, setLocalTypographyPairing] = useState<TypographyPairingKey>(typographyPairing);
   const [template, setTemplate] = useState<WebsiteTemplateKey>("modern");
-  const [brandName, setBrandName] = useState("");
-  const [tagline, setTagline] = useState("");
-  const [monogram, setMonogram] = useState("");
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   const { data: tenant } = trpc.tenant.getCurrent.useQuery();
@@ -34,9 +31,6 @@ export default function AppearancePage() {
       setLocalTypographyPairing(newTypographyPairing);
       setColorPreset(newColorPreset);
       setTypographyPairing(newTypographyPairing);
-      setBrandName(tenant.name || "");
-      setTagline(tenant.tagline || "");
-      setMonogram(tenant.monogram || "");
     }
   }, [tenant, setColorPreset, setTypographyPairing]);
 
@@ -52,9 +46,6 @@ export default function AppearancePage() {
 
   const handleSave = () => {
     updateTheme.mutate({
-      name: brandName,
-      tagline,
-      monogram,
       themePreference: localColorPreset,
       typographyPreference: localTypographyPairing,
       websiteTemplate: template,
@@ -70,12 +61,7 @@ export default function AppearancePage() {
         onTypographyPairingChange={handleTypographyChange}
         template={template}
         onTemplateChange={setTemplate}
-        brandName={brandName}
-        onBrandNameChange={setBrandName}
-        tagline={tagline}
-        onTaglineChange={setTagline}
-        monogram={monogram}
-        onMonogramChange={setMonogram}
+        showBrandingFields={false}
         onSave={handleSave}
         isSaving={updateTheme.isPending}
         canSave={true}
@@ -85,9 +71,9 @@ export default function AppearancePage() {
         colorPreset={localColorPreset}
         typographyPairing={localTypographyPairing}
         template={template}
-        brandName={brandName}
-        tagline={tagline}
-        monogram={monogram}
+        brandName={tenant?.name || "Tierarztpraxis"}
+        tagline={tenant?.tagline || ""}
+        monogram={tenant?.monogram || ""}
       />
     </div>
   );
