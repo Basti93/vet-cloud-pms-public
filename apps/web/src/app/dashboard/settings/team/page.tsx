@@ -66,32 +66,34 @@ export default function TeamPage() {
         users.map((user: UserWithRoles) => (
           <div
             key={user.id}
-            className="rounded-xl p-4 flex items-center justify-between"
+            className="rounded-xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4"
             style={{
               backgroundColor: "var(--color-surface)",
               border: "1px solid var(--color-border)",
             }}
           >
-            <div className="flex items-center gap-3">
+            {/* User Info */}
+            <div className="flex items-center gap-3 min-w-0">
               <div
                 className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
                 style={{ backgroundColor: "var(--color-accent)" }}
               >
                 {(user.firstName?.[0] || user.email[0]).toUpperCase()}
               </div>
-              <div>
-                <p className="font-medium text-sm">
+              <div className="min-w-0 flex-1">
+                <p className="font-medium text-sm truncate">
                   {user.firstName} {user.lastName}
                 </p>
-                <p className="text-xs" style={{ color: "var(--color-muted)" }}>
+                <p className="text-xs truncate" style={{ color: "var(--color-muted)" }}>
                   {user.email}
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            {/* Status and Roles - Stack on mobile */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
               <span
-                className="text-xs px-2 py-1 rounded-full font-medium"
+                className="text-xs px-2 py-1 rounded-full font-medium flex-shrink-0"
                 style={{
                   backgroundColor: "var(--color-accent-soft)",
                   color: "var(--color-accent-text)",
@@ -100,8 +102,8 @@ export default function TeamPage() {
                 {user.active ? "Aktiv" : "Inaktiv"}
               </span>
 
-              {/* Display assigned roles as badges */}
-              <div className="flex flex-wrap gap-2 items-center max-w-xs">
+              {/* Display assigned roles as badges - wrap on mobile */}
+              <div className="flex flex-wrap gap-2 items-center">
                 {user.roles && user.roles.length > 0 ? (
                   user.roles.map((role) => (
                     <div
@@ -130,7 +132,7 @@ export default function TeamPage() {
                 {/* Add Role button */}
                 <button
                   onClick={() => setShowAddRoleModal(user.id)}
-                  className="px-2 py-1 rounded-lg border border-dashed text-xs font-medium hover:bg-opacity-50"
+                  className="px-2 py-1 rounded-lg border border-dashed text-xs font-medium hover:bg-opacity-50 flex-shrink-0"
                   style={{
                     borderColor: "var(--color-border)",
                     backgroundColor: "var(--color-bg)",
