@@ -10,7 +10,18 @@ export default function EmailSettingsPage() {
   const [testEmail, setTestEmail] = useState('');
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [testSuccess, setTestSuccess] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | undefined>();
+
+  // Local state for form fields
+  const [confirmationEmailEnabled, setConfirmationEmailEnabled] = useState(false);
+  const [confirmationSubject, setConfirmationSubject] = useState('');
+  const [confirmationBody, setConfirmationBody] = useState('');
+  const [reminderEmailEnabled, setReminderEmailEnabled] = useState(false);
+  const [reminderHoursBefore, setReminderHoursBefore] = useState(24);
+  const [reminderSubject, setReminderSubject] = useState('');
+  const [reminderBody, setReminderBody] = useState('');
+  const [bookingNotificationEnabled, setBookingNotificationEnabled] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
 
   // Get current tenant
   const tenant = trpc.tenant.getCurrent.useQuery();
@@ -22,12 +33,29 @@ export default function EmailSettingsPage() {
     { enabled: !!tenant.data?.id }
   );
 
+  // Initialize local state from fetched settings
+  useEffect(() => {
+    if (emailSettings.data) {
+      setConfirmationEmailEnabled(emailSettings.data.confirmationEmailEnabled);
+      setConfirmationSubject(emailSettings.data.confirmationSubject);
+      setConfirmationBody(emailSettings.data.confirmationBody);
+      setReminderEmailEnabled(emailSettings.data.reminderEmailEnabled);
+      setReminderHoursBefore(emailSettings.data.reminderHoursBefore);
+      setReminderSubject(emailSettings.data.reminderSubject);
+      setReminderBody(emailSettings.data.reminderBody);
+      setBookingNotificationEnabled(emailSettings.data.bookingNotificationEnabled);
+      setIsDirty(false);
+    }
+  }, [emailSettings.data]);
+
   const updateSettingsMutation = trpc.email.updateSettings.useMutation({
     onSuccess: () => {
       // Invalidate the settings query to refetch
       utils.email.getSettings.invalidate({ tenantId: tenant.data?.id });
+      setIsDirty(false);
+      setError(undefined);
       setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 2000);
+      setTimeout(() => setSaveSuccess(false), 3000);
     },
     onError: (err) => setError(`Update error: ${err.message}`),
   });
@@ -51,13 +79,42 @@ export default function EmailSettingsPage() {
   const settings = emailSettings.data;
   const isUpdating = updateSettingsMutation.isPending;
 
-  const handleToggle = async (field: string, currentValue: boolean) => {
+  const handleSave = async () => {
     if (!tenant.data?.id) return;
-    setError(null);
+    setError(undefined);
     updateSettingsMutation.mutate({
       tenantId: tenant.data.id,
-      [field]: !currentValue,
+      confirmationEmailEnabled,
+      confirmationSubject,
+      confirmationBody,
+      reminderEmailEnabled,
+      reminderHoursBefore,
+      reminderSubject,
+      reminderBody,
+      bookingNotificationEnabled,
     });
+  };
+
+  const handleReset = () => {
+    if (emailSettings.data) {
+      setConfirmationEmailEnabled(emailSettings.data.confirmationEmailEnabled);
+      setConfirmationSubject(emailSettings.data.confirmationSubject);
+      setConfirmationBody(emailSettings.data.confirmationBody);
+      setReminderEmailEnabled(emailSettings.data.reminderEmailEnabled);
+      setReminderHoursBefore(emailSettings.data.reminderHoursBefore);
+      setReminderSubject(emailSettings.data.reminderSubject);
+      setReminderBody(emailSettings.data.reminderBody);
+      setBookingNotificationEnabled(emailSettings.data.bookingNotificationEnabled);
+      setIsDirty(false);
+      setError(undefined);
+      setSaveSuccess(false);
+    }
+  };
+
+  const handleFieldChange = () => {
+    setIsDirty(true);
+    setError(undefined);
+    setSaveSuccess(false);
   };
 
   return (
@@ -108,27 +165,25 @@ export default function EmailSettingsPage() {
                 <p className="text-sm text-muted">E-Mails an Tierbesitzer nach Online-Terminanfrage</p>
               </div>
               <ToggleSwitch
-                checked={settings.confirmationEmailEnabled}
-                onChange={(checked) =>
-                  handleToggle('confirmationEmailEnabled', !checked)
-                }
+                checked={confirmationEmailEnabled}
+                onChange={(checked) => {
+                  setConfirmationEmailEnabled(checked);
+                  handleFieldChange();
+                }}
                 disabled={isUpdating}
               />
             </div>
 
-            {settings.confirmationEmailEnabled && (
+            {confirmationEmailEnabled && (
               <div className="space-y-4 border-t border-[var(--color-border)] pt-4">
                 <div>
                   <label className="block text-sm font-medium text-fg mb-2">Betreff</label>
                   <input
                     type="text"
-                    value={settings.confirmationSubject}
+                    value={confirmationSubject}
                     onChange={(e) => {
-                      setError(null);
-                      updateSettingsMutation.mutate({
-                        tenantId: tenant.data!.id,
-                        confirmationSubject: e.target.value,
-                      });
+                      setConfirmationSubject(e.target.value);
+                      handleFieldChange();
                     }}
                     disabled={isUpdating}
                     className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg bg-bg text-fg disabled:opacity-50"
@@ -138,13 +193,10 @@ export default function EmailSettingsPage() {
                 <div>
                   <label className="block text-sm font-medium text-fg mb-2">Nachricht</label>
                   <textarea
-                    value={settings.confirmationBody}
+                    value={confirmationBody}
                     onChange={(e) => {
-                      setError(null);
-                      updateSettingsMutation.mutate({
-                        tenantId: tenant.data!.id,
-                        confirmationBody: e.target.value,
-                      });
+                      setConfirmationBody(e.target.value);
+                      handleFieldChange();
                     }}
                     disabled={isUpdating}
                     rows={6}
@@ -166,15 +218,16 @@ export default function EmailSettingsPage() {
                 <p className="text-sm text-muted">E-Mails an Tierbesitzer vor dem Termin</p>
               </div>
               <ToggleSwitch
-                checked={settings.reminderEmailEnabled}
-                onChange={(checked) =>
-                  handleToggle('reminderEmailEnabled', !checked)
-                }
+                checked={reminderEmailEnabled}
+                onChange={(checked) => {
+                  setReminderEmailEnabled(checked);
+                  handleFieldChange();
+                }}
                 disabled={isUpdating}
               />
             </div>
 
-            {settings.reminderEmailEnabled && (
+            {reminderEmailEnabled && (
               <div className="space-y-4 border-t border-[var(--color-border)] pt-4">
                 <div>
                   <label className="block text-sm font-medium text-fg mb-2">
@@ -184,13 +237,10 @@ export default function EmailSettingsPage() {
                     type="number"
                     min="1"
                     max="168"
-                    value={settings.reminderHoursBefore}
+                    value={reminderHoursBefore}
                     onChange={(e) => {
-                      setError(null);
-                      updateSettingsMutation.mutate({
-                        tenantId: tenant.data!.id,
-                        reminderHoursBefore: parseInt(e.target.value, 10),
-                      });
+                      setReminderHoursBefore(parseInt(e.target.value, 10));
+                      handleFieldChange();
                     }}
                     disabled={isUpdating}
                     className="w-32 px-3 py-2 border border-[var(--color-border)] rounded-lg bg-bg text-fg disabled:opacity-50"
@@ -201,13 +251,10 @@ export default function EmailSettingsPage() {
                   <label className="block text-sm font-medium text-fg mb-2">Betreff</label>
                   <input
                     type="text"
-                    value={settings.reminderSubject}
+                    value={reminderSubject}
                     onChange={(e) => {
-                      setError(null);
-                      updateSettingsMutation.mutate({
-                        tenantId: tenant.data!.id,
-                        reminderSubject: e.target.value,
-                      });
+                      setReminderSubject(e.target.value);
+                      handleFieldChange();
                     }}
                     disabled={isUpdating}
                     className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg bg-bg text-fg disabled:opacity-50"
@@ -217,13 +264,10 @@ export default function EmailSettingsPage() {
                 <div>
                   <label className="block text-sm font-medium text-fg mb-2">Nachricht</label>
                   <textarea
-                    value={settings.reminderBody}
+                    value={reminderBody}
                     onChange={(e) => {
-                      setError(null);
-                      updateSettingsMutation.mutate({
-                        tenantId: tenant.data!.id,
-                        reminderBody: e.target.value,
-                      });
+                      setReminderBody(e.target.value);
+                      handleFieldChange();
                     }}
                     disabled={isUpdating}
                     rows={6}
@@ -245,14 +289,36 @@ export default function EmailSettingsPage() {
                 <p className="text-sm text-muted">E-Mails an Praxisteam bei neuen Terminanfragen</p>
               </div>
               <ToggleSwitch
-                checked={settings.bookingNotificationEnabled}
-                onChange={(checked) =>
-                  handleToggle('bookingNotificationEnabled', !checked)
-                }
+                checked={bookingNotificationEnabled}
+                onChange={(checked) => {
+                  setBookingNotificationEnabled(checked);
+                  handleFieldChange();
+                }}
                 disabled={isUpdating}
               />
             </div>
           </div>
+
+          {/* Save/Cancel buttons - only show when dirty */}
+          {isDirty && (
+            <div className="flex items-center gap-3 mt-6">
+              <button
+                onClick={handleSave}
+                disabled={isUpdating}
+                className="px-6 py-2 text-white rounded-lg font-medium hover:opacity-90 transition disabled:opacity-50"
+                style={{ backgroundColor: 'var(--color-accent)' }}
+              >
+                {isUpdating ? 'Wird gespeichert...' : 'Änderungen speichern'}
+              </button>
+              <button
+                onClick={handleReset}
+                disabled={isUpdating}
+                className="px-6 py-2 rounded-lg font-medium border border-[var(--color-border)] hover:bg-surface transition disabled:opacity-50"
+              >
+                Abbrechen
+              </button>
+            </div>
+          )}
 
           {/* Test Email */}
           <div className="bg-surface rounded-lg border border-[var(--color-border)] p-6 space-y-4">
@@ -268,7 +334,7 @@ export default function EmailSettingsPage() {
               />
               <button
                 onClick={() => {
-                  setError(null);
+                  setError(undefined);
                   testEmailMutation.mutate({
                     tenantId: tenant.data!.id,
                     recipientEmail: testEmail,
