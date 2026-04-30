@@ -120,23 +120,26 @@ export default function DashboardContent({ children }: { children: ReactNode }) 
             </div>
           )}
 
+          {/* User Settings - Always visible */}
+          <div className="my-2" style={{ borderColor: 'var(--color-accent-soft)', borderTopWidth: '1px', opacity: 0.3 }} />
+          <div className="space-y-1">
+            {USER_NAV_ITEMS.map(({ href, icon: Icon, label }) => (
+              <Link
+                key={href}
+                href={href}
+                onClick={() => setSidebarOpen(false)}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-colors group"
+                style={{ color: 'var(--color-accent-soft)' }}
+              >
+                <Icon size={18} />
+                {label}
+              </Link>
+            ))}
+          </div>
+
+          {/* Admin Settings - Only if user is loaded and has permission */}
           {!userLoading && (
             <>
-              <div className="my-2" style={{ borderColor: 'var(--color-accent-soft)', borderTopWidth: '1px', opacity: 0.3 }} />
-              <div className="space-y-1">
-                {USER_NAV_ITEMS.map(({ href, icon: Icon, label }) => (
-                  <Link
-                    key={href}
-                    href={href}
-                    onClick={() => setSidebarOpen(false)}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-colors group"
-                    style={{ color: 'var(--color-accent-soft)' }}
-                  >
-                    <Icon size={18} />
-                    {label}
-                  </Link>
-                ))}
-              </div>
               <div className="my-2" style={{ borderColor: 'var(--color-accent-soft)', borderTopWidth: '1px', opacity: 0.3 }} />
               {ADMIN_NAV_ITEMS.map(({ href, icon: Icon, label }) => (
                 <Link

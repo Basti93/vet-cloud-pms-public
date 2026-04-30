@@ -192,10 +192,16 @@ export default function AvailabilityPage() {
     { enabled: !!tenantId }
   );
   const upsertVetDay = trpc.schedule.upsertVetDaySchedule.useMutation({
-    onSuccess: () => utils.schedule.getVetSchedules.invalidate({ tenantId }),
+    onSuccess: () => {
+      utils.schedule.getVetSchedules.invalidate({ tenantId });
+      utils.user.getVetSchedule.invalidate();  // Also refresh user's personal schedule
+    },
   });
   const updateVetSlotDuration = trpc.schedule.updateVetSlotDuration.useMutation({
-    onSuccess: () => utils.schedule.getVetSchedules.invalidate({ tenantId }),
+    onSuccess: () => {
+      utils.schedule.getVetSchedules.invalidate({ tenantId });
+      utils.user.getVetSchedule.invalidate();  // Also refresh user's personal schedule
+    },
   });
   const [expandedVet, setExpandedVet] = useState<string | null>(null);
   const [vetSaved, setVetSaved] = useState<string | null>(null);

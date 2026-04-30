@@ -14,6 +14,7 @@ import {
   vitals,
   roles,
   userRoles,
+  rolePermissions,
   PERMISSIONS,
 } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
@@ -72,6 +73,7 @@ export const adminRouter = createTRPCRouter({
         firstName: users.firstName,
         role: users.role,
         tenantId: users.tenantId,
+        slotDurationMin: users.slotDurationMin,
       })
       .from(users)
       .where(eq(users.clerkId, ctx.userId))
@@ -317,29 +319,23 @@ export const adminRouter = createTRPCRouter({
         });
       }
 
-      // Check if user already has this role (prevent duplicates)
-      const [existing] = await ctx.db
-        .select({ userId: userRoles.userId })
-        .from(userRoles)
-        .where(
-          eq(userRoles.userId, input.userId) &&
-          eq(userRoles.roleId, input.roleId)
-        )
-        .limit(1);
-
-      if (existing) {
-        // Already assigned, return success (idempotent operation)
-        return { success: true, message: "Role already assigned" };
+      // Try to insert the role assignment
+      // If it already exists (unique constraint), the database will reject it
+      try {
+        await ctx.db.insert(userRoles).values({
+          userId: input.userId,
+          roleId: input.roleId,
+          assignedBy: currentUser!.id,
+        });
+        return { success: true, message: "Role assigned" };
+      } catch (error: any) {
+        // Check if this is a unique constraint violation (role already assigned)
+        if (error.code === "23505" || error.message?.includes("duplicate key")) {
+          return { success: true, message: "Role already assigned" };
+        }
+        // Re-throw other errors
+        throw error;
       }
-
-      // Insert into userRoles join table
-      await ctx.db.insert(userRoles).values({
-        userId: input.userId,
-        roleId: input.roleId,
-        assignedBy: currentUser!.id,
-      });
-
-      return { success: true, message: "Role assigned" };
     }),
 
   /**
@@ -417,10 +413,137 @@ export const adminRouter = createTRPCRouter({
         });
       }
 
-      return await ctx.db
+      const allRoles = await ctx.db
         .select()
         .from(roles)
         .where(eq(roles.tenantId, input.tenantId))
         .orderBy(roles.name);
+
+      // For each role, fetch its permissions
+      const rolesWithPerms = await Promise.all(
+        allRoles.map(async (role) => {
+          const perms = await ctx.db
+            .select({ permission: rolePermissions.permission })
+            .from(rolePermissions)
+            .where(eq(rolePermissions.roleId, role.id));
+
+          return {
+            ...role,
+            permissions: perms.map((p) => p.permission),
+          };
+        })
+      );
+
+      return rolesWithPerms;
+    }),
+
+  /**
+   * Add a permission to a role
+   * Protected: USERS_MANAGE permission
+   * Idempotent: Adding same permission twice is safe
+   */
+  addPermissionToRole: protectedProcedure
+    .use(requirePermission(PERMISSIONS.USERS_MANAGE))
+    .input(
+      z.object({
+        tenantId: z.string().uuid(),
+        roleId: z.string().uuid(),
+        permission: z.string(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Verify current user is in this tenant
+      const [currentUser] = await ctx.db
+        .select({ tenantId: users.tenantId })
+        .from(users)
+        .where(eq(users.clerkId, ctx.userId!))
+        .limit(1);
+
+      if (currentUser?.tenantId !== input.tenantId) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Cannot manage roles in other tenants",
+        });
+      }
+
+      // Verify role exists in this tenant
+      const [roleExists] = await ctx.db
+        .select({ id: roles.id })
+        .from(roles)
+        .where(eq(roles.id, input.roleId) && eq(roles.tenantId, input.tenantId))
+        .limit(1);
+
+      if (!roleExists) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Role not found in this tenant",
+        });
+      }
+
+      try {
+        await ctx.db.insert(rolePermissions).values({
+          roleId: input.roleId,
+          permission: input.permission,
+        });
+      } catch (error: any) {
+        // Ignore duplicate key errors (permission already assigned)
+        if (error.code !== "23505") {
+          throw error;
+        }
+      }
+
+      return { success: true };
+    }),
+
+  /**
+   * Remove a permission from a role
+   * Protected: USERS_MANAGE permission
+   */
+  removePermissionFromRole: protectedProcedure
+    .use(requirePermission(PERMISSIONS.USERS_MANAGE))
+    .input(
+      z.object({
+        tenantId: z.string().uuid(),
+        roleId: z.string().uuid(),
+        permission: z.string(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Verify current user is in this tenant
+      const [currentUser] = await ctx.db
+        .select({ tenantId: users.tenantId })
+        .from(users)
+        .where(eq(users.clerkId, ctx.userId!))
+        .limit(1);
+
+      if (currentUser?.tenantId !== input.tenantId) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Cannot manage roles in other tenants",
+        });
+      }
+
+      // Verify role exists in this tenant
+      const [roleExists] = await ctx.db
+        .select({ id: roles.id })
+        .from(roles)
+        .where(eq(roles.id, input.roleId) && eq(roles.tenantId, input.tenantId))
+        .limit(1);
+
+      if (!roleExists) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Role not found in this tenant",
+        });
+      }
+
+      await ctx.db
+        .delete(rolePermissions)
+        .where(
+          eq(rolePermissions.roleId, input.roleId) &&
+          eq(rolePermissions.permission, input.permission)
+        );
+
+      return { success: true };
     }),
 });

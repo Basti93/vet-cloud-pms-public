@@ -37,6 +37,8 @@ export const PERMISSIONS = {
   REPORTS_READ: "reports:read",
   REPORTS_EXPORT: "reports:export",
 
+  SCHEDULE_MANAGE: "schedule:manage",
+
   USERS_MANAGE: "users:manage",
   ROLES_MANAGE: "roles:manage",
   SETTINGS_MANAGE: "settings:manage",
