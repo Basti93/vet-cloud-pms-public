@@ -182,6 +182,7 @@ export const users = pgTable(
     }),
     active: boolean("active").default(true).notNull(),
     slotDurationMin: integer("slot_duration_min").default(30).notNull(),
+    locale: varchar("locale", { length: 10 }).default("de").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .default(sql`now()`)
       .notNull(),
