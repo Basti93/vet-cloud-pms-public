@@ -3,7 +3,7 @@
 import { ReactNode, useMemo, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Palette, Users, ArrowLeft, Building2, Mail, CalendarClock } from "lucide-react";
+import { Palette, Users, ArrowLeft, Building2, Mail, CalendarClock, User } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { PERMISSIONS } from "@/lib/db/schema";
 import { Tabs } from "@/components/ui/tabs";
@@ -14,6 +14,7 @@ const ALL_TABS = [
   { href: "/dashboard/settings/email", label: "E-Mails", icon: Mail },
   { href: "/dashboard/settings/availability", label: "Verfügbarkeit", icon: CalendarClock },
   { href: "/dashboard/settings/team", label: "Team & Benutzer", icon: Users, requiredPermission: PERMISSIONS.USERS_MANAGE },
+  { href: "/dashboard/settings/account", label: "Benutzerkonto", icon: User },
 ];
 
 export default function SettingsLayout({ children }: { children: ReactNode }) {

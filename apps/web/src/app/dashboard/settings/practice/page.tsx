@@ -5,7 +5,8 @@ import { trpc } from "@/lib/trpc/client";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Globe, ExternalLink, CheckCircle, Save, Trash2, AlertTriangle, ChevronDown, Copy, Check } from "lucide-react";
+import { Globe, ExternalLink, CheckCircle, Save, Trash2, AlertTriangle } from "lucide-react";
+import { EmbedHelpSection } from "@/components/settings/EmbedHelpSection";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -67,10 +68,7 @@ export default function PracticePage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
-  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
   const [newDomain, setNewDomain] = useState("");
-  const [embedType, setEmbedType] = useState<"iframe" | "modal">("iframe");
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (tenant) {
@@ -103,14 +101,6 @@ export default function PracticePage() {
   const websiteUrl = tenant?.slug
     ? `${typeof window !== "undefined" ? window.location.origin : ""}/${tenant.slug}`
     : null;
-
-  const handleCopyCode = (code: string, index: number) => {
-    navigator.clipboard.writeText(code);
-    setCopiedIndex(index);
-    setTimeout(() => setCopiedIndex(null), 2000);
-  };
-
-  const currentEmbedCode = embedCode ? (embedType === "iframe" ? embedCode.iframeCode : embedCode.modalCode) : "";
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -231,101 +221,7 @@ export default function PracticePage() {
       </Card>
 
       {/* How to include booking */}
-      <Card className="p-6" style={{ borderColor: "var(--color-border)" }}>
-        <button
-          onClick={() => setExpandedSections(prev => ({ ...prev, booking: !prev.booking }))}
-          className="w-full flex items-center justify-between gap-3 hover:opacity-75 transition-opacity"
-        >
-          <h2 className="text-base font-semibold">Wie binde ich die Online-Terminbuchung ein?</h2>
-          <ChevronDown
-            size={20}
-            style={{
-              transform: expandedSections.booking ? "rotate(180deg)" : "rotate(0deg)",
-              transition: "transform 0.2s",
-            }}
-          />
-        </button>
-
-        {expandedSections.booking && (
-          <div className="mt-4 pt-4 border-t space-y-4" style={{ borderColor: "var(--color-border)" }}>
-            <div className="text-sm">
-              <p style={{ color: "var(--color-muted)" }} className="mb-3">
-                Wählen Sie eine Einbindungsmethode und kopieren Sie den Code für Ihre Website:
-              </p>
-
-              {/* Embed type selector */}
-              <div className="flex gap-2 mb-4">
-                <button
-                  onClick={() => setEmbedType("iframe")}
-                  className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
-                    embedType === "iframe"
-                      ? "text-gray-900"
-                      : "text-gray-600"
-                  }`}
-                  style={{
-                    backgroundColor: embedType === "iframe" ? "var(--primary)" : "var(--color-bg)",
-                  }}
-                >
-                  iframe (Eingebettet)
-                </button>
-                <button
-                  onClick={() => setEmbedType("modal")}
-                  className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
-                    embedType === "modal"
-                      ? "text-gray-900"
-                      : "text-gray-600"
-                  }`}
-                  style={{
-                    backgroundColor: embedType === "modal" ? "var(--primary)" : "var(--color-bg)",
-                  }}
-                >
-                  Modal (Popup-Dialog)
-                </button>
-              </div>
-
-              {/* Code display */}
-              {currentEmbedCode && (
-                <div className="space-y-2">
-                  <p className="text-xs font-medium" style={{ color: "var(--color-muted)" }}>
-                    {embedType === "iframe"
-                      ? "Fügen Sie diesen Code an der gewünschten Stelle Ihrer Website ein:"
-                      : "Fügen Sie diesen Code am Ende Ihres HTML (vor </body>) ein:"}
-                  </p>
-                  <div className="relative">
-                    <pre
-                      className="px-3 py-3 rounded-lg text-xs overflow-x-auto"
-                      style={{
-                        backgroundColor: "var(--color-bg)",
-                        color: "var(--color-accent)",
-                        fontFamily: "monospace",
-                      }}
-                    >
-                      {currentEmbedCode}
-                    </pre>
-                    <button
-                      onClick={() => handleCopyCode(currentEmbedCode, 0)}
-                      className="absolute top-2 right-2 p-2 rounded hover:opacity-75 transition-opacity"
-                      style={{ backgroundColor: "var(--color-bg)", color: "var(--color-accent)" }}
-                    >
-                      {copiedIndex === 0 ? (
-                        <Check size={14} style={{ color: "#16a34a" }} />
-                      ) : (
-                        <Copy size={14} />
-                      )}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              <div className="mt-4 p-3 rounded text-xs" style={{ backgroundColor: "var(--color-accent-soft)" }}>
-                <p style={{ color: "var(--color-muted)" }}>
-                  <strong>💡 Tipp:</strong> Der Code nutzt automatisch Ihre Praxisinformationen, den Buchungslink und das Farbschema aus Ihren Einstellungen.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-      </Card>
+      <EmbedHelpSection embedCode={embedCode} />
 
       {/* Allowed embedding domains */}
       <Card className="p-6" style={{ borderColor: "var(--color-border)" }}>
