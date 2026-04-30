@@ -13,3 +13,4 @@ build/
 coverage/
 .vitest/
 .claude/
+*.tsbuildinfo
