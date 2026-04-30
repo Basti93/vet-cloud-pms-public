@@ -69,6 +69,7 @@ export const adminRouter = createTRPCRouter({
       .select({
         id: users.id,
         clerkId: users.clerkId,
+        firstName: users.firstName,
         role: users.role,
         tenantId: users.tenantId,
       })
