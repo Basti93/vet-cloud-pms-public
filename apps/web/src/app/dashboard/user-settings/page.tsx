@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useLocale } from "@/lib/locale/context";
 import { locales } from "@/i18n.config";
-import { Globe } from "lucide-react";
+import { Globe, Calendar, Clock } from "lucide-react";
 import { SelectField } from "@/components/forms/SelectField";
 import { SettingsSection } from "@/components/forms/SettingsSection";
 import { trpc } from "@/lib/trpc/client";
@@ -14,21 +14,25 @@ const localeNames: Record<string, string> = {
   en: "English",
 };
 
-export default function AccountPage() {
+export default function UserSettingsPage() {
   const { locale, setLocale } = useLocale();
   const [localLocale, setLocalLocale] = useState(locale);
   const [isDirty, setIsDirty] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const [successMessage, setSuccessMessage] = useState<string | undefined>();
 
+  const { data: currentUser } = trpc.admin.getCurrentUser.useQuery();
+  const { data: tenant } = trpc.tenant.getCurrent.useQuery();
+
+  const isVet = currentUser?.role === "vet";
+  const tenantId = tenant?.id;
+
   const updateLocaleMutation = trpc.user.updateLocale.useMutation({
     onSuccess: () => {
-      // Update the global locale context
       setLocale(localLocale);
       setIsDirty(false);
       setError(undefined);
       setSuccessMessage("Sprache erfolgreich gespeichert");
-      // Hide success message after 3 seconds
       setTimeout(() => setSuccessMessage(undefined), 3000);
     },
     onError: (err) => {
@@ -85,12 +89,62 @@ export default function AccountPage() {
         />
       </SettingsSection>
 
+      {/* Vet-only sections */}
+      {isVet && tenantId && (
+        <>
+          <Card
+            className="p-6 border border-blue-200"
+            style={{ borderColor: "var(--color-accent-soft)", backgroundColor: "var(--color-surface)" }}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div
+                className="w-10 h-10 rounded-lg flex items-center justify-center"
+                style={{ backgroundColor: "var(--color-accent-soft)" }}
+              >
+                <Clock size={20} style={{ color: "var(--color-accent)" }} />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold">Verfügbarkeitszeiten</h2>
+                <p className="text-sm" style={{ color: "var(--color-muted)" }}>
+                  Setzen Sie Ihre wöchentlichen Arbeitszeiten
+                </p>
+              </div>
+            </div>
+            <p className="text-sm" style={{ color: "var(--color-muted)" }}>
+              Gehen Sie zu Praxisverwaltung → Verfügbarkeit, um Ihre Verfügbarkeitszeiten zu konfigurieren.
+            </p>
+          </Card>
+
+          <Card
+            className="p-6 border border-blue-200"
+            style={{ borderColor: "var(--color-accent-soft)", backgroundColor: "var(--color-surface)" }}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div
+                className="w-10 h-10 rounded-lg flex items-center justify-center"
+                style={{ backgroundColor: "var(--color-accent-soft)" }}
+              >
+                <Calendar size={20} style={{ color: "var(--color-accent)" }} />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold">Urlaub & Abwesenheit</h2>
+                <p className="text-sm" style={{ color: "var(--color-muted)" }}>
+                  Verwalten Sie Ihre Abwesenheitszeiten
+                </p>
+              </div>
+            </div>
+            <p className="text-sm" style={{ color: "var(--color-muted)" }}>
+              Gehen Sie zu Praxisverwaltung → Verfügbarkeit, um Urlaub, Krankheit und andere Abwesenheiten zu registrieren.
+            </p>
+          </Card>
+        </>
+      )}
+
       {/* Placeholder for future features */}
       <Card className="p-6" style={{ borderColor: "var(--color-border)" }}>
-        <h2 className="text-base font-semibold mb-2">Benutzerkonto</h2>
+        <h2 className="text-base font-semibold mb-2">Weitere Kontooptionen</h2>
         <p className="text-sm" style={{ color: "var(--color-muted)" }}>
-          Weitere Kontooptionen wie Passwort, E-Mail-Adresse und Kontolöschung
-          werden in Kürze hinzugefügt.
+          Passwort, E-Mail-Adresse und Kontolöschung werden in Kürze hinzugefügt.
         </p>
       </Card>
     </div>

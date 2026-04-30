@@ -5,7 +5,6 @@ import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { LayoutDashboard, Calendar, Users, Phone, ClipboardList, Clock, Menu, X, Settings, TrendingUp } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
-import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useLocale } from "@/lib/locale/context";
 
 function useNavItems() {
@@ -27,6 +26,12 @@ function useBetaNavItems() {
   ];
 }
 
+function useUserNavItems() {
+  return [
+    { href: "/dashboard/user-settings", icon: Settings, label: "Benutzereinstellungen" },
+  ];
+}
+
 function useAdminNavItems() {
   const { t } = useLocale();
   return [
@@ -42,6 +47,7 @@ export default function DashboardContent({ children }: { children: ReactNode }) 
   const { t } = useLocale();
   const NAV_ITEMS = useNavItems();
   const BETA_NAV_ITEMS = useBetaNavItems();
+  const USER_NAV_ITEMS = useUserNavItems();
   const ADMIN_NAV_ITEMS = useAdminNavItems();
 
   return (
@@ -117,6 +123,21 @@ export default function DashboardContent({ children }: { children: ReactNode }) 
           {!userLoading && (
             <>
               <div className="my-2" style={{ borderColor: 'var(--color-accent-soft)', borderTopWidth: '1px', opacity: 0.3 }} />
+              <div className="space-y-1">
+                {USER_NAV_ITEMS.map(({ href, icon: Icon, label }) => (
+                  <Link
+                    key={href}
+                    href={href}
+                    onClick={() => setSidebarOpen(false)}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-colors group"
+                    style={{ color: 'var(--color-accent-soft)' }}
+                  >
+                    <Icon size={18} />
+                    {label}
+                  </Link>
+                ))}
+              </div>
+              <div className="my-2" style={{ borderColor: 'var(--color-accent-soft)', borderTopWidth: '1px', opacity: 0.3 }} />
               {ADMIN_NAV_ITEMS.map(({ href, icon: Icon, label }) => (
                 <Link
                   key={href}
@@ -167,7 +188,6 @@ export default function DashboardContent({ children }: { children: ReactNode }) 
           >
             {tenant?.name || 'Demo-Praxis'}
           </span>
-          <LanguageSwitcher />
         </header>
         <main className="flex-1 overflow-auto" style={{ backgroundColor: 'var(--color-bg)' }}>
           <div className="p-4 md:p-8" style={{ color: 'var(--color-fg)' }}>
