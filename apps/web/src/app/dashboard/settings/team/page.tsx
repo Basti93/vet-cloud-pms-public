@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useTenant } from "@/hooks/useTenant";
 import { trpc } from "@/lib/trpc/client";
+import { PERMISSIONS } from "@/lib/db/schema";
 
 interface UserWithRoles {
   id: string;
@@ -15,10 +17,20 @@ interface UserWithRoles {
 
 export default function TeamPage() {
   const { tenantId } = useTenant();
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [showAddRoleModal, setShowAddRoleModal] = useState<string | null>(null);
 
+  const { data: permissions } = trpc.admin.getUserPermissions.useQuery();
+
   useEffect(() => { setMounted(true); }, []);
+
+  // Check permissions and redirect if user doesn't have access
+  useEffect(() => {
+    if (mounted && permissions && !permissions.includes(PERMISSIONS.USERS_MANAGE)) {
+      router.push("/dashboard/settings/practice");
+    }
+  }, [permissions, mounted, router]);
 
   const { data: users, isLoading: usersLoading, refetch: refetchUsers } =
     trpc.admin.listUsers.useQuery({ tenantId: tenantId! }, { enabled: !!tenantId && mounted });

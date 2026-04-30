@@ -18,6 +18,7 @@ import {
 } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
 import { requirePermission } from "@/server/trpc/middleware";
+import { getUserPermissions } from "@/lib/auth/permissions";
 
 const DEMO_TENANT_ID = process.env.NEXT_PUBLIC_DEMO_TENANT_ID!;
 const DEMO_TENANT_SLUG = "demo";
@@ -76,6 +77,23 @@ export const adminRouter = createTRPCRouter({
       .limit(1);
 
     return user || null;
+  }),
+
+  /**
+   * Get current user's permissions
+   * Protected: Auth required
+   * Returns array of permission strings the user has across all their roles
+   */
+  getUserPermissions: protectedProcedure.query(async ({ ctx }) => {
+    if (!ctx.userId) {
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: "Not authenticated",
+      });
+    }
+
+    const permissions = await getUserPermissions(ctx.userId);
+    return Array.from(permissions);
   }),
 
   /**
