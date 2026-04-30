@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 
 export interface TabItem {
-  href: string;
+  href?: string;
   label: string;
   icon?: React.ComponentType<{ size: number }>;
   requiredPermission?: string;
@@ -13,17 +13,23 @@ export interface TabItem {
 
 interface TabsProps {
   tabs: TabItem[];
-  currentPath: string;
+  currentPath?: string;
   permissions?: string[];
+  onTabChange?: (tabIndex: number) => void;
+  activeTabIndex?: number;
 }
 
 /**
  * Reusable Tabs Component with mobile/desktop UX
  *
+ * Supports two modes:
+ * 1. Navigation mode: Tabs navigate to different pages via href
+ * 2. Content mode: Tabs call onTabChange callback for local state management
+ *
  * Desktop (sm+): Horizontal tab bar with border-bottom active indicator
  * Mobile (< sm): Dropdown showing current tab
  *
- * Usage:
+ * Navigation mode usage (for page navigation):
  * ```tsx
  * const tabs = [
  *   { href: "/settings/general", label: "General", icon: Settings },
@@ -31,9 +37,29 @@ interface TabsProps {
  * ];
  * <Tabs tabs={tabs} currentPath={pathname} permissions={userPermissions} />
  * ```
+ *
+ * Content mode usage (for content tabs without navigation):
+ * ```tsx
+ * const [activeTab, setActiveTab] = useState(0);
+ * const tabs = [
+ *   { label: "iframe", icon: Code },
+ *   { label: "Modal", icon: Code },
+ * ];
+ * <Tabs tabs={tabs} activeTabIndex={activeTab} onTabChange={setActiveTab} />
+ * ```
  */
-export function Tabs({ tabs, currentPath, permissions = [] }: TabsProps) {
+export function Tabs({
+  tabs,
+  currentPath,
+  permissions = [],
+  onTabChange,
+  activeTabIndex = 0,
+}: TabsProps) {
   const [mobileDropdownOpen, setMobileDropdownOpen] = useState(false);
+
+  // Determine if this is navigation mode or content mode
+  const isNavigationMode = currentPath !== undefined && tabs.some((tab) => tab.href);
+  const isContentMode = onTabChange !== undefined;
 
   // Filter tabs based on permissions
   const visibleTabs = useMemo(() => {
@@ -44,11 +70,15 @@ export function Tabs({ tabs, currentPath, permissions = [] }: TabsProps) {
   }, [tabs, permissions]);
 
   // Find current tab
-  const currentTab = visibleTabs.find((tab) => tab.href === currentPath) || visibleTabs[0];
+  const currentTab = isNavigationMode
+    ? visibleTabs.find((tab) => tab.href === currentPath) || visibleTabs[0]
+    : visibleTabs[activeTabIndex] || visibleTabs[0];
 
   if (visibleTabs.length === 0) {
     return null;
   }
+
+  const TabElement = isNavigationMode ? Link : "button";
 
   return (
     <>
@@ -58,21 +88,38 @@ export function Tabs({ tabs, currentPath, permissions = [] }: TabsProps) {
         style={{ borderColor: "var(--color-border)" }}
       >
         <div className="flex gap-1 min-w-min">
-          {visibleTabs.map(({ href, label, icon: Icon }) => {
-            const active = currentPath === href;
+          {visibleTabs.map(({ href, label, icon: Icon }, index) => {
+            const active = isNavigationMode
+              ? currentPath === href
+              : activeTabIndex === index;
+
+            const commonProps = {
+              className:
+                "flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap",
+              style: {
+                borderColor: active ? "var(--color-accent)" : "transparent",
+                color: active ? "var(--color-accent)" : "var(--color-muted)",
+              },
+            };
+
+            if (isNavigationMode && href) {
+              return (
+                <Link key={href} href={href} {...commonProps}>
+                  {Icon && <Icon size={16} />}
+                  <span>{label}</span>
+                </Link>
+              );
+            }
+
             return (
-              <Link
-                key={href}
-                href={href}
-                className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap"
-                style={{
-                  borderColor: active ? "var(--color-accent)" : "transparent",
-                  color: active ? "var(--color-accent)" : "var(--color-muted)",
-                }}
+              <button
+                key={`${label}-${index}`}
+                onClick={() => onTabChange?.(index)}
+                {...commonProps}
               >
                 {Icon && <Icon size={16} />}
                 <span>{label}</span>
-              </Link>
+              </button>
             );
           })}
         </div>
@@ -110,23 +157,42 @@ export function Tabs({ tabs, currentPath, permissions = [] }: TabsProps) {
               onClick={() => setMobileDropdownOpen(false)}
             >
               <nav className="flex flex-col">
-                {visibleTabs.map(({ href, label, icon: Icon }) => {
-                  const active = currentPath === href;
+                {visibleTabs.map(({ href, label, icon: Icon }, index) => {
+                  const active = isNavigationMode
+                    ? currentPath === href
+                    : activeTabIndex === index;
+
+                  const commonProps = {
+                    className:
+                      "flex items-center gap-3 px-4 py-3 border-b text-sm transition-all",
+                    style: {
+                      borderColor: "var(--color-border)",
+                      backgroundColor: active
+                        ? "var(--color-accent-soft)"
+                        : "transparent",
+                      color: active ? "var(--color-accent)" : "var(--color-fg)",
+                      fontWeight: active ? "600" : "400",
+                    },
+                  };
+
+                  if (isNavigationMode && href) {
+                    return (
+                      <Link key={href} href={href} {...commonProps}>
+                        {Icon && <Icon size={16} />}
+                        <span>{label}</span>
+                      </Link>
+                    );
+                  }
+
                   return (
-                    <Link
-                      key={href}
-                      href={href}
-                      className="flex items-center gap-3 px-4 py-3 border-b text-sm transition-all"
-                      style={{
-                        borderColor: "var(--color-border)",
-                        backgroundColor: active ? "var(--color-accent-soft)" : "transparent",
-                        color: active ? "var(--color-accent)" : "var(--color-fg)",
-                        fontWeight: active ? "600" : "400",
-                      }}
+                    <button
+                      key={`${label}-${index}`}
+                      onClick={() => onTabChange?.(index)}
+                      {...commonProps}
                     >
                       {Icon && <Icon size={16} />}
                       <span>{label}</span>
-                    </Link>
+                    </button>
                   );
                 })}
               </nav>

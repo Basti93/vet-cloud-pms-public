@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Copy, Check } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { Tabs } from "@/components/ui/tabs";
 
 interface EmbedHelpSectionProps {
   embedCode?: {
@@ -12,7 +13,7 @@ interface EmbedHelpSectionProps {
 }
 
 export function EmbedHelpSection({ embedCode }: EmbedHelpSectionProps) {
-  const [activeTab, setActiveTab] = useState<"iframe" | "modal">("iframe");
+  const [activeTabIndex, setActiveTabIndex] = useState(0);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
   const handleCopyCode = (code: string, index: number) => {
@@ -22,8 +23,8 @@ export function EmbedHelpSection({ embedCode }: EmbedHelpSectionProps) {
   };
 
   const embedTabs = [
-    { id: "iframe" as const, label: "iframe (Eingebettet)" },
-    { id: "modal" as const, label: "Modal (Popup-Dialog)" },
+    { label: "iframe (Eingebettet)" },
+    { label: "Modal (Popup-Dialog)" },
   ];
 
   return (
@@ -41,36 +42,19 @@ export function EmbedHelpSection({ embedCode }: EmbedHelpSectionProps) {
           Website:
         </p>
 
-        {/* Tab buttons using Tabs component styling */}
-        <div
-          className="border-b overflow-x-auto mb-4"
-          style={{ borderColor: "var(--color-border)" }}
-        >
-          <div className="flex gap-1 min-w-min">
-            {embedTabs.map(({ id, label }) => (
-              <button
-                key={id}
-                onClick={() => setActiveTab(id)}
-                className="px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap"
-                style={{
-                  borderColor:
-                    activeTab === id ? "var(--color-accent)" : "transparent",
-                  color:
-                    activeTab === id
-                      ? "var(--color-accent)"
-                      : "var(--color-muted)",
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+        {/* Use Tabs component in content mode */}
+        <div className="mb-4">
+          <Tabs
+            tabs={embedTabs}
+            activeTabIndex={activeTabIndex}
+            onTabChange={setActiveTabIndex}
+          />
         </div>
 
         {/* Code display */}
         {embedCode && (
           <div className="space-y-2">
-            {activeTab === "iframe" && (
+            {activeTabIndex === 0 && (
               <>
                 <p
                   className="text-xs font-medium"
@@ -109,7 +93,7 @@ export function EmbedHelpSection({ embedCode }: EmbedHelpSectionProps) {
               </>
             )}
 
-            {activeTab === "modal" && (
+            {activeTabIndex === 1 && (
               <>
                 <p
                   className="text-xs font-medium"
