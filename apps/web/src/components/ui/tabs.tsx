@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 
@@ -98,6 +98,13 @@ export function Tabs({
       tab.children.some((child) => child.href === currentPath)
   );
 
+  // Auto-expand the group if a child tab is selected
+  useEffect(() => {
+    if (currentGroupWithChild && !expandedGroup) {
+      setExpandedGroup(currentGroupWithChild.label);
+    }
+  }, [currentGroupWithChild?.label, expandedGroup]);
+
   if (visibleTabs.length === 0) {
     return null;
   }
@@ -116,15 +123,16 @@ export function Tabs({
             const isCurrentTabInGroup =
               isGroup &&
               tab.children?.some((child) => child.href === currentPath);
+            const isExpanded = expandedGroup === tab.label;
 
             const commonProps = {
               className:
                 "flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap",
               style: {
-                borderColor: isActive || isCurrentTabInGroup
+                borderColor: isActive || isCurrentTabInGroup || (isGroup && isExpanded)
                   ? "var(--color-accent)"
                   : "transparent",
-                color: isActive || isCurrentTabInGroup
+                color: isActive || isCurrentTabInGroup || (isGroup && isExpanded)
                   ? "var(--color-accent)"
                   : "var(--color-muted)",
               },
@@ -268,6 +276,7 @@ export function Tabs({
                 {visibleTabs.map((tab) => {
                   const isGroup = tab.children && tab.children.length > 0;
                   const isCurrentGroupExpanded = expandedGroup === tab.label;
+                  const isChildActive = tab.children?.some((child) => child.href === currentPath);
 
                   if (isGroup) {
                     return (
@@ -282,8 +291,8 @@ export function Tabs({
                           className="w-full flex items-center justify-between px-4 py-3 border-b text-sm font-medium transition-all"
                           style={{
                             borderColor: "var(--color-border)",
-                            backgroundColor: "transparent",
-                            color: "var(--color-fg)",
+                            backgroundColor: isCurrentGroupExpanded || isChildActive ? "var(--color-accent-soft)" : "transparent",
+                            color: isCurrentGroupExpanded || isChildActive ? "var(--color-accent)" : "var(--color-fg)",
                           }}
                         >
                           <div className="flex items-center gap-3">

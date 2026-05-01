@@ -9,6 +9,7 @@ import { useTenant } from '@/hooks/useTenant';
 import { useCurrentVet } from '@/hooks/useCurrentVet';
 import { TableFilters, type FilterState } from '@/components/appointments/TableFilters';
 import { AppointmentTable } from '@/components/appointments/AppointmentTable';
+import { AppointmentModal } from '@/components/appointments/AppointmentModal';
 import { Card } from '@/components/ui/card';
 
 export default function AppointmentsPage() {
@@ -22,6 +23,8 @@ export default function AppointmentsPage() {
     dateFrom: '',
     dateTo: '',
   });
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
 
   // Auto-set filter to current vet if they are a vet
   useEffect(() => {
@@ -31,7 +34,7 @@ export default function AppointmentsPage() {
   }, [vetId]);
 
   // Fetch appointments with details
-  const { data: appointments, isLoading: isFetching } =
+  const { data: appointments, isLoading: isFetching, refetch: refetchAppointments } =
     trpc.appointments.listWithDetails.useQuery(
       {
         tenantId: tenantId || '',
@@ -147,7 +150,39 @@ export default function AppointmentsPage() {
         vets={vets || []}
         loading={isFetching}
         showActions={false}
+        onAppointmentClick={(item) => {
+          setSelectedAppointment(item);
+          setModalOpen(true);
+        }}
       />
+
+      {/* Edit Modal */}
+      {selectedAppointment && (
+        <AppointmentModal
+          open={modalOpen}
+          onClose={() => {
+            setModalOpen(false);
+            setSelectedAppointment(null);
+          }}
+          tenantId={tenantId || ''}
+          editData={{
+            id: selectedAppointment.id,
+            title: selectedAppointment.title,
+            description: selectedAppointment.description || null,
+            startTime: new Date(selectedAppointment.startTime),
+            endTime: new Date(selectedAppointment.endTime),
+            status: selectedAppointment.status,
+            patientId: selectedAppointment.patientId,
+            vetId: selectedAppointment.vetId,
+            patientName: selectedAppointment.patientName,
+          }}
+          onSuccess={() => {
+            refetchAppointments();
+            setModalOpen(false);
+            setSelectedAppointment(null);
+          }}
+        />
+      )}
     </div>
   );
 }

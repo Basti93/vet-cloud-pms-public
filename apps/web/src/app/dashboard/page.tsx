@@ -6,6 +6,7 @@ import { trpc } from "@/lib/trpc/client";
 import { useTenant } from "@/hooks/useTenant";
 import { useCurrentVet } from "@/hooks/useCurrentVet";
 import { Skeleton } from "@/components/ui/skeleton";
+import { StatusTooltip } from "@/components/ui/status-tooltip";
 import { AppointmentModal } from "@/components/appointments/AppointmentModal";
 import { NewPatientModal } from "@/components/patients/NewPatientModal";
 import { AppointmentTable } from "@/components/appointments/AppointmentTable";
@@ -51,16 +52,20 @@ export default function DashboardHome() {
   const { tenantId } = useTenant();
   const vetId = useCurrentVet();
   const [apptModalOpen, setApptModalOpen] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
   const [patientModalOpen, setPatientModalOpen] = useState(false);
   const { data: currentUser } = trpc.admin.getCurrentUser.useQuery();
 
   const { today, todayStart, todayEnd, monthStart, monthEnd, upcomingEnd } = useMemo(() => {
     const today = new Date();
-    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const todayEnd = new Date(todayStart.getTime() + 86_400_000);
-    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-    const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-    const upcomingEnd = new Date(today.getTime() + 7 * 86_400_000);
+    // Today: from 00:00:00 to 23:59:59
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0);
+    const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+    // Month: from 1st to last day (inclusive)
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1, 0, 0, 0, 0);
+    const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
+    // Upcoming: next 7 days
+    const upcomingEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 7, 23, 59, 59, 999);
     return { today, todayStart, todayEnd, monthStart, monthEnd, upcomingEnd };
   }, []);
 
@@ -72,7 +77,7 @@ export default function DashboardHome() {
     { tenantId: tenantId!, from: monthStart, to: monthEnd },
     { enabled: !!tenantId }
   );
-  const { data: upcomingAppts, isLoading: upcomingLoading } = trpc.appointments.listWithDetails.useQuery(
+  const { data: upcomingAppts, isLoading: upcomingLoading, refetch: refetchUpcomingAppts } = trpc.appointments.listWithDetails.useQuery(
     { tenantId: tenantId!, from: today, to: upcomingEnd },
     { enabled: !!tenantId }
   );
@@ -83,7 +88,9 @@ export default function DashboardHome() {
 
   const todayAppts = allAppts?.filter((a) => {
     const d = new Date(a.startTime);
-    return d >= todayStart && d < todayEnd && (!vetId || a.vetId === vetId);
+    const dDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const todayDate = new Date(todayStart.getFullYear(), todayStart.getMonth(), todayStart.getDate());
+    return dDate.getTime() === todayDate.getTime() && (!vetId || a.vetId === vetId);
   }) ?? [];
 
   const completedThisMonth = allAppts?.filter(
@@ -164,6 +171,10 @@ export default function DashboardHome() {
               todayStart={todayStart}
               todayEnd={todayEnd}
               showActions={false}
+              onAppointmentClick={(item) => {
+                setSelectedAppointment(item);
+                setApptModalOpen(true);
+              }}
             />
           </div>
         </div>
@@ -230,10 +241,14 @@ export default function DashboardHome() {
 
           {/* Today summary */}
           <div className="bg-surface rounded-2xl border border-border shadow-sm p-6">
-            <h3 className="font-semibold text-fg text-sm mb-3">Heute im Überblick</h3>
+            <div className="flex items-center gap-2 mb-3">
+              <h3 className="font-semibold text-fg text-sm">Heute im Überblick</h3>
+              <StatusTooltip />
+            </div>
             <div className="space-y-2.5">
               {[
                 ["Geplant", todayAppts.filter((a) => a.status === "scheduled").length, "#2563eb"],
+                ["Bestätigt", todayAppts.filter((a) => a.status === "confirmed").length, "#10b981"],
                 ["Abgeschlossen", todayAppts.filter((a) => a.status === "completed").length, "#16a34a"],
                 ["Abgesagt", todayAppts.filter((a) => a.status === "cancelled").length, "#dc2626"],
                 ["Nicht erschienen", todayAppts.filter((a) => a.status === "no-show").length, "#d97706"],
@@ -252,9 +267,28 @@ export default function DashboardHome() {
         <>
           <AppointmentModal
             open={apptModalOpen}
-            onClose={() => setApptModalOpen(false)}
+            onClose={() => {
+              setApptModalOpen(false);
+              setSelectedAppointment(null);
+            }}
             tenantId={tenantId}
-            onSuccess={() => refetchAppts()}
+            onSuccess={() => {
+              refetchAppts();
+              refetchUpcomingAppts();
+              setApptModalOpen(false);
+              setSelectedAppointment(null);
+            }}
+            editData={selectedAppointment ? {
+              id: selectedAppointment.id,
+              title: selectedAppointment.title,
+              description: selectedAppointment.description || null,
+              startTime: new Date(selectedAppointment.startTime),
+              endTime: new Date(selectedAppointment.endTime),
+              status: selectedAppointment.status,
+              patientId: selectedAppointment.patientId,
+              vetId: selectedAppointment.vetId,
+              patientName: selectedAppointment.patientName,
+            } : undefined}
           />
           <NewPatientModal
             open={patientModalOpen}

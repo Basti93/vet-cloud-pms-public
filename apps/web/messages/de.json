@@ -68,10 +68,15 @@
   },
   "status": {
     "scheduled": "Geplant",
+    "scheduled_description": "Online-Buchung wartet auf Bestätigung durch die Praxis",
     "confirmed": "Bestätigt",
+    "confirmed_description": "Termin wurde bestätigt oder direkt von der Praxis geplant",
     "completed": "Abgeschlossen",
+    "completed_description": "Termin wurde durchgeführt und abgeschlossen",
     "cancelled": "Abgesagt",
-    "noShow": "Nicht erschienen"
+    "cancelled_description": "Termin wurde storniert oder abgesagt",
+    "no_show": "Nicht erschienen",
+    "no_show_description": "Patient ist nicht zum Termin erschienen"
   },
   "booking": {
     "title": "Online-Terminbuchung",

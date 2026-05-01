@@ -125,22 +125,28 @@ export function SearchableSelect({
           }}
         >
           <Search size={16} style={{ color: "var(--color-muted)" }} />
-          <input
-            ref={inputRef}
-            type="text"
-            placeholder={selectedOption ? selectedOption.label : placeholder}
-            value={isOpen ? search : ""}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setHighlightedIndex(0);
-            }}
-            onKeyDown={handleKeyDown}
-            onFocus={() => !disabled && setIsOpen(true)}
-            disabled={disabled}
-            className="flex-1 bg-transparent outline-none text-sm placeholder:opacity-50"
-            style={{ color: "var(--color-fg)" }}
-          />
-          {value && !isOpen && (
+          {!isOpen && selectedOption ? (
+            <span className="flex-1 text-sm font-medium" style={{ color: "var(--color-fg)" }}>
+              {selectedOption.label}
+            </span>
+          ) : (
+            <input
+              ref={inputRef}
+              type="text"
+              placeholder={placeholder}
+              value={isOpen ? search : ""}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setHighlightedIndex(0);
+              }}
+              onKeyDown={handleKeyDown}
+              onFocus={() => !disabled && setIsOpen(true)}
+              disabled={disabled}
+              className="flex-1 bg-transparent outline-none text-sm placeholder:opacity-50"
+              style={{ color: "var(--color-fg)" }}
+            />
+          )}
+          {value && !isOpen && !disabled && (
             <button
               type="button"
               onClick={handleClear}

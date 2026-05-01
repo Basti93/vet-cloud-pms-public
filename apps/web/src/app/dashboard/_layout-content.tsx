@@ -196,27 +196,13 @@ export default function DashboardContent({ children }: { children: ReactNode }) 
 
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <header
-          className="px-4 md:px-8 py-4 flex items-center justify-between flex-shrink-0"
-          style={{
-            backgroundColor: 'var(--color-surface)',
-            borderColor: 'var(--color-border)',
-            borderBottomWidth: '1px',
-          }}
-        >
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="md:hidden p-2 rounded-lg transition-colors" style={{ color: 'var(--color-fg)' }}>
-            {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
+        {/* Mobile header with hamburger */}
+        <div className="md:hidden px-4 py-3 flex items-center flex-shrink-0" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)', borderBottomWidth: '1px' }}>
+          <button onClick={() => setSidebarOpen(true)} className="p-2 rounded-lg transition-colors" style={{ color: 'var(--color-fg)' }}>
+            <Menu size={20} />
           </button>
-          <span
-            className="text-xs px-2.5 py-1 rounded-full font-medium"
-            style={{
-              backgroundColor: 'var(--color-accent-soft)',
-              color: 'var(--color-accent-text)',
-            }}
-          >
-            {praxis?.tenantName || 'Demo-Praxis'}
-          </span>
-        </header>
+        </div>
+
         <main className="flex-1 overflow-auto" style={{ backgroundColor: 'var(--color-bg)' }}>
           <div className="p-4 md:p-8" style={{ color: 'var(--color-fg)' }}>
             {children}

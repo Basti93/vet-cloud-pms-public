@@ -370,9 +370,16 @@ export function AppointmentTable({
                       return (
                         <div
                           key={item.id}
-                          className={`flex items-start gap-3 px-4 py-3 hover:bg-muted-soft transition-colors ${
+                          className={`flex items-start gap-3 px-4 py-3 hover:bg-muted-soft transition-colors cursor-pointer ${
                             compact ? 'text-xs' : 'text-sm'
                           }`}
+                          onClick={() => {
+                            if (onAppointmentClick) {
+                              onAppointmentClick(item);
+                            } else {
+                              router.push(`/dashboard/schedule?appointment=${item.id}`);
+                            }
+                          }}
                         >
                           <div
                             className={`rounded-lg flex items-center justify-center flex-shrink-0 ${

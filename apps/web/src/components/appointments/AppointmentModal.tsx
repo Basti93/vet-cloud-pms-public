@@ -299,6 +299,7 @@ export function AppointmentModal({
               variant="destructive"
               onClick={handleDelete}
               loading={deleteAppt.isPending}
+              disabled={isLoading || deleteAppt.isPending}
               className="flex-shrink-0"
             >
               <Trash2 size={14} />

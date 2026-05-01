@@ -33,7 +33,7 @@ export function AppointmentStatusBadge({
 }) {
   const map: Record<string, { variant: BadgeProps["variant"]; label: string }> = {
     scheduled: { variant: "info", label: "Geplant" },
-    completed: { variant: "success", label: "Bestätigt" },
+    completed: { variant: "success", label: "Abgeschlossen" },
     confirmed: { variant: "success", label: "Bestätigt" },
     cancelled: { variant: "danger", label: "Abgesagt" },
     "no-show": { variant: "warning", label: "Nicht erschienen" },
