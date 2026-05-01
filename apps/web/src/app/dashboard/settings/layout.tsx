@@ -2,23 +2,29 @@
 
 import { ReactNode, useMemo, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Palette, Users, Building2, Mail, CalendarClock, Shield, Settings as SettingsIcon, User } from "lucide-react";
+import { Palette, Users, Building2, Mail, CalendarClock, Shield, Cog } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { PERMISSIONS } from "@/lib/db/schema";
 import { Tabs } from "@/components/ui/tabs";
 
 const ALL_TABS = [
   {
-    label: "Einstellungen",
-    icon: SettingsIcon,
+    label: "Grundeinstellungen",
+    icon: Cog,
     children: [
       { href: "/dashboard/settings/practice", label: "Praxis", icon: Building2 },
       { href: "/dashboard/settings/appearance", label: "Erscheinungsbild", icon: Palette },
       { href: "/dashboard/settings/email", label: "E-Mails", icon: Mail },
       { href: "/dashboard/settings/availability", label: "Verfügbarkeit", icon: CalendarClock },
-      { href: "/dashboard/settings/team", label: "Team & Benutzer", icon: Users, requiredPermission: PERMISSIONS.USERS_MANAGE },
-      { href: "/dashboard/settings/roles", label: "Rollen & Berechtigungen", icon: Shield, requiredPermission: PERMISSIONS.USERS_MANAGE },
-      { href: "/dashboard/user-settings", label: "Benutzereinstellungen", icon: User },
+    ],
+  },
+  {
+    label: "Team & Berechtigungen",
+    icon: Shield,
+    requiredPermission: PERMISSIONS.USERS_MANAGE,
+    children: [
+      { href: "/dashboard/settings/team", label: "Team & Benutzer", icon: Users },
+      { href: "/dashboard/settings/roles", label: "Rollen & Berechtigungen", icon: Shield },
     ],
   },
 ];
