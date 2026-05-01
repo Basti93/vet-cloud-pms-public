@@ -24,18 +24,24 @@ export const userRouter = createTRPCRouter({
       }
 
       try {
-        const [updatedUser] = await ctx.db
-          .update(users)
-          .set({ locale: input.locale })
-          .where(eq(users.id, ctx.userId))
-          .returning();
+        // Get user's database ID by clerkId
+        const [user] = await ctx.db
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.clerkId, ctx.userId));
 
-        if (!updatedUser) {
+        if (!user) {
           throw new TRPCError({
             code: "NOT_FOUND",
             message: "User not found",
           });
         }
+
+        const [updatedUser] = await ctx.db
+          .update(users)
+          .set({ locale: input.locale })
+          .where(eq(users.id, user.id))
+          .returning();
 
         return updatedUser;
       } catch (error) {
@@ -65,7 +71,7 @@ export const userRouter = createTRPCRouter({
     const [user] = await ctx.db
       .select({ locale: users.locale })
       .from(users)
-      .where(eq(users.id, ctx.userId));
+      .where(eq(users.clerkId, ctx.userId));
 
     if (!user) {
       throw new TRPCError({

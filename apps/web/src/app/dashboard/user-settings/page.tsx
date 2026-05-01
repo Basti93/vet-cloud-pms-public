@@ -94,6 +94,7 @@ export default function UserSettingsPage() {
       setError(undefined);
       setSuccessMessage("Sprache erfolgreich gespeichert");
       setTimeout(() => setSuccessMessage(undefined), 3000);
+      utils.user.getLocale.invalidate();
     },
     onError: (err) => {
       setError(err.message || "Fehler beim Speichern der Sprache");
