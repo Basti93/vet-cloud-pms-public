@@ -15,7 +15,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { EnvironmentBanner } from "@/components/EnvironmentBanner";
 import type { PraxisPreferences, UserPreferences } from "@/lib/user/preferences";
-// import "./globals.css";
+import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Vet Cloud PMS",
