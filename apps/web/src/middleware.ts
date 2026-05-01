@@ -2,7 +2,7 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { PUBLIC_ROUTES } from '@/config/routes';
 
-const isPublicRoute = createRouteMatcher(PUBLIC_ROUTES);
+const isPublicRoute = createRouteMatcher([...PUBLIC_ROUTES]);
 
 export default clerkMiddleware(async (auth, req) => {
   // Intercept CORS preflight before Clerk auth runs.
