@@ -53,16 +53,10 @@ export default function UserSettingsPage() {
   // Get utils at top level (before hooks)
   const utils = trpc.useUtils();
 
-  // Load user's saved locale from database
-  const { data: savedLocale } = trpc.user.getLocale.useQuery();
-
-  // Sync saved locale from database to context and local state
+  // Sync context locale to local state when component mounts
   useEffect(() => {
-    if (savedLocale?.locale && (savedLocale.locale === "de" || savedLocale.locale === "en")) {
-      setLocale(savedLocale.locale);
-      setLocalLocale(savedLocale.locale);
-    }
-  }, [savedLocale?.locale, setLocale]);
+    setLocalLocale(locale);
+  }, [locale]);
 
   // Vet-specific queries and mutations
   const { data: vetSchedule = [] } = trpc.user.getVetSchedule.useQuery(
