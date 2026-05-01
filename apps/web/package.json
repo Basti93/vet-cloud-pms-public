@@ -49,6 +49,7 @@
     "zod": "^3"
   },
   "devDependencies": {
+    "@swc/helpers": "^0.5.17",
     "@tailwindcss/postcss": "^4",
     "@testing-library/react": "^16",
     "@types/jsonwebtoken": "^9.0.10",
@@ -68,8 +69,5 @@
     "tsx": "^4",
     "typescript": "^5",
     "vitest": "^2"
-  },
-  "optionalDependencies": {
-    "lightningcss-linux-x64-gnu": "1.32.0"
   }
 }
