@@ -1,16 +1,10 @@
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { FlatCompat } from "@eslint/eslintrc";
+import { defineConfig, globalIgnores } from "eslint/config";
+import nextVitals from "eslint-config-next/core-web-vitals";
+import nextTs from "eslint-config-next/typescript";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-});
-
-const config = [
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
+export default defineConfig([
+  ...nextVitals,
+  ...nextTs,
   {
     rules: {
       "@next/next/no-html-link-for-pages": "off",
@@ -26,6 +20,11 @@ const config = [
       "@typescript-eslint/no-unused-expressions": "error",
       "@typescript-eslint/no-empty-object-type": "warn",
       "@typescript-eslint/triple-slash-reference": "off",
+      "react-hooks/static-components": "off",
+      "react-hooks/refs": "off",
+      "react-hooks/set-state-in-effect": "off",
+      "react-hooks/purity": "off",
+      "react-hooks/error-boundaries": "off",
       "react-hooks/exhaustive-deps": "error",
       "react-hooks/rules-of-hooks": "error",
       "react/no-unescaped-entities": "warn",
@@ -33,18 +32,14 @@ const config = [
       "import/no-anonymous-default-export": "warn",
     },
   },
-  {
-    ignores: [
-      "next-env.d.ts",
-      ".next/**",
-      "out/**",
-      "build/**",
-      "dist/**",
-      "coverage/**",
-      "drizzle/**",
-      "scripts/**",
-    ],
-  },
-];
-
-export default config;
+  globalIgnores([
+    ".next/**",
+    "out/**",
+    "build/**",
+    "dist/**",
+    "coverage/**",
+    "drizzle/**",
+    "scripts/**",
+    "next-env.d.ts",
+  ]),
+]);
