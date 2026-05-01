@@ -6,12 +6,13 @@ import { formatDistanceToNow } from "date-fns";
 import { de } from "date-fns/locale";
 
 export default function LogsPage() {
-  const [level, setLevel] = useState<string | undefined>();
+  type LogLevel = "debug" | "info" | "warn" | "error" | "critical";
+  const [level, setLevel] = useState<LogLevel | undefined>();
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const { data, isLoading, error } = trpc.adminDashboard.logs.queryLogs.useQuery(
     {
-      level: (level as any) || undefined,
+      level,
       limit: 100,
     },
     {
@@ -62,7 +63,7 @@ export default function LogsPage() {
         </label>
         <select
           value={level || ""}
-          onChange={(e) => setLevel(e.target.value || undefined)}
+          onChange={(e) => setLevel((e.target.value || undefined) as LogLevel | undefined)}
           className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Alle Schweregrade</option>

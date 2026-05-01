@@ -7,15 +7,17 @@ import { formatDistanceToNow } from "date-fns";
 import { de } from "date-fns/locale";
 
 export default function TenantsPage() {
+  type TenantPlan = "free" | "starter" | "pro" | "enterprise";
+  type TenantStatus = "trial" | "active" | "paused" | "cancelled";
   const [search, setSearch] = useState("");
-  const [plan, setPlan] = useState<string | undefined>();
-  const [status, setStatus] = useState<string | undefined>();
+  const [plan, setPlan] = useState<TenantPlan | undefined>();
+  const [status, setStatus] = useState<TenantStatus | undefined>();
 
   const { data, isLoading, error } = trpc.adminDashboard.core.listTenants.useQuery(
     {
       search: search || undefined,
-      plan: (plan as any) || undefined,
-      status: (status as any) || undefined,
+      plan,
+      status,
       limit: 50,
     },
     {
@@ -62,7 +64,7 @@ export default function TenantsPage() {
           </label>
           <select
             value={plan || ""}
-            onChange={(e) => setPlan(e.target.value || undefined)}
+            onChange={(e) => setPlan((e.target.value || undefined) as TenantPlan | undefined)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">Alle Pläne</option>
@@ -79,7 +81,9 @@ export default function TenantsPage() {
           </label>
           <select
             value={status || ""}
-            onChange={(e) => setStatus(e.target.value || undefined)}
+            onChange={(e) =>
+              setStatus((e.target.value || undefined) as TenantStatus | undefined)
+            }
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">Alle Status</option>
