@@ -1,14 +1,14 @@
 import { z } from "zod";
-import { adminProcedure, createTRPCRouter } from "../trpc";
+import { createAdminRouter, procedure } from "../adminTrpc";
 import { db } from "@/lib/db/client";
 import { users, userRoles, roles } from "@/lib/db/schema";
 import { eq, inArray } from "drizzle-orm";
 
-export const adminUsersRouter = createTRPCRouter({
+export const adminUsersRouter = createAdminRouter({
   /**
    * Get all users in a specific tenant with their roles
    */
-  listTenantUsers: adminProcedure
+  listTenantUsers: procedure
     .input(z.object({ tenantId: z.string().uuid() }))
     .query(async ({ input }) => {
       const tenantUsers = await db

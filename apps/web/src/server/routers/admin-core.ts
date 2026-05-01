@@ -1,14 +1,14 @@
 import { z } from "zod";
-import { adminProcedure, createTRPCRouter } from "../trpc";
+import { createAdminRouter, procedure } from "../adminTrpc";
 import { db } from "@/lib/db/client";
 import { tenants, users } from "@/lib/db/schema";
 import { eq, like, desc, and, count } from "drizzle-orm";
 
-export const adminCoreRouter = createTRPCRouter({
+export const adminCoreRouter = createAdminRouter({
   /**
    * List all tenants with optional filters
    */
-  listTenants: adminProcedure
+  listTenants: procedure
     .input(
       z.object({
         search: z.string().optional(),
@@ -71,7 +71,7 @@ export const adminCoreRouter = createTRPCRouter({
   /**
    * Get detailed tenant info including usage stats
    */
-  getTenantDetails: adminProcedure
+  getTenantDetails: procedure
     .input(z.object({ tenantId: z.string().uuid() }))
     .query(async ({ input }) => {
       const [tenant] = await db
@@ -98,7 +98,7 @@ export const adminCoreRouter = createTRPCRouter({
   /**
    * Suspend a tenant (prevent access)
    */
-  suspendTenant: adminProcedure
+  suspendTenant: procedure
     .input(
       z.object({
         tenantId: z.string().uuid(),
@@ -117,7 +117,7 @@ export const adminCoreRouter = createTRPCRouter({
   /**
    * Unsuspend a tenant
    */
-  unsuspendTenant: adminProcedure
+  unsuspendTenant: procedure
     .input(z.object({ tenantId: z.string().uuid() }))
     .mutation(async ({ input }) => {
       await db
@@ -131,7 +131,7 @@ export const adminCoreRouter = createTRPCRouter({
   /**
    * Update tenant plan
    */
-  updatePlan: adminProcedure
+  updatePlan: procedure
     .input(
       z.object({
         tenantId: z.string().uuid(),
@@ -151,7 +151,7 @@ export const adminCoreRouter = createTRPCRouter({
    * Toggle feature flag (e.g., AI voice enabled/disabled)
    * For now, stored in a JSON column. Future: dedicated feature_flags table.
    */
-  toggleFeatureFlag: adminProcedure
+  toggleFeatureFlag: procedure
     .input(
       z.object({
         tenantId: z.string().uuid(),

@@ -1,21 +1,23 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+import { NextResponse } from 'next/server';
+import { PUBLIC_ROUTES } from '@/config/routes';
 
-// Routes that don't require authentication
-const isPublicRoute = createRouteMatcher([
-  '/sign-in(.*)',
-  '/sign-up(.*)',
-  '/book(.*)',  // Public booking pages
-  '/impressum(.*)',  // Legal notice
-  '/datenschutz(.*)',  // Privacy policy
-  '/api/webhooks/clerk',  // Clerk webhooks (use Svix signature verification)
-  '/api/trpc/booking(.*)',  // Public booking tRPC endpoints
-  '/api/trpc/tenant(.*)',  // Public tenant endpoints
-  '/api/calendar(.*)',  // Calendar export (token-protected, not user-authenticated)
-  '/',
-]);
+const isPublicRoute = createRouteMatcher(PUBLIC_ROUTES);
 
 export default clerkMiddleware(async (auth, req) => {
-  // Protect non-public routes by redirecting to sign-in if not authenticated
+  // Intercept CORS preflight before Clerk auth runs.
+  // Bearer token auth doesn't need credentials mode, so wildcard origin is safe.
+  if (req.method === 'OPTIONS') {
+    return new NextResponse(null, {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      },
+    });
+  }
+
   if (!isPublicRoute(req)) {
     const authObj = await auth();
     if (!authObj.userId) {
@@ -26,7 +28,6 @@ export default clerkMiddleware(async (auth, req) => {
 
 export const config = {
   matcher: [
-    // Match all routes except static files and Next.js internals
     '/((?!_next/static|_next/image|favicon.ico|.*\\.png|.*\\.jpg|.*\\.jpeg|.*\\.gif|.*\\.svg).*)',
   ],
 };

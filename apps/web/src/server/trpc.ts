@@ -63,7 +63,6 @@ const enforceIsAdmin = t.middleware(({ ctx, next }) => {
     throw new TRPCError({ code: "UNAUTHORIZED" });
   }
 
-  // Check if user is in ADMIN_CLERK_IDS list
   const allowedIds = (process.env.ADMIN_CLERK_IDS ?? "")
     .split(",")
     .map((id) => id.trim())

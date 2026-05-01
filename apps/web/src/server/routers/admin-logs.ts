@@ -1,14 +1,14 @@
 import { z } from "zod";
-import { adminProcedure, createTRPCRouter } from "../trpc";
+import { createAdminRouter, procedure } from "../adminTrpc";
 import { db } from "@/lib/db/client";
 import { systemLogs } from "@/lib/db/schema";
 import { eq, and, gte, lte, desc, inArray } from "drizzle-orm";
 
-export const adminLogsRouter = createTRPCRouter({
+export const adminLogsRouter = createAdminRouter({
   /**
    * Query logs with optional filters
    */
-  queryLogs: adminProcedure
+  queryLogs: procedure
     .input(
       z.object({
         tenantId: z.string().uuid().optional(),
@@ -71,7 +71,7 @@ export const adminLogsRouter = createTRPCRouter({
   /**
    * Get full log entry with stack trace and metadata
    */
-  getLogDetails: adminProcedure
+  getLogDetails: procedure
     .input(z.object({ logId: z.string().uuid() }))
     .query(async ({ input }) => {
       const [log] = await db
