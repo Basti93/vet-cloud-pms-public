@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useMemo, useEffect, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Palette, Users, Building2, Mail, CalendarClock, Shield, Cog, Lock } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";

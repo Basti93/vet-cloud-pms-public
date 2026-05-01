@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { trpc } from '@/lib/trpc/client';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
-import { Mail, AlertCircle, CheckCircle } from 'lucide-react';
+import { Mail, AlertCircle } from 'lucide-react';
 
 export default function EmailSettingsPage() {
   const [isMounted, setIsMounted] = useState(false);

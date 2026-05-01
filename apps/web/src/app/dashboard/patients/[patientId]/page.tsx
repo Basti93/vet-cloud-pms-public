@@ -5,7 +5,6 @@ import { trpc } from '@/lib/trpc/client';
 import { useParams } from 'next/navigation';
 import { useTenant } from '@/hooks/useTenant';
 import {
-  AlertCircle,
   ChevronLeft,
   Plus,
   Pill,
@@ -13,7 +12,6 @@ import {
   TrendingDown,
   AlertTriangle,
   Calendar,
-  Edit2,
   Clock,
 } from 'lucide-react';
 import Link from 'next/link';

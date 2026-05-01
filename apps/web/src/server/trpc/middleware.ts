@@ -6,6 +6,9 @@ import { hasPermission } from "@/lib/auth/permissions";
  * Throws FORBIDDEN if user lacks the permission
  */
 export function requirePermission(permission: string) {
+  // tRPC middleware context/result typing varies by procedure builder;
+  // keep this generic to remain compatible across all routers.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return async ({ ctx, next }: any) => {
     if (!ctx.userId) {
       throw new TRPCError({

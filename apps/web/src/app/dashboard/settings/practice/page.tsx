@@ -81,7 +81,8 @@ export default function PracticePage() {
         postalCode: tenant.postalCode || "",
         tagline: tenant.tagline || "",
         monogram: tenant.monogram || "",
-        allowedEmbeddingDomains: ((tenant as any).allowedEmbeddingDomains as string[]) || [],
+        allowedEmbeddingDomains:
+          (tenant as { allowedEmbeddingDomains?: string[] }).allowedEmbeddingDomains || [],
       });
     }
   }, [tenant]);

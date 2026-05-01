@@ -1,6 +1,6 @@
 'use client';
 
-import { Mail, Phone, MapPin, Clock } from 'lucide-react';
+import { Mail, Phone, MapPin } from 'lucide-react';
 
 interface KlassikTemplateProps {
   brandName: string;

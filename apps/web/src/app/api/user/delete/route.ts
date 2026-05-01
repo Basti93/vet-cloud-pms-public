@@ -53,7 +53,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Parse request body
-    let body: any = {};
+    let body: { confirmDelete?: boolean } = {};
     try {
       body = await request.json();
     } catch {

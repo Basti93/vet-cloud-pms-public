@@ -5,7 +5,6 @@ import { trpc } from '@/lib/trpc/client';
 import { Clock, User, CalendarOff, Plus, Trash2, CheckCircle, ChevronDown, ChevronUp, X } from 'lucide-react';
 import type { DaySchedule, TimeRange } from '@/lib/schedule-types';
 
-const DAY_NAMES = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
 const DAY_SHORT = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 // Display order: Mon first
 const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
@@ -71,20 +70,6 @@ function DayRow({
     } else {
       onChange({ ...day, slots: [{ startHour: 8, startMin: 0, endHour: 18, endMin: 0 }] });
     }
-  }
-
-  function updateSlot(i: number, field: keyof TimeRange, h: number, m?: number) {
-    const newSlots = day.slots.map((s, idx) =>
-      idx === i ? { ...s, [field]: field.endsWith('Min') ? (m ?? 0) : h, ...(m !== undefined && field.startsWith('start') ? { startMin: m } : {}), ...(m !== undefined && field.startsWith('end') ? { endMin: m } : {}) } : s
-    );
-    // Handle paired hour+min update
-    const slots = day.slots.map((s, idx) => {
-      if (idx !== i) return s;
-      if (field === 'startHour') return { ...s, startHour: h, startMin: m ?? s.startMin };
-      if (field === 'endHour') return { ...s, endHour: h, endMin: m ?? s.endMin };
-      return s;
-    });
-    onChange({ ...day, slots });
   }
 
   function addSlot() {
@@ -296,7 +281,7 @@ export default function AvailabilityPage() {
 
         <div className="flex items-center gap-3 pt-1">
           <button
-            onClick={() => updatePracticeHours.mutate({ tenantId, hours: practiceHours as any })}
+            onClick={() => updatePracticeHours.mutate({ tenantId, hours: practiceHours as DaySchedule[] })}
             disabled={updatePracticeHours.isPending}
             className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
             style={{ backgroundColor: 'var(--color-accent)' }}
@@ -468,7 +453,7 @@ export default function AvailabilityPage() {
               </div>
               <div>
                 <label className="text-xs font-medium block mb-1" style={{ color: 'var(--color-muted)' }}>Art</label>
-                <select value={newAbsence.type} onChange={(e) => setNewAbsence({ ...newAbsence, type: e.target.value as any })}
+                <select value={newAbsence.type} onChange={(e) => setNewAbsence({ ...newAbsence, type: e.target.value as 'vacation' | 'sick' | 'other' })}
                   className="w-full text-sm border rounded px-2 py-1.5"
                   style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)', color: 'var(--color-fg)' }}>
                   {ABSENCE_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}

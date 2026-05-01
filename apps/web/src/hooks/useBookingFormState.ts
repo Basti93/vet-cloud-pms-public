@@ -38,7 +38,7 @@ function generateOrGetSessionId(): string {
   return sessionId;
 }
 
-export function useBookingFormState(tenantSlug: string) {
+export function useBookingFormState(_tenantSlug: string) {
   const [state, setState] = useState<BookingFormState>({});
   const [isLoaded, setIsLoaded] = useState(false);
 

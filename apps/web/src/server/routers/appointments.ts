@@ -2,12 +2,13 @@ import { z } from "zod";
 import { eq, and, gte, lte } from "drizzle-orm";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "@/server/trpc";
 import { appointments, patients, owners, users, PERMISSIONS } from "@/lib/db/schema";
+import { db as appDb } from "@/lib/db/client";
 import { TRPCError } from "@trpc/server";
 import { verifyConfirmationToken } from "@/lib/tokens/confirmation";
 import { requirePermission } from "@/server/trpc/middleware";
 import { appointmentEvents } from "@/lib/events/appointment";
 
-async function getUserTenant(ctx: any, userId: string) {
+async function getUserTenant(ctx: { db: typeof appDb }, userId: string) {
   const [user] = await ctx.db
     .select({ tenantId: users.tenantId })
     .from(users)

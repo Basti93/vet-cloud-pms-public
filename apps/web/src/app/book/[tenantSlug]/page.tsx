@@ -193,7 +193,7 @@ function CountdownTimer({ expiresAt, onExpired }: { expiresAt: Date; onExpired: 
 function StepVet({
   vets,
   vetAvailability,
-  primaryColor,
+  primaryColor: _primaryColor,
   onSelect,
 }: {
   vets?: VetOption[];
@@ -518,7 +518,7 @@ function StepDetails({
   slot,
   vetName,
   primaryColor,
-  holdToken,
+  holdToken: _holdToken,
   holdExpiresAt,
   onHoldExpired,
   onBack,
@@ -714,7 +714,7 @@ function StepConfirm({
   selectedVetId,
   primaryColor,
   browserSessionId,
-  holdToken,
+  holdToken: _holdToken,
   holdExpiresAt,
   onHoldExpired,
   onBack,
@@ -935,7 +935,7 @@ export default function BookingPage({
   const releaseHoldMutation = trpc.booking.releaseHold.useMutation();
 
   // Persistent form state via localStorage
-  const { state: formState, updateField, clear: clearFormState, isLoaded } = useBookingFormState(tenantSlug);
+  const { state: formState, updateField, clear: clearFormState } = useBookingFormState(tenantSlug);
 
   const [step, setStep] = useState<Step>("vet");
   const [successData, setSuccessData] = useState<{ startTime: Date; ownerName: string; patientName: string; vetName?: string } | null>(null);

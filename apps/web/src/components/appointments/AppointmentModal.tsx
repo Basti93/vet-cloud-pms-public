@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
-import { AppointmentStatusBadge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc/client";
 import { Trash2 } from "lucide-react";
 
@@ -152,7 +151,7 @@ export function AppointmentModal({
         description: form.description || undefined,
         startTime,
         endTime,
-        status: form.status as any,
+        status: form.status as "scheduled" | "confirmed" | "completed" | "cancelled" | "no-show",
         vetId: form.vetId,
       });
     } else {

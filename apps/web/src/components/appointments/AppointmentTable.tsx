@@ -6,36 +6,38 @@ import { ChevronDown, Calendar, Loader2 } from 'lucide-react';
 import { SpeciesIcon } from '@/components/ui/badge';
 
 // Union type to support both Appointments and Bookings
-type AppointmentType =
-  | {
-      id: string;
-      startTime: Date | string;
-      endTime: Date | string;
-      title: string;
-      status: string;
-      vetId: string;
-      patientName?: string | null;
-      patientSpecies?: string | null;
-      ownerFirstName?: string | null;
-      ownerLastName?: string | null;
-    }
-  | {
-      id: string;
-      startTime: Date | string;
-      endTime: Date | string;
-      vetId: string;
-      status: 'scheduled' | 'completed' | 'cancelled' | 'confirmed';
-      patient: {
-        name: string;
-        species: string;
-      };
-      owner: {
-        firstName: string;
-        lastName: string;
-        email: string;
-      };
-      reason?: string;
-    };
+type AppointmentItem = {
+  id: string;
+  startTime: Date | string;
+  endTime: Date | string;
+  title: string;
+  status: string;
+  vetId: string;
+  patientName?: string | null;
+  patientSpecies?: string | null;
+  ownerFirstName?: string | null;
+  ownerLastName?: string | null;
+};
+
+type BookingItem = {
+  id: string;
+  startTime: Date | string;
+  endTime: Date | string;
+  vetId: string;
+  status: 'scheduled' | 'completed' | 'cancelled' | 'confirmed';
+  patient: {
+    name: string;
+    species: string;
+  };
+  owner: {
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+  reason?: string;
+};
+
+export type AppointmentType = AppointmentItem | BookingItem;
 
 interface Vet {
   id: string;
@@ -58,10 +60,7 @@ interface AppointmentTableProps {
   onAppointmentClick?: (item: AppointmentType) => void;
 }
 
-function isBooking(item: AppointmentType): item is AppointmentType & {
-  patient: { name: string; species: string };
-  owner: { firstName: string; lastName: string; email: string };
-} {
+function isBooking(item: AppointmentType): item is BookingItem {
   return 'patient' in item && typeof item.patient === 'object' && 'owner' in item;
 }
 
@@ -69,29 +68,28 @@ function getPatientName(item: AppointmentType): string {
   if (isBooking(item)) {
     return item.patient.name;
   }
-  return (item as any).patientName ?? '—';
+  return item.patientName ?? '—';
 }
 
 function getPatientSpecies(item: AppointmentType): string {
   if (isBooking(item)) {
     return item.patient.species;
   }
-  return (item as any).patientSpecies ?? 'other';
+  return item.patientSpecies ?? 'other';
 }
 
 function getOwnerName(item: AppointmentType): string {
   if (isBooking(item)) {
     return `${item.owner.firstName} ${item.owner.lastName}`;
   }
-  const appt = item as any;
-  return appt.ownerFirstName ? `${appt.ownerFirstName} ${appt.ownerLastName}` : '';
+  return item.ownerFirstName ? `${item.ownerFirstName} ${item.ownerLastName}` : '';
 }
 
 function getTitle(item: AppointmentType): string {
   if (isBooking(item)) {
-    return (item as any).reason || '—';
+    return item.reason || '—';
   }
-  return (item as any).title || '—';
+  return item.title || '—';
 }
 
 function getStatusColor(status: string) {

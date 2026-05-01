@@ -1,7 +1,29 @@
 export interface ICalEventData {
-  appointment: any;
-  patient: any & { owner: any };
-  veterinarian: any;
+  appointment: {
+    id: string;
+    title?: string | null;
+    status?: string | null;
+    startTime: Date | string;
+    endTime: Date | string;
+    createdAt: Date | string;
+    updatedAt: Date | string;
+  };
+  patient: {
+    name: string;
+    species?: string | null;
+    breed?: string | null;
+    owner: {
+      firstName?: string | null;
+      lastName?: string | null;
+      phone?: string | null;
+      email?: string | null;
+    };
+  };
+  veterinarian: {
+    title?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+  };
   clinicName: string;
   clinicAddress?: string;
   clinicCity?: string;
@@ -38,7 +60,6 @@ export function generateAppointmentICS(
       veterinarian,
       clinicAddress,
       clinicCity,
-      practiceTimezone,
     } = event;
 
     // Build event summary: "PatientName (Species) - VetName"
@@ -74,7 +95,8 @@ export function generateAppointmentICS(
       cancelled: 'CANCELLED',
       'no-show': 'CANCELLED',
     };
-    const icalStatus = statusMap[appointment.status] || 'TENTATIVE';
+    const statusKey = appointment.status ?? '';
+    const icalStatus = statusMap[statusKey] || 'TENTATIVE';
 
     // Format dates for iCal (YYYYMMDDTHHMMSSZ format)
     const startTime = new Date(appointment.startTime);

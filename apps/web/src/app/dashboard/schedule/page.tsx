@@ -3,7 +3,7 @@
 import { useRef, useState, useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
 import type FullCalendarType from "@fullcalendar/react";
-import { Plus, ChevronLeft, ChevronRight, Calendar, List, Share2 } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, Share2 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { AppointmentStatusBadge } from "@/components/ui/badge";
@@ -28,13 +28,6 @@ const FullCalendar = dynamic(
 );
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-// Helper to get CSS variable colors (computed at runtime)
-function getCSSColor(varName: string): string {
-  if (typeof window === "undefined") return "#3B82F6"; // SSR fallback
-  const value = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
-  return value || "#3B82F6";
-}
 
 const STATUS_COLORS: Record<string, { bg: string; border: string }> = {
   scheduled: { bg: "#3B82F6", border: "#2563EB" }, // Accent color fallback

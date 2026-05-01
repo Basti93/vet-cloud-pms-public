@@ -10,6 +10,7 @@ import { StatusTooltip } from "@/components/ui/status-tooltip";
 import { AppointmentModal } from "@/components/appointments/AppointmentModal";
 import { NewPatientModal } from "@/components/patients/NewPatientModal";
 import { AppointmentTable } from "@/components/appointments/AppointmentTable";
+import type { AppointmentType } from "@/components/appointments/AppointmentTable";
 import { useState, useMemo } from "react";
 
 function StatCard({
@@ -49,10 +50,27 @@ function StatCard({
 }
 
 export default function DashboardHome() {
+  type EditableAppointment = {
+    id: string;
+    title: string;
+    description: string | null;
+    startTime: Date | string;
+    endTime: Date | string;
+    status: string;
+    patientId: string;
+    vetId: string;
+    patientName?: string | null;
+  };
+  type EditableSource = AppointmentType & {
+    title: string;
+    patientId: string;
+    description?: string | null;
+    patientName?: string | null;
+  };
   const { tenantId } = useTenant();
   const vetId = useCurrentVet();
   const [apptModalOpen, setApptModalOpen] = useState(false);
-  const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
+  const [selectedAppointment, setSelectedAppointment] = useState<AppointmentType | null>(null);
   const [patientModalOpen, setPatientModalOpen] = useState(false);
   const { data: currentUser } = trpc.admin.getCurrentUser.useQuery();
 
@@ -98,6 +116,26 @@ export default function DashboardHome() {
   ).length ?? 0;
 
   const isLoading = !tenantId;
+
+  const isEditableSource = (item: AppointmentType): item is EditableSource =>
+    "title" in item && "patientId" in item && typeof item.patientId === "string";
+
+  const toEditableAppointment = (item: AppointmentType | null): EditableAppointment | null => {
+    if (!item) return null;
+    if (!isEditableSource(item)) return null;
+
+    return {
+      id: item.id,
+      title: item.title,
+      description: item.description ?? null,
+      startTime: item.startTime,
+      endTime: item.endTime,
+      status: item.status,
+      patientId: item.patientId,
+      vetId: item.vetId,
+      patientName: item.patientName ?? null,
+    };
+  };
 
   return (
     <div className="space-y-6">
@@ -273,17 +311,21 @@ export default function DashboardHome() {
               setApptModalOpen(false);
               setSelectedAppointment(null);
             }}
-            editData={selectedAppointment ? {
-              id: selectedAppointment.id,
-              title: selectedAppointment.title,
-              description: selectedAppointment.description || null,
-              startTime: new Date(selectedAppointment.startTime),
-              endTime: new Date(selectedAppointment.endTime),
-              status: selectedAppointment.status,
-              patientId: selectedAppointment.patientId,
-              vetId: selectedAppointment.vetId,
-              patientName: selectedAppointment.patientName,
-            } : undefined}
+            editData={(() => {
+              const editable = toEditableAppointment(selectedAppointment);
+              if (!editable) return undefined;
+              return {
+                id: editable.id,
+                title: editable.title,
+                description: editable.description || null,
+                startTime: new Date(editable.startTime),
+                endTime: new Date(editable.endTime),
+                status: editable.status,
+                patientId: editable.patientId,
+                vetId: editable.vetId,
+                patientName: editable.patientName,
+              };
+            })()}
           />
           <NewPatientModal
             open={patientModalOpen}

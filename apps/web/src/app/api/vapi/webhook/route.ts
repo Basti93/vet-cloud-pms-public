@@ -38,7 +38,7 @@ interface VapiWebhookEvent {
     role?: "user" | "assistant";
     functionCall?: {
       name: string;
-      parameters: Record<string, any>;
+      parameters: Record<string, unknown>;
     };
     endedReason?: string;
     recordingUrl?: string;
@@ -135,7 +135,12 @@ export async function POST(req: NextRequest) {
         const tenantId = getDefaultTenantId();
         if (!tenantId) break;
 
-        const params = fn.parameters;
+        const params = fn.parameters as {
+          patientName?: string;
+          ownerPhone?: string;
+          date?: string;
+          time?: string;
+        };
         console.log("[Vapi] bookAppointment called:", params);
 
         // Look up or create patient

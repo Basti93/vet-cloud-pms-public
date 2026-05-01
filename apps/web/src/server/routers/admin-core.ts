@@ -105,7 +105,7 @@ export const adminCoreRouter = createAdminRouter({
         reason: z.string().optional(),
       })
     )
-    .mutation(async ({ input: _input }) => {
+    .mutation(async ({ input }) => {
       await db
         .update(tenants)
         .set({ subscriptionStatus: "paused" })
@@ -159,7 +159,7 @@ export const adminCoreRouter = createAdminRouter({
         enabled: z.boolean(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input: _input }) => {
       // Placeholder: update to add feature_flags JSONB column later
       // For MVP, just acknowledge the request
       return { success: true };

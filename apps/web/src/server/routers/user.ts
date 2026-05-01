@@ -227,11 +227,12 @@ export const userRouter = createTRPCRouter({
         }
 
         return { success: true };
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
         console.error("updateVetScheduleDay error:", error);
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: `Database error: ${error.message}`,
+          message: `Database error: ${errorMessage}`,
         });
       }
     }),

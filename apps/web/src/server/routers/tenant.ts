@@ -1,6 +1,7 @@
 import { createTRPCRouter, publicProcedure, protectedProcedure } from "@/server/trpc";
 import { z } from "zod";
 import { tenants, users, featureFlags, accountDeletionRequests } from "@/lib/db/schema";
+import { db as appDb } from "@/lib/db/client";
 import { eq } from "drizzle-orm";
 import { randomUUID, randomBytes } from "crypto";
 import { sendAccountDeletionEmail } from "@/lib/email/service";
@@ -8,7 +9,7 @@ import { getMainDomain } from "@/lib/env";
 
 // Helper function to generate a unique slug from tenant name
 async function generateUniqueSlug(
-  db: any,
+  db: typeof appDb,
   baseName: string
 ): Promise<string> {
   // Convert to lowercase, remove special chars, replace spaces with hyphens
@@ -100,7 +101,7 @@ export const tenantRouter = createTRPCRouter({
           tenantId: currentUser.tenantId,
           aiReceptionEnabled: false, // Disabled by default
         });
-      } catch (error) {
+      } catch (_error) {
         // Feature flags already exist, that's fine
       }
 
@@ -157,7 +158,7 @@ export const tenantRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const { tenantId, ...updates } = input;
-      const updateData: any = {};
+      const updateData: Record<string, unknown> = {};
 
       if (updates.brandName !== undefined) updateData.name = updates.brandName;
       if (updates.tagline !== undefined) updateData.tagline = updates.tagline;
@@ -233,7 +234,7 @@ export const tenantRouter = createTRPCRouter({
         throw new Error("User not found");
       }
 
-      const updateData: any = {};
+      const updateData: Record<string, unknown> = {};
       if (input.name !== undefined) updateData.name = input.name;
       if (input.email !== undefined) updateData.email = input.email;
       if (input.phone !== undefined) updateData.phone = input.phone;
@@ -373,7 +374,7 @@ export const tenantRouter = createTRPCRouter({
         .where(eq(featureFlags.tenantId, user.tenantId))
         .limit(1);
 
-      const updateData: any = {};
+      const updateData: Record<string, unknown> = {};
       if (input.aiReceptionEnabled !== undefined) {
         updateData.aiReceptionEnabled = input.aiReceptionEnabled;
       }

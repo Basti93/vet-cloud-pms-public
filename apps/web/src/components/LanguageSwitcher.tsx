@@ -13,7 +13,7 @@ export function LanguageSwitcher() {
   const { locale, setLocale } = useLocale();
 
   const handleLocaleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setLocale(e.target.value as any).catch((error) => {
+    setLocale(e.target.value as 'de' | 'en').catch((error) => {
       console.error('Failed to update locale:', error);
     });
   };

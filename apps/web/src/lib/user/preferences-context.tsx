@@ -8,7 +8,7 @@ import enMessages from '../../../messages/en.json';
 import { trpc } from '@/lib/trpc/client';
 
 // Translation messages
-const translations: Record<'de' | 'en', Record<string, any>> = {
+const translations: Record<'de' | 'en', Record<string, unknown>> = {
   de: deMessages,
   en: enMessages,
 };
@@ -58,9 +58,13 @@ export function UserPreferencesProvider({
     (key: string): string => {
       const locale = preferences?.locale || 'de';
       const keys = key.split('.');
-      let value: any = translations[locale as 'de' | 'en'];
+      let value: unknown = translations[locale as 'de' | 'en'];
       for (const k of keys) {
-        value = value?.[k];
+        if (typeof value === 'object' && value !== null && k in value) {
+          value = (value as Record<string, unknown>)[k];
+        } else {
+          value = undefined;
+        }
       }
       return typeof value === 'string' ? value : key;
     },

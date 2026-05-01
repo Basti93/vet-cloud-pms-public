@@ -48,7 +48,7 @@ export async function ThemeInjector() {
         {`:root { ${cssVariables} }`}
       </style>
     );
-  } catch (error) {
+  } catch (_error) {
     // Silently fail - use default theme from globals.css
     return null;
   }

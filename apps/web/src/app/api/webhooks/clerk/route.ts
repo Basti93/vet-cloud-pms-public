@@ -55,7 +55,7 @@ export async function POST(req: Request) {
 
   // Create a new Webhook instance with your secret
   const wh = new Webhook(process.env.CLERK_WEBHOOK_SECRET || "");
-  let evt: any;
+  let evt: { type: string; data: unknown };
 
   // Verify the webhook
   try {
@@ -63,16 +63,23 @@ export async function POST(req: Request) {
       "svix-id": svixId,
       "svix-timestamp": svixTimestamp,
       "svix-signature": svixSignature,
-    });
-  } catch (err: any) {
-    console.error("Webhook verification failed:", err.message);
+    }) as { type: string; data: unknown };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown verification error";
+    console.error("Webhook verification failed:", message);
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   // Handle the user.created event
   if (evt.type === "user.created") {
     try {
-      const clerkUser = evt.data as any;
+      const clerkUser = evt.data as {
+        id: string;
+        email?: string;
+        email_addresses?: Array<{ email_address?: string }>;
+        first_name?: string;
+        last_name?: string;
+      };
       const clerkId = clerkUser.id;
       const email =
         clerkUser.email_addresses?.[0]?.email_address || clerkUser.email;
@@ -134,16 +141,20 @@ export async function POST(req: Request) {
 
       console.log(`User created: ${clerkId} (${email})`);
       return NextResponse.json({ success: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errObj =
+        error && typeof error === "object"
+          ? (error as { message?: string; code?: string; detail?: string; stack?: string })
+          : {};
       console.error("Error handling user.created webhook:", {
-        message: error?.message,
-        code: error?.code,
-        detail: error?.detail,
-        stack: error?.stack,
+        message: errObj.message,
+        code: errObj.code,
+        detail: errObj.detail,
+        stack: errObj.stack,
         fullError: JSON.stringify(error, null, 2)
       });
       return NextResponse.json(
-        { error: "Internal server error", details: error?.message },
+        { error: "Internal server error", details: errObj.message },
         { status: 500 }
       );
     }

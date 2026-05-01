@@ -34,7 +34,6 @@ export async function GET(request: NextRequest) {
 
     let totalSent = 0;
     let totalFailed = 0;
-    const results = [];
 
     for (const tenant of allTenants) {
       // Get email settings for this tenant

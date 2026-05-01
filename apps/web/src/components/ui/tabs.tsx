@@ -56,7 +56,6 @@ export function Tabs({
 
   // Determine if this is navigation mode or content mode
   const isNavigationMode = currentPath !== undefined;
-  const isContentMode = onTabChange !== undefined;
 
   // Flatten tabs to include all visible items (for finding current tab)
   const flattenTabs = (items: TabItem[]): TabItem[] => {
@@ -164,10 +163,6 @@ export function Tabs({
                 </button>
               );
             }
-
-            const active = isNavigationMode
-              ? currentPath === tab.href
-              : activeTabIndex === index;
 
             if (isNavigationMode && tab.href) {
               return (

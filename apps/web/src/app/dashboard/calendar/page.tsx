@@ -21,7 +21,8 @@ export default function CalendarExportPage() {
   const { refetch: refetchTokens } = trpc.calendar.listTokens.useQuery();
 
   // Check if user is a vet
-  const isVetError = (error as any)?.code === "VET_ONLY" || error?.message?.includes("veterinarian");
+  const typedError = error as { code?: string; message?: string } | null;
+  const isVetError = typedError?.code === "VET_ONLY" || typedError?.message?.includes("veterinarian");
   if (isVetError) {
     return (
       <div className="max-w-2xl">

@@ -9,8 +9,20 @@ import { TableFilters, type FilterState } from '@/components/appointments/TableF
 import { AppointmentTable } from '@/components/appointments/AppointmentTable';
 import { AppointmentModal } from '@/components/appointments/AppointmentModal';
 import { Card } from '@/components/ui/card';
+import type { AppointmentType } from '@/components/appointments/AppointmentTable';
 
 export default function AppointmentsPage() {
+  type EditableAppointment = {
+    id: string;
+    title: string;
+    description: string | null;
+    startTime: Date | string;
+    endTime: Date | string;
+    status: string;
+    patientId: string;
+    vetId: string;
+    patientName?: string | null;
+  };
   const { userId } = useAuth();
   const { tenantId } = useTenant();
   const vetId = useCurrentVet();
@@ -21,7 +33,27 @@ export default function AppointmentsPage() {
     dateTo: '',
   });
   const [modalOpen, setModalOpen] = useState(false);
-  const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
+  const [selectedAppointment, setSelectedAppointment] = useState<AppointmentType | null>(null);
+
+  const isEditableSource = (item: AppointmentType): item is EditableSource =>
+    'title' in item && 'patientId' in item && typeof item.patientId === 'string';
+
+  const toEditableAppointment = (item: AppointmentType | null): EditableAppointment | null => {
+    if (!item) return null;
+    if (!isEditableSource(item)) return null;
+
+    return {
+      id: item.id,
+      title: item.title,
+      description: item.description ?? null,
+      startTime: item.startTime,
+      endTime: item.endTime,
+      status: item.status,
+      patientId: item.patientId,
+      vetId: item.vetId,
+      patientName: item.patientName ?? null,
+    };
+  };
 
   // Auto-set filter to current vet if they are a vet
   useEffect(() => {
@@ -142,7 +174,7 @@ export default function AppointmentsPage() {
       />
 
       {/* Edit Modal */}
-      {selectedAppointment && (
+      {toEditableAppointment(selectedAppointment) && (
         <AppointmentModal
           open={modalOpen}
           onClose={() => {
@@ -150,17 +182,21 @@ export default function AppointmentsPage() {
             setSelectedAppointment(null);
           }}
           tenantId={tenantId || ''}
-          editData={{
-            id: selectedAppointment.id,
-            title: selectedAppointment.title,
-            description: selectedAppointment.description || null,
-            startTime: new Date(selectedAppointment.startTime),
-            endTime: new Date(selectedAppointment.endTime),
-            status: selectedAppointment.status,
-            patientId: selectedAppointment.patientId,
-            vetId: selectedAppointment.vetId,
-            patientName: selectedAppointment.patientName,
-          }}
+          editData={(() => {
+            const editable = toEditableAppointment(selectedAppointment);
+            if (!editable) return undefined;
+            return {
+              id: editable.id,
+              title: editable.title,
+              description: editable.description || null,
+              startTime: new Date(editable.startTime),
+              endTime: new Date(editable.endTime),
+              status: editable.status,
+              patientId: editable.patientId,
+              vetId: editable.vetId,
+              patientName: editable.patientName,
+            };
+          })()}
           onSuccess={() => {
             refetchAppointments();
             setModalOpen(false);
@@ -171,3 +207,9 @@ export default function AppointmentsPage() {
     </div>
   );
 }
+  type EditableSource = AppointmentType & {
+    title: string;
+    patientId: string;
+    description?: string | null;
+    patientName?: string | null;
+  };

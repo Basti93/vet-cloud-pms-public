@@ -329,7 +329,7 @@ export default function UserSettingsPage() {
                   type="date"
                   value={newAbsence?.startDate || ""}
                   onChange={(e) =>
-                    setNewAbsence({ ...newAbsence, startDate: e.target.value } as any)
+                    setNewAbsence({ ...newAbsence, startDate: e.target.value })
                   }
                   className="p-2 rounded border text-sm"
                   style={{ borderColor: "var(--color-border)" }}
@@ -339,7 +339,7 @@ export default function UserSettingsPage() {
                   type="date"
                   value={newAbsence?.endDate || ""}
                   onChange={(e) =>
-                    setNewAbsence({ ...newAbsence, endDate: e.target.value } as any)
+                    setNewAbsence({ ...newAbsence, endDate: e.target.value })
                   }
                   className="p-2 rounded border text-sm"
                   style={{ borderColor: "var(--color-border)" }}
@@ -351,8 +351,8 @@ export default function UserSettingsPage() {
                 onChange={(e) =>
                   setNewAbsence({
                     ...newAbsence,
-                    type: e.target.value as any,
-                  } as any)
+                    type: e.target.value as "vacation" | "sick" | "other",
+                  })
                 }
                 className="w-full p-2 rounded border text-sm"
                 style={{ borderColor: "var(--color-border)" }}
@@ -364,7 +364,7 @@ export default function UserSettingsPage() {
               <textarea
                 value={newAbsence?.note || ""}
                 onChange={(e) =>
-                  setNewAbsence({ ...newAbsence, note: e.target.value } as any)
+                  setNewAbsence({ ...newAbsence, note: e.target.value })
                 }
                 className="w-full p-2 rounded border text-sm"
                 style={{ borderColor: "var(--color-border)" }}

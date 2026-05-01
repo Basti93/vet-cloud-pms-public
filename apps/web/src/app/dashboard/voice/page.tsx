@@ -16,6 +16,21 @@ interface TranscriptEntry {
   timestamp: Date;
 }
 
+interface VapiMessage {
+  type?: string;
+  role?: "user" | "assistant" | string;
+  transcript?: string;
+  transcriptType?: "partial" | "final" | string;
+  functionCall?: {
+    name?: string;
+    parameters?: {
+      patientName?: string;
+      date?: string;
+      time?: string;
+    };
+  };
+}
+
 // ── Volume Visualizer ────────────────────────────────────────────────────────
 
 function VolumeBar({ volume, active }: { volume: number; active: boolean }) {
@@ -190,7 +205,7 @@ export default function VoicePage() {
     vapi.on("speech-end", () => setIsSpeaking(false));
     vapi.on("volume-level", (v) => setVolume(v));
 
-    vapi.on("message", (msg: any) => {
+    vapi.on("message", (msg: VapiMessage) => {
       if (msg?.type === "transcript") {
         const role: "user" | "assistant" =
           msg.role === "assistant" ? "assistant" : "user";
@@ -250,9 +265,13 @@ export default function VoicePage() {
       }
     });
 
-    vapi.on("error", (err: any) => {
+    vapi.on("error", (err: unknown) => {
+      const errMsg =
+        err && typeof err === "object" && "message" in err
+          ? String((err as { message?: string }).message)
+          : "Unbekannter Verbindungsfehler";
       console.error("[Vapi Error]", err);
-      setError(err?.message ?? "Unbekannter Verbindungsfehler");
+      setError(errMsg);
       setStatus("idle");
       if (timerRef.current) clearInterval(timerRef.current);
     });
@@ -281,8 +300,12 @@ export default function VoicePage() {
 
     try {
       await vapi.start(assistantId);
-    } catch (err: any) {
-      setError(err?.message ?? "Verbindung fehlgeschlagen");
+    } catch (err: unknown) {
+      const errMsg =
+        err && typeof err === "object" && "message" in err
+          ? String((err as { message?: string }).message)
+          : "Verbindung fehlgeschlagen";
+      setError(errMsg);
       setStatus("idle");
     }
   }, []);

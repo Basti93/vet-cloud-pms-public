@@ -15,15 +15,6 @@ export interface DaySchedule {
   slots: TimeRange[];
 }
 
-const DAY_NAMES = [
-  "Sonntag",
-  "Montag",
-  "Dienstag",
-  "Mittwoch",
-  "Donnerstag",
-  "Freitag",
-  "Samstag",
-];
 const DAY_SHORT = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 
 interface DayRowProps {

@@ -329,9 +329,15 @@ export const adminRouter = createTRPCRouter({
           assignedBy: currentUser!.id,
         });
         return { success: true, message: "Role assigned" };
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const duplicate =
+          error &&
+          typeof error === "object" &&
+          ("code" in error || "message" in error) &&
+          ((error as { code?: string }).code === "23505" ||
+            (error as { message?: string }).message?.includes("duplicate key"));
         // Check if this is a unique constraint violation (role already assigned)
-        if (error.code === "23505" || error.message?.includes("duplicate key")) {
+        if (duplicate) {
           return { success: true, message: "Role already assigned" };
         }
         // Re-throw other errors
@@ -486,9 +492,13 @@ export const adminRouter = createTRPCRouter({
           roleId: input.roleId,
           permission: input.permission,
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const code =
+          error && typeof error === "object" && "code" in error
+            ? (error as { code?: string }).code
+            : undefined;
         // Ignore duplicate key errors (permission already assigned)
-        if (error.code !== "23505") {
+        if (code !== "23505") {
           throw error;
         }
       }

@@ -9,7 +9,7 @@ export interface LogEventParams {
   category?: string;
   eventType?: string;
   message: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   errorStack?: string;
   tenantId?: string;
   userId?: string;
@@ -55,7 +55,11 @@ export function logEventAsync(params: LogEventParams): void {
  * tRPC middleware that logs errors and slow requests.
  * Attach to your tRPC instance with: .use(loggingMiddleware)
  */
-export const loggingMiddleware = async (opts: any) => {
+export const loggingMiddleware = async (opts: {
+  path: string;
+  type: "query" | "mutation" | "subscription";
+  next: () => Promise<unknown>;
+}) => {
   const startMs = Date.now();
   const path = opts.path;
   const type = opts.type; // "query" | "mutation" | "subscription"
