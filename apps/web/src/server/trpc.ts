@@ -58,6 +58,24 @@ const enforceUserIsAuthenticated = t.middleware(({ ctx, next }) => {
   return next({ ctx: { ...ctx, userId: ctx.userId } });
 });
 
+const enforceIsAdmin = t.middleware(({ ctx, next }) => {
+  if (!ctx.userId) {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
+
+  // Check if user is in ADMIN_CLERK_IDS list
+  const allowedIds = (process.env.ADMIN_CLERK_IDS ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+
+  if (!allowedIds.includes(ctx.userId)) {
+    throw new TRPCError({ code: "FORBIDDEN" });
+  }
+
+  return next({ ctx: { ...ctx, userId: ctx.userId } });
+});
+
 // ✅ Rate limiting: 100 requests per 60 seconds per user/IP
 const rateLimitMiddleware = t.middleware(({ ctx, next }) => {
   // Use userId if authenticated, otherwise fall back to IP
@@ -112,3 +130,9 @@ export const protectedProcedure = t.procedure
   .use(rateLimitMiddleware)
   .use(timingMiddleware)
   .use(enforceUserIsAuthenticated);
+
+/** Admin procedure — requires Clerk session + ADMIN_CLERK_IDS env var */
+export const adminProcedure = t.procedure
+  .use(rateLimitMiddleware)
+  .use(timingMiddleware)
+  .use(enforceIsAdmin);

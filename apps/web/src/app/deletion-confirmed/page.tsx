@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
-export default function DeletionConfirmedPage() {
+function DeletionConfirmedContent() {
   const searchParams = useSearchParams();
   const success = searchParams.get("success") === "true";
   const message = searchParams.get("message") || "Anfrage verarbeitet";
@@ -49,5 +50,13 @@ export default function DeletionConfirmedPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function DeletionConfirmedPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-white flex items-center justify-center">Lädt...</div>}>
+      <DeletionConfirmedContent />
+    </Suspense>
   );
 }

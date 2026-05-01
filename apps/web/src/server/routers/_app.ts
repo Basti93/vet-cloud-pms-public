@@ -3,6 +3,9 @@ import { appointmentsRouter } from "./appointments";
 import { patientsRouter } from "./patients";
 import { bookingRouter } from "./booking";
 import { adminRouter } from "./admin";
+import { adminCoreRouter } from "./admin-core";
+import { adminLogsRouter } from "./admin-logs";
+import { adminUsersRouter } from "./admin-users";
 import { medicalRouter } from "./medical";
 import { vetRouter } from "./vet";
 import { emailRouter } from "./email";
@@ -17,6 +20,11 @@ export const appRouter = createTRPCRouter({
   patients: patientsRouter,
   booking: bookingRouter,
   admin: adminRouter,
+  adminDashboard: createTRPCRouter({
+    core: adminCoreRouter,
+    logs: adminLogsRouter,
+    users: adminUsersRouter,
+  }),
   medical: medicalRouter,
   vet: vetRouter,
   email: emailRouter,

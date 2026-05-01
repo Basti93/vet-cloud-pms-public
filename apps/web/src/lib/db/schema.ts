@@ -832,6 +832,44 @@ export const accountDeletionRequests = pgTable(
 );
 
 // ============================================================================
+// SYSTEM LOGGING (Admin Dashboard, Error Tracking)
+// ============================================================================
+
+export const systemLogs = pgTable(
+  "system_logs",
+  {
+    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+    timestamp: timestamp("timestamp", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+    tenantId: uuid("tenant_id").references(() => tenants.id, { onDelete: "set null" }),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    level: varchar("level", {
+      length: 20,
+      enum: ["debug", "info", "warn", "error", "critical"],
+    })
+      .default("info")
+      .notNull(),
+    category: varchar("category", { length: 50 }), // api, auth, email, booking, etc
+    eventType: varchar("event_type", { length: 100 }), // request_failed, slow_request, email_send_failed, etc
+    message: text("message").notNull(),
+    metadata: jsonb("metadata"), // { path, durationMs, input, statusCode, etc }
+    errorStack: text("error_stack"),
+    ipAddress: varchar("ip_address", { length: 45 }), // IPv4 or IPv6
+    correlationId: varchar("correlation_id", { length: 100 }), // Track related logs
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (table) => ({
+    timestampIdx: index("system_logs_timestamp_idx").on(table.timestamp),
+    tenantTimestampIdx: index("system_logs_tenant_timestamp_idx").on(table.tenantId, table.timestamp),
+    levelIdx: index("system_logs_level_idx").on(table.level),
+    correlationIdIdx: index("system_logs_correlation_id_idx").on(table.correlationId),
+  })
+);
+
+// ============================================================================
 // RLS Policies (für später, muss in Postgres direkt gesetzt werden)
 // ============================================================================
 
