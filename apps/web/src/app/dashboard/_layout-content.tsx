@@ -3,7 +3,7 @@
 import { ReactNode, useState } from "react";
 import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
-import { LayoutDashboard, Calendar, Users, Phone, ClipboardList, Clock, Menu, X, Settings, TrendingUp } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, Phone, ClipboardList, Clock, Menu, X, Settings, TrendingUp, ChevronDown, User, Building2 } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { useLocale } from "@/lib/user/preferences-context";
 import { usePraxis } from "@/lib/praxis/context";
@@ -29,19 +29,20 @@ function useBetaNavItems() {
 
 function useUserNavItems() {
   return [
-    { href: "/dashboard/user-settings", icon: Settings, label: "Benutzereinstellungen" },
+    { href: "/dashboard/user-settings", icon: User, label: "Benutzereinstellungen" },
   ];
 }
 
 function useAdminNavItems() {
   const { t } = useLocale();
   return [
-    { href: "/dashboard/settings", icon: Settings, labelKey: "navigation.settings", label: t("navigation.settings"), adminOnly: true },
+    { href: "/dashboard/settings", icon: Building2, labelKey: "navigation.settings", label: t("navigation.settings"), adminOnly: true },
   ];
 }
 
 export default function DashboardContent({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [settingsExpanded, setSettingsExpanded] = useState(false);
   const { praxis } = usePraxis(); // Tenant name already loaded server-side
   const { data: user, isLoading: userLoading } = trpc.admin.getCurrentUser.useQuery();
   const { data: featureFlags } = trpc.tenant.getFeatureFlags.useQuery();
@@ -121,41 +122,64 @@ export default function DashboardContent({ children }: { children: ReactNode }) 
             </div>
           )}
 
-          {/* User Settings - Always visible */}
+          {/* Settings Group - Expandable */}
           <div className="my-2" style={{ borderColor: 'var(--color-accent-soft)', borderTopWidth: '1px', opacity: 0.3 }} />
           <div className="space-y-1">
-            {USER_NAV_ITEMS.map(({ href, icon: Icon, label }) => (
-              <Link
-                key={href}
-                href={href}
-                onClick={() => setSidebarOpen(false)}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-colors group"
-                style={{ color: 'var(--color-accent-soft)' }}
-              >
-                <Icon size={18} />
-                {label}
-              </Link>
-            ))}
-          </div>
+            <button
+              onClick={() => setSettingsExpanded(!settingsExpanded)}
+              className="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-colors"
+              style={{ color: 'var(--color-accent-soft)' }}
+            >
+              <div className="flex items-center gap-3">
+                <Settings size={18} />
+                <span>Einstellungen</span>
+              </div>
+              <ChevronDown
+                size={16}
+                style={{
+                  transform: settingsExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                  transition: 'transform 0.2s',
+                }}
+              />
+            </button>
 
-          {/* Admin Settings - Only if user is loaded and has permission */}
-          {!userLoading && (
-            <>
-              <div className="my-2" style={{ borderColor: 'var(--color-accent-soft)', borderTopWidth: '1px', opacity: 0.3 }} />
-              {ADMIN_NAV_ITEMS.map(({ href, icon: Icon, label }) => (
-                <Link
-                  key={href}
-                  href={href}
-                  onClick={() => setSidebarOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-colors group"
-                  style={{ color: 'var(--color-accent-soft)' }}
-                >
-                  <Icon size={18} />
-                  {label}
-                </Link>
-              ))}
-            </>
-          )}
+            {/* Expanded Settings Items */}
+            {settingsExpanded && (
+              <div className="space-y-1 pl-2">
+                {USER_NAV_ITEMS.map(({ href, icon: Icon, label }) => (
+                  <Link
+                    key={href}
+                    href={href}
+                    onClick={() => setSidebarOpen(false)}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-colors"
+                    style={{ color: 'var(--color-accent-soft)' }}
+                  >
+                    <Icon size={18} />
+                    {label}
+                  </Link>
+                ))}
+
+                {/* Admin Settings - Only if user is loaded and has permission */}
+                {!userLoading && ADMIN_NAV_ITEMS.length > 0 && (
+                  <>
+                    <div className="my-1" style={{ borderColor: 'var(--color-accent-soft)', borderTopWidth: '1px', opacity: 0.2 }} />
+                    {ADMIN_NAV_ITEMS.map(({ href, icon: Icon, label }) => (
+                      <Link
+                        key={href}
+                        href={href}
+                        onClick={() => setSidebarOpen(false)}
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition-colors"
+                        style={{ color: 'var(--color-accent-soft)' }}
+                      >
+                        <Icon size={18} />
+                        {label}
+                      </Link>
+                    ))}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         </nav>
         <div className="px-4 py-4" style={{ borderColor: 'var(--color-border-strong)', borderTopWidth: '1px' }}>
           <div className="flex items-center gap-3">
