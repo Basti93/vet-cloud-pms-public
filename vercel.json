@@ -1,6 +1,6 @@
 {
   "buildCommand": "npm run build",
-  "installCommand": "npm ci --include=optional",
+  "installCommand": "npm install --include=optional",
   "headers": [
     {
       "source": "/(.*)",
