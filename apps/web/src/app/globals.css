@@ -1,35 +1,29 @@
-@layer base {
-  /* Default theme variables (sage theme) — prevents FOUC and provides fallbacks */
-  :root {
-    --color-accent: oklch(55% 0.10 165);
-    --color-accent-hover: oklch(50% 0.10 165);
-    --color-accent-soft: oklch(95% 0.025 165);
-    --color-accent-text: oklch(35% 0.08 165);
-    --color-bg: oklch(98.8% 0.004 150);
-    --color-surface: #ffffff;
-    --color-border: oklch(92% 0.006 150);
-    --color-border-strong: oklch(86% 0.008 150);
-    --color-fg: oklch(22% 0.01 200);
-    --color-muted: oklch(38% 0.01 200);
-    --color-muted-soft: oklch(96% 0.004 150);
-    --font-heading: ui-serif, Georgia, Garamond, "Times New Roman", serif;
-    --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    --font-heading-weight: 700;
-    --font-heading-tracking: -0.01em;
-  }
+:root {
+  --color-accent: oklch(55% 0.10 165);
+  --color-accent-hover: oklch(50% 0.10 165);
+  --color-accent-soft: oklch(95% 0.025 165);
+  --color-accent-text: oklch(35% 0.08 165);
+  --color-bg: oklch(98.8% 0.004 150);
+  --color-surface: #ffffff;
+  --color-border: oklch(92% 0.006 150);
+  --color-border-strong: oklch(86% 0.008 150);
+  --color-fg: oklch(22% 0.01 200);
+  --color-muted: oklch(38% 0.01 200);
+  --color-muted-soft: oklch(96% 0.004 150);
+  --font-heading: ui-serif, Georgia, Garamond, "Times New Roman", serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-heading-weight: 700;
+  --font-heading-tracking: -0.01em;
 }
 
-@layer base {
-  /* Apply theme fonts globally */
-  * {
-    font-family: var(--font-body);
-  }
+* {
+  font-family: var(--font-body);
+}
 
-  h1, h2, h3, h4, h5, h6, [role="heading"] {
-    font-family: var(--font-heading);
-    font-weight: var(--font-heading-weight);
-    letter-spacing: var(--font-heading-tracking);
-  }
+h1, h2, h3, h4, h5, h6, [role="heading"] {
+  font-family: var(--font-heading);
+  font-weight: var(--font-heading-weight);
+  letter-spacing: var(--font-heading-tracking);
 }
 
 .fc {
@@ -38,7 +32,6 @@
   color: var(--color-fg) !important;
 }
 
-/* Calendar header and text colors */
 .fc .fc-col-header-cell {
   background-color: var(--color-surface) !important;
   border-color: var(--color-border) !important;
@@ -82,7 +75,6 @@
   color: var(--color-muted) !important;
 }
 
-/* Button styles */
 .fc .fc-button-primary {
   background-color: var(--color-accent) !important;
   border-color: var(--color-accent) !important;
@@ -99,12 +91,10 @@
   border-color: var(--color-accent) !important;
 }
 
-/* Event styling - respect status-based colors from event props */
 .fc .fc-event {
   color: white !important;
 }
 
-/* List view styles */
 .fc .fc-list-day-cushion {
   background-color: var(--color-bg) !important;
 }
@@ -114,18 +104,15 @@
   color: var(--color-fg) !important;
 }
 
-/* Now indicator */
 .fc .fc-now-indicator {
   border-color: var(--color-accent) !important;
 }
 
-/* Business hours background */
 .fc .fc-bgevent {
   background-color: var(--color-bg) !important;
   opacity: 0.5;
 }
 
-/* Time grid styles */
 .fc .fc-timegrid-body {
   background-color: var(--color-surface) !important;
 }
@@ -136,7 +123,6 @@
   color: var(--color-muted) !important;
 }
 
-/* Selection styles */
 .fc .fc-highlight {
   background-color: var(--color-bg) !important;
 }
@@ -145,7 +131,6 @@
   background-color: var(--color-accent) !important;
 }
 
-/* Table cell styles */
 .fc th {
   background-color: var(--color-surface) !important;
   border-color: var(--color-border) !important;
@@ -156,7 +141,6 @@
   border-color: var(--color-border) !important;
 }
 
-/* Disabled state */
 .fc .fc-button-primary:disabled {
   opacity: 0.5;
   background-color: var(--color-accent) !important;
