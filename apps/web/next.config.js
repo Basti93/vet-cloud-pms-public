@@ -1,4 +1,46 @@
 /** @type {import('next').NextConfig} */
+const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
+let clerkFrontendOrigin = "";
+let clerkAccountsOrigin = "";
+
+try {
+  if (appUrl) {
+    const { hostname } = new URL(appUrl);
+    clerkFrontendOrigin = `https://clerk.${hostname}`;
+    clerkAccountsOrigin = `https://accounts.${hostname}`;
+  }
+} catch {
+  // Ignore invalid NEXT_PUBLIC_APP_URL and fall back to default Clerk domains only.
+}
+
+const clerkScriptSrc = [
+  "https://cdn.clerk.com",
+  "https://*.clerk.com",
+  "https://*.clerk.accounts.dev",
+  clerkFrontendOrigin,
+]
+  .filter(Boolean)
+  .join(" ");
+
+const clerkConnectSrc = [
+  "https://api.clerk.com",
+  "https://*.clerk.com",
+  "https://*.clerk.accounts.dev",
+  clerkFrontendOrigin,
+  clerkAccountsOrigin,
+]
+  .filter(Boolean)
+  .join(" ");
+
+const clerkFrameSrc = [
+  "https://clerk.com",
+  "https://*.clerk.com",
+  "https://*.clerk.accounts.dev",
+  clerkAccountsOrigin,
+]
+  .filter(Boolean)
+  .join(" ");
+
 const nextConfig = {
   reactStrictMode: true,
 
@@ -18,12 +60,12 @@ const nextConfig = {
             key: "Content-Security-Policy",
             value:
               "default-src 'self'; " +
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.clerk.com https://*.clerk.com https://*.clerk.accounts.dev; " +
+              `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${clerkScriptSrc}; ` +
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
               "font-src 'self' https://fonts.gstatic.com; " +
               "img-src 'self' data: https: blob:; " +
-              "connect-src 'self' https://api.clerk.com https://*.clerk.com https://*.clerk.accounts.dev https://neon.tech https://api.resend.com https://vapi.ai https://*.vapi.ai; " +
-              "frame-src 'self' https://clerk.com https://*.clerk.com https://*.clerk.accounts.dev; " +
+              `connect-src 'self' ${clerkConnectSrc} https://neon.tech https://api.resend.com https://vapi.ai https://*.vapi.ai; ` +
+              `frame-src 'self' ${clerkFrameSrc}; ` +
               "object-src 'none'; " +
               "base-uri 'self'; " +
               "form-action 'self'; " +
@@ -63,4 +105,4 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+export default nextConfig;
