@@ -154,9 +154,8 @@ export default function SchedulePage() {
 
   // Auto-set filter to current vet if they are a vet
   useEffect(() => {
-    if (vetId && !filters.vetId) {
-      setFilters((prev) => ({ ...prev, vetId }));
-    }
+    if (!vetId) return;
+    setFilters((prev) => (prev.vetId ? prev : { ...prev, vetId }));
   }, [vetId]);
 
   // ✅ FIX: Memoize date range to prevent infinite refetch loop
@@ -189,7 +188,9 @@ export default function SchedulePage() {
   const nav = (dir: "prev" | "next" | "today") => {
     const api = calRef.current?.getApi();
     if (!api) return;
-    dir === "prev" ? api.prev() : dir === "next" ? api.next() : api.today();
+    if (dir === "prev") api.prev();
+    else if (dir === "next") api.next();
+    else api.today();
     setCurrentTitle(api.view.title);
   };
 

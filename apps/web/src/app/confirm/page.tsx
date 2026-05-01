@@ -56,7 +56,7 @@ function ConfirmationContent() {
     };
 
     confirmAppointment();
-  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [token, confirmAppointmentMutation]);
 
   return (
     <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8">

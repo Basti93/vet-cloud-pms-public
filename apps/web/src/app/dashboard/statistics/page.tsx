@@ -105,8 +105,8 @@ export default function StatisticsPage() {
   const { t } = useLocale();
   const [selectedPeriod, setSelectedPeriod] = useState("month");
 
-  const now = new Date();
   const { from, to } = useMemo(() => {
+    const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
     if (selectedPeriod === "week") {

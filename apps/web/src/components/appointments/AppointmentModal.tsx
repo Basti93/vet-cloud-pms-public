@@ -91,7 +91,7 @@ export function AppointmentModal({
       setErrors({});
       setConfirmDelete(false);
     }
-  }, [open, editData, defaultStart]);
+  }, [open, editData, defaultStart, preselectedPatientId]);
 
   // Auto-adjust end time when start or duration changes
   const handleStartChange = (val: string) => {

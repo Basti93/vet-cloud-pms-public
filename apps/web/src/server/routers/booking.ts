@@ -849,7 +849,7 @@ export const bookingRouter = createTRPCRouter({
 
       // Generate next 28 calendar days (enough to find working days per vet's schedule)
       const nextDays: Date[] = [];
-      let cursor = new Date();
+      const cursor = new Date();
       cursor.setDate(cursor.getDate() + 1);
       for (let i = 0; i < 28; i++) {
         nextDays.push(new Date(cursor));

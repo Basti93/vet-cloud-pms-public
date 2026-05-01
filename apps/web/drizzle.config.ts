@@ -24,7 +24,7 @@ if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL is not set. Set it in environment or .env files");
 }
 
-export default {
+const drizzleConfig = {
   schema: "./src/lib/db/schema.ts",
   out: "./drizzle",
   dialect: "postgresql",
@@ -34,3 +34,5 @@ export default {
   strict: true,
   verbose: true,
 };
+
+export default drizzleConfig;

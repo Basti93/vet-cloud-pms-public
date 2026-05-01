@@ -28,9 +28,8 @@ export default function AppointmentsPage() {
 
   // Auto-set filter to current vet if they are a vet
   useEffect(() => {
-    if (vetId && !filters.vetId) {
-      setFilters((prev) => ({ ...prev, vetId }));
-    }
+    if (!vetId) return;
+    setFilters((prev) => (prev.vetId ? prev : { ...prev, vetId }));
   }, [vetId]);
 
   // Fetch appointments with details

@@ -103,7 +103,7 @@ export function Tabs({
     if (currentGroupWithChild && !expandedGroup) {
       setExpandedGroup(currentGroupWithChild.label);
     }
-  }, [currentGroupWithChild?.label, expandedGroup]);
+  }, [currentGroupWithChild, expandedGroup]);
 
   if (visibleTabs.length === 0) {
     return null;

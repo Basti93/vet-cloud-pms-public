@@ -37,7 +37,8 @@ export async function GET(
     }>;
   }
 ) {
-  let { tenantSlug, vetId } = await params;
+  const { tenantSlug, vetId: rawVetId } = await params;
+  let vetId = rawVetId;
 
   // Remove .ics extension if present (URL might be /api/calendar/demo/vetId.ics)
   if (vetId.endsWith('.ics')) {

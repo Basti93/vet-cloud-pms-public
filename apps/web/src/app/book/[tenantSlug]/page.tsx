@@ -1013,7 +1013,7 @@ export default function BookingPage({
         }
       );
     }
-  }, [step, selectedVetId, clinic?.id, vets, updateField]);
+  }, [step, selectedVetId, clinic?.id, vets, updateField, suggestVetMutation]);
 
   // Loading state
   if (clinicLoading) {
