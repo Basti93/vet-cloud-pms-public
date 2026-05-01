@@ -1064,7 +1064,7 @@ export default function BookingPage({
 
       <div className="min-h-screen bg-gray-50 flex flex-col">
         {/* Clinic header */}
-        <div className="bg-white border-b border-gray-200 px-6 py-5">
+        <div className="sticky top-0 z-50 bg-white border-b border-gray-200 px-6 py-5 shadow-lg" style={{ backgroundColor: '#ffffff', opacity: 1 }}>
           <div className="max-w-xl mx-auto flex items-start gap-4">
             <div
               className="w-12 h-12 rounded-2xl flex items-center justify-center text-white font-bold text-lg flex-shrink-0"

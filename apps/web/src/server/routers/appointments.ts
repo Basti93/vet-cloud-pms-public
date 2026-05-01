@@ -5,6 +5,7 @@ import { appointments, patients, owners, users, PERMISSIONS } from "@/lib/db/sch
 import { TRPCError } from "@trpc/server";
 import { verifyConfirmationToken } from "@/lib/tokens/confirmation";
 import { requirePermission } from "@/server/trpc/middleware";
+import { appointmentEvents } from "@/lib/events/appointment";
 
 async function getUserTenant(ctx: any, userId: string) {
   const [user] = await ctx.db
@@ -153,6 +154,16 @@ export const appointmentsRouter = createTRPCRouter({
         .insert(appointments)
         .values({ ...input, status: "scheduled" })
         .returning();
+
+      // Emit event to invalidate calendar cache
+      appointmentEvents.notifyChange({
+        tenantId: input.tenantId,
+        vetId: input.vetId,
+        appointmentId: created.id,
+        type: 'created',
+        timestamp: new Date(),
+      });
+
       return created;
     }),
 
@@ -188,6 +199,16 @@ export const appointmentsRouter = createTRPCRouter({
         .returning();
 
       if (!updated) throw new TRPCError({ code: "NOT_FOUND" });
+
+      // Emit event to invalidate calendar cache
+      appointmentEvents.notifyChange({
+        tenantId: input.tenantId,
+        vetId: updated.vetId || undefined,
+        appointmentId: updated.id,
+        type: 'updated',
+        timestamp: new Date(),
+      });
+
       return updated;
     }),
 
@@ -238,7 +259,7 @@ export const appointmentsRouter = createTRPCRouter({
       }
 
       const [existing] = await ctx.db
-        .select({ id: appointments.id })
+        .select({ id: appointments.id, vetId: appointments.vetId })
         .from(appointments)
         .where(and(eq(appointments.id, input.id), eq(appointments.tenantId, input.tenantId)))
         .limit(1);
@@ -250,6 +271,15 @@ export const appointmentsRouter = createTRPCRouter({
       await ctx.db
         .delete(appointments)
         .where(and(eq(appointments.id, input.id), eq(appointments.tenantId, input.tenantId)));
+
+      // Emit event to invalidate calendar cache
+      appointmentEvents.notifyChange({
+        tenantId: input.tenantId,
+        vetId: existing.vetId || undefined,
+        appointmentId: existing.id,
+        type: 'deleted',
+        timestamp: new Date(),
+      });
 
       return { success: true };
     }),
@@ -323,6 +353,15 @@ export const appointmentsRouter = createTRPCRouter({
           message: "Termin nicht gefunden",
         });
       }
+
+      // Emit event to invalidate calendar cache
+      appointmentEvents.notifyChange({
+        tenantId: updated.tenantId,
+        vetId: updated.vetId || undefined,
+        appointmentId: updated.id,
+        type: 'updated',
+        timestamp: new Date(),
+      });
 
       return {
         success: true,

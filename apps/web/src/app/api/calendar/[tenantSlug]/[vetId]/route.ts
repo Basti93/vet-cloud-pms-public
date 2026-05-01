@@ -12,6 +12,10 @@ import {
 import { eq, and } from 'drizzle-orm';
 import { generateAppointmentICS, validateICalFormat } from '@/lib/calendar/ics-generator';
 import type { ICalEventData } from '@/lib/calendar/ics-generator';
+import { getCachedICS, setCachedICS, initializeCacheInvalidation } from '@/lib/calendar/cache';
+
+// Initialize cache invalidation system once per server instance
+let cacheInitialized = false;
 
 /**
  * GET /api/calendar/[tenantSlug]/[vetId].ics?token=[accessToken]
@@ -56,6 +60,12 @@ export async function GET(
   const userAgent = request.headers.get('user-agent') || '';
 
   try {
+    // Initialize cache invalidation system once
+    if (!cacheInitialized) {
+      initializeCacheInvalidation();
+      cacheInitialized = true;
+    }
+
     // 1. Verify tenant exists
     const tenant = await db
       .select({ id: tenants.id, email: tenants.email, name: tenants.name, timezone: tenants.timezone, address: tenants.address, city: tenants.city })
@@ -114,7 +124,42 @@ export async function GET(
 
     const tokenId = accessToken[0].id;
 
-    // 4. Query appointments for this vet in next 12 months
+    // 4. Check cache first
+    const cachedICS = getCachedICS(tenantData.id, vetId);
+    if (cachedICS) {
+      console.log('[Cache] Serving cached ICS for tenant', tenantData.id, 'vet', vetId);
+
+      // Still log audit entry and update last used timestamp
+      await logAudit(
+        tokenId,
+        tenantData.id,
+        vetId,
+        200,
+        clientIp,
+        userAgent,
+        0 // Unknown count from cache
+      );
+
+      await db
+        .update(calendarAccessTokens)
+        .set({
+          lastUsedAt: new Date(),
+        })
+        .where(eq(calendarAccessTokens.id, tokenId));
+
+      return new NextResponse(cachedICS, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/calendar; charset=utf-8',
+          'Content-Disposition': `attachment; filename="${tenantSlug}-${vetId}.ics"`,
+          'Cache-Control': 'max-age=900, public', // Cache for 15 minutes
+          'Access-Control-Allow-Origin': '*',
+          'X-Cache': 'HIT', // Indicate cache hit
+        },
+      });
+    }
+
+    // 5. Query appointments for this vet in next 12 months
     const now = new Date();
     const endDate = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
 
@@ -141,7 +186,7 @@ export async function GET(
       (a) => new Date(a.appointment.startTime) >= now && new Date(a.appointment.startTime) <= endDate
     );
 
-    // 5. Generate iCal
+    // 6. Generate iCal
     const events: ICalEventData[] = filteredAppointments.map((item) => ({
       appointment: item.appointment,
       patient: {
@@ -187,7 +232,11 @@ export async function GET(
       );
     }
 
-    // 6. Log audit entry
+    // 7. Store in cache for future requests
+    setCachedICS(tenantData.id, vetId, icsContent);
+    console.log('[Cache] Stored ICS in cache for tenant', tenantData.id, 'vet', vetId);
+
+    // 8. Log audit entry
     await logAudit(
       tokenId,
       tenantData.id,
@@ -198,7 +247,7 @@ export async function GET(
       filteredAppointments.length
     );
 
-    // 7. Update last used timestamp
+    // 9. Update last used timestamp
     await db
       .update(calendarAccessTokens)
       .set({
@@ -206,7 +255,7 @@ export async function GET(
       })
       .where(eq(calendarAccessTokens.id, tokenId));
 
-    // 8. Return iCal feed
+    // 10. Return iCal feed
     return new NextResponse(icsContent, {
       status: 200,
       headers: {
@@ -214,6 +263,7 @@ export async function GET(
         'Content-Disposition': `attachment; filename="${tenantSlug}-${vetId}.ics"`,
         'Cache-Control': 'max-age=900, public', // Cache for 15 minutes
         'Access-Control-Allow-Origin': '*',
+        'X-Cache': 'MISS', // Indicate cache miss (just generated)
       },
     });
   } catch (error) {
