@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { ColorPresetKey, TypographyPairingKey, generateCSSVariables, COLOR_PRESETS, TYPE_PAIRINGS } from './theme';
+import { ColorPresetKey, TypographyPairingKey, generateCSSVariables } from './theme';
 
 interface ThemeContextType {
   colorPreset: ColorPresetKey;

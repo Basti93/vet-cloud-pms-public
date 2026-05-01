@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq, inArray, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { createTRPCRouter, protectedProcedure } from "@/server/trpc";
 import {
   tenants,

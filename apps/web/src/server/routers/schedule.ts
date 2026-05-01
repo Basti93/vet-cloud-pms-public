@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq, and, gte, lte } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { createTRPCRouter, protectedProcedure } from "@/server/trpc";
 import { tenants, vetSchedules, vetAbsences, users } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";

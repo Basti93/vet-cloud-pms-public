@@ -2,7 +2,7 @@ import { ReactNode } from "react";
 import { db } from "@/lib/db/client";
 import { tenants } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { generateThemeStyles, getPrimaryColor } from "@/lib/theme-utils";
+import { generateThemeStyles } from "@/lib/theme-utils";
 
 export default async function BookingLayout({
   children,

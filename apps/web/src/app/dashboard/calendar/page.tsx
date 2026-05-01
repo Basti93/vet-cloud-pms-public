@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
-import { Copy, Check, Download } from "lucide-react";
+import { Copy, Download } from "lucide-react";
 
 export default function CalendarExportPage() {
   const [copiedTokenId, setCopiedTokenId] = useState<string | null>(null);

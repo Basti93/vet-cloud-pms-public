@@ -4,13 +4,11 @@
  */
 
 import { z } from 'zod';
-import { createTRPCRouter, protectedProcedure, publicProcedure } from '@/server/trpc';
-import { appointments, owners, patients, users, emailSettings, tenants } from '@/lib/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { createTRPCRouter, protectedProcedure } from '@/server/trpc';
+import { users, emailSettings, tenants } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { sendConfirmationEmail, SendConfirmationEmailInput } from '@/lib/email/service';
-import { generateConfirmationToken, buildConfirmationUrl } from '@/lib/tokens/confirmation';
-import { PERMISSIONS } from '@/lib/db/schema';
 
 export const emailRouter = createTRPCRouter({
   // TODO: Re-implement sendConfirmationEmail and sendCancellationEmail with new email settings

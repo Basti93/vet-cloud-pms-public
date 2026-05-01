@@ -18,7 +18,7 @@ export const adminCoreRouter = createAdminRouter({
         cursor: z.string().optional(),
       })
     )
-    .query(async ({ input, ctx }) => {
+    .query(async ({ input }) => {
       const query = db.select({
         id: tenants.id,
         name: tenants.name,
@@ -105,7 +105,7 @@ export const adminCoreRouter = createAdminRouter({
         reason: z.string().optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input: _input }) => {
       await db
         .update(tenants)
         .set({ subscriptionStatus: "paused" })

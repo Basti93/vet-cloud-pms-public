@@ -44,7 +44,7 @@ export default function DashboardContent({ children }: { children: ReactNode }) 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsExpanded, setSettingsExpanded] = useState(false);
   const { praxis } = usePraxis(); // Tenant name already loaded server-side
-  const { data: user, isLoading: userLoading } = trpc.admin.getCurrentUser.useQuery();
+  const { isLoading: userLoading } = trpc.admin.getCurrentUser.useQuery();
   const { data: featureFlags } = trpc.tenant.getFeatureFlags.useQuery();
   const { t } = useLocale();
   const NAV_ITEMS = useNavItems();

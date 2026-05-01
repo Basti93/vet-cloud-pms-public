@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "crypto";
 import { db } from "@/lib/db/client";
-import { voiceCalls, appointments, patients, owners } from "@/lib/db/schema";
+import { voiceCalls, patients, owners } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
 /**

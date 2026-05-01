@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq, and, ilike, desc } from "drizzle-orm";
+import { eq, and, ilike } from "drizzle-orm";
 import { createTRPCRouter, protectedProcedure } from "@/server/trpc";
 import { patients, owners, users, PERMISSIONS } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";

@@ -3,8 +3,6 @@
 import { useState, useEffect } from 'react';
 import { trpc } from '@/lib/trpc/client';
 import { useAuth } from '@clerk/nextjs';
-import { Calendar } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { useTenant } from '@/hooks/useTenant';
 import { useCurrentVet } from '@/hooks/useCurrentVet';
 import { TableFilters, type FilterState } from '@/components/appointments/TableFilters';
@@ -14,7 +12,6 @@ import { Card } from '@/components/ui/card';
 
 export default function AppointmentsPage() {
   const { userId } = useAuth();
-  const router = useRouter();
   const { tenantId } = useTenant();
   const vetId = useCurrentVet();
   const [filters, setFilters] = useState<FilterState>({
@@ -71,17 +68,6 @@ export default function AppointmentsPage() {
     if (filters.status && apt.status !== filters.status) return false;
     return true;
   });
-
-  // Group by vet for display
-  const appointmentsByVet = vets?.reduce(
-    (acc, vet) => {
-      const vetAppointments = filteredAppointments.filter(
-        (apt) => apt.vetId === vet.id
-      );
-      return { ...acc, [vet.id]: vetAppointments };
-    },
-    {} as Record<string, (typeof filteredAppointments)[0][]>
-  );
 
   // Calculate stats
   const stats = {

@@ -3,8 +3,7 @@
 import { useState, useEffect } from 'react';
 import { trpc } from '@/lib/trpc/client';
 import { useAuth } from '@clerk/nextjs';
-import { AlertCircle, CheckCircle2, XCircle, Calendar, User } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { AlertCircle, CheckCircle2, XCircle, Calendar } from 'lucide-react';
 import { useTenant } from '@/hooks/useTenant';
 import { useCurrentVet } from '@/hooks/useCurrentVet';
 import { TableFilters, type FilterState } from '@/components/appointments/TableFilters';
@@ -12,7 +11,6 @@ import { AppointmentTable } from '@/components/appointments/AppointmentTable';
 
 export default function BookingsPage() {
   const { userId } = useAuth();
-  const router = useRouter();
   const { tenantId } = useTenant();
   const vetId = useCurrentVet();
   const [confirmingId, setConfirmingId] = useState<string | null>(null);

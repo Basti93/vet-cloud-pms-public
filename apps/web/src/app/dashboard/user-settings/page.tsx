@@ -16,16 +16,6 @@ const localeNames: Record<string, string> = {
   en: "English",
 };
 
-const DAYS_OF_WEEK = [
-  { label: "Montag", value: 1 },
-  { label: "Dienstag", value: 2 },
-  { label: "Mittwoch", value: 3 },
-  { label: "Donnerstag", value: 4 },
-  { label: "Freitag", value: 5 },
-  { label: "Samstag", value: 6 },
-  { label: "Sonntag", value: 0 },
-];
-
 function getToday() {
   return new Date().toISOString().split("T")[0];
 }
@@ -45,7 +35,6 @@ export default function UserSettingsPage() {
   const [successMessage, setSuccessMessage] = useState<string | undefined>();
   const [isLoading, setIsLoading] = useState(false);
 
-  const { data: tenant } = trpc.tenant.getCurrent.useQuery();
   const { data: permissions } = trpc.admin.getUserPermissions.useQuery();
   const { data: currentUser } = trpc.admin.getCurrentUser.useQuery();
 

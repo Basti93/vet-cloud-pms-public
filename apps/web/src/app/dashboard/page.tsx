@@ -97,11 +97,6 @@ export default function DashboardHome() {
     (a) => a.status === "completed" && (!vetId || a.vetId === vetId)
   ).length ?? 0;
 
-  const next5 = (upcomingAppts ?? [])
-    .filter((a) => new Date(a.startTime) >= today && (!vetId || a.vetId === vetId))
-    .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
-    .slice(0, 5);
-
   const isLoading = !tenantId;
 
   return (

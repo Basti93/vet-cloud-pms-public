@@ -1,15 +1,12 @@
 import { z } from "zod";
-import { eq, and, gte, lte, sql, count, desc, asc } from "drizzle-orm";
+import { eq, and, gte, lte, count, asc } from "drizzle-orm";
 import { createTRPCRouter, protectedProcedure } from "@/server/trpc";
 import {
   appointments,
   patients,
-  owners,
   users,
-  vetSchedules,
   appointmentEmailLogs,
 } from "@/lib/db/schema";
-import { PERMISSIONS } from "@/lib/db/schema";
 
 export const statisticsRouter = createTRPCRouter({
   getMetrics: protectedProcedure

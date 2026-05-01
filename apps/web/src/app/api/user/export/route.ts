@@ -30,7 +30,7 @@ import { eq } from "drizzle-orm";
  * Authentication: Required (Clerk)
  * Response: JSON file with all tenant data
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const { userId } = await auth();
 

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { createAdminRouter, procedure } from "../adminTrpc";
 import { db } from "@/lib/db/client";
 import { systemLogs } from "@/lib/db/schema";
-import { eq, and, gte, lte, desc, inArray } from "drizzle-orm";
+import { eq, and, gte, lte, desc } from "drizzle-orm";
 
 export const adminLogsRouter = createAdminRouter({
   /**

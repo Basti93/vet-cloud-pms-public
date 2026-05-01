@@ -1,11 +1,10 @@
 import { z } from "zod";
 import { eq, and, gte, lte, lt, or, isNull } from "drizzle-orm";
 import { createTRPCRouter, publicProcedure, publicBookingProcedure, protectedProcedure } from "@/server/trpc";
-import { tenants, appointments, owners, patients, users, appointmentHolds, emailSettings, appointmentEmailLogs, vetSchedules, vetAbsences } from "@/lib/db/schema";
+import { tenants, appointments, owners, patients, users, appointmentHolds, emailSettings, vetSchedules, vetAbsences } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
 import { sendConfirmationEmail, sendBookingNotificationEmail } from "@/lib/email/service";
 import type { SendConfirmationEmailInput, SendBookingNotificationInput } from "@/lib/email/service";
-import { generateConfirmationToken, buildConfirmationUrl } from "@/lib/tokens/confirmation";
 import { DEFAULT_OPENING_HOURS, type DaySchedule, type TimeRange } from "@/lib/schedule-types";
 import { getMainDomain } from "@/lib/env";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";

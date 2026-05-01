@@ -10,7 +10,6 @@ import {
   smallint,
   date,
   index,
-  foreignKey,
   primaryKey,
   unique,
 } from "drizzle-orm/pg-core";
