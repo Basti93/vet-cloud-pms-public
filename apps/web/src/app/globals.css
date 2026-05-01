@@ -1,29 +1,29 @@
 @layer base {
   /* Default theme variables (sage theme) — prevents FOUC and provides fallbacks */
   :root {
-  --color-accent: oklch(55% 0.10 165);
-  --color-accent-hover: oklch(50% 0.10 165);
-  --color-accent-soft: oklch(95% 0.025 165);
-  --color-accent-text: oklch(35% 0.08 165);
-  --color-bg: oklch(98.8% 0.004 150);
-  --color-surface: #ffffff;
-  --color-border: oklch(92% 0.006 150);
-  --color-border-strong: oklch(86% 0.008 150);
-  --color-fg: oklch(22% 0.01 200);
-  --color-muted: oklch(38% 0.01 200);
-  --color-muted-soft: oklch(96% 0.004 150);
-  --font-heading: ui-serif, Georgia, Garamond, "Times New Roman", serif;
-  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-heading-weight: 700;
-  --font-heading-tracking: -0.01em;
+    --color-accent: oklch(55% 0.10 165);
+    --color-accent-hover: oklch(50% 0.10 165);
+    --color-accent-soft: oklch(95% 0.025 165);
+    --color-accent-text: oklch(35% 0.08 165);
+    --color-bg: oklch(98.8% 0.004 150);
+    --color-surface: #ffffff;
+    --color-border: oklch(92% 0.006 150);
+    --color-border-strong: oklch(86% 0.008 150);
+    --color-fg: oklch(22% 0.01 200);
+    --color-muted: oklch(38% 0.01 200);
+    --color-muted-soft: oklch(96% 0.004 150);
+    --font-heading: ui-serif, Georgia, Garamond, "Times New Roman", serif;
+    --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-heading-weight: 700;
+    --font-heading-tracking: -0.01em;
   }
 }
 
 @layer base {
   /* Apply theme fonts globally */
-* {
-  font-family: var(--font-body);
-}
+  * {
+    font-family: var(--font-body);
+  }
 
   h1, h2, h3, h4, h5, h6, [role="heading"] {
     font-family: var(--font-heading);
