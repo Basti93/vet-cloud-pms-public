@@ -28,7 +28,7 @@ export function ModernTemplate({
   return (
     <div className="min-h-screen bg-bg text-fg">
       {/* Header */}
-      <header className="sticky top-0 bg-surface border-b border-[var(--color-border)] z-40">
+      <header className="sticky top-0 bg-surface border-b border-[var(--color-border)] z-40" style={{ backgroundColor: '#ffffff' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div
