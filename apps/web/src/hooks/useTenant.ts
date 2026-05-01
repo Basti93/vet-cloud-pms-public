@@ -15,6 +15,9 @@ import { trpc } from "@/lib/trpc/client";
  */
 export function useTenant() {
   const { user, isLoaded: clerkLoaded } = useUser();
+  const demoTenantId = process.env.NEXT_PUBLIC_DEMO_TENANT_ID ?? null;
+  const canUseDemoFallback =
+    process.env.NODE_ENV !== "production" && !!demoTenantId;
 
   // Fetch current tenant from database via TRPC
   const { data: tenant, isLoading: tenantLoading } = trpc.tenant.getCurrent.useQuery(
@@ -22,9 +25,11 @@ export function useTenant() {
     { enabled: !!user && clerkLoaded }
   );
 
+  const resolvedTenantId = tenant?.id ?? (canUseDemoFallback ? demoTenantId : null);
+
   return {
-    tenantId: tenant?.id ?? null,
+    tenantId: resolvedTenantId,
     isReady: clerkLoaded && !tenantLoading,
-    isOnboarded: !!tenant?.id,
+    isOnboarded: !!resolvedTenantId,
   };
 }
