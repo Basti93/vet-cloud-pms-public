@@ -1,4 +1,15 @@
 /**
+ * PRAXIS (Tenant) preferences — clinic-wide settings.
+ * Loaded server-side on every page load via layout.tsx
+ */
+export interface PraxisPreferences {
+  tenantId: string;
+  tenantName: string;
+  // Future: add tenantDefaultLocale to allow per-clinic language defaults
+  // Users can override this in their own locale preference
+}
+
+/**
  * UserPreferences - All user preferences load once on app start.
  *
  * When adding new preferences:
@@ -8,6 +19,8 @@
  * 4. Done - automatically available in context everywhere
  *
  * Why this pattern: Single query on app start. Scales better than individual cookies/localStorage.
+ * User preferences can override praxis (tenant) defaults.
+ * Example: clinic defaults to German, but a user can set their own to English.
  * See CLAUDE.md "User Preferences Pattern"
  */
 export interface UserPreferences {

@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { Calendar, TrendingUp, Users, CheckCircle, Activity } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { useTenant } from "@/hooks/useTenant";
-import { useLocale } from "@/lib/locale/context";
+import { useLocale } from "@/lib/user/preferences-context";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function StatCard({

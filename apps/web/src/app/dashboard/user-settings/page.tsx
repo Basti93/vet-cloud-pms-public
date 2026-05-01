@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useLocale } from "@/lib/locale/context";
+import { useLocale } from "@/lib/user/preferences-context";
 import { locales } from "@/i18n.config";
 import { Globe, Calendar, Clock, Trash2, Plus } from "lucide-react";
 import { SelectField } from "@/components/forms/SelectField";
@@ -43,6 +43,7 @@ export default function UserSettingsPage() {
   const [isDirty, setIsDirty] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const [successMessage, setSuccessMessage] = useState<string | undefined>();
+  const [isLoading, setIsLoading] = useState(false);
 
   const { data: tenant } = trpc.tenant.getCurrent.useQuery();
   const { data: permissions } = trpc.admin.getUserPermissions.useQuery();
@@ -92,19 +93,8 @@ export default function UserSettingsPage() {
     note: "",
   });
 
-  const updateLocaleMutation = trpc.user.updateLocale.useMutation({
-    onSuccess: () => {
-      setLocale(localLocale);
-      setIsDirty(false);
-      setError(undefined);
-      setSuccessMessage("Sprache erfolgreich gespeichert");
-      setTimeout(() => setSuccessMessage(undefined), 3000);
-      utils.user.getLocale.invalidate();
-    },
-    onError: (err) => {
-      setError(err.message || "Fehler beim Speichern der Sprache");
-    },
-  });
+  // Note: setLocale handles the mutation internally
+  // We just track UI state (isDirty, error, successMessage)
 
   const updateScheduleMutation = trpc.user.updateVetScheduleDay.useMutation({
     onSuccess: () => {
@@ -163,12 +153,18 @@ export default function UserSettingsPage() {
   };
 
   const handleSaveLocale = async () => {
+    setIsLoading(true);
     try {
-      await updateLocaleMutation.mutateAsync({
-        locale: localLocale as "de" | "en",
-      });
-    } catch {
-      // Error is handled by mutation onError
+      await setLocale(localLocale as "de" | "en");
+      setIsDirty(false);
+      setError(undefined);
+      setSuccessMessage("Sprache erfolgreich gespeichert");
+      setTimeout(() => setSuccessMessage(undefined), 3000);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Fehler beim Speichern der Sprache";
+      setError(message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -187,7 +183,7 @@ export default function UserSettingsPage() {
         description="Wählen Sie die Sprache für Ihr Benutzererlebnis"
         icon={<Globe size={20} style={{ color: "var(--color-accent)" }} />}
         isDirty={isDirty}
-        isLoading={updateLocaleMutation.isPending}
+        isLoading={isLoading}
         error={error}
         successMessage={successMessage}
         onSave={handleSaveLocale}

@@ -3,7 +3,7 @@
 import { use, useState, useEffect, useRef, useCallback } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { useBookingFormState } from "@/hooks/useBookingFormState";
-import { useLocale } from "@/lib/locale/context";
+import { useLocale } from "@/lib/user/preferences-context";
 import { ChevronLeft, ChevronRight, Check, Phone, MapPin, Clock, Calendar, AlertCircle, Loader2, Stethoscope, PawPrint } from "lucide-react";
 import { COLOR_PRESETS, TYPE_PAIRINGS, type ColorPresetKey, type TypographyPairingKey } from "@/lib/theme";
 

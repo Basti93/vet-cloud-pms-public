@@ -5,7 +5,7 @@ import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { LayoutDashboard, Calendar, Users, Phone, ClipboardList, Clock, Menu, X, Settings, TrendingUp } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
-import { useLocale } from "@/lib/locale/context";
+import { useLocale } from "@/lib/user/preferences-context";
 
 function useNavItems() {
   const { t } = useLocale();
