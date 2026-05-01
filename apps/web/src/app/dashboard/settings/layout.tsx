@@ -2,7 +2,7 @@
 
 import { ReactNode, useMemo, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Palette, Users, Building2, Mail, CalendarClock, Shield, Cog } from "lucide-react";
+import { Palette, Users, Building2, Mail, CalendarClock, Shield, Cog, Lock } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { PERMISSIONS } from "@/lib/db/schema";
 import { Tabs } from "@/components/ui/tabs";
@@ -25,6 +25,13 @@ const ALL_TABS = [
     children: [
       { href: "/dashboard/settings/team", label: "Team & Benutzer", icon: Users },
       { href: "/dashboard/settings/roles", label: "Rollen & Berechtigungen", icon: Shield },
+    ],
+  },
+  {
+    label: "Datenschutz & Konto",
+    icon: Lock,
+    children: [
+      { href: "/dashboard/settings/account", label: "Mein Konto", icon: Lock },
     ],
   },
 ];
