@@ -78,9 +78,9 @@ export default async function RootLayout({
   }
 
   return (
-    <ClerkProviderWrapper>
-      <html lang={htmlLang}>
-        <body>
+    <html lang={htmlLang}>
+      <body>
+        <ClerkProviderWrapper>
           <EnvironmentBanner />
           <TRPCProvider>
             <PraxisProvider praxis={praxisData}>
@@ -95,8 +95,8 @@ export default async function RootLayout({
           </TRPCProvider>
           <Analytics />
           <SpeedInsights />
-        </body>
-      </html>
-    </ClerkProviderWrapper>
+        </ClerkProviderWrapper>
+      </body>
+    </html>
   );
 }

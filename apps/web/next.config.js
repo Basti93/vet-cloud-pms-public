@@ -66,6 +66,7 @@ const nextConfig = {
               "img-src 'self' data: https: blob:; " +
               `connect-src 'self' ${clerkConnectSrc} https://neon.tech https://api.resend.com https://vapi.ai https://*.vapi.ai; ` +
               `frame-src 'self' ${clerkFrameSrc}; ` +
+              "worker-src 'self' blob:; " +
               "object-src 'none'; " +
               "base-uri 'self'; " +
               "form-action 'self'; " +
