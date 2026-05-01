@@ -101,25 +101,34 @@ async function main() {
     } else if (command === "--reset") {
       console.log(`🔄 Resetting demo tenant data...`);
 
-      // Update tenant profile + opening hours
+      // Ensure demo tenant exists, then sync profile + opening hours
       const t = TEST_DATA.tenant;
       await db
-        .update(tenants)
-        .set({
-          name: t.name,
-          email: t.email,
-          phone: t.phone,
-          address: t.address,
-          city: t.city,
-          tagline: t.tagline,
-          monogram: t.monogram,
-          themePreference: t.themePreference,
-          typographyPreference: t.typographyPreference,
-          websiteTemplate: t.websiteTemplate,
-          openingHours: t.openingHours,
-          updatedAt: new Date(),
-        })
-        .where(eq(tenants.id, DEMO_TENANT_ID));
+        .insert(tenants)
+        .values(t)
+        .onConflictDoUpdate({
+          target: tenants.id,
+          set: {
+            slug: t.slug,
+            name: t.name,
+            email: t.email,
+            phone: t.phone,
+            address: t.address,
+            city: t.city,
+            postalCode: t.postalCode,
+            country: t.country,
+            tagline: t.tagline,
+            monogram: t.monogram,
+            themePreference: t.themePreference,
+            typographyPreference: t.typographyPreference,
+            websiteTemplate: t.websiteTemplate,
+            openingHours: t.openingHours,
+            subscriptionStatus: t.subscriptionStatus,
+            subscriptionPlan: t.subscriptionPlan,
+            maxUsers: t.maxUsers,
+            updatedAt: new Date(),
+          },
+        });
 
       // Delete in correct order (foreign key constraints)
       // Role permissions will be cascade-deleted when roles are deleted
