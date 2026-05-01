@@ -19,21 +19,28 @@ const translations: Record<Locale, Record<string, any>> = {
   en: enMessages,
 };
 
-export function LocaleProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(defaultLocale);
+interface LocaleProviderProps {
+  children: React.ReactNode;
+  initialLocale?: Locale;
+}
+
+export function LocaleProvider({ children, initialLocale }: LocaleProviderProps) {
+  const [locale, setLocaleState] = useState<Locale>(initialLocale || defaultLocale);
 
   useEffect(() => {
-    // Get locale from cookie or Accept-Language header on mount
-    const cookieLocale = getCookieLocale();
-    if (cookieLocale && isValidLocale(cookieLocale)) {
-      setLocaleState(cookieLocale);
-    } else {
-      const headerLocale = getAcceptLanguageLocale();
-      if (headerLocale) {
-        setLocaleState(headerLocale);
+    // Only sync from cookie/browser if we didn't get an initial locale from server
+    if (!initialLocale) {
+      const cookieLocale = getCookieLocale();
+      if (cookieLocale && isValidLocale(cookieLocale)) {
+        setLocaleState(cookieLocale);
+      } else {
+        const headerLocale = getAcceptLanguageLocale();
+        if (headerLocale) {
+          setLocaleState(headerLocale);
+        }
       }
     }
-  }, []);
+  }, [initialLocale]);
 
   const setLocale = (newLocale: Locale) => {
     setLocaleState(newLocale);
