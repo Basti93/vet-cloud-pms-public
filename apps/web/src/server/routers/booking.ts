@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { eq, and, gte, lte, lt, or, isNull } from "drizzle-orm";
-import { createTRPCRouter, publicProcedure, protectedProcedure } from "@/server/trpc";
+import { createTRPCRouter, publicProcedure, publicBookingProcedure, protectedProcedure } from "@/server/trpc";
 import { tenants, appointments, owners, patients, users, appointmentHolds, emailSettings, appointmentEmailLogs, vetSchedules, vetAbsences } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
 import { sendConfirmationEmail, sendBookingNotificationEmail } from "@/lib/email/service";
@@ -447,7 +447,7 @@ export const bookingRouter = createTRPCRouter({
     }),
 
   /** Public: Create owner + patient + appointment from booking widget */
-  book: publicProcedure
+  book: publicBookingProcedure
     .input(
       z.object({
         tenantId: z.string().uuid(),
@@ -643,7 +643,7 @@ export const bookingRouter = createTRPCRouter({
   // ─── Slot-Hold Procedures ──────────────────────────────────────────────────
 
   /** Public: Reserve a slot for 15 minutes — returns holdToken */
-  holdSlot: publicProcedure
+  holdSlot: publicBookingProcedure
     .input(
       z.object({
         tenantId: z.string().uuid(),

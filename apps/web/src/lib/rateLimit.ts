@@ -10,10 +10,15 @@ const requestLog = new Map<
 >();
 
 const RATE_LIMIT_WINDOW = 60 * 1000; // 60 seconds
-const MAX_REQUESTS = 100; // per window
+const MAX_REQUESTS = 100; // per window (default for authenticated/general endpoints)
+const MAX_PUBLIC_BOOKING_REQUESTS = 20; // per window (strict limit for public booking endpoints)
 
-export function checkRateLimit(identifier: string): boolean {
+export function checkRateLimit(
+  identifier: string,
+  isPublicBooking: boolean = false
+): boolean {
   const now = Date.now();
+  const maxRequests = isPublicBooking ? MAX_PUBLIC_BOOKING_REQUESTS : MAX_REQUESTS;
   const entry = requestLog.get(identifier);
 
   if (!entry || now > entry.resetAt) {
@@ -25,7 +30,7 @@ export function checkRateLimit(identifier: string): boolean {
     return true;
   }
 
-  if (entry.count < MAX_REQUESTS) {
+  if (entry.count < maxRequests) {
     entry.count++;
     return true;
   }
@@ -34,16 +39,17 @@ export function checkRateLimit(identifier: string): boolean {
   return false;
 }
 
-export function getRateLimitInfo(identifier: string) {
+export function getRateLimitInfo(identifier: string, isPublicBooking: boolean = false) {
   const entry = requestLog.get(identifier);
   const now = Date.now();
+  const maxRequests = isPublicBooking ? MAX_PUBLIC_BOOKING_REQUESTS : MAX_REQUESTS;
 
   if (!entry || now > entry.resetAt) {
-    return { remaining: MAX_REQUESTS, resetAt: now + RATE_LIMIT_WINDOW };
+    return { remaining: maxRequests, resetAt: now + RATE_LIMIT_WINDOW };
   }
 
   return {
-    remaining: Math.max(0, MAX_REQUESTS - entry.count),
+    remaining: Math.max(0, maxRequests - entry.count),
     resetAt: entry.resetAt,
   };
 }

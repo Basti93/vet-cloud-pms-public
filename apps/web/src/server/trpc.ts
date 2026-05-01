@@ -63,8 +63,24 @@ const rateLimitMiddleware = t.middleware(({ ctx, next }) => {
   // Use userId if authenticated, otherwise fall back to IP
   const identifier = ctx.userId || ctx.headers.get("x-forwarded-for") || "unknown";
 
-  if (!checkRateLimit(identifier)) {
-    const info = getRateLimitInfo(identifier);
+  if (!checkRateLimit(identifier, false)) {
+    const info = getRateLimitInfo(identifier, false);
+    throw new TRPCError({
+      code: "TOO_MANY_REQUESTS",
+      message: `Rate limit exceeded. Reset at ${new Date(info.resetAt).toISOString()}`,
+    });
+  }
+
+  return next();
+});
+
+// ✅ Stricter rate limiting for public booking: 20 requests per 60 seconds per IP
+const publicBookingRateLimitMiddleware = t.middleware(({ ctx, next }) => {
+  // Use IP only for public booking endpoints (no userId since they're unauthenticated)
+  const identifier = ctx.headers.get("x-forwarded-for") || "unknown";
+
+  if (!checkRateLimit(identifier, true)) {
+    const info = getRateLimitInfo(identifier, true);
     throw new TRPCError({
       code: "TOO_MANY_REQUESTS",
       message: `Rate limit exceeded. Reset at ${new Date(info.resetAt).toISOString()}`,
@@ -84,6 +100,11 @@ export const createCallerFactory = t.createCallerFactory;
 /** Public procedure — no auth required */
 export const publicProcedure = t.procedure
   .use(rateLimitMiddleware)
+  .use(timingMiddleware);
+
+/** Public booking procedure — stricter rate limit (20 req/60s) for public booking endpoints */
+export const publicBookingProcedure = t.procedure
+  .use(publicBookingRateLimitMiddleware)
   .use(timingMiddleware);
 
 /** Protected procedure — requires Clerk session */
