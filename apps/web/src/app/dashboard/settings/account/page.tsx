@@ -2,19 +2,17 @@
 
 import { useState } from "react";
 import { trpc } from "@/lib/trpc/client";
-import { useRouter } from "next/navigation";
 
 export default function AccountPage() {
-  const router = useRouter();
   const [exportLoading, setExportLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [deletionEmailSent, setDeletionEmailSent] = useState(false);
 
   const { data: currentUser } = trpc.admin.getCurrentUser.useQuery();
   const { data: tenant } = trpc.tenant.getCurrent.useQuery();
-  const deleteTenantMutation = trpc.tenant.delete.useMutation();
+  const requestDeletionMutation = trpc.tenant.requestDeletion.useMutation();
 
   const handleExportData = async () => {
     try {
@@ -47,26 +45,37 @@ export default function AccountPage() {
   };
 
   const handleDeleteAccount = async () => {
-    if (!tenant?.id) return;
+    if (!tenant?.id) {
+      setErrorMessage("Praxisdaten nicht geladen. Bitte aktualisieren Sie die Seite.");
+      return;
+    }
+    if (!currentUser?.id || !currentUser?.email) {
+      setErrorMessage("Benutzerdaten nicht geladen. Bitte aktualisieren Sie die Seite.");
+      return;
+    }
 
     try {
       setDeleteLoading(true);
       setErrorMessage("");
+      console.log("Requesting deletion for tenant:", tenant.id, "user:", currentUser.id);
 
-      await deleteTenantMutation.mutateAsync({
+      await requestDeletionMutation.mutateAsync({
         tenantId: tenant.id,
+        userId: currentUser.id,
       });
 
-      setSuccessMessage("Konto und alle Daten werden gelöscht. Sie werden jetzt abgemeldet.");
-
-      // Redirect after a short delay
-      setTimeout(() => {
-        window.location.href = "/";
-      }, 2000);
+      setDeletionEmailSent(true);
+      setSuccessMessage(
+        "Eine Bestätigungsemail wurde an " +
+          currentUser.email +
+          " gesendet. Bitte folgen Sie dem Link in der Email, um die Löschung zu bestätigen."
+      );
     } catch (error) {
+      console.error("Delete error:", error);
       setErrorMessage(
         error instanceof Error ? error.message : "Fehler beim Löschen des Kontos"
       );
+    } finally {
       setDeleteLoading(false);
     }
   };
@@ -120,56 +129,44 @@ export default function AccountPage() {
           </p>
         </div>
 
-        {!deleteConfirm ? (
-          <button
-            onClick={() => setDeleteConfirm(true)}
-            className="px-6 py-3 rounded-lg font-medium transition-all text-white bg-red-600 hover:bg-red-700"
-          >
-            Konto löschen
-          </button>
-        ) : (
-          <div className="space-y-4">
-            <div className="p-4 rounded-lg bg-red-50 border border-red-200">
-              <p className="text-sm text-red-900 font-semibold mb-4">
-                ⚠️ Sind Sie sicher? Diese Aktion kann nicht rückgängig gemacht werden.
+        {!deletionEmailSent ? (
+          <>
+            <div className="p-4 rounded-lg bg-red-50 border border-red-200 mb-4">
+              <p className="text-sm text-red-900 font-semibold mb-3">
+                ⚠️ Vor dem Löschen:
               </p>
-              <p className="text-sm text-red-800 mb-4">
-                Folgende Daten werden gelöscht:
-              </p>
-              <ul className="text-sm text-red-800 list-disc list-inside space-y-1 mb-4">
-                <li>Alle Praxisinformationen</li>
-                <li>Alle Patientendaten und Tierakten</li>
-                <li>Alle Termine und Terminhistorie</li>
-                <li>Alle Benutzerkonten in dieser Praxis</li>
-                <li>Alle E-Mail-Einstellungen und Vorlagen</li>
+              <ul className="text-sm text-red-800 list-disc list-inside space-y-1">
+                <li>Stellen Sie sicher, dass Sie keine ausstehenden Verträge haben</li>
+                <li>Alle Patientendaten werden dauerhaft gelöscht</li>
+                <li>Diese Aktion kann nicht rückgängig gemacht werden</li>
+                <li>Sie erhalten eine Bestätigungsemail mit einem Link</li>
               </ul>
             </div>
 
-            <div className="flex gap-3">
-              <button
-                onClick={handleDeleteAccount}
-                disabled={deleteLoading}
-                className="px-6 py-3 rounded-lg font-medium transition-all text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {deleteLoading ? "Wird gelöscht..." : "Ja, alles löschen"}
-              </button>
-              <button
-                onClick={() => {
-                  setDeleteConfirm(false);
-                  setErrorMessage("");
-                }}
-                disabled={deleteLoading}
-                className="px-6 py-3 rounded-lg font-medium transition-all bg-gray-100 hover:bg-gray-200 text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Abbrechen
-              </button>
-            </div>
+            <button
+              onClick={handleDeleteAccount}
+              disabled={deleteLoading || !tenant || !currentUser}
+              className="px-6 py-3 rounded-lg font-medium transition-all text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              title={!tenant || !currentUser ? "Daten werden geladen..." : ""}
+            >
+              {deleteLoading ? "Wird vorbereitet..." : "Konto löschen"}
+            </button>
+
+            <p className="text-xs text-muted mt-4">
+              Ein Bestätigungslink wird an Ihre E-Mail-Adresse gesendet. Der Link ist 24 Stunden gültig.
+            </p>
+          </>
+        ) : (
+          <div className="p-4 rounded-lg bg-green-50 border border-green-200">
+            <p className="text-sm text-green-900 font-semibold mb-2">
+              ✓ Bestätigungsemail gesendet
+            </p>
+            <p className="text-sm text-green-800">
+              Eine Email mit einem Bestätigungslink wurde an <strong>{currentUser?.email}</strong> gesendet.
+              Bitte folgen Sie dem Link, um die Löschung zu bestätigen. Der Link ist 24 Stunden lang gültig.
+            </p>
           </div>
         )}
-
-        <p className="text-xs text-muted mt-4">
-          Nach der Löschung werden Sie von allen Systemen abgemeldet. Backup-Daten können für bis zu 90 Tage beibehalten werden.
-        </p>
       </div>
 
       {/* DSGVO Rights Information */}

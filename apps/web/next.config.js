@@ -18,12 +18,12 @@ const nextConfig = {
             key: "Content-Security-Policy",
             value:
               "default-src 'self'; " +
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.clerk.com https://clerk.com; " +
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.clerk.com https://*.clerk.com https://*.clerk.accounts.dev; " +
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
               "font-src 'self' https://fonts.gstatic.com; " +
-              "img-src 'self' data: https:; " +
-              "connect-src 'self' https://api.clerk.com https://*.clerk.com https://neon.tech https://api.resend.com https://vapi.ai https://*.vapi.ai; " +
-              "frame-src 'self' https://clerk.com https://*.clerk.com; " +
+              "img-src 'self' data: https: blob:; " +
+              "connect-src 'self' https://api.clerk.com https://*.clerk.com https://*.clerk.accounts.dev https://neon.tech https://api.resend.com https://vapi.ai https://*.vapi.ai; " +
+              "frame-src 'self' https://clerk.com https://*.clerk.com https://*.clerk.accounts.dev; " +
               "object-src 'none'; " +
               "base-uri 'self'; " +
               "form-action 'self'; " +

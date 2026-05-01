@@ -41,6 +41,12 @@ export interface SendBookingNotificationInput {
   vetName?: string;
 }
 
+export interface SendAccountDeletionEmailInput {
+  to: string;
+  confirmUrl: string;
+  expiresAt: string;
+}
+
 /**
  * Send appointment confirmation email to patient owner
  */
@@ -169,6 +175,59 @@ export async function sendBookingNotificationEmail(input: SendBookingNotificatio
     return { success: true, messageId: result.data?.id };
   } catch (error) {
     console.error("Error sending booking notification:", error);
+    return { success: false, error };
+  }
+}
+
+/**
+ * Send account deletion confirmation email
+ * DSGVO Art. 17 - Right to erasure
+ */
+export async function sendAccountDeletionEmail(input: SendAccountDeletionEmailInput) {
+  const subject = "Bestätigung: Kontolöschung angefordert";
+
+  const body = `
+Hallo,
+
+Sie haben eine Anfrage zum Löschen Ihres Kontos und aller damit verbundenen Daten gestellt.
+
+Bitte bestätigen Sie die Kontolöschung, indem Sie auf den folgenden Link klicken:
+
+${input.confirmUrl}
+
+Dieser Link ist bis ${input.expiresAt} gültig.
+
+Wenn Sie diese Anfrage nicht gestellt haben, ignorieren Sie diese Email und unternehmen Sie keine weiteren Maßnahmen. Ihr Konto wird nicht gelöscht.
+
+WARNUNG: Nach der Bestätigung werden folgende Daten permanent gelöscht:
+- Alle Praxisinformationen
+- Alle Patientendaten und Tierakten
+- Alle Termine und Terminhistorie
+- Alle Benutzerkonten in dieser Praxis
+- Alle E-Mail-Einstellungen und Vorlagen
+
+Diese Aktion kann nicht rückgängig gemacht werden.
+
+Mit freundlichen Grüßen,
+Ihr VetCloud PMS Team
+  `.trim();
+
+  try {
+    const result = await resend.emails.send({
+      from: `VetCloud PMS <${FROM_EMAIL}>`,
+      to: input.to,
+      subject,
+      text: body,
+    });
+
+    if (result.error) {
+      console.error("Resend error:", result.error);
+      return { success: false, error: result.error };
+    }
+
+    return { success: true, messageId: result.data?.id };
+  } catch (error) {
+    console.error("Error sending account deletion email:", error);
     return { success: false, error };
   }
 }

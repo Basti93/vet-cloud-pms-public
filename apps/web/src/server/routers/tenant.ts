@@ -1,8 +1,10 @@
 import { createTRPCRouter, publicProcedure, protectedProcedure } from "@/server/trpc";
 import { z } from "zod";
-import { tenants, users, featureFlags } from "@/lib/db/schema";
+import { tenants, users, featureFlags, accountDeletionRequests } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { randomUUID } from "crypto";
+import { randomUUID, randomBytes } from "crypto";
+import { sendAccountDeletionEmail } from "@/lib/email/service";
+import { getMainDomain } from "@/lib/env";
 
 // Helper function to generate a unique slug from tenant name
 async function generateUniqueSlug(
@@ -393,5 +395,135 @@ export const tenantRouter = createTRPCRouter({
       }
 
       return { success: true };
+    }),
+
+  requestDeletion: protectedProcedure
+    .input(z.object({ tenantId: z.string().uuid(), userId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      // Get current user
+      const [user] = await ctx.db
+        .select({ id: users.id, tenantId: users.tenantId, email: users.email, role: users.role })
+        .from(users)
+        .where(eq(users.clerkId, ctx.userId))
+        .limit(1);
+
+      if (!user || user.role !== "admin") {
+        throw new Error("Only admins can request account deletion");
+      }
+
+      if (user.tenantId !== input.tenantId) {
+        throw new Error("Can only delete your own practice");
+      }
+
+      // Verify the userId matches the current user
+      if (input.userId !== user.id) {
+        throw new Error("Can only request deletion for your own account");
+      }
+
+      // Generate deletion token
+      const token = randomBytes(32).toString("hex");
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+      // Create deletion request
+      const [deletionRequest] = await ctx.db
+        .insert(accountDeletionRequests)
+        .values({
+          id: randomUUID(),
+          tenantId: input.tenantId,
+          userId: input.userId,
+          token,
+          email: user.email,
+          expiresAt,
+          status: "pending",
+        })
+        .returning();
+
+      // Send confirmation email
+      const domain = getMainDomain();
+      const confirmUrl = `${domain}/api/tenant/confirm-deletion?token=${token}`;
+
+      try {
+        await sendAccountDeletionEmail({
+          to: user.email || "",
+          confirmUrl,
+          expiresAt: expiresAt.toLocaleString("de-DE"),
+        });
+      } catch (error) {
+        console.error("Failed to send deletion email:", error);
+        // Delete the request if email fails
+        await ctx.db.delete(accountDeletionRequests).where(eq(accountDeletionRequests.id, deletionRequest.id));
+        throw new Error("Failed to send confirmation email");
+      }
+
+      return { success: true, message: "Confirmation email sent" };
+    }),
+
+  confirmDeletion: publicProcedure
+    .input(z.object({ token: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      // Find valid deletion request
+      const [deletionRequest] = await ctx.db
+        .select()
+        .from(accountDeletionRequests)
+        .where(eq(accountDeletionRequests.token, input.token))
+        .limit(1);
+
+      if (!deletionRequest) {
+        throw new Error("Invalid or expired deletion token");
+      }
+
+      if (deletionRequest.status !== "pending") {
+        throw new Error("This deletion request has already been processed");
+      }
+
+      if (new Date() > deletionRequest.expiresAt) {
+        throw new Error("Deletion token has expired (24 hours)");
+      }
+
+      // Mark as confirmed
+      await ctx.db
+        .update(accountDeletionRequests)
+        .set({ status: "confirmed", confirmedAt: new Date() })
+        .where(eq(accountDeletionRequests.id, deletionRequest.id));
+
+      // Get all users in this tenant to delete from Clerk
+      const tenantUsers = await ctx.db
+        .select({ clerkId: users.clerkId })
+        .from(users)
+        .where(eq(users.tenantId, deletionRequest.tenantId));
+
+      // Delete from Clerk (best effort)
+      const clerkSecretKey = process.env.CLERK_SECRET_KEY;
+      if (clerkSecretKey && tenantUsers.length > 0) {
+        try {
+          for (const u of tenantUsers) {
+            const response = await fetch(`https://api.clerk.com/v1/users/${u.clerkId}`, {
+              method: "DELETE",
+              headers: {
+                Authorization: `Bearer ${clerkSecretKey}`,
+              },
+            });
+            if (!response.ok && response.status !== 404) {
+              console.error(`Failed to delete Clerk user ${u.clerkId}:`, response.statusText);
+            }
+          }
+        } catch (error) {
+          console.error("Error deleting Clerk users:", error);
+        }
+      }
+
+      // Delete the tenant (cascades all related data)
+      const [deletedTenant] = await ctx.db
+        .delete(tenants)
+        .where(eq(tenants.id, deletionRequest.tenantId))
+        .returning();
+
+      if (!deletedTenant) {
+        throw new Error("Practice not found");
+      }
+
+      console.log(`Practice deleted via email confirmation: ${deletedTenant.slug} (${deletedTenant.id})`);
+
+      return { success: true, message: "Account and all data have been deleted" };
     }),
 });

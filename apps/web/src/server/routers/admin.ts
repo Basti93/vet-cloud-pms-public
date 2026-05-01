@@ -54,7 +54,7 @@ export const adminRouter = createTRPCRouter({
   }),
 
   /**
-   * Get current user's full details (id, role, tenantId)
+   * Get current user's full details (id, email, role, tenantId)
    * Protected: Auth required
    * Returns null if user doesn't exist in database yet
    */
@@ -70,6 +70,7 @@ export const adminRouter = createTRPCRouter({
       .select({
         id: users.id,
         clerkId: users.clerkId,
+        email: users.email,
         firstName: users.firstName,
         role: users.role,
         tenantId: users.tenantId,

@@ -805,6 +805,32 @@ export const calendarAccessAudit = pgTable(
   })
 );
 
+export const accountDeletionRequests = pgTable(
+  "account_deletion_requests",
+  {
+    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    token: varchar("token", { length: 255 }).notNull().unique(),
+    email: varchar("email", { length: 255 }).notNull(), // Snapshot of email for verification
+    status: varchar("status", { length: 50 }).default("pending").notNull(), // pending, confirmed, expired, cancelled
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(), // 24 hours from creation
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (table) => ({
+    tenantIdIdx: index("deletion_request_tenant_id_idx").on(table.tenantId),
+    tokenIdx: index("deletion_request_token_idx").on(table.token),
+    expiresAtIdx: index("deletion_request_expires_at_idx").on(table.expiresAt),
+  })
+);
+
 // ============================================================================
 // RLS Policies (für später, muss in Postgres direkt gesetzt werden)
 // ============================================================================
