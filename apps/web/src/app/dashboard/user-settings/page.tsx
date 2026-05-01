@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocale } from "@/lib/locale/context";
 import { locales } from "@/i18n.config";
 import { Globe, Calendar, Clock, Trash2, Plus } from "lucide-react";
@@ -52,6 +52,17 @@ export default function UserSettingsPage() {
 
   // Get utils at top level (before hooks)
   const utils = trpc.useUtils();
+
+  // Load user's saved locale from database
+  const { data: savedLocale } = trpc.user.getLocale.useQuery();
+
+  // Sync saved locale from database to context and local state
+  useEffect(() => {
+    if (savedLocale?.locale && (savedLocale.locale === "de" || savedLocale.locale === "en")) {
+      setLocale(savedLocale.locale);
+      setLocalLocale(savedLocale.locale);
+    }
+  }, [savedLocale?.locale, setLocale]);
 
   // Vet-specific queries and mutations
   const { data: vetSchedule = [] } = trpc.user.getVetSchedule.useQuery(

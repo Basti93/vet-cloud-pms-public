@@ -6,6 +6,39 @@ import { TRPCError } from "@trpc/server";
 
 export const userRouter = createTRPCRouter({
   /**
+   * Get current user's preferences (locale, theme, etc.)
+   * Protected: Auth required
+   *
+   * Loads all preferences at once. Called once on app initialization.
+   */
+  getPreferences: protectedProcedure.query(async ({ ctx }) => {
+    if (!ctx.userId) {
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: "Not authenticated",
+      });
+    }
+
+    const [user] = await ctx.db
+      .select({
+        locale: users.locale,
+      })
+      .from(users)
+      .where(eq(users.clerkId, ctx.userId));
+
+    if (!user) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "User not found",
+      });
+    }
+
+    return {
+      locale: (user.locale as "de" | "en") || "de",
+    };
+  }),
+
+  /**
    * Update current user's locale preference
    * Protected: Auth required
    */

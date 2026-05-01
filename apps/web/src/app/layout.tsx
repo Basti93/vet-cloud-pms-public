@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { ClerkProviderWrapper } from "@/components/ClerkProviderWrapper";
 import { TRPCProvider } from "@/lib/trpc/provider";
+import { PreferencesLoader } from "@/components/PreferencesLoader";
 import { LocaleProvider } from "@/lib/locale/context";
 import { ToastProvider } from "@/lib/toast/context";
 import { ToastContainer } from "@/components/ui/toast";
@@ -31,11 +32,13 @@ export default async function RootLayout({
         <body>
           <EnvironmentBanner />
           <TRPCProvider>
-            <ToastProvider>
-              <DynamicFavicon />
-              <LocaleProvider>{children}</LocaleProvider>
-              <ToastContainer />
-            </ToastProvider>
+            <PreferencesLoader>
+              <ToastProvider>
+                <DynamicFavicon />
+                <LocaleProvider>{children}</LocaleProvider>
+                <ToastContainer />
+              </ToastProvider>
+            </PreferencesLoader>
           </TRPCProvider>
           <Analytics />
           <SpeedInsights />
