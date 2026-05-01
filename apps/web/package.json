@@ -18,7 +18,7 @@
     "script": "npx tsx scripts"
   },
   "dependencies": {
-    "@clerk/localizations": "^1",
+    "@clerk/localizations": "^4.5.5",
     "@clerk/nextjs": "^7",
     "@fullcalendar/daygrid": "^6",
     "@fullcalendar/interaction": "^6",
