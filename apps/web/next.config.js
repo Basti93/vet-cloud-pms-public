@@ -6,8 +6,16 @@ let clerkAccountsOrigin = "";
 try {
   if (appUrl) {
     const { hostname } = new URL(appUrl);
-    clerkFrontendOrigin = `https://clerk.${hostname}`;
-    clerkAccountsOrigin = `https://accounts.${hostname}`;
+    const isLocalHost =
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "0.0.0.0";
+
+    // Only derive custom Clerk subdomains for real internet domains.
+    if (!isLocalHost && hostname.includes(".")) {
+      clerkFrontendOrigin = `https://clerk.${hostname}`;
+      clerkAccountsOrigin = `https://accounts.${hostname}`;
+    }
   }
 } catch {
   // Ignore invalid NEXT_PUBLIC_APP_URL and fall back to default Clerk domains only.
@@ -17,6 +25,7 @@ const clerkScriptSrc = [
   "https://cdn.clerk.com",
   "https://*.clerk.com",
   "https://*.clerk.accounts.dev",
+  "https://va.vercel-scripts.com",
   clerkFrontendOrigin,
 ]
   .filter(Boolean)
@@ -26,6 +35,8 @@ const clerkConnectSrc = [
   "https://api.clerk.com",
   "https://*.clerk.com",
   "https://*.clerk.accounts.dev",
+  "https://clerk-telemetry.com",
+  "https://va.vercel-scripts.com",
   clerkFrontendOrigin,
   clerkAccountsOrigin,
 ]
