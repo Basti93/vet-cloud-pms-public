@@ -1,5 +1,5 @@
 import { createTRPCReact } from "@trpc/react-query";
 
-// Using any for now due to type resolution issues with nested adminDashboard router
+// TODO: replace with shared AppRouter type package once cross-workspace path aliases are unified.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const trpc = createTRPCReact<any>();
+export const trpc: any = createTRPCReact<any>();
