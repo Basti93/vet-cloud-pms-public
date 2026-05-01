@@ -58,6 +58,7 @@ export default async function RootLayout({
             .select({
               id: tenants.id,
               name: tenants.name,
+              monogram: tenants.monogram,
             })
             .from(tenants)
             .where(eq(tenants.id, user.tenantId));
@@ -66,6 +67,7 @@ export default async function RootLayout({
             praxisData = {
               tenantId: tenant.id,
               tenantName: tenant.name,
+              monogram: tenant.monogram || null,
             };
           }
         }

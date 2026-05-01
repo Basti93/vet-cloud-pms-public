@@ -6,6 +6,7 @@ import Link from "next/link";
 import { LayoutDashboard, Calendar, Users, Phone, ClipboardList, Clock, Menu, X, Settings, TrendingUp } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { useLocale } from "@/lib/user/preferences-context";
+import { usePraxis } from "@/lib/praxis/context";
 
 function useNavItems() {
   const { t } = useLocale();
@@ -41,7 +42,7 @@ function useAdminNavItems() {
 
 export default function DashboardContent({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { data: tenant } = trpc.tenant.getCurrent.useQuery();
+  const { praxis } = usePraxis(); // Tenant name already loaded server-side
   const { data: user, isLoading: userLoading } = trpc.admin.getCurrentUser.useQuery();
   const { data: featureFlags } = trpc.tenant.getFeatureFlags.useQuery();
   const { t } = useLocale();
@@ -64,12 +65,12 @@ export default function DashboardContent({ children }: { children: ReactNode }) 
                 className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold"
                 style={{ backgroundColor: 'var(--color-accent-soft)' }}
               >
-                {tenant?.monogram || tenant?.name?.charAt(0).toUpperCase() || 'VC'}
+                {praxis?.monogram || praxis?.tenantName?.charAt(0).toUpperCase() || 'VC'}
               </div>
               <div>
-                <p className="font-bold text-sm leading-tight">{tenant?.name || 'Vet Cloud'}</p>
+                <p className="font-bold text-sm leading-tight">{praxis?.tenantName || 'Vet Cloud'}</p>
                 <p className="text-xs leading-tight" style={{ color: 'var(--color-accent-soft)' }}>
-                  {tenant?.name ? 'Praxis' : 'Praxisverwaltung'}
+                  {praxis?.tenantName ? 'Praxis' : 'Praxisverwaltung'}
                 </p>
               </div>
             </div>
@@ -189,7 +190,7 @@ export default function DashboardContent({ children }: { children: ReactNode }) 
               color: 'var(--color-accent-text)',
             }}
           >
-            {tenant?.name || 'Demo-Praxis'}
+            {praxis?.tenantName || 'Demo-Praxis'}
           </span>
         </header>
         <main className="flex-1 overflow-auto" style={{ backgroundColor: 'var(--color-bg)' }}>

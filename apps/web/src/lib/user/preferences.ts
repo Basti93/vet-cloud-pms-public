@@ -1,10 +1,12 @@
 /**
  * PRAXIS (Tenant) preferences — clinic-wide settings.
  * Loaded server-side on every page load via layout.tsx
+ * Available immediately on first paint (no client-side loading)
  */
 export interface PraxisPreferences {
   tenantId: string;
   tenantName: string;
+  monogram: string | null; // e.g., "MVK" for branding
   // Future: add tenantDefaultLocale to allow per-clinic language defaults
   // Users can override this in their own locale preference
 }
