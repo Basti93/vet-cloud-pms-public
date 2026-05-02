@@ -6,10 +6,11 @@ import { sendReminderEmail } from "@/lib/email/service";
 
 // Vercel cron jobs require a secret for security
 const CRON_SECRET = process.env.CRON_SECRET;
+const CRON_LOOKAHEAD_HOURS = 24;
 
 /**
- * Cron job to send 24-hour reminder emails for upcoming appointments.
- * Runs every hour and sends reminders for appointments within the configured reminder window.
+ * Cron job to send reminder emails for upcoming appointments.
+ * On Vercel Hobby this runs once per day, so we scan a 24h window.
  *
  * Security: Requires CRON_SECRET header to match environment variable
  */
@@ -47,12 +48,13 @@ export async function GET(request: NextRequest) {
       }
 
       const reminderHoursBefore = settings[0].reminderHoursBefore;
-      // Hourly cron: send reminders for appointments that start in the next hour
-      // around the tenant-configured "hours before appointment" threshold.
+      // Daily cron (Hobby-compatible): scan a 24h window around the configured threshold.
       const windowStart = new Date(
         now.getTime() + reminderHoursBefore * 60 * 60 * 1000
       );
-      const windowEnd = new Date(windowStart.getTime() + 60 * 60 * 1000);
+      const windowEnd = new Date(
+        windowStart.getTime() + CRON_LOOKAHEAD_HOURS * 60 * 60 * 1000
+      );
 
       // Find appointments in the reminder window that haven't been sent reminders yet
       const appointmentsToRemind = await db

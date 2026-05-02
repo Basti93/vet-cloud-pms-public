@@ -6,6 +6,7 @@ import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { Mail, AlertCircle } from 'lucide-react';
 
 export default function EmailSettingsPage() {
+  const FIXED_REMINDER_HOURS = 24;
   const [isMounted, setIsMounted] = useState(false);
   const [testEmail, setTestEmail] = useState('');
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -17,7 +18,6 @@ export default function EmailSettingsPage() {
   const [confirmationSubject, setConfirmationSubject] = useState('');
   const [confirmationBody, setConfirmationBody] = useState('');
   const [reminderEmailEnabled, setReminderEmailEnabled] = useState(false);
-  const [reminderHoursBefore, setReminderHoursBefore] = useState(24);
   const [reminderSubject, setReminderSubject] = useState('');
   const [reminderBody, setReminderBody] = useState('');
   const [bookingNotificationEnabled, setBookingNotificationEnabled] = useState(false);
@@ -40,7 +40,6 @@ export default function EmailSettingsPage() {
       setConfirmationSubject(emailSettings.data.confirmationSubject);
       setConfirmationBody(emailSettings.data.confirmationBody);
       setReminderEmailEnabled(emailSettings.data.reminderEmailEnabled);
-      setReminderHoursBefore(emailSettings.data.reminderHoursBefore);
       setReminderSubject(emailSettings.data.reminderSubject);
       setReminderBody(emailSettings.data.reminderBody);
       setBookingNotificationEnabled(emailSettings.data.bookingNotificationEnabled);
@@ -88,7 +87,7 @@ export default function EmailSettingsPage() {
       confirmationSubject,
       confirmationBody,
       reminderEmailEnabled,
-      reminderHoursBefore,
+      reminderHoursBefore: FIXED_REMINDER_HOURS,
       reminderSubject,
       reminderBody,
       bookingNotificationEnabled,
@@ -101,7 +100,6 @@ export default function EmailSettingsPage() {
       setConfirmationSubject(emailSettings.data.confirmationSubject);
       setConfirmationBody(emailSettings.data.confirmationBody);
       setReminderEmailEnabled(emailSettings.data.reminderEmailEnabled);
-      setReminderHoursBefore(emailSettings.data.reminderHoursBefore);
       setReminderSubject(emailSettings.data.reminderSubject);
       setReminderBody(emailSettings.data.reminderBody);
       setBookingNotificationEnabled(emailSettings.data.bookingNotificationEnabled);
@@ -237,14 +235,14 @@ export default function EmailSettingsPage() {
                     type="number"
                     min="1"
                     max="168"
-                    value={reminderHoursBefore}
-                    onChange={(e) => {
-                      setReminderHoursBefore(parseInt(e.target.value, 10));
-                      handleFieldChange();
-                    }}
-                    disabled={isUpdating}
-                    className="w-32 px-3 py-2 border border-[var(--color-border)] rounded-lg bg-bg text-fg disabled:opacity-50"
+                    value={FIXED_REMINDER_HOURS}
+                    disabled
+                    readOnly
+                    className="w-32 cursor-not-allowed px-3 py-2 border border-[var(--color-border)] rounded-lg bg-bg text-fg disabled:opacity-60"
                   />
+                  <p className="mt-2 text-xs text-muted">
+                    Vorübergehend fixiert auf 24h (Hobby-Cron kompatibel).
+                  </p>
                 </div>
 
                 <div>

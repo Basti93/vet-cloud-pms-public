@@ -8,6 +8,8 @@ import { requirePermission } from "@/server/trpc/middleware";
 import { PERMISSIONS } from "@/lib/db/schema";
 import { sendConfirmationEmail, SendConfirmationEmailInput } from "@/lib/email/service";
 
+const FIXED_REMINDER_HOURS = 24;
+
 async function getUserTenant(ctx: { db: typeof appDb }, userId: string) {
   const [user] = await ctx.db
     .select({ tenantId: users.tenantId })
@@ -80,6 +82,10 @@ export const emailSettingsRouter = createTRPCRouter({
       }
 
       const { tenantId, ...updateData } = input;
+      const normalizedUpdateData = {
+        ...updateData,
+        reminderHoursBefore: FIXED_REMINDER_HOURS,
+      };
 
       const [existing] = await ctx.db
         .select()
@@ -91,14 +97,14 @@ export const emailSettingsRouter = createTRPCRouter({
         // Create if doesn't exist
         const [created] = await ctx.db
           .insert(emailSettings)
-          .values({ tenantId, ...updateData })
+          .values({ tenantId, ...normalizedUpdateData })
           .returning();
         return created;
       }
 
       const [updated] = await ctx.db
         .update(emailSettings)
-        .set({ ...updateData, updatedAt: new Date() })
+        .set({ ...normalizedUpdateData, updatedAt: new Date() })
         .where(eq(emailSettings.tenantId, tenantId))
         .returning();
 

@@ -10,6 +10,8 @@ import { eq } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { sendConfirmationEmail, SendConfirmationEmailInput } from '@/lib/email/service';
 
+const FIXED_REMINDER_HOURS = 24;
+
 export const emailRouter = createTRPCRouter({
   // TODO: Re-implement sendConfirmationEmail and sendCancellationEmail with new email settings
   // These will use the new sendConfirmationEmail function from the service and respect email settings
@@ -95,6 +97,10 @@ export const emailRouter = createTRPCRouter({
       }
 
       const { tenantId, ...updateData } = input;
+      const normalizedUpdateData = {
+        ...updateData,
+        reminderHoursBefore: FIXED_REMINDER_HOURS,
+      };
 
       const [existing] = await ctx.db
         .select()
@@ -106,14 +112,14 @@ export const emailRouter = createTRPCRouter({
         // Create if doesn't exist
         const [created] = await ctx.db
           .insert(emailSettings)
-          .values({ tenantId, ...updateData })
+          .values({ tenantId, ...normalizedUpdateData })
           .returning();
         return created;
       }
 
       const [updated] = await ctx.db
         .update(emailSettings)
-        .set({ ...updateData, updatedAt: new Date() })
+        .set({ ...normalizedUpdateData, updatedAt: new Date() })
         .where(eq(emailSettings.tenantId, tenantId))
         .returning();
 
