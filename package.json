@@ -26,7 +26,10 @@
     "turbo": "^1.13.0"
   },
   "scripts": {
-    "dev": "turbo run dev --parallel",
+    "dev": "npm run dev:web",
+    "dev:web": "npm run dev --workspace @vet-cloud/web",
+    "dev:admin": "npm run dev --workspace admin",
+    "dev:all": "turbo run dev --parallel --filter=@vet-cloud/web --filter=admin",
     "build": "turbo run build",
     "lint": "turbo run lint"
   },
