@@ -96,12 +96,26 @@ export async function DELETE(request: NextRequest) {
       .values({
         tenantId: tenantId,
         userId: currentUser.id,
-        action: "ACCOUNT_DELETION",
+        action: "delete",
         entityType: "tenant",
         entityId: tenantId,
         changes: {
-          type: "DSGVO_Art_17_Erasure",
-          timestamp: new Date().toISOString(),
+          schemaVersion: "1.0.0",
+          event: "tenant.deletion_requested",
+          summary: "DSGVO Art. 17 erasure request",
+          actor: {
+            clerkUserId: userId,
+            userId: currentUser.id,
+          },
+          target: {
+            entityType: "tenant",
+            entityId: tenantId,
+          },
+          diff: {
+            legalBasis: "DSGVO_Art_17",
+          },
+          metadata: {},
+          occurredAt: new Date().toISOString(),
         },
       })
       .returning({ id: auditLogs.id })

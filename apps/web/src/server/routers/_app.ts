@@ -8,6 +8,7 @@ import { adminLogsRouter } from "./admin-logs";
 import { adminUsersRouter } from "./admin-users";
 import { adminHealthRouter } from "./admin-health";
 import { adminRemindersRouter } from "./admin-reminders";
+import { adminAuditRouter } from "./admin-audit";
 import { medicalRouter } from "./medical";
 import { vetRouter } from "./vet";
 import { emailRouter } from "./email";
@@ -28,6 +29,7 @@ export const appRouter = createTRPCRouter({
     users: adminUsersRouter,
     health: adminHealthRouter,
     reminders: adminRemindersRouter,
+    audit: adminAuditRouter,
   }),
   medical: medicalRouter,
   vet: vetRouter,

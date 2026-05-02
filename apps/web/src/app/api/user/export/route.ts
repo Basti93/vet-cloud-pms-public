@@ -166,10 +166,29 @@ export async function GET(_request: NextRequest) {
     await db.insert(auditLogs).values({
       tenantId: tenantId,
       userId: currentUser.id,
-      action: "DATA_EXPORT",
-      entityType: "user",
-      entityId: currentUser.id,
-      changes: { type: "DSGVO_Art_20_Export", timestamp: new Date().toISOString() },
+      action: "export",
+      entityType: "tenant",
+      entityId: tenantId,
+      changes: {
+        schemaVersion: "1.0.0",
+        event: "tenant.data_exported",
+        summary: "DSGVO Art. 20 data export",
+        actor: {
+          clerkUserId: userId,
+          userId: currentUser.id,
+        },
+        target: {
+          entityType: "tenant",
+          entityId: tenantId,
+        },
+        diff: {
+          legalBasis: "DSGVO_Art_20",
+        },
+        metadata: {
+          exportScope: "full_tenant",
+        },
+        occurredAt: new Date().toISOString(),
+      },
     });
 
     // Return as JSON file download

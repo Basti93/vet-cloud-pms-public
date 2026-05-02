@@ -7,6 +7,7 @@ import { TRPCError } from "@trpc/server";
 import { verifyConfirmationToken } from "@/lib/tokens/confirmation";
 import { requirePermission } from "@/server/trpc/middleware";
 import { appointmentEvents } from "@/lib/events/appointment";
+import { writeAuditLog } from "@/server/audit";
 
 async function getUserTenant(ctx: { db: typeof appDb }, userId: string) {
   const [user] = await ctx.db
@@ -156,6 +157,22 @@ export const appointmentsRouter = createTRPCRouter({
         .values({ ...input, status: "scheduled" })
         .returning();
 
+      await writeAuditLog(ctx, {
+        tenantId: input.tenantId,
+        action: "create",
+        entity: { type: "appointment", id: created.id },
+        event: "appointment.created",
+        summary: "Appointment created",
+        changes: {
+          patientId: created.patientId,
+          vetId: created.vetId,
+          startTime: created.startTime.toISOString(),
+          endTime: created.endTime.toISOString(),
+          source: created.source,
+          status: created.status,
+        },
+      });
+
       // Emit event to invalidate calendar cache
       appointmentEvents.notifyChange({
         tenantId: input.tenantId,
@@ -200,6 +217,15 @@ export const appointmentsRouter = createTRPCRouter({
         .returning();
 
       if (!updated) throw new TRPCError({ code: "NOT_FOUND" });
+
+      await writeAuditLog(ctx, {
+        tenantId: input.tenantId,
+        action: "update",
+        entity: { type: "appointment", id: updated.id },
+        event: "appointment.updated",
+        summary: "Appointment updated",
+        changes: data,
+      });
 
       // Emit event to invalidate calendar cache
       appointmentEvents.notifyChange({
@@ -272,6 +298,15 @@ export const appointmentsRouter = createTRPCRouter({
       await ctx.db
         .delete(appointments)
         .where(and(eq(appointments.id, input.id), eq(appointments.tenantId, input.tenantId)));
+
+      await writeAuditLog(ctx, {
+        tenantId: input.tenantId,
+        action: "delete",
+        entity: { type: "appointment", id: input.id },
+        event: "appointment.deleted",
+        summary: "Appointment deleted",
+        changes: { deleted: true },
+      });
 
       // Emit event to invalidate calendar cache
       appointmentEvents.notifyChange({

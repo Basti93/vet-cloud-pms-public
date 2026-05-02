@@ -5,6 +5,7 @@ import { patients, owners, users, PERMISSIONS } from "@/lib/db/schema";
 import { db as appDb } from "@/lib/db/client";
 import { TRPCError } from "@trpc/server";
 import { requirePermission } from "@/server/trpc/middleware";
+import { writeAuditLog } from "@/server/audit";
 
 async function getUserTenant(ctx: { db: typeof appDb }, userId: string) {
   const [user] = await ctx.db
@@ -137,6 +138,18 @@ export const patientsRouter = createTRPCRouter({
           notes: input.notes,
         })
         .returning();
+
+      await writeAuditLog(ctx, {
+        tenantId: input.tenantId,
+        action: "create",
+        entity: { type: "patient", id: patient!.id },
+        event: "patient.created",
+        summary: "Patient created",
+        changes: {
+          ownerId: owner!.id,
+          species: patient!.species,
+        },
+      });
 
       return { patient, owner };
     }),
