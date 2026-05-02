@@ -12,8 +12,7 @@ function isAllowedTrpcPath(trpcPath: string) {
 function getWebBackendBaseUrl() {
   const explicit =
     process.env.WEB_API_URL?.trim() ||
-    process.env.NEXT_PUBLIC_WEB_API_URL?.trim() ||
-    process.env.NEXT_PUBLIC_APP_URL?.trim();
+    process.env.NEXT_PUBLIC_WEB_API_URL?.trim();
 
   if (explicit) {
     const normalized = explicit.replace(/\/+$/, "");
@@ -32,7 +31,7 @@ function getWebBackendBaseUrl() {
   }
 
   throw new Error(
-    "Missing WEB_API_URL or NEXT_PUBLIC_WEB_API_URL for admin tRPC proxy."
+    "Missing WEB_API_URL or NEXT_PUBLIC_WEB_API_URL for admin tRPC proxy. Do not use NEXT_PUBLIC_APP_URL here."
   );
 }
 
@@ -41,6 +40,14 @@ function buildTargetUrl(req: NextRequest, trpcPath: string) {
   const incoming = new URL(req.url);
   const target = new URL(`${backend}/api/trpc/${trpcPath}`);
   target.search = incoming.search;
+
+  // Hard stop against accidental self-proxy loops (admin -> admin).
+  if (target.host === incoming.host) {
+    throw new Error(
+      `Admin tRPC proxy loop detected: target host "${target.host}" equals incoming host. Set WEB_API_URL to your web app domain (e.g. https://example.com).`
+    );
+  }
+
   return target;
 }
 
