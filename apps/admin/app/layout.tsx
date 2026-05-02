@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Vet Cloud PMS — Admin Dashboard",
-  description: "System Administrator Dashboard",
+  title: "Vet Cloud PMS Admin",
+  description: "Vet Cloud PMS Admin admin command center",
   robots: {
     index: false,
     follow: false,
