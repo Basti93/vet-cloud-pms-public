@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { createAdminRouter, procedure } from "../adminTrpc";
 import { db } from "@/lib/db/client";
-import { tenants, users, auditLogs, systemLogs } from "@/lib/db/schema";
-import { eq, like, desc, and, count, gte, sql } from "drizzle-orm";
+import { tenants, users, auditLogs, systemLogs, appointments } from "@/lib/db/schema";
+import { eq, like, desc, and, count, gte, lte, lt, sql } from "drizzle-orm";
 import { writeAuditLog } from "@/server/audit";
 
 export const adminCoreRouter = createAdminRouter({
@@ -202,10 +202,36 @@ export const adminCoreRouter = createAdminRouter({
       z.object({
         hours: z.number().int().min(1).max(24 * 30).default(24),
         limit: z.number().int().min(1).max(50).default(10),
+        tenantId: z.string().uuid().optional(),
+        from: z.string().datetime().optional(),
+        to: z.string().datetime().optional(),
       })
     )
     .query(async ({ input }) => {
-      const since = new Date(Date.now() - input.hours * 60 * 60 * 1000);
+      const toDate = input.to ? new Date(input.to) : new Date();
+      const fromDate = input.from
+        ? new Date(input.from)
+        : new Date(toDate.getTime() - input.hours * 60 * 60 * 1000);
+      const since = fromDate;
+
+      const rangeMs = Math.max(1, toDate.getTime() - fromDate.getTime());
+      const previousFrom = new Date(fromDate.getTime() - rangeMs);
+      const previousTo = fromDate;
+      const now = new Date();
+      const day = now.getUTCDay(); // 0=Sunday
+      const diffToMonday = day === 0 ? 6 : day - 1;
+      const currentWeekStart = new Date(
+        Date.UTC(
+          now.getUTCFullYear(),
+          now.getUTCMonth(),
+          now.getUTCDate() - diffToMonday,
+          0,
+          0,
+          0,
+          0
+        )
+      );
+      const previousWeekStart = new Date(currentWeekStart.getTime() - 7 * 24 * 60 * 60 * 1000);
 
       const trafficByTenant = await db
         .select({
@@ -218,6 +244,8 @@ export const adminCoreRouter = createAdminRouter({
         .where(
           and(
             gte(systemLogs.timestamp, since),
+            lte(systemLogs.timestamp, toDate),
+            input.tenantId ? eq(systemLogs.tenantId, input.tenantId) : undefined,
             sql`${systemLogs.tenantId} is not null`
           )
         )
@@ -232,8 +260,46 @@ export const adminCoreRouter = createAdminRouter({
           auditEventCount: sql<number>`count(*)`,
         })
         .from(auditLogs)
-        .where(gte(auditLogs.createdAt, since))
+        .where(
+          and(
+            gte(auditLogs.createdAt, since),
+            lte(auditLogs.createdAt, toDate),
+            input.tenantId ? eq(auditLogs.tenantId, input.tenantId) : undefined
+          )
+        )
         .groupBy(auditLogs.tenantId);
+
+      const appointmentsCurrentWeek = await db
+        .select({
+          tenantId: appointments.tenantId,
+          count: sql<number>`count(*)`,
+        })
+        .from(appointments)
+        .where(
+          and(
+            gte(appointments.startTime, fromDate),
+            lte(appointments.startTime, toDate),
+            input.tenantId ? eq(appointments.tenantId, input.tenantId) : undefined,
+            sql`${appointments.tenantId} is not null`
+          )
+        )
+        .groupBy(appointments.tenantId);
+
+      const appointmentsPreviousWeek = await db
+        .select({
+          tenantId: appointments.tenantId,
+          count: sql<number>`count(*)`,
+        })
+        .from(appointments)
+        .where(
+          and(
+            gte(appointments.startTime, previousFrom),
+            lt(appointments.startTime, previousTo),
+            input.tenantId ? eq(appointments.tenantId, input.tenantId) : undefined,
+            sql`${appointments.tenantId} is not null`
+          )
+        )
+        .groupBy(appointments.tenantId);
 
       const allTenants = await db
         .select({
@@ -244,6 +310,9 @@ export const adminCoreRouter = createAdminRouter({
           status: tenants.subscriptionStatus,
         })
         .from(tenants);
+      const tenantsFiltered = input.tenantId
+        ? allTenants.filter((tenant) => tenant.id === input.tenantId)
+        : allTenants;
 
       const trafficMap = new Map(
         trafficByTenant.map((row) => [
@@ -266,8 +335,14 @@ export const adminCoreRouter = createAdminRouter({
           },
         ])
       );
+      const appointmentsCurrentMap = new Map(
+        appointmentsCurrentWeek.map((row) => [row.tenantId!, Number(row.count ?? 0)])
+      );
+      const appointmentsPreviousMap = new Map(
+        appointmentsPreviousWeek.map((row) => [row.tenantId!, Number(row.count ?? 0)])
+      );
 
-      const items = allTenants
+      const items = tenantsFiltered
         .map((tenant) => {
           const traffic = trafficMap.get(tenant.id) ?? {
             trafficCount: 0,
@@ -280,6 +355,21 @@ export const adminCoreRouter = createAdminRouter({
             exportCount: 0,
             auditEventCount: 0,
           };
+          const appointmentsThisWeek = appointmentsCurrentMap.get(tenant.id) ?? 0;
+          const appointmentsLastWeek = appointmentsPreviousMap.get(tenant.id) ?? 0;
+          const appointmentDelta = appointmentsThisWeek - appointmentsLastWeek;
+          const appointmentDeltaPct =
+            appointmentsLastWeek > 0
+              ? (appointmentDelta / appointmentsLastWeek) * 100
+              : appointmentsThisWeek > 0
+              ? 100
+              : 0;
+          const appointmentTrend =
+            appointmentDeltaPct > 5
+              ? "growing"
+              : appointmentDeltaPct < -5
+              ? "shrinking"
+              : "stable";
 
           const eventsCount = traffic.trafficCount + changes.auditEventCount;
           const errorRate =
@@ -303,13 +393,27 @@ export const adminCoreRouter = createAdminRouter({
             exportCount: changes.exportCount,
             errorRate: Math.round(errorRate * 10) / 10,
             suspicious,
+            appointmentsThisWeek,
+            appointmentsLastWeek,
+            appointmentDelta,
+            appointmentDeltaPct: Math.round(appointmentDeltaPct * 10) / 10,
+            appointmentTrend,
           };
         })
-        .sort((a, b) => b.eventsCount - a.eventsCount)
+        .sort((a, b) => {
+          if (b.appointmentsThisWeek !== a.appointmentsThisWeek) {
+            return b.appointmentsThisWeek - a.appointmentsThisWeek;
+          }
+          return b.eventsCount - a.eventsCount;
+        })
         .slice(0, input.limit);
 
       return {
         hours: input.hours,
+        from: fromDate.toISOString(),
+        to: toDate.toISOString(),
+        currentWeekStart: currentWeekStart.toISOString(),
+        previousWeekStart: previousWeekStart.toISOString(),
         items,
       };
     }),

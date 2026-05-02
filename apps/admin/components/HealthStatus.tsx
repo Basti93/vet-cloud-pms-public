@@ -19,11 +19,18 @@ export function HealthStatus() {
   const ok = data?.status === "ok";
 
   return (
-    <div className="flex items-center gap-2 text-xs" title={`DB: ${data?.db} · ${data?.dbLatencyMs}ms`}>
-      <span className={`h-2 w-2 rounded-full ${ok ? "bg-green-500" : "bg-red-500"}`} />
-      <span className={ok ? "text-green-700" : "text-red-700"}>
-        {ok ? "System OK" : "Degraded"}
-      </span>
+    <div className="text-xs" title={`DB: ${data?.db} · ${data?.dbLatencyMs}ms`}>
+      <div className="flex items-center gap-2">
+        <span className={`h-2 w-2 rounded-full ${ok ? "bg-green-500" : "bg-red-500"}`} />
+        <span className={ok ? "text-green-700" : "text-red-700"}>
+          {ok ? "System OK" : "Degraded"}
+        </span>
+      </div>
+      <p className="mt-1 text-[11px] text-gray-500">
+        {ok
+          ? "API erreichbar, Datenbank antwortet."
+          : "Mindestens ein Kernservice antwortet nicht stabil."}
+      </p>
     </div>
   );
 }

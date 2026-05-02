@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { HealthStatus } from "@/components/HealthStatus";
@@ -7,48 +10,72 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const closeMobileMenu = () => setMobileMenuOpen(false);
+
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex min-h-screen flex-col bg-gray-50 md:h-screen md:flex-row">
       {/* Sidebar */}
-      <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
-        <div className="p-6 border-b border-gray-200">
+      <div className="w-full border-b border-gray-200 bg-white md:w-64 md:border-b-0 md:border-r md:flex md:flex-col">
+        <div className="flex items-center justify-between border-b border-gray-200 p-4 md:block md:p-6">
           <h1 className="text-xl font-bold text-gray-900">Vet Cloud Admin</h1>
+          <button
+            type="button"
+            className="inline-flex items-center rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 md:hidden"
+            onClick={() => setMobileMenuOpen((v) => !v)}
+            aria-label="Menü öffnen"
+            aria-expanded={mobileMenuOpen}
+          >
+            ☰
+          </button>
         </div>
 
-        <nav className="flex-1 px-4 py-6 space-y-2">
+        <nav
+          className={`px-4 py-4 md:flex-1 md:px-4 md:py-6 ${
+            mobileMenuOpen ? "block" : "hidden md:block"
+          }`}
+        >
+          <div className="space-y-2">
           <Link
             href="/dashboard"
-            className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition"
+            className="block rounded-lg px-4 py-2 text-gray-700 transition hover:bg-gray-100"
+            onClick={closeMobileMenu}
           >
             Übersicht
           </Link>
           <Link
             href="/dashboard/tenants"
-            className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition"
+            className="block rounded-lg px-4 py-2 text-gray-700 transition hover:bg-gray-100"
+            onClick={closeMobileMenu}
           >
             Mandanten
           </Link>
           <Link
             href="/dashboard/logs"
-            className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition"
+            className="block rounded-lg px-4 py-2 text-gray-700 transition hover:bg-gray-100"
+            onClick={closeMobileMenu}
           >
             Fehlerprotokoll
           </Link>
           <Link
             href="/dashboard/reminders"
-            className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition"
+            className="block rounded-lg px-4 py-2 text-gray-700 transition hover:bg-gray-100"
+            onClick={closeMobileMenu}
           >
             Reminder E-Mails
           </Link>
           <Link
             href="/dashboard/audit"
-            className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition"
+            className="block rounded-lg px-4 py-2 text-gray-700 transition hover:bg-gray-100"
+            onClick={closeMobileMenu}
           >
             Audit-Log
           </Link>
+          </div>
         </nav>
 
-        <div className="p-4 border-t border-gray-200 space-y-3">
+        <div className="space-y-3 border-t border-gray-200 p-4 md:mt-auto">
           <HealthStatus />
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-700">Admin</span>
@@ -58,9 +85,9 @@ export default function DashboardLayout({
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex flex-1 flex-col overflow-hidden">
         <div className="flex-1 overflow-auto">
-          <main className="p-8">{children}</main>
+          <main className="p-4 md:p-8">{children}</main>
         </div>
       </div>
     </div>
