@@ -25,7 +25,6 @@ export async function GET(request: NextRequest) {
 
   try {
     const now = new Date();
-    const maxTime = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
 
     // Get all tenants (needed to fetch their email settings)
     const allTenants = await db
@@ -48,23 +47,34 @@ export async function GET(request: NextRequest) {
       }
 
       const reminderHoursBefore = settings[0].reminderHoursBefore;
-      const minTime = new Date(now.getTime() - reminderHoursBefore * 60 * 60 * 1000);
+      // Hourly cron: send reminders for appointments that start in the next hour
+      // around the tenant-configured "hours before appointment" threshold.
+      const windowStart = new Date(
+        now.getTime() + reminderHoursBefore * 60 * 60 * 1000
+      );
+      const windowEnd = new Date(windowStart.getTime() + 60 * 60 * 1000);
 
       // Find appointments in the reminder window that haven't been sent reminders yet
       const appointmentsToRemind = await db
         .select({
           id: appointments.id,
           startTime: appointments.startTime,
-          patientId: appointments.patientId,
           title: appointments.title,
+          patientName: patients.name,
+          patientSpecies: patients.species,
+          ownerFirstName: owners.firstName,
+          ownerLastName: owners.lastName,
+          ownerEmail: owners.email,
         })
         .from(appointments)
+        .innerJoin(patients, eq(appointments.patientId, patients.id))
+        .innerJoin(owners, eq(patients.ownerId, owners.id))
         .where(
           and(
             eq(appointments.tenantId, tenant.id),
             eq(appointments.status, "scheduled"),
-            gte(appointments.startTime, minTime),
-            lte(appointments.startTime, maxTime)
+            gte(appointments.startTime, windowStart),
+            lte(appointments.startTime, windowEnd)
           )
         );
 
@@ -78,7 +88,8 @@ export async function GET(request: NextRequest) {
         .where(
           and(
             inArray(appointmentEmailLogs.appointmentId, appointmentIds),
-            eq(appointmentEmailLogs.emailType, "reminder")
+            eq(appointmentEmailLogs.emailType, "reminder"),
+            eq(appointmentEmailLogs.status, "sent")
           )
         );
 
@@ -97,22 +108,7 @@ export async function GET(request: NextRequest) {
       // Send reminders for appointments that don't have one yet
       for (const appointment of newReminders) {
         try {
-          // Fetch patient and owner info
-          const patientData = await db
-            .select({ ownerId: patients.ownerId, name: patients.name, species: patients.species })
-            .from(patients)
-            .where(eq(patients.id, appointment.patientId))
-            .limit(1);
-
-          if (!patientData[0]) continue;
-
-          const ownerData = await db
-            .select({ firstName: owners.firstName, lastName: owners.lastName, email: owners.email })
-            .from(owners)
-            .where(eq(owners.id, patientData[0].ownerId))
-            .limit(1);
-
-          if (!ownerData[0] || !ownerData[0].email) continue;
+          if (!appointment.ownerEmail) continue;
 
           // Send the reminder email
           const appointmentTime = appointment.startTime.toLocaleTimeString("de-DE", {
@@ -123,11 +119,11 @@ export async function GET(request: NextRequest) {
           const appointmentDateTime = `${appointmentDate} ${appointmentTime}`;
 
           const result = await sendReminderEmail({
-            to: ownerData[0].email,
+            to: appointment.ownerEmail,
             practiceName,
-            ownerFirstName: ownerData[0].firstName,
-            patientName: patientData[0].name,
-            patientSpecies: patientData[0].species,
+            ownerFirstName: appointment.ownerFirstName,
+            patientName: appointment.patientName,
+            patientSpecies: appointment.patientSpecies,
             appointmentTime,
             appointmentDateTime,
           });
@@ -138,7 +134,7 @@ export async function GET(request: NextRequest) {
               tenantId: tenant.id,
               appointmentId: appointment.id,
               emailType: "reminder",
-              recipientEmail: ownerData[0].email,
+              recipientEmail: appointment.ownerEmail,
               status: "sent",
             });
             totalSent++;
@@ -151,7 +147,7 @@ export async function GET(request: NextRequest) {
               tenantId: tenant.id,
               appointmentId: appointment.id,
               emailType: "reminder",
-              recipientEmail: ownerData[0].email,
+              recipientEmail: appointment.ownerEmail,
               status: "failed",
               errorMessage: errorMsg,
             });

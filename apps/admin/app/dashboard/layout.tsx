@@ -34,6 +34,12 @@ export default function DashboardLayout({
           >
             Fehlerprotokoll
           </Link>
+          <Link
+            href="/dashboard/reminders"
+            className="block px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition"
+          >
+            Reminder E-Mails
+          </Link>
         </nav>
 
         <div className="p-4 border-t border-gray-200 space-y-3">
