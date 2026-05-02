@@ -7,19 +7,23 @@ export function getBaseUrl() {
   }
 
   if (typeof window !== "undefined") {
-    const { protocol, hostname } = window.location;
+    const { hostname } = window.location;
 
-    if (hostname === "localhost" || hostname === "127.0.0.1") {
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1") {
       return "http://localhost:3000";
     }
-
-    if (hostname.startsWith("admin app.")) {
-      const rootDomain = hostname.replace(/^admin app\./, "");
-      return `${protocol}//${rootDomain}`;
-    }
+    throw new Error(
+      "NEXT_PUBLIC_WEB_API_URL is required for non-localhost environments."
+    );
   }
 
-  return "http://localhost:3000";
+  return process.env.NODE_ENV === "production"
+    ? (() => {
+        throw new Error(
+          "NEXT_PUBLIC_WEB_API_URL is required in production."
+        );
+      })()
+    : "http://localhost:3000";
 }
 
 export const queryClient = new QueryClient({
