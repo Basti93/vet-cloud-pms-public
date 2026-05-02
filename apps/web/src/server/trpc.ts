@@ -4,6 +4,7 @@ import superjson from "superjson";
 import { ZodError } from "zod";
 import { db } from "@/lib/db/client";
 import { checkRateLimit, getRateLimitInfo } from "@/lib/rateLimit";
+import { logEvent, logEventAsync } from "./trpc/logging-middleware";
 
 // ============================================================================
 // Context
@@ -107,6 +108,57 @@ const publicBookingRateLimitMiddleware = t.middleware(({ ctx, next }) => {
   return next();
 });
 
+const SLOW_REQUEST_THRESHOLD_MS = 2000;
+
+const systemLoggingMiddleware = t.middleware(async ({ ctx, path, type, next }) => {
+  const start = Date.now();
+  const isAdminProxy = ctx.headers.get("x-admin-proxy") === "1";
+
+  try {
+    const result = await next();
+    const durationMs = Date.now() - start;
+
+    // Only log web-app traffic, never admin-proxied requests
+    if (!isAdminProxy && durationMs > SLOW_REQUEST_THRESHOLD_MS) {
+      logEventAsync({
+        level: "warn",
+        category: "api",
+        eventType: "slow_request",
+        message: `Slow ${type} request: ${path}`,
+        metadata: { path, type, durationMs },
+      });
+    }
+
+    return result;
+  } catch (error) {
+    const durationMs = Date.now() - start;
+
+    if (!isAdminProxy) {
+      const isTRPCError = error instanceof TRPCError;
+      const code = isTRPCError ? error.code : "INTERNAL_SERVER_ERROR";
+      const message = error instanceof Error ? error.message : String(error);
+      const stack = error instanceof Error ? error.stack : undefined;
+
+      await logEvent({
+        level: code === "UNAUTHORIZED" || code === "FORBIDDEN" ? "warn" : "error",
+        category: "api",
+        eventType: `request_failed_${code}`,
+        message: `${type} request failed: ${path}`,
+        metadata: {
+          path,
+          type,
+          code,
+          durationMs,
+          errorMessage: message,
+        },
+        errorStack: stack,
+      });
+    }
+
+    throw error;
+  }
+});
+
 // ============================================================================
 // Exports
 // ============================================================================
@@ -116,16 +168,19 @@ export const createCallerFactory = t.createCallerFactory;
 
 /** Public procedure — no auth required */
 export const publicProcedure = t.procedure
+  .use(systemLoggingMiddleware)
   .use(rateLimitMiddleware)
   .use(timingMiddleware);
 
 /** Public booking procedure — stricter rate limit (20 req/60s) for public booking endpoints */
 export const publicBookingProcedure = t.procedure
+  .use(systemLoggingMiddleware)
   .use(publicBookingRateLimitMiddleware)
   .use(timingMiddleware);
 
 /** Protected procedure — requires Clerk session */
 export const protectedProcedure = t.procedure
+  .use(systemLoggingMiddleware)
   .use(rateLimitMiddleware)
   .use(timingMiddleware)
   .use(enforceUserIsAuthenticated);
