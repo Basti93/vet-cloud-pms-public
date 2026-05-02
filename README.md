@@ -130,3 +130,24 @@ Siehe `DEPLOYMENT.md` für Details.
 - `SETUP.md` — Detaillierte Installationsanleitung
 - `DEPLOYMENT.md` — Vercel & Hetzner Setup
 - `.env.local.example` — Environment Template
+
+## ✅ Commit Convention
+
+Dieses Repo erzwingt **Conventional Commits** per Husky `commit-msg` Hook.
+
+Format:
+
+```text
+type(scope): subject
+```
+
+Erlaubte `type` Werte:
+`feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`, `security`
+
+Beispiele:
+
+```text
+feat(web): add tenant filter
+fix(admin): forward auth header in proxy
+chore: update lockfile
+```
