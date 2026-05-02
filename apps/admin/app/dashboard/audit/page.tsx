@@ -11,19 +11,26 @@ export default function AuditPage() {
   const [entityType, setEntityType] = useState("");
   const [hours, setHours] = useState(24);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [tenantId, setTenantId] = useState<string | undefined>();
+
+  const tenants = trpc.adminDashboard.core.listTenants.useQuery(
+    { limit: 200 },
+    { refetchInterval: 60000 }
+  );
 
   const {
     data: summary,
     isLoading: summaryLoading,
     error: summaryError,
   } = trpc.adminDashboard.audit.getSummary.useQuery(
-    { hours },
+    { hours, tenantId },
     { refetchInterval: 30000 }
   );
 
   const { data, isLoading, error } = trpc.adminDashboard.audit.list.useQuery(
     {
       action,
+      tenantId,
       entityType: entityType || undefined,
       limit: 150,
     },
@@ -55,7 +62,7 @@ export default function AuditPage() {
         </p>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="bg-white rounded-lg border border-gray-200 p-4 grid grid-cols-1 md:grid-cols-4 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Zeitraum
@@ -68,6 +75,23 @@ export default function AuditPage() {
             <option value={24}>Letzte 24h</option>
             <option value={72}>Letzte 72h</option>
             <option value={168}>Letzte 7 Tage</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Mandant
+          </label>
+          <select
+            value={tenantId || ""}
+            onChange={(e) => setTenantId(e.target.value || undefined)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Alle Mandanten</option>
+            {(tenants.data?.items ?? []).map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
           </select>
         </div>
         <div>

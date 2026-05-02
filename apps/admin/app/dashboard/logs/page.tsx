@@ -9,10 +9,23 @@ export default function LogsPage() {
   type LogLevel = "debug" | "info" | "warn" | "error" | "critical";
   const [level, setLevel] = useState<LogLevel | undefined>();
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [tenantId, setTenantId] = useState<string | undefined>();
+  const [hours, setHours] = useState(24);
+
+  const tenants = trpc.adminDashboard.core.listTenants.useQuery(
+    { limit: 200 },
+    { refetchInterval: 60000 }
+  );
+
+  const summary = trpc.adminDashboard.logs.getSummary.useQuery(
+    { hours, tenantId },
+    { refetchInterval: 30000 }
+  );
 
   const { data, isLoading, error } = trpc.adminDashboard.logs.queryLogs.useQuery(
     {
       level,
+      tenantId,
       limit: 100,
     },
     {
@@ -57,22 +70,64 @@ export default function LogsPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Schweregrad
-        </label>
-        <select
-          value={level || ""}
-          onChange={(e) => setLevel((e.target.value || undefined) as LogLevel | undefined)}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">Alle Schweregrade</option>
-          <option value="debug">Debug</option>
-          <option value="info">Info</option>
-          <option value="warn">Warnung</option>
-          <option value="error">Fehler</option>
-          <option value="critical">Kritisch</option>
-        </select>
+      <div className="bg-white rounded-lg border border-gray-200 p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Zeitraum
+          </label>
+          <select
+            value={hours}
+            onChange={(e) => setHours(Number(e.target.value))}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value={24}>Letzte 24h</option>
+            <option value={72}>Letzte 72h</option>
+            <option value={168}>Letzte 7 Tage</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Mandant
+          </label>
+          <select
+            value={tenantId || ""}
+            onChange={(e) => setTenantId(e.target.value || undefined)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Alle Mandanten</option>
+            {(tenants.data?.items ?? []).map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Schweregrad
+          </label>
+          <select
+            value={level || ""}
+            onChange={(e) => setLevel((e.target.value || undefined) as LogLevel | undefined)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Alle Schweregrade</option>
+            <option value="debug">Debug</option>
+            <option value="info">Info</option>
+            <option value="warn">Warnung</option>
+            <option value="error">Fehler</option>
+            <option value="critical">Kritisch</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <MetricCard title="Events gesamt" value={String(summary.data?.total ?? 0)} />
+        <MetricCard title="Warnungen" value={String(summary.data?.warnCount ?? 0)} />
+        <MetricCard title="Fehler" value={String(summary.data?.errorCount ?? 0)} />
+        <MetricCard title="Kritisch" value={String(summary.data?.criticalCount ?? 0)} />
       </div>
 
       {/* Logs List */}
@@ -162,6 +217,15 @@ export default function LogsPage() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function MetricCard({ title, value }: { title: string; value: string }) {
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 p-4">
+      <p className="text-sm text-gray-500">{title}</p>
+      <p className="mt-1 text-2xl font-bold text-gray-900">{value}</p>
     </div>
   );
 }

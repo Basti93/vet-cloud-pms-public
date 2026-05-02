@@ -3,6 +3,8 @@ import { auth } from "@clerk/nextjs/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
 import { db } from "@/lib/db/client";
+import { users } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import { checkRateLimit, getRateLimitInfo } from "@/lib/rateLimit";
 import { logEvent, logEventAsync } from "./trpc/logging-middleware";
 
@@ -113,6 +115,23 @@ const SLOW_REQUEST_THRESHOLD_MS = 2000;
 const systemLoggingMiddleware = t.middleware(async ({ ctx, path, type, next }) => {
   const start = Date.now();
   const isAdminProxy = ctx.headers.get("x-admin-proxy") === "1";
+  const requestId = ctx.headers.get("x-request-id") ?? undefined;
+  const ipAddress = ctx.headers.get("x-forwarded-for") ?? undefined;
+
+  const resolveUserContext = async () => {
+    if (!ctx.userId) return { tenantId: undefined, userId: undefined };
+
+    const [user] = await ctx.db
+      .select({ id: users.id, tenantId: users.tenantId })
+      .from(users)
+      .where(eq(users.clerkId, ctx.userId))
+      .limit(1);
+
+    return {
+      tenantId: user?.tenantId ?? undefined,
+      userId: user?.id ?? undefined,
+    };
+  };
 
   try {
     const result = await next();
@@ -120,12 +139,17 @@ const systemLoggingMiddleware = t.middleware(async ({ ctx, path, type, next }) =
 
     // Only log web-app traffic, never admin-proxied requests
     if (!isAdminProxy && durationMs > SLOW_REQUEST_THRESHOLD_MS) {
+      const actor = await resolveUserContext();
       logEventAsync({
         level: "warn",
         category: "api",
         eventType: "slow_request",
         message: `Slow ${type} request: ${path}`,
         metadata: { path, type, durationMs },
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        correlationId: requestId,
+        ipAddress,
       });
     }
 
@@ -138,6 +162,7 @@ const systemLoggingMiddleware = t.middleware(async ({ ctx, path, type, next }) =
       const code = isTRPCError ? error.code : "INTERNAL_SERVER_ERROR";
       const message = error instanceof Error ? error.message : String(error);
       const stack = error instanceof Error ? error.stack : undefined;
+      const actor = await resolveUserContext();
 
       await logEvent({
         level: code === "UNAUTHORIZED" || code === "FORBIDDEN" ? "warn" : "error",
@@ -152,6 +177,10 @@ const systemLoggingMiddleware = t.middleware(async ({ ctx, path, type, next }) =
           errorMessage: message,
         },
         errorStack: stack,
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        correlationId: requestId,
+        ipAddress,
       });
     }
 

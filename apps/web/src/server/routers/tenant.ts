@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { randomUUID, randomBytes } from "crypto";
 import { sendAccountDeletionEmail } from "@/lib/email/service";
 import { getMainDomain } from "@/lib/env";
+import { writeAuditLog } from "@/server/audit";
 
 // Helper function to generate a unique slug from tenant name
 async function generateUniqueSlug(
@@ -107,6 +108,15 @@ export const tenantRouter = createTRPCRouter({
 
       console.log(`Practice created: ${updatedTenant.slug} (${updatedTenant.id})`);
 
+      await writeAuditLog(ctx, {
+        tenantId: updatedTenant.id,
+        action: "create",
+        entity: { type: "tenant", id: updatedTenant.id },
+        event: "tenant.created_from_placeholder",
+        summary: "Practice created from placeholder tenant",
+        changes: { slug: updatedTenant.slug, nameSet: Boolean(updatedTenant.name) },
+      });
+
       return {
         id: updatedTenant.id,
         name: updatedTenant.name,
@@ -171,6 +181,17 @@ export const tenantRouter = createTRPCRouter({
         updateData.websiteTemplate = updates.websiteTemplate;
 
       await ctx.db.update(tenants).set(updateData).where(eq(tenants.id, tenantId));
+
+      await writeAuditLog(ctx, {
+        tenantId,
+        action: "config_change",
+        entity: { type: "tenant", id: tenantId },
+        event: "tenant.theme_updated",
+        summary: "Tenant branding/theme updated",
+        changes: {
+          updatedFields: Object.keys(updateData),
+        },
+      });
 
       return { success: true };
     }),
@@ -249,6 +270,17 @@ export const tenantRouter = createTRPCRouter({
 
       await ctx.db.update(tenants).set(updateData).where(eq(tenants.id, user.tenantId));
 
+      await writeAuditLog(ctx, {
+        tenantId: user.tenantId,
+        action: "update",
+        entity: { type: "tenant", id: user.tenantId },
+        event: "tenant.profile_updated",
+        summary: "Tenant profile updated",
+        changes: {
+          updatedFields: Object.keys(updateData),
+        },
+      });
+
       return { success: true };
     }),
 
@@ -306,6 +338,15 @@ export const tenantRouter = createTRPCRouter({
       if (!deletedTenant) {
         throw new Error("Practice not found");
       }
+
+      await writeAuditLog(ctx, {
+        tenantId: input.tenantId,
+        action: "delete",
+        entity: { type: "tenant", id: input.tenantId },
+        event: "tenant.deleted",
+        summary: "Tenant deleted by admin",
+        changes: { deletedSlug: deletedTenant.slug },
+      });
 
       console.log(`Practice deleted: ${deletedTenant.slug} (${deletedTenant.id})`);
       return { success: true, deletedSlug: deletedTenant.slug };
@@ -395,6 +436,15 @@ export const tenantRouter = createTRPCRouter({
         });
       }
 
+      await writeAuditLog(ctx, {
+        tenantId: user.tenantId,
+        action: "config_change",
+        entity: { type: "feature_flags", id: user.tenantId },
+        event: "tenant.feature_flags_updated",
+        summary: "Tenant feature flags updated",
+        changes: input,
+      });
+
       return { success: true };
     }),
 
@@ -438,6 +488,15 @@ export const tenantRouter = createTRPCRouter({
           status: "pending",
         })
         .returning();
+
+      await writeAuditLog(ctx, {
+        tenantId: input.tenantId,
+        action: "delete",
+        entity: { type: "account_deletion_request", id: deletionRequest.id },
+        event: "tenant.deletion_requested",
+        summary: "Tenant deletion requested",
+        changes: { expiresAt: deletionRequest.expiresAt.toISOString() },
+      });
 
       // Send confirmation email
       const domain = getMainDomain();
@@ -486,6 +545,15 @@ export const tenantRouter = createTRPCRouter({
         .update(accountDeletionRequests)
         .set({ status: "confirmed", confirmedAt: new Date() })
         .where(eq(accountDeletionRequests.id, deletionRequest.id));
+
+      await writeAuditLog(ctx, {
+        tenantId: deletionRequest.tenantId,
+        action: "delete",
+        entity: { type: "account_deletion_request", id: deletionRequest.id },
+        event: "tenant.deletion_confirmed",
+        summary: "Tenant deletion confirmed via token",
+        changes: { confirmedAt: new Date().toISOString() },
+      });
 
       // Get all users in this tenant to delete from Clerk
       const tenantUsers = await ctx.db

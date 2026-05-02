@@ -5,6 +5,7 @@ import { diagnoses, medications, vitals, patients, users, PERMISSIONS } from "@/
 import { db as appDb } from "@/lib/db/client";
 import { TRPCError } from "@trpc/server";
 import { requirePermission } from "@/server/trpc/middleware";
+import { writeAuditLog } from "@/server/audit";
 
 async function getUserTenant(ctx: { db: typeof appDb }, userId: string) {
   const [user] = await ctx.db
@@ -90,6 +91,20 @@ const diagnosesRouter = createTRPCRouter({
         })
         .returning();
 
+      await writeAuditLog(ctx, {
+        tenantId: user.tenantId,
+        action: "create",
+        entity: { type: "diagnosis", id: diagnosis!.id },
+        event: "diagnosis.created",
+        summary: "Diagnosis created",
+        changes: {
+          patientId: input.patientId,
+          status: input.status,
+          severity: input.severity ?? null,
+          dateOfDiagnosis: input.dateOfDiagnosis.toISOString(),
+        },
+      });
+
       return diagnosis;
     }),
 
@@ -123,6 +138,18 @@ const diagnosesRouter = createTRPCRouter({
       if (!diagnosis) {
         throw new TRPCError({ code: "NOT_FOUND" });
       }
+
+      await writeAuditLog(ctx, {
+        tenantId: input.tenantId,
+        action: "update",
+        entity: { type: "diagnosis", id: diagnosis.id },
+        event: "diagnosis.updated",
+        summary: "Diagnosis updated",
+        changes: {
+          status: input.status,
+          descriptionUpdated: input.description !== undefined,
+        },
+      });
 
       return diagnosis;
     }),
@@ -198,6 +225,21 @@ const medicationsRouter = createTRPCRouter({
         })
         .returning();
 
+      await writeAuditLog(ctx, {
+        tenantId: user.tenantId,
+        action: "create",
+        entity: { type: "medication", id: medication!.id },
+        event: "medication.created",
+        summary: "Medication created",
+        changes: {
+          patientId: input.patientId,
+          diagnosisId: input.diagnosisId ?? null,
+          route: input.route,
+          startDate: input.startDate.toISOString(),
+          endDate: input.endDate?.toISOString() ?? null,
+        },
+      });
+
       return medication;
     }),
 
@@ -230,6 +272,18 @@ const medicationsRouter = createTRPCRouter({
       if (!medication) {
         throw new TRPCError({ code: "NOT_FOUND" });
       }
+
+      await writeAuditLog(ctx, {
+        tenantId: input.tenantId,
+        action: "update",
+        entity: { type: "medication", id: medication.id },
+        event: "medication.updated",
+        summary: "Medication updated",
+        changes: {
+          endDate: input.endDate?.toISOString() ?? null,
+          notesUpdated: input.notes !== undefined,
+        },
+      });
 
       return medication;
     }),
@@ -302,6 +356,22 @@ const vitalsRouter = createTRPCRouter({
         })
         .returning();
 
+      await writeAuditLog(ctx, {
+        tenantId: user.tenantId,
+        action: "create",
+        entity: { type: "vital", id: vital!.id },
+        event: "vital.created",
+        summary: "Vitals recorded",
+        changes: {
+          patientId: input.patientId,
+          recordedAt: input.recordedAt.toISOString(),
+          hasWeight: input.weight !== undefined,
+          hasTemperature: input.temperature !== undefined,
+          hasHeartRate: input.heartRate !== undefined,
+          hasRespiratoryRate: input.respiratoryRate !== undefined,
+        },
+      });
+
       return vital;
     }),
 });
@@ -332,6 +402,17 @@ const allergiesRouter = createTRPCRouter({
       if (!patient) {
         throw new TRPCError({ code: "NOT_FOUND" });
       }
+
+      await writeAuditLog(ctx, {
+        tenantId: input.tenantId,
+        action: "update",
+        entity: { type: "patient", id: patient.id },
+        event: "patient.allergies_updated",
+        summary: "Patient allergies updated",
+        changes: {
+          hasAllergiesText: Boolean(input.allergies && input.allergies.trim().length > 0),
+        },
+      });
 
       return patient;
     }),

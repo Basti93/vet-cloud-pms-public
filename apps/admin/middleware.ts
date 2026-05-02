@@ -6,6 +6,14 @@ const isProtectedRoute = createRouteMatcher([
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
+  // Guard against accidental document navigation to RSC/Flight URLs.
+  // Internal Next.js RSC fetches include the `rsc: 1` header and should pass through.
+  if (req.nextUrl.searchParams.has("_rsc") && req.headers.get("rsc") !== "1") {
+    const cleanUrl = req.nextUrl.clone();
+    cleanUrl.searchParams.delete("_rsc");
+    return NextResponse.redirect(cleanUrl);
+  }
+
   if (isProtectedRoute(req)) {
     await auth.protect();
   }

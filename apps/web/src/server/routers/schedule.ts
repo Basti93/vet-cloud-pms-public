@@ -4,6 +4,7 @@ import { createTRPCRouter, protectedProcedure } from "@/server/trpc";
 import { tenants, vetSchedules, vetAbsences, users } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
 import { DEFAULT_OPENING_HOURS, type DaySchedule } from "@/lib/schedule-types";
+import { writeAuditLog } from "@/server/audit";
 
 const timeRangeSchema = z.object({
   startHour: z.number().int().min(0).max(23),
@@ -44,6 +45,15 @@ export const scheduleRouter = createTRPCRouter({
         .update(tenants)
         .set({ openingHours: input.hours, updatedAt: new Date() })
         .where(eq(tenants.id, input.tenantId));
+
+      await writeAuditLog(ctx, {
+        tenantId: input.tenantId,
+        action: "config_change",
+        entity: { type: "tenant_schedule", id: input.tenantId },
+        event: "schedule.practice_hours_updated",
+        summary: "Practice opening hours updated",
+        changes: { daysConfigured: input.hours.length },
+      });
       return { success: true };
     }),
 
@@ -113,6 +123,19 @@ export const scheduleRouter = createTRPCRouter({
           notes: input.notes ?? null,
         });
       }
+
+      await writeAuditLog(ctx, {
+        tenantId: input.tenantId,
+        action: "config_change",
+        entity: { type: "vet_schedule", id: existing?.id ?? `${input.vetId}:${input.dayOfWeek}` },
+        event: "schedule.vet_day_upserted",
+        summary: "Vet day schedule updated",
+        changes: {
+          vetId: input.vetId,
+          dayOfWeek: input.dayOfWeek,
+          slotsCount: input.slots.length,
+        },
+      });
       return { success: true };
     }),
 
@@ -127,6 +150,15 @@ export const scheduleRouter = createTRPCRouter({
         .update(users)
         .set({ slotDurationMin: input.slotDurationMin, updatedAt: new Date() })
         .where(and(eq(users.id, input.vetId), eq(users.tenantId, input.tenantId)));
+
+      await writeAuditLog(ctx, {
+        tenantId: input.tenantId,
+        action: "config_change",
+        entity: { type: "vet", id: input.vetId },
+        event: "schedule.slot_duration_updated",
+        summary: "Vet slot duration updated",
+        changes: { slotDurationMin: input.slotDurationMin },
+      });
       return { success: true };
     }),
 
@@ -189,6 +221,20 @@ export const scheduleRouter = createTRPCRouter({
           note: input.note ?? null,
         })
         .returning({ id: vetAbsences.id });
+
+      await writeAuditLog(ctx, {
+        tenantId: input.tenantId,
+        action: "create",
+        entity: { type: "vet_absence", id: created!.id },
+        event: "schedule.absence_created",
+        summary: "Vet absence created",
+        changes: {
+          vetId: input.vetId,
+          startDate: input.startDate,
+          endDate: input.endDate,
+          type: input.type,
+        },
+      });
       return created;
     }),
 
@@ -201,6 +247,15 @@ export const scheduleRouter = createTRPCRouter({
       await ctx.db
         .delete(vetAbsences)
         .where(and(eq(vetAbsences.id, input.absenceId), eq(vetAbsences.tenantId, input.tenantId)));
+
+      await writeAuditLog(ctx, {
+        tenantId: input.tenantId,
+        action: "delete",
+        entity: { type: "vet_absence", id: input.absenceId },
+        event: "schedule.absence_deleted",
+        summary: "Vet absence deleted",
+        changes: { deleted: true },
+      });
       return { success: true };
     }),
 });

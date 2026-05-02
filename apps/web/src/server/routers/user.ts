@@ -3,6 +3,7 @@ import { eq, and } from "drizzle-orm";
 import { createTRPCRouter, protectedProcedure } from "@/server/trpc";
 import { users, vetSchedules, vetAbsences } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
+import { writeAuditLog } from "@/server/audit";
 
 export const userRouter = createTRPCRouter({
   /**
@@ -75,6 +76,15 @@ export const userRouter = createTRPCRouter({
           .set({ locale: input.locale })
           .where(eq(users.id, user.id))
           .returning();
+
+        await writeAuditLog(ctx, {
+          tenantId: updatedUser!.tenantId,
+          action: "config_change",
+          entity: { type: "user", id: updatedUser!.id },
+          event: "user.locale_updated",
+          summary: "User locale updated",
+          changes: { locale: input.locale },
+        });
 
         return updatedUser;
       } catch (error) {
@@ -226,6 +236,15 @@ export const userRouter = createTRPCRouter({
           });
         }
 
+        await writeAuditLog(ctx, {
+          tenantId: user.tenantId,
+          action: "config_change",
+          entity: { type: "vet_schedule", id: existing?.id ?? `${user.id}:${input.dayOfWeek}` },
+          event: "user.vet_schedule_day_updated",
+          summary: "Own vet schedule day updated",
+          changes: { dayOfWeek: input.dayOfWeek, slotsCount: input.slots.length },
+        });
+
         return { success: true };
       } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -318,6 +337,19 @@ export const userRouter = createTRPCRouter({
         note: input.note || null,
       });
 
+      await writeAuditLog(ctx, {
+        tenantId: user.tenantId,
+        action: "create",
+        entity: { type: "vet_absence", id: `${user.id}:${input.startDate}:${input.endDate}` },
+        event: "user.vet_absence_added",
+        summary: "Own absence added",
+        changes: {
+          startDate: input.startDate,
+          endDate: input.endDate,
+          type: input.type,
+        },
+      });
+
       return { success: true };
     }),
 
@@ -367,6 +399,15 @@ export const userRouter = createTRPCRouter({
 
       await ctx.db.delete(vetAbsences).where(eq(vetAbsences.id, input.absenceId));
 
+      await writeAuditLog(ctx, {
+        tenantId: absence.tenantId,
+        action: "delete",
+        entity: { type: "vet_absence", id: input.absenceId },
+        event: "user.vet_absence_removed",
+        summary: "Own absence removed",
+        changes: { deleted: true },
+      });
+
       return { success: true };
     }),
 
@@ -394,6 +435,15 @@ export const userRouter = createTRPCRouter({
           .set({ slotDurationMin: input.slotDurationMin })
           .where(eq(users.clerkId, ctx.userId))
           .returning();
+
+        await writeAuditLog(ctx, {
+          tenantId: updatedUser!.tenantId,
+          action: "config_change",
+          entity: { type: "user", id: updatedUser!.id },
+          event: "user.slot_duration_updated",
+          summary: "Own slot duration updated",
+          changes: { slotDurationMin: input.slotDurationMin },
+        });
 
         if (!updatedUser) {
           throw new TRPCError({

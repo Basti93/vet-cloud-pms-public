@@ -28,7 +28,7 @@ export async function logEvent(params: LogEventParams): Promise<void> {
       category: params.category,
       eventType: params.eventType,
       message: params.message,
-      metadata: params.metadata ? JSON.stringify(params.metadata) : null,
+      metadata: params.metadata ?? null,
       errorStack: params.errorStack,
       tenantId: params.tenantId ? params.tenantId : null,
       userId: params.userId ? params.userId : null,
