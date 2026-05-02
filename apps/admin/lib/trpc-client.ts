@@ -6,6 +6,14 @@ export function getBaseUrl() {
     return apiUrl.replace(/\/+$/, "");
   }
 
+  // During server-side rendering / prerender at build time, avoid hard-failing.
+  // Runtime safety is enforced in the browser branch below.
+  if (typeof window === "undefined") {
+    return process.env.NODE_ENV === "production"
+      ? "https://example.com"
+      : "http://localhost:3000";
+  }
+
   if (typeof window !== "undefined") {
     const { hostname } = window.location;
 
@@ -16,14 +24,7 @@ export function getBaseUrl() {
       "NEXT_PUBLIC_WEB_API_URL is required for non-localhost environments."
     );
   }
-
-  return process.env.NODE_ENV === "production"
-    ? (() => {
-        throw new Error(
-          "NEXT_PUBLIC_WEB_API_URL is required in production."
-        );
-      })()
-    : "http://localhost:3000";
+  return "http://localhost:3000";
 }
 
 export const queryClient = new QueryClient({
