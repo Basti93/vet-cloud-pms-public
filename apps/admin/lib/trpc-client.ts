@@ -9,9 +9,7 @@ export function getBaseUrl() {
   // During server-side rendering / prerender at build time, avoid hard-failing.
   // Runtime safety is enforced in the browser branch below.
   if (typeof window === "undefined") {
-    return process.env.NODE_ENV === "production"
-      ? "https://example.com"
-      : "http://localhost:3000";
+    return apiUrl || "http://localhost:3000";
   }
 
   if (typeof window !== "undefined") {
