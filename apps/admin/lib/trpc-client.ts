@@ -1,7 +1,10 @@
 import { QueryClient } from "@tanstack/react-query";
 
 export function getBaseUrl() {
-  const apiUrl = process.env.NEXT_PUBLIC_WEB_API_URL?.trim();
+  const apiUrl = (
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    process.env.NEXT_PUBLIC_WEB_API_URL?.trim()
+  );
   if (apiUrl) {
     return apiUrl.replace(/\/+$/, "");
   }
@@ -19,7 +22,7 @@ export function getBaseUrl() {
       return "http://localhost:3000";
     }
     throw new Error(
-      "NEXT_PUBLIC_WEB_API_URL is required for non-localhost environments."
+      "NEXT_PUBLIC_APP_URL is required for non-localhost environments."
     );
   }
   return "http://localhost:3000";
