@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { createTRPCRouter, protectedProcedure } from "@/server/trpc";
 import {
   tenants,
@@ -327,7 +327,7 @@ export const adminRouter = createTRPCRouter({
           isEditableByTenant: roles.isEditableByTenant,
         })
         .from(roles)
-        .where(eq(roles.id, input.roleId) && eq(roles.tenantId, input.tenantId))
+        .where(and(eq(roles.id, input.roleId), eq(roles.tenantId, input.tenantId)))
         .limit(1);
 
       if (!roleExists) {
@@ -505,7 +505,7 @@ export const adminRouter = createTRPCRouter({
           isEditableByTenant: roles.isEditableByTenant,
         })
         .from(roles)
-        .where(eq(roles.id, input.roleId) && eq(roles.tenantId, input.tenantId))
+        .where(and(eq(roles.id, input.roleId), eq(roles.tenantId, input.tenantId)))
         .limit(1);
 
       if (!roleExists) {
@@ -572,7 +572,7 @@ export const adminRouter = createTRPCRouter({
       const [roleExists] = await ctx.db
         .select({ id: roles.id, code: roles.code, isSystem: roles.isSystem })
         .from(roles)
-        .where(eq(roles.id, input.roleId) && eq(roles.tenantId, input.tenantId))
+        .where(and(eq(roles.id, input.roleId), eq(roles.tenantId, input.tenantId)))
         .limit(1);
 
       if (!roleExists) {

@@ -1,5 +1,5 @@
 import { randomBytes, createHash } from "crypto";
-import { and, eq, lt } from "drizzle-orm";
+import { and, eq, gt, lt } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { db } from "@/lib/db/client";
 import { roles, userInvitations, userRoles, users } from "@/lib/db/schema";
@@ -234,6 +234,26 @@ export async function acceptInvite(params: { token: string; clerkUserId: string 
   }
 
   await db.transaction(async (tx) => {
+    const claimed = await tx
+      .update(userInvitations)
+      .set({
+        status: "accepted",
+        acceptedByUserId: user.id,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(userInvitations.id, invitation.id),
+          eq(userInvitations.status, "pending"),
+          gt(userInvitations.expiresAt, now)
+        )
+      )
+      .returning({ id: userInvitations.id });
+
+    if (claimed.length === 0) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Invitation already used or expired" });
+    }
+
     await tx
       .update(users)
       .set({
@@ -250,15 +270,6 @@ export async function acceptInvite(params: { token: string; clerkUserId: string 
       roleId: targetRole.id,
       assignedBy: null,
     });
-
-    await tx
-      .update(userInvitations)
-      .set({
-        status: "accepted",
-        acceptedByUserId: user.id,
-        updatedAt: now,
-      })
-      .where(eq(userInvitations.id, invitation.id));
   });
 
   return {
