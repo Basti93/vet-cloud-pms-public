@@ -5,6 +5,7 @@ import { TRPCError } from "@trpc/server";
 import {
   tenants,
   users,
+  roles,
   auditLogs,
   systemLogs,
   appointments,
@@ -16,6 +17,7 @@ import { writeAuditLog } from "@/server/audit";
 import { executeDueTenantDeletions, hardDeleteTenantById } from "@/server/tenant-deletion";
 import { sendTenantLifecycleEmail } from "@/lib/email/service";
 import { randomUUID } from "crypto";
+import { createDefaultRoles } from "@/lib/auth/permissions";
 
 export const adminCoreRouter = createAdminRouter({
   /**
@@ -133,6 +135,13 @@ export const adminCoreRouter = createAdminRouter({
         .from(featureFlags)
         .where(eq(featureFlags.tenantId, tenant.id))
         .limit(1);
+      const [systemRoleLockState] = await db
+        .select({
+          editableCount: sql<number>`count(*) filter (where ${roles.isSystem} = true and ${roles.isEditableByTenant} = true)`,
+          totalSystemCount: sql<number>`count(*) filter (where ${roles.isSystem} = true)`,
+        })
+        .from(roles)
+        .where(eq(roles.tenantId, tenant.id));
 
       return {
         ...tenant,
@@ -140,7 +149,47 @@ export const adminCoreRouter = createAdminRouter({
         featureFlags: {
           aiReceptionEnabled: flags?.aiReceptionEnabled ?? false,
         },
+        systemRolesEditable:
+          Number(systemRoleLockState?.editableCount ?? 0) > 0 &&
+          Number(systemRoleLockState?.totalSystemCount ?? 0) > 0,
       };
+    }),
+
+  setSystemRolesEditable: procedure
+    .input(
+      z.object({
+        tenantId: z.string().uuid(),
+        editable: z.boolean(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      await createDefaultRoles(input.tenantId);
+      await db
+        .update(roles)
+        .set({
+          isEditableByTenant: input.editable,
+        })
+        .where(and(eq(roles.tenantId, input.tenantId), eq(roles.isSystem, true)));
+
+      // Re-sync canonical system permissions when locking back down
+      if (!input.editable) {
+        await createDefaultRoles(input.tenantId);
+      }
+
+      await writeAuditLog(ctx, {
+        tenantId: input.tenantId,
+        action: "permission_change",
+        entity: { type: "tenant_roles", id: input.tenantId },
+        event: input.editable
+          ? "admin.tenant_system_roles_unlocked"
+          : "admin.tenant_system_roles_locked",
+        summary: input.editable
+          ? "System roles unlocked for tenant customization"
+          : "System roles locked to platform defaults",
+        changes: { editable: input.editable },
+      });
+
+      return { success: true };
     }),
 
   /**

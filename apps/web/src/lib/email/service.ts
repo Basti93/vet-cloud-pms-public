@@ -71,6 +71,14 @@ export interface SendTenantLifecycleEmailInput {
   body: string;
 }
 
+export interface SendUserInvitationEmailInput {
+  to: string;
+  practiceName: string;
+  role: "admin" | "vet" | "reception";
+  acceptUrl: string;
+  expiresAt: string;
+}
+
 /**
  * Send appointment confirmation email to patient owner
  */
@@ -299,6 +307,46 @@ export async function sendTenantLifecycleEmail(input: SendTenantLifecycleEmailIn
       to: input.to,
       subject: input.subject,
       text: input.body,
+    });
+    if (result.error) {
+      return { success: false, error: result.error };
+    }
+    return { success: true, messageId: result.data?.id };
+  } catch (error) {
+    return { success: false, error };
+  }
+}
+
+export async function sendUserInvitationEmail(input: SendUserInvitationEmailInput) {
+  const roleLabel =
+    input.role === "admin"
+      ? "Administrator"
+      : input.role === "vet"
+      ? "Tierarzt"
+      : "Empfang";
+
+  const subject = `Einladung zu ${input.practiceName}`;
+  const body = `
+Hallo,
+
+Sie wurden zu "${input.practiceName}" eingeladen.
+
+Rolle: ${roleLabel}
+Einladung akzeptieren: ${input.acceptUrl}
+Gültig bis: ${input.expiresAt}
+
+Wenn Sie diese Einladung nicht erwartet haben, ignorieren Sie diese E-Mail.
+
+Mit freundlichen Grüßen,
+Ihr ${SYSTEM_DOMAIN} Team
+  `.trim();
+
+  try {
+    const result = await resend.emails.send({
+      from: systemSender(),
+      to: input.to,
+      subject,
+      text: body,
     });
     if (result.error) {
       return { success: false, error: result.error };

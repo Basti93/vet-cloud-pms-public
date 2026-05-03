@@ -3,6 +3,8 @@ import { z } from "zod";
 import {
   tenants,
   users,
+  roles,
+  userRoles,
   featureFlags,
   tenantDeletionSchedules,
   PERMISSIONS,
@@ -15,6 +17,10 @@ import { getMainDomain } from "@/lib/env";
 import { writeAuditLog } from "@/server/audit";
 import { logEventAsync, serializeLogError } from "@/server/trpc/logging-middleware";
 import { requirePermission } from "@/server/trpc/middleware";
+import { clerkClient } from "@clerk/nextjs/server";
+import { sendTenantLifecycleEmail } from "@/lib/email/service";
+import { createDefaultRoles } from "@/lib/auth/permissions";
+import { ROLE_CODES } from "@/lib/auth/roles";
 
 // Helper function to generate a unique slug from tenant name
 async function generateUniqueSlug(
@@ -214,14 +220,39 @@ export const tenantRouter = createTRPCRouter({
         .where(eq(tenants.id, currentUser.tenantId))
         .returning();
 
-      // Update user role to admin
+      // Ensure tenant default roles exist and assign Admin role in user_roles (source of truth)
+      await createDefaultRoles(currentUser.tenantId);
+      const [adminRole] = await ctx.db
+        .select({ id: roles.id })
+        .from(roles)
+        .where(and(eq(roles.tenantId, currentUser.tenantId), eq(roles.code, ROLE_CODES.ADMIN)))
+        .limit(1);
+      if (!adminRole) {
+        throw new Error("Admin role not found after role initialization");
+      }
+
+      const [dbUser] = await ctx.db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.clerkId, ctx.userId))
+        .limit(1);
+      if (!dbUser) {
+        throw new Error("User not found during onboarding role assignment");
+      }
+
+      await ctx.db.delete(userRoles).where(eq(userRoles.userId, dbUser.id));
+      await ctx.db.insert(userRoles).values({
+        userId: dbUser.id,
+        roleId: adminRole.id,
+        assignedBy: dbUser.id,
+      });
+
       await ctx.db
         .update(users)
         .set({
-          role: "admin",
           updatedAt: new Date(),
         })
-        .where(eq(users.clerkId, ctx.userId));
+        .where(eq(users.id, dbUser.id));
 
       // Initialize feature flags for this tenant (if not already created)
       // Try insert, ignore if already exists
@@ -245,6 +276,101 @@ export const tenantRouter = createTRPCRouter({
         summary: "Practice created from placeholder tenant",
         changes: { slug: updatedTenant.slug, nameSet: Boolean(updatedTenant.name) },
       });
+
+      await writeAuditLog(ctx, {
+        tenantId: updatedTenant.id,
+        action: "create",
+        entity: { type: "tenant", id: updatedTenant.id },
+        event: "tenant.onboarding_completed",
+        summary: "Tenant onboarding completed",
+        changes: {
+          tenantName: updatedTenant.name,
+          tenantSlug: updatedTenant.slug,
+          adminEmail: currentUser.email,
+        },
+      });
+
+      try {
+        const adminIds = (process.env.ADMIN_CLERK_IDS ?? "")
+          .split(",")
+          .map((id) => id.trim())
+          .filter(Boolean);
+
+        if (adminIds.length === 0) {
+          logEventAsync({
+            level: "warn",
+            category: "email",
+            eventType: "onboarding_admin_notification_skipped",
+            message: "No ADMIN_CLERK_IDS configured for onboarding admin email",
+            tenantId: updatedTenant.id,
+            metadata: { operation: "tenant_onboarding_completed", reason: "missing_admin_clerk_ids" },
+          });
+        } else {
+          const clerk = await clerkClient();
+          const recipients = (
+            await Promise.all(
+              adminIds.map(async (id) => {
+                try {
+                  const u = await clerk.users.getUser(id);
+                  return u.emailAddresses?.[0]?.emailAddress ?? null;
+                } catch {
+                  return null;
+                }
+              })
+            )
+          ).filter((email): email is string => Boolean(email));
+
+          if (recipients.length === 0) {
+            logEventAsync({
+              level: "warn",
+              category: "email",
+              eventType: "onboarding_admin_notification_skipped",
+              message: "Could not resolve any admin recipient emails from ADMIN_CLERK_IDS",
+              tenantId: updatedTenant.id,
+              metadata: { operation: "tenant_onboarding_completed", adminIdsCount: adminIds.length },
+            });
+          } else {
+            const subject = `Neues Onboarding abgeschlossen: ${updatedTenant.name}`;
+            const body = `Ein neues Tenant-Onboarding wurde abgeschlossen.\n\nTenant: ${updatedTenant.name}\nSlug: ${updatedTenant.slug}\nTenant ID: ${updatedTenant.id}\nAdmin E-Mail: ${currentUser.email}\nZeitpunkt: ${new Date().toISOString()}`;
+            for (const recipient of recipients) {
+              const emailResult = await sendTenantLifecycleEmail({
+                to: recipient,
+                practiceName: updatedTenant.name,
+                subject,
+                body,
+              });
+              if (!emailResult.success) {
+                const serialized = serializeLogError(emailResult.error);
+                logEventAsync({
+                  level: "error",
+                  category: "email",
+                  eventType: "onboarding_admin_notification_failed",
+                  message: "Failed to send onboarding completion notification to system admin",
+                  tenantId: updatedTenant.id,
+                  metadata: {
+                    operation: "tenant_onboarding_completed",
+                    recipient,
+                    ...serialized,
+                  },
+                });
+              }
+            }
+          }
+        }
+      } catch (error) {
+        const serialized = serializeLogError(error);
+        logEventAsync({
+          level: "error",
+          category: "email",
+          eventType: "onboarding_admin_notification_failed",
+          message: "Unexpected error while sending onboarding completion notifications",
+          tenantId: updatedTenant.id,
+          metadata: {
+            operation: "tenant_onboarding_completed",
+            ...serialized,
+          },
+        });
+      }
 
       return {
         id: updatedTenant.id,

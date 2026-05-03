@@ -68,7 +68,6 @@ export const scheduleRouter = createTRPCRouter({
           firstName: users.firstName,
           lastName: users.lastName,
           title: users.title,
-          role: users.role,
           slotDurationMin: users.slotDurationMin,
         })
         .from(users)

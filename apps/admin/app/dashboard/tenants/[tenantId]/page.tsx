@@ -16,6 +16,7 @@ export default function TenantDetailPage() {
     "free" | "starter" | "pro" | "enterprise"
   >("free");
   const [aiReceptionEnabled, setAiReceptionEnabled] = useState(false);
+  const [systemRolesEditable, setSystemRolesEditable] = useState(false);
 
   const { data: tenant, isLoading, error } =
     trpc.adminDashboard.core.getTenantDetails.useQuery({
@@ -25,6 +26,7 @@ export default function TenantDetailPage() {
   useEffect(() => {
     if (!tenant) return;
     setAiReceptionEnabled(tenant.featureFlags?.aiReceptionEnabled ?? false);
+    setSystemRolesEditable(Boolean(tenant.systemRolesEditable));
   }, [tenant]);
 
   const { data: users } = trpc.adminDashboard.users.listTenantUsers.useQuery({
@@ -53,6 +55,12 @@ export default function TenantDetailPage() {
     trpc.adminDashboard.core.updateFeatureFlags.useMutation({
       onError: () => {
         setAiReceptionEnabled(tenant?.featureFlags?.aiReceptionEnabled ?? false);
+      },
+    });
+  const setSystemRolesEditableMutation =
+    trpc.adminDashboard.core.setSystemRolesEditable.useMutation({
+      onError: () => {
+        setSystemRolesEditable(Boolean(tenant?.systemRolesEditable));
       },
     });
 
@@ -178,6 +186,40 @@ export default function TenantDetailPage() {
               className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
             />
             {updateFeatureFlagsMutation.isPending ? "Speichert..." : "Aktiv"}
+          </label>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <h3 className="text-sm font-semibold text-gray-900">Systemrollen</h3>
+        <p className="mt-1 text-xs text-gray-500">
+          Standardmäßig sind Systemrollen gesperrt. Aktivieren erlaubt Tenant-Admins, die
+          Systemrollen-Berechtigungen selbst anzupassen.
+        </p>
+
+        <div className="mt-4 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-gray-900">Tenant darf Systemrollen bearbeiten</p>
+            <p className="text-xs text-gray-500">
+              Bei Deaktivierung werden Systemrollen auf Plattform-Defaults zurückgeführt.
+            </p>
+          </div>
+          <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={systemRolesEditable}
+              onChange={(e) => {
+                const nextValue = e.target.checked;
+                setSystemRolesEditable(nextValue);
+                setSystemRolesEditableMutation.mutate({
+                  tenantId,
+                  editable: nextValue,
+                });
+              }}
+              disabled={setSystemRolesEditableMutation.isPending}
+              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            {setSystemRolesEditableMutation.isPending ? "Speichert..." : "Aktiv"}
           </label>
         </div>
       </div>

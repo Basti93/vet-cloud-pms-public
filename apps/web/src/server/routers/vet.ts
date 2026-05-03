@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { eq, and, or, count, lte, gte } from "drizzle-orm";
 import { createTRPCRouter, protectedProcedure } from "@/server/trpc";
-import { users, appointments, patients, owners } from "@/lib/db/schema";
+import { users, appointments, patients, owners, userRoles, roles } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
+import { ROLE_CODES } from "@/lib/auth/roles";
 
 // ── Fair Distribution Algorithm ───────────────────────────────────────────
 /**
@@ -32,13 +33,14 @@ export const vetRouter = createTRPCRouter({
           firstName: users.firstName,
           lastName: users.lastName,
           email: users.email,
-          role: users.role,
         })
         .from(users)
+        .innerJoin(userRoles, eq(userRoles.userId, users.id))
+        .innerJoin(roles, eq(roles.id, userRoles.roleId))
         .where(
           and(
             eq(users.tenantId, input.tenantId),
-            or(eq(users.role, "vet"), eq(users.role, "admin")),
+            or(eq(roles.code, ROLE_CODES.VET), eq(roles.code, ROLE_CODES.ADMIN)),
             eq(users.active, true)
           )
         );
@@ -147,10 +149,12 @@ export const vetRouter = createTRPCRouter({
           lastName: users.lastName,
         })
         .from(users)
+        .innerJoin(userRoles, eq(userRoles.userId, users.id))
+        .innerJoin(roles, eq(roles.id, userRoles.roleId))
         .where(
           and(
             eq(users.tenantId, input.tenantId),
-            or(eq(users.role, "vet"), eq(users.role, "admin")),
+            or(eq(roles.code, ROLE_CODES.VET), eq(roles.code, ROLE_CODES.ADMIN)),
             eq(users.active, true)
           )
         );

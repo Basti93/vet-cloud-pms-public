@@ -135,7 +135,6 @@ export async function POST(req: Request) {
         email,
         firstName,
         lastName,
-        role: "staff", // Will be changed to "admin" when they create their practice
         active: true,
       });
 

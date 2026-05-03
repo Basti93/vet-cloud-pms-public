@@ -33,6 +33,7 @@ import {
   vetAbsences,
   roles,
   rolePermissions,
+  userRoles,
 } from "@/lib/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import {
@@ -207,6 +208,7 @@ async function main() {
       vetAbsences,
       roles,
       rolePermissions,
+      userRoles,
     },
   });
 
@@ -323,7 +325,12 @@ async function main() {
           db
             .insert(users)
             .values({
-              ...u,
+              clerkId: u.clerkId,
+              tenantId: u.tenantId,
+              email: u.email,
+              title: u.title,
+              firstName: u.firstName,
+              lastName: u.lastName,
               active: true,
             })
             .onConflictDoUpdate({
@@ -334,9 +341,7 @@ async function main() {
                 title: u.title,
                 firstName: u.firstName,
                 lastName: u.lastName,
-                role: u.role,
                 active: true,
-                roleId: null,
                 updatedAt: new Date(),
               },
             })
@@ -349,28 +354,32 @@ async function main() {
       // ASSIGN ROLES TO USERS
       // ────────────────────────────────────────────────────────────────────
       console.log("🔐 Assigning roles to users...");
-      const rolesByName = (await db.select().from(roles).where(eq(roles.tenantId, DEMO_TENANT_ID))).reduce(
+      const rolesByCode = (await db.select().from(roles).where(eq(roles.tenantId, DEMO_TENANT_ID))).reduce(
         (acc, role) => {
-          acc[role.name.toLowerCase()] = role.id;
+          acc[role.code.toLowerCase()] = role.id;
           return acc;
         },
         {} as Record<string, string>
       );
 
       await Promise.all(
-        createdUsers.map((u) => {
+        createdUsers.map((u, idx) => {
           if (!u) return Promise.resolve(null);
-          const roleId = rolesByName[u.role.toLowerCase()];
+          const roleId = rolesByCode[usersToCreate[idx].role.toLowerCase()];
           if (!roleId) return Promise.resolve(null);
           return db
-            .update(users)
-            .set({ roleId })
-            .where(eq(users.id, u.id));
+            .insert(userRoles)
+            .values({
+              userId: u.id,
+              roleId,
+              assignedBy: u.id,
+            })
+            .onConflictDoNothing();
         })
       );
       console.log("  ✓ Roles assigned\n");
 
-      const createdVets = createdUsers.filter((u) => u?.role === "vet");
+      const createdVets = createdUsers.filter((u, idx) => u && usersToCreate[idx].role === "vet");
       if (createdVets.length === 0) {
         throw new Error("No vet users created");
       }

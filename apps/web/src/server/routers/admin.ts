@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { createTRPCRouter, protectedProcedure } from "@/server/trpc";
 import {
   tenants,
@@ -15,11 +15,24 @@ import {
   roles,
   userRoles,
   rolePermissions,
+  userInvitations,
   PERMISSIONS,
 } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
 import { requirePermission } from "@/server/trpc/middleware";
 import { getUserPermissions } from "@/lib/auth/permissions";
+import {
+  acceptInvite,
+  createInvite,
+  resendInvite,
+  revokeInvite,
+  expirePastInvitations,
+} from "@/server/invitations";
+import { sendUserInvitationEmail } from "@/lib/email/service";
+import { getMainDomain } from "@/lib/env";
+import { writeAuditLog } from "@/server/audit";
+import { logEventAsync, serializeLogError } from "@/server/trpc/logging-middleware";
+import { ROLE_CODES } from "@/lib/auth/roles";
 
 const DEMO_TENANT_ID = process.env.NEXT_PUBLIC_DEMO_TENANT_ID!;
 const DEMO_TENANT_SLUG = "demo";
@@ -72,7 +85,6 @@ export const adminRouter = createTRPCRouter({
         clerkId: users.clerkId,
         email: users.email,
         firstName: users.firstName,
-        role: users.role,
         tenantId: users.tenantId,
         slotDurationMin: users.slotDurationMin,
       })
@@ -308,7 +320,12 @@ export const adminRouter = createTRPCRouter({
 
       // Verify role exists in this tenant
       const [roleExists] = await ctx.db
-        .select({ id: roles.id })
+        .select({
+          id: roles.id,
+          code: roles.code,
+          isSystem: roles.isSystem,
+          isEditableByTenant: roles.isEditableByTenant,
+        })
         .from(roles)
         .where(eq(roles.id, input.roleId) && eq(roles.tenantId, input.tenantId))
         .limit(1);
@@ -317,6 +334,12 @@ export const adminRouter = createTRPCRouter({
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Role not found in this tenant",
+        });
+      }
+      if (roleExists.isSystem && !roleExists.isEditableByTenant) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "System role permissions are locked for this tenant.",
         });
       }
 
@@ -475,7 +498,12 @@ export const adminRouter = createTRPCRouter({
 
       // Verify role exists in this tenant
       const [roleExists] = await ctx.db
-        .select({ id: roles.id })
+        .select({
+          id: roles.id,
+          code: roles.code,
+          isSystem: roles.isSystem,
+          isEditableByTenant: roles.isEditableByTenant,
+        })
         .from(roles)
         .where(eq(roles.id, input.roleId) && eq(roles.tenantId, input.tenantId))
         .limit(1);
@@ -484,6 +512,12 @@ export const adminRouter = createTRPCRouter({
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Role not found in this tenant",
+        });
+      }
+      if (roleExists.isSystem && !roleExists.isEditableByTenant) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "System role permissions are locked for this tenant.",
         });
       }
 
@@ -536,7 +570,7 @@ export const adminRouter = createTRPCRouter({
 
       // Verify role exists in this tenant
       const [roleExists] = await ctx.db
-        .select({ id: roles.id })
+        .select({ id: roles.id, code: roles.code, isSystem: roles.isSystem })
         .from(roles)
         .where(eq(roles.id, input.roleId) && eq(roles.tenantId, input.tenantId))
         .limit(1);
@@ -548,6 +582,58 @@ export const adminRouter = createTRPCRouter({
         });
       }
 
+      const CRITICAL_ADMIN_PERMISSIONS = [
+        PERMISSIONS.USERS_MANAGE,
+        PERMISSIONS.ROLES_MANAGE,
+        PERMISSIONS.SETTINGS_MANAGE,
+      ];
+      if (
+        roleExists.isSystem &&
+        roleExists.code === ROLE_CODES.ADMIN &&
+        CRITICAL_ADMIN_PERMISSIONS.includes(input.permission as (typeof CRITICAL_ADMIN_PERMISSIONS)[number])
+      ) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Critical permissions cannot be removed from the system Admin role.",
+        });
+      }
+
+      // Self-lockout guard: current tenant admin must not remove their own last grant
+      const [currentDbUser] = await ctx.db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.clerkId, ctx.userId!))
+        .limit(1);
+      if (!currentDbUser) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Current user not found" });
+      }
+      const currentAssignments = await ctx.db
+        .select({ roleId: userRoles.roleId })
+        .from(userRoles)
+        .where(eq(userRoles.userId, currentDbUser.id));
+      const assignedRoleIds = currentAssignments.map((r) => r.roleId);
+      if (assignedRoleIds.includes(input.roleId)) {
+        const permsRows = assignedRoleIds.length
+          ? await ctx.db
+              .select({
+                roleId: rolePermissions.roleId,
+                permission: rolePermissions.permission,
+              })
+              .from(rolePermissions)
+              .where(inArray(rolePermissions.roleId, assignedRoleIds))
+          : [];
+        const stillHasPermissionAfterRemoval = permsRows.some(
+          (row) => row.permission === input.permission && row.roleId !== input.roleId
+        );
+        if (!stillHasPermissionAfterRemoval) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              "Cannot remove this permission because it would lock you out from managing roles.",
+          });
+        }
+      }
+
       await ctx.db
         .delete(rolePermissions)
         .where(
@@ -556,5 +642,216 @@ export const adminRouter = createTRPCRouter({
         );
 
       return { success: true };
+    }),
+
+  listInvitations: protectedProcedure
+    .use(requirePermission(PERMISSIONS.USERS_MANAGE))
+    .input(z.object({ tenantId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const [currentUser] = await ctx.db
+        .select({ tenantId: users.tenantId })
+        .from(users)
+        .where(eq(users.clerkId, ctx.userId!))
+        .limit(1);
+      if (currentUser?.tenantId !== input.tenantId) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Cannot list invitations from other tenants" });
+      }
+
+      await expirePastInvitations(input.tenantId);
+
+      return ctx.db
+        .select({
+          id: userInvitations.id,
+          email: userInvitations.email,
+          role: userInvitations.role,
+          status: userInvitations.status,
+          expiresAt: userInvitations.expiresAt,
+          createdAt: userInvitations.createdAt,
+          updatedAt: userInvitations.updatedAt,
+        })
+        .from(userInvitations)
+        .where(eq(userInvitations.tenantId, input.tenantId))
+        .orderBy(userInvitations.createdAt);
+    }),
+
+  createInvitation: protectedProcedure
+    .use(requirePermission(PERMISSIONS.USERS_MANAGE))
+    .input(
+      z.object({
+        tenantId: z.string().uuid(),
+        email: z.string().email(),
+        role: z.enum(["admin", "vet", "reception"]),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [currentUser] = await ctx.db
+        .select({ id: users.id, tenantId: users.tenantId, email: users.email })
+        .from(users)
+        .where(eq(users.clerkId, ctx.userId!))
+        .limit(1);
+      if (!currentUser || currentUser.tenantId !== input.tenantId) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Cannot invite users for other tenants" });
+      }
+
+      const [tenant] = await ctx.db
+        .select({ name: tenants.name })
+        .from(tenants)
+        .where(eq(tenants.id, input.tenantId))
+        .limit(1);
+      if (!tenant) throw new TRPCError({ code: "NOT_FOUND", message: "Tenant not found" });
+
+      const invite = await createInvite({
+        tenantId: input.tenantId,
+        invitedByUserId: currentUser.id,
+        email: input.email,
+        role: input.role,
+      });
+
+      const acceptUrl = `${getMainDomain()}/invite/accept?token=${invite.token}`;
+      const emailResult = await sendUserInvitationEmail({
+        to: invite.email,
+        practiceName: tenant.name,
+        role: input.role,
+        acceptUrl,
+        expiresAt: invite.expiresAt.toLocaleString("de-DE"),
+      });
+
+      if (!emailResult.success) {
+        const serialized = serializeLogError(emailResult.error);
+        logEventAsync({
+          level: "error",
+          category: "email",
+          eventType: "user_invitation_email_failed",
+          message: "Invitation created but email delivery failed",
+          tenantId: input.tenantId,
+          userId: currentUser.id,
+          metadata: {
+            operation: "create_invitation",
+            recipient: invite.email,
+            invitationId: invite.invitationId,
+            ...serialized,
+          },
+        });
+      }
+
+      await writeAuditLog(ctx, {
+        tenantId: input.tenantId,
+        action: "create",
+        entity: { type: "user_invitation", id: invite.invitationId },
+        event: "user.invitation_created",
+        summary: "User invitation created",
+        changes: { email: invite.email, role: input.role, expiresAt: invite.expiresAt.toISOString() },
+      });
+
+      return { success: true, invitationId: invite.invitationId, emailSent: emailResult.success };
+    }),
+
+  resendInvitation: protectedProcedure
+    .use(requirePermission(PERMISSIONS.USERS_MANAGE))
+    .input(z.object({ tenantId: z.string().uuid(), invitationId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const [currentUser] = await ctx.db
+        .select({ id: users.id, tenantId: users.tenantId })
+        .from(users)
+        .where(eq(users.clerkId, ctx.userId!))
+        .limit(1);
+      if (!currentUser || currentUser.tenantId !== input.tenantId) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Cannot resend invitations for other tenants" });
+      }
+      const [tenant] = await ctx.db
+        .select({ name: tenants.name })
+        .from(tenants)
+        .where(eq(tenants.id, input.tenantId))
+        .limit(1);
+      if (!tenant) throw new TRPCError({ code: "NOT_FOUND", message: "Tenant not found" });
+
+      const resent = await resendInvite({
+        tenantId: input.tenantId,
+        invitationId: input.invitationId,
+        invitedByUserId: currentUser.id,
+      });
+
+      const acceptUrl = `${getMainDomain()}/invite/accept?token=${resent.token}`;
+      const emailResult = await sendUserInvitationEmail({
+        to: resent.invitation.email,
+        practiceName: tenant.name,
+        role: resent.invitation.role,
+        acceptUrl,
+        expiresAt: resent.expiresAt.toLocaleString("de-DE"),
+      });
+
+      if (!emailResult.success) {
+        const serialized = serializeLogError(emailResult.error);
+        logEventAsync({
+          level: "error",
+          category: "email",
+          eventType: "user_invitation_email_failed",
+          message: "Invitation resent but email delivery failed",
+          tenantId: input.tenantId,
+          userId: currentUser.id,
+          metadata: {
+            operation: "resend_invitation",
+            recipient: resent.invitation.email,
+            invitationId: resent.invitation.id,
+            ...serialized,
+          },
+        });
+      }
+
+      await writeAuditLog(ctx, {
+        tenantId: input.tenantId,
+        action: "update",
+        entity: { type: "user_invitation", id: resent.invitation.id },
+        event: "user.invitation_resent",
+        summary: "User invitation resent",
+        changes: { expiresAt: resent.expiresAt.toISOString() },
+      });
+
+      return { success: true, emailSent: emailResult.success };
+    }),
+
+  revokeInvitation: protectedProcedure
+    .use(requirePermission(PERMISSIONS.USERS_MANAGE))
+    .input(z.object({ tenantId: z.string().uuid(), invitationId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const [currentUser] = await ctx.db
+        .select({ id: users.id, tenantId: users.tenantId })
+        .from(users)
+        .where(eq(users.clerkId, ctx.userId!))
+        .limit(1);
+      if (!currentUser || currentUser.tenantId !== input.tenantId) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Cannot revoke invitations for other tenants" });
+      }
+
+      const invitation = await revokeInvite({ tenantId: input.tenantId, invitationId: input.invitationId });
+
+      await writeAuditLog(ctx, {
+        tenantId: input.tenantId,
+        action: "update",
+        entity: { type: "user_invitation", id: invitation.id },
+        event: "user.invitation_revoked",
+        summary: "User invitation revoked",
+        changes: { email: invitation.email },
+      });
+
+      return { success: true };
+    }),
+
+  acceptInvitation: protectedProcedure
+    .input(z.object({ token: z.string().min(20) }))
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.userId) throw new TRPCError({ code: "UNAUTHORIZED" });
+      const accepted = await acceptInvite({ token: input.token, clerkUserId: ctx.userId });
+
+      await writeAuditLog(ctx, {
+        tenantId: accepted.tenantId,
+        action: "update",
+        entity: { type: "user_invitation", id: accepted.invitationId },
+        event: "user.invitation_accepted",
+        summary: "User invitation accepted",
+        changes: { role: accepted.role, userId: accepted.userId },
+      });
+
+      return { success: true, tenantId: accepted.tenantId };
     }),
 });

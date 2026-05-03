@@ -327,9 +327,6 @@ export default function AvailabilityPage() {
                 >
                   <span className="font-medium text-sm">
                     {vet.title ? `${vet.title} ` : ''}{vet.firstName} {vet.lastName}
-                    <span className="ml-2 text-xs font-normal" style={{ color: 'var(--color-muted)' }}>
-                      {vet.role === 'admin' ? 'Praxisinhaber' : 'Tierarzt'}
-                    </span>
                   </span>
                   {expandedVet === vet.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                 </button>

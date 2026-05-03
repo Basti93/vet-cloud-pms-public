@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { eq, and, gte, lte, lt, or, isNull } from "drizzle-orm";
 import { createTRPCRouter, publicProcedure, publicBookingProcedure, protectedProcedure } from "@/server/trpc";
-import { tenants, appointments, owners, patients, users, appointmentHolds, emailSettings, vetSchedules, vetAbsences } from "@/lib/db/schema";
+import { tenants, appointments, owners, patients, users, userRoles, roles, appointmentHolds, emailSettings, vetSchedules, vetAbsences } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
 import { sendConfirmationEmail, sendBookingNotificationEmail } from "@/lib/email/service";
 import type { SendConfirmationEmailInput, SendBookingNotificationInput } from "@/lib/email/service";
@@ -9,6 +9,7 @@ import { DEFAULT_OPENING_HOURS, type DaySchedule, type TimeRange } from "@/lib/s
 import { getMainDomain } from "@/lib/env";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import type * as schema from "@/lib/db/schema";
+import { ROLE_CODES } from "@/lib/auth/roles";
 
 // ── Slot generation ───────────────────────────────────────────────────────────
 
@@ -838,10 +839,12 @@ export const bookingRouter = createTRPCRouter({
           lastName: users.lastName,
         })
         .from(users)
+        .innerJoin(userRoles, eq(userRoles.userId, users.id))
+        .innerJoin(roles, eq(roles.id, userRoles.roleId))
         .where(
           and(
             eq(users.tenantId, input.tenantId),
-            eq(users.role, "vet"),
+            eq(roles.code, ROLE_CODES.VET),
             eq(users.active, true)
           )
         );

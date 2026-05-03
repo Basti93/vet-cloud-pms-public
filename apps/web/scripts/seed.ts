@@ -29,6 +29,7 @@ import { eq } from "drizzle-orm";
 import {
   tenants,
   users,
+  userRoles,
   owners,
   patients,
   appointments,
@@ -146,7 +147,12 @@ async function seed() {
         db
           .insert(users)
           .values({
-            ...u,
+            clerkId: u.clerkId,
+            tenantId: u.tenantId,
+            email: u.email,
+            title: u.title,
+            firstName: u.firstName,
+            lastName: u.lastName,
             active: true,
           })
           .onConflictDoNothing()
@@ -173,28 +179,29 @@ async function seed() {
     // 2a. ASSIGN ROLES TO USERS
     // ────────────────────────────────────────────────────────────────────────
     console.log("🔐 Assigning roles to users...");
-    const rolesByName = (await db.select().from(roles).where(eq(roles.tenantId, tenantId))).reduce(
+    const rolesByCode = (await db.select().from(roles).where(eq(roles.tenantId, tenantId))).reduce(
       (acc, role) => {
-        acc[role.name.toLowerCase()] = role.id;
+        acc[role.code.toLowerCase()] = role.id;
         return acc;
       },
       {} as Record<string, string>
     );
 
     await Promise.all(
-      createdOrExistingUsers.map((u) => {
+      createdOrExistingUsers.map((u, idx) => {
         if (!u) return Promise.resolve(null);
-        const roleId = rolesByName[u.role.toLowerCase()];
+        const roleId = rolesByCode[usersToCreate[idx].role.toLowerCase()];
         if (!roleId) return Promise.resolve(null);
-        return db
-          .update(users)
-          .set({ roleId })
-          .where(eq(users.id, u.id));
+        return db.insert(userRoles).values({
+          userId: u.id,
+          roleId,
+          assignedBy: u.id,
+        }).onConflictDoNothing();
       })
     );
     console.log("  ✓ Roles assigned\n");
 
-    const createdVets = createdOrExistingUsers.filter((u) => u?.role === "vet");
+    const createdVets = createdOrExistingUsers.filter((u, idx) => u && usersToCreate[idx].role === "vet");
     if (createdVets.length === 0) throw new Error("No vet users created");
     const vetUser = createdVets[0]!; // Use first vet as default
     console.log(`  ✓ ${createdUsers.length} users\n`);
@@ -433,4 +440,3 @@ seed()
   .then(() => {
     process.exit(0);
   });
-

@@ -1,6 +1,5 @@
 import { db } from "@/lib/db/client";
 import { users, roles, userRoles } from "@/lib/db/schema";
-import { isNotNull } from "drizzle-orm";
 
 async function checkRoles() {
   console.log("🔍 Checking database state...\n");
@@ -8,9 +7,9 @@ async function checkRoles() {
   // Check users table
   const allUsers = await db.select().from(users);
   console.log(`Total users: ${allUsers.length}`);
-  console.log("Users with roleId:");
+  console.log("Users:");
   allUsers.forEach(u => {
-    console.log(`  - ${u.email || u.id}: roleId=${u.roleId}`);
+    console.log(`  - ${u.email || u.id}`);
   });
 
   console.log("\n");
@@ -33,20 +32,7 @@ async function checkRoles() {
 
   console.log("\n");
 
-  // Check users with non-null roleId (what migration is looking for)
-  const usersWithRole = await db
-    .select({
-      id: users.id,
-      email: users.email,
-      roleId: users.roleId,
-    })
-    .from(users)
-    .where(isNotNull(users.roleId));
-
-  console.log(`Users with roleId field set: ${usersWithRole.length}`);
-  usersWithRole.forEach(u => {
-    console.log(`  - ${u.email || u.id}: roleId=${u.roleId}`);
-  });
+  console.log("Role source of truth is user_roles.");
 }
 
 checkRoles().catch(console.error);

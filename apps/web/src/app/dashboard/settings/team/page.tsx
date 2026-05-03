@@ -15,11 +15,22 @@ interface UserWithRoles {
   roles: Array<{ id: string; name: string }>;
 }
 
+interface InvitationItem {
+  id: string;
+  email: string;
+  role: "admin" | "vet" | "reception";
+  status: "pending" | "accepted" | "revoked" | "expired";
+  expiresAt: string | Date;
+  createdAt: string | Date;
+}
+
 export default function TeamPage() {
   const { tenantId } = useTenant();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [showAddRoleModal, setShowAddRoleModal] = useState<string | null>(null);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<"admin" | "vet" | "reception">("reception");
 
   const { data: permissions } = trpc.admin.getUserPermissions.useQuery();
 
@@ -45,6 +56,24 @@ export default function TeamPage() {
   const removeRoleMutation = trpc.admin.removeUserRole.useMutation({
     onSuccess: () => { refetchUsers(); },
   });
+  const { data: invitations, isLoading: invitationsLoading, refetch: refetchInvitations } =
+    trpc.admin.listInvitations.useQuery({ tenantId: tenantId! }, { enabled: !!tenantId && mounted });
+  const createInvitationMutation = trpc.admin.createInvitation.useMutation({
+    onSuccess: () => {
+      setInviteEmail("");
+      void refetchInvitations();
+    },
+  });
+  const resendInvitationMutation = trpc.admin.resendInvitation.useMutation({
+    onSuccess: () => {
+      void refetchInvitations();
+    },
+  });
+  const revokeInvitationMutation = trpc.admin.revokeInvitation.useMutation({
+    onSuccess: () => {
+      void refetchInvitations();
+    },
+  });
 
   if (!mounted) return null;
 
@@ -56,6 +85,15 @@ export default function TeamPage() {
   const handleRemoveRole = (userId: string, roleId: string) => {
     if (!tenantId) return;
     removeRoleMutation.mutate({ tenantId, userId, roleId });
+  };
+  const handleCreateInvitation = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tenantId || !inviteEmail.trim()) return;
+    createInvitationMutation.mutate({
+      tenantId,
+      email: inviteEmail.trim(),
+      role: inviteRole,
+    });
   };
 
   return (
@@ -150,6 +188,91 @@ export default function TeamPage() {
         <p style={{ color: "var(--color-muted)" }}>Keine Benutzer gefunden</p>
       )}
 
+      <div
+        className="rounded-xl p-4 space-y-3"
+        style={{
+          backgroundColor: "var(--color-surface)",
+          border: "1px solid var(--color-border)",
+        }}
+      >
+        <h3 className="text-base font-semibold">Einladungen</h3>
+        <form onSubmit={handleCreateInvitation} className="grid gap-3 sm:grid-cols-[1fr_auto_auto]">
+          <input
+            type="email"
+            value={inviteEmail}
+            onChange={(e) => setInviteEmail(e.target.value)}
+            placeholder="name@beispiel.de"
+            className="rounded-lg px-3 py-2 border"
+            style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-bg)", color: "var(--color-fg)" }}
+            required
+          />
+          <select
+            value={inviteRole}
+            onChange={(e) => setInviteRole(e.target.value as "admin" | "vet" | "reception")}
+            className="rounded-lg px-3 py-2 border"
+            style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-bg)", color: "var(--color-fg)" }}
+          >
+            <option value="admin">Admin</option>
+            <option value="vet">Vet</option>
+            <option value="reception">Reception</option>
+          </select>
+          <button
+            type="submit"
+            disabled={createInvitationMutation.isPending}
+            className="px-4 py-2 rounded-lg text-white font-medium disabled:opacity-50"
+            style={{ backgroundColor: "var(--color-accent)" }}
+          >
+            {createInvitationMutation.isPending ? "Sendet..." : "Einladen"}
+          </button>
+        </form>
+
+        {invitationsLoading ? (
+          <p style={{ color: "var(--color-muted)" }}>Einladungen laden...</p>
+        ) : invitations && invitations.length > 0 ? (
+          <div className="space-y-2">
+            {(invitations as InvitationItem[]).map((inv) => (
+              <div
+                key={inv.id}
+                className="rounded-lg p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                style={{ border: "1px solid var(--color-border)" }}
+              >
+                <div>
+                  <p className="text-sm font-medium">{inv.email}</p>
+                  <p className="text-xs" style={{ color: "var(--color-muted)" }}>
+                    Rolle: {inv.role} · Status: {inv.status} · Gültig bis:{" "}
+                    {new Date(inv.expiresAt).toLocaleString("de-DE")}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  {(inv.status === "pending" || inv.status === "expired") && (
+                    <button
+                      onClick={() => tenantId && resendInvitationMutation.mutate({ tenantId, invitationId: inv.id })}
+                      className="px-3 py-1.5 rounded text-xs"
+                      style={{ backgroundColor: "var(--color-bg)", border: "1px solid var(--color-border)" }}
+                      disabled={resendInvitationMutation.isPending}
+                    >
+                      Erneut senden
+                    </button>
+                  )}
+                  {(inv.status === "pending" || inv.status === "expired") && (
+                    <button
+                      onClick={() => tenantId && revokeInvitationMutation.mutate({ tenantId, invitationId: inv.id })}
+                      className="px-3 py-1.5 rounded text-xs"
+                      style={{ backgroundColor: "#fef2f2", color: "#991b1b", border: "1px solid #fecaca" }}
+                      disabled={revokeInvitationMutation.isPending}
+                    >
+                      Widerrufen
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p style={{ color: "var(--color-muted)" }}>Noch keine Einladungen.</p>
+        )}
+      </div>
+
       {/* Add Role Modal */}
       {showAddRoleModal && (
         <div
@@ -218,6 +341,21 @@ export default function TeamPage() {
       {removeRoleMutation.error && (
         <div className="rounded-lg p-4 text-sm" style={{ backgroundColor: "#fef2f2", color: "#991b1b", border: "1px solid #fecaca" }}>
           Fehler beim Entfernen der Rolle: {removeRoleMutation.error.message}
+        </div>
+      )}
+      {createInvitationMutation.error && (
+        <div className="rounded-lg p-4 text-sm" style={{ backgroundColor: "#fef2f2", color: "#991b1b", border: "1px solid #fecaca" }}>
+          Fehler beim Erstellen der Einladung: {createInvitationMutation.error.message}
+        </div>
+      )}
+      {resendInvitationMutation.error && (
+        <div className="rounded-lg p-4 text-sm" style={{ backgroundColor: "#fef2f2", color: "#991b1b", border: "1px solid #fecaca" }}>
+          Fehler beim erneuten Senden: {resendInvitationMutation.error.message}
+        </div>
+      )}
+      {revokeInvitationMutation.error && (
+        <div className="rounded-lg p-4 text-sm" style={{ backgroundColor: "#fef2f2", color: "#991b1b", border: "1px solid #fecaca" }}>
+          Fehler beim Widerrufen: {revokeInvitationMutation.error.message}
         </div>
       )}
     </div>

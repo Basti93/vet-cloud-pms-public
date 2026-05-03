@@ -125,8 +125,11 @@ export const roles = pgTable(
       .notNull()
       .references(() => tenants.id),
     name: varchar("name", { length: 100 }).notNull(),
+    code: varchar("code", { length: 50 }).notNull(),
     description: text("description"),
     isSystem: boolean("is_system").default(false),
+    isEditableByTenant: boolean("is_editable_by_tenant").default(false).notNull(),
+    baseVersion: integer("base_version").default(1).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .default(sql`now()`)
       .notNull(),
@@ -135,6 +138,10 @@ export const roles = pgTable(
     tenantNameIdx: unique("roles_tenant_name_idx").on(
       table.tenantId,
       table.name
+    ),
+    tenantCodeIdx: unique("roles_tenant_code_idx").on(
+      table.tenantId,
+      table.code
     ),
     tenantIdIdx: index("roles_tenant_id_idx").on(table.tenantId),
   })
@@ -166,21 +173,6 @@ export const users = pgTable(
     title: varchar("title", { length: 50 }), // "Dr.", "Prof.", "Dr. med.", etc.
     firstName: varchar("first_name", { length: 100 }),
     lastName: varchar("last_name", { length: 100 }),
-    // DEPRECATED (Phase 8): Use userRoles join table instead.
-    // Kept for backwards-compatibility with old code.
-    // Will be removed in future migration after all code updated.
-    role: varchar("role", {
-      length: 50,
-      enum: ["admin", "vet", "staff", "reception"],
-    })
-      .default("staff")
-      .notNull(),
-    // DEPRECATED (Phase 8): Use userRoles join table instead.
-    // Kept for backwards-compatibility during migration.
-    // Will be removed in future migration.
-    roleId: uuid("role_id").references(() => roles.id, {
-      onDelete: "set null",
-    }),
     active: boolean("active").default(true).notNull(),
     slotDurationMin: integer("slot_duration_min").default(30).notNull(),
     locale: varchar("locale", { length: 10 }).default("de").notNull(),
@@ -194,7 +186,6 @@ export const users = pgTable(
   (table) => ({
     tenantIdIdx: index("users_tenant_id_idx").on(table.tenantId),
     clerkIdIdx: index("users_clerk_id_idx").on(table.clerkId),
-    roleIdIdx: index("users_role_id_idx").on(table.roleId),
   })
 );
 
@@ -846,6 +837,47 @@ export const tenantDeletionSchedules = pgTable(
     reactivationTokenIdx: index("tenant_deletion_schedules_reactivation_token_idx").on(
       table.reactivationToken
     ),
+  })
+);
+
+export const userInvitations = pgTable(
+  "user_invitations",
+  {
+    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    email: varchar("email", { length: 255 }).notNull(),
+    role: varchar("role", {
+      length: 20,
+      enum: ["admin", "vet", "reception"],
+    }).notNull(),
+    status: varchar("status", {
+      length: 20,
+      enum: ["pending", "accepted", "revoked", "expired"],
+    })
+      .default("pending")
+      .notNull(),
+    tokenHash: varchar("token_hash", { length: 255 }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    invitedByUserId: uuid("invited_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    acceptedByUserId: uuid("accepted_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (table) => ({
+    tenantIdIdx: index("user_invitations_tenant_id_idx").on(table.tenantId),
+    tenantEmailIdx: index("user_invitations_tenant_email_idx").on(table.tenantId, table.email),
+    statusExpiresIdx: index("user_invitations_status_expires_idx").on(table.status, table.expiresAt),
+    tokenHashIdx: unique("user_invitations_token_hash_unique").on(table.tokenHash),
   })
 );
 

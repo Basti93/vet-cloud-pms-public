@@ -17,18 +17,28 @@ if (fs.existsSync(envPath)) {
 
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { users, appointments } from "@/lib/db/schema";
+import { users, appointments, userRoles, roles } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { ROLE_CODES } from "@/lib/auth/roles";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) throw new Error("DATABASE_URL is not set");
 const dbUrl = DATABASE_URL + (DATABASE_URL.includes("?") ? "&sslmode=require" : "?sslmode=require");
 const sql = postgres(dbUrl, { max: 1 });
-const db = drizzle(sql, { schema: { users, appointments } });
+const db = drizzle(sql, { schema: { users, appointments, userRoles, roles } });
 
 (async () => {
   // Get all vets
-  const allVets = await db.select().from(users).where(eq(users.role, "vet"));
+  const allVets = await db
+    .select({
+      id: users.id,
+      firstName: users.firstName,
+      lastName: users.lastName,
+    })
+    .from(users)
+    .innerJoin(userRoles, eq(userRoles.userId, users.id))
+    .innerJoin(roles, eq(roles.id, userRoles.roleId))
+    .where(eq(roles.code, ROLE_CODES.VET));
   console.log("All vets:", allVets.map((v: any) => `${v.firstName} ${v.lastName} (${v.id})`));
 
   // Get appointments count by vet

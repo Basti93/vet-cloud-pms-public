@@ -1,8 +1,10 @@
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db/client";
-import { users } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { users, roles, userRoles } from "@/lib/db/schema";
+import { eq, and } from "drizzle-orm";
 import { clerkClient } from "@clerk/nextjs/server";
+import { createDefaultRoles } from "@/lib/auth/permissions";
+import { ROLE_CODES } from "@/lib/auth/roles";
 
 export const dynamic = "force-dynamic";
 
@@ -46,10 +48,9 @@ export async function POST() {
     let user;
 
     if (existingUser) {
-      // Update existing user to admin
       const [updated] = await db
         .update(users)
-        .set({ role: "admin" })
+        .set({ updatedAt: new Date() })
         .where(eq(users.clerkId, userId))
         .returning();
       user = updated;
@@ -63,12 +64,25 @@ export async function POST() {
           firstName: clerkUser.firstName || "",
           lastName: clerkUser.lastName || "",
           tenantId: demoTenantId,
-          role: "admin",
           active: true,
         })
         .returning();
       user = created;
     }
+
+    await createDefaultRoles(demoTenantId);
+    const [adminRole] = await db
+      .select({ id: roles.id })
+      .from(roles)
+      .where(and(eq(roles.tenantId, demoTenantId), eq(roles.code, ROLE_CODES.ADMIN)))
+      .limit(1);
+    if (!adminRole) {
+      return Response.json({ error: "Admin role not found for tenant" }, { status: 500 });
+    }
+    await db
+      .insert(userRoles)
+      .values({ userId: user.id, roleId: adminRole.id, assignedBy: user.id })
+      .onConflictDoNothing();
 
     return Response.json(
       {

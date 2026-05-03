@@ -1,17 +1,16 @@
 /**
  * Test script: Assign test roles to existing users
  *
- * This script assigns roles directly to users via the old users.roleId column
- * to simulate the state before the migration. It's useful for testing the
- * migrate-roles-to-join-table.ts script.
+ * This script assigns roles directly to users via the userRoles join table.
  *
  * Usage:
  *   npx tsx scripts/assign-test-roles.ts
  */
 
 import { db } from "@/lib/db/client";
-import { users, roles } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { users, roles, userRoles } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+import { ROLE_NAMES } from "@/lib/auth/roles";
 
 async function assignTestRoles() {
   console.log("📋 Assigning test roles to existing users...\n");
@@ -39,9 +38,9 @@ async function assignTestRoles() {
     // - Second user: Vet from their tenant
     // - Third user: Receptionist from their tenant
     const testAssignments = [
-      { userIndex: 0, roleIndex: 0, label: "Admin" },      // Admin
-      { userIndex: 1, roleIndex: 1, label: "Vet" },        // Vet
-      { userIndex: 2, roleIndex: 2, label: "Receptionist" }, // Receptionist
+      { userIndex: 0, roleIndex: 0, label: ROLE_NAMES.ADMIN },
+      { userIndex: 1, roleIndex: 1, label: ROLE_NAMES.VET },
+      { userIndex: 2, roleIndex: 2, label: ROLE_NAMES.RECEPTIONIST },
     ];
 
     for (const assignment of testAssignments) {
@@ -64,12 +63,14 @@ async function assignTestRoles() {
         continue;
       }
 
-      // Update user.roleId
-      const result = await db
-        .update(users)
-        .set({ roleId: roleForTenant.id })
-        .where(eq(users.id, user.id))
-        .returning();
+      await db
+        .insert(userRoles)
+        .values({
+          userId: user.id,
+          roleId: roleForTenant.id,
+          assignedBy: user.id,
+        })
+        .onConflictDoNothing();
 
       console.log(
         `✓ Assigned ${assignment.label} to ${user.email || user.id}`
@@ -77,8 +78,7 @@ async function assignTestRoles() {
     }
 
     console.log("\n✅ Test roles assigned!");
-    console.log("\nNow run the migration:");
-    console.log("  npx tsx scripts/migrate-roles-to-join-table.ts");
+    console.log("\nAssignments were written to user_roles.");
   } catch (error) {
     console.error("❌ Assignment failed:", error);
     throw error;
