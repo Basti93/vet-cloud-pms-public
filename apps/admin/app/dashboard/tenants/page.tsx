@@ -35,6 +35,12 @@ export default function TenantsPage() {
       await utils.adminDashboard.core.listTenants.invalidate();
     },
   });
+  const debugHardDelete = trpc.adminDashboard.core.debugHardDeleteNow.useMutation({
+    onSuccess: async () => {
+      await utils.adminDashboard.core.listTenants.invalidate();
+    },
+  });
+  const showDebugHardDelete = process.env.NODE_ENV !== "production";
 
   if (error) {
     return (
@@ -195,6 +201,27 @@ export default function TenantsPage() {
                           >
                             Löschung abbrechen
                           </button>
+                          {showDebugHardDelete && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const confirmText = window.prompt(
+                                  `Debug-Hard-Delete jetzt? Bitte exakt eingeben: DELETE NOW ${tenant.slug}`
+                                );
+                                if (!confirmText) return;
+                                debugHardDelete.mutate({
+                                  tenantId: tenant.id,
+                                  confirmationText: confirmText,
+                                });
+                              }}
+                              className="w-fit rounded border border-amber-300 px-2 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-50"
+                              disabled={debugHardDelete.isPending}
+                            >
+                              {debugHardDelete.isPending
+                                ? "Hard-Delete läuft..."
+                                : "Debug: Jetzt endgültig löschen"}
+                            </button>
+                          )}
                         </>
                       ) : (
                         <button

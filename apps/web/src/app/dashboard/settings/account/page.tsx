@@ -207,6 +207,7 @@ export default function AccountPage() {
             </p>
           </div>
         )}
+
       </div>
 
       {/* DSGVO Rights Information */}

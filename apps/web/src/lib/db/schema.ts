@@ -818,6 +818,10 @@ export const tenantDeletionSchedules = pgTable(
     status: varchar("status", { length: 30, enum: ["scheduled", "cancelled", "executed"] })
       .default("scheduled")
       .notNull(),
+    previousSubscriptionStatus: varchar("previous_subscription_status", {
+      length: 20,
+      enum: ["trial", "active", "paused", "cancelled"],
+    }),
     reason: text("reason"),
     reactivationToken: varchar("reactivation_token", { length: 255 }),
     reactivationTokenExpiresAt: timestamp("reactivation_token_expires_at", {

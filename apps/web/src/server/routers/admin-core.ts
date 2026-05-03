@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createAdminRouter, procedure } from "../adminTrpc";
 import { db } from "@/lib/db/client";
+import { TRPCError } from "@trpc/server";
 import {
   tenants,
   users,
@@ -11,7 +12,7 @@ import {
 } from "@/lib/db/schema";
 import { eq, like, desc, and, count, gte, lte, lt, sql, inArray } from "drizzle-orm";
 import { writeAuditLog } from "@/server/audit";
-import { executeDueTenantDeletions } from "@/server/tenant-deletion";
+import { executeDueTenantDeletions, hardDeleteTenantById } from "@/server/tenant-deletion";
 import { sendTenantLifecycleEmail } from "@/lib/email/service";
 
 export const adminCoreRouter = createAdminRouter({
@@ -192,19 +193,36 @@ export const adminCoreRouter = createAdminRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const [tenant] = await db
-        .select({ id: tenants.id, slug: tenants.slug, name: tenants.name, email: tenants.email })
+        .select({
+          id: tenants.id,
+          slug: tenants.slug,
+          name: tenants.name,
+          email: tenants.email,
+          subscriptionStatus: tenants.subscriptionStatus,
+        })
         .from(tenants)
         .where(eq(tenants.id, input.tenantId))
         .limit(1);
 
-      if (!tenant) throw new Error("Tenant not found");
-      if (tenant.slug === "demo") {
-        throw new Error("Demo tenant cannot be scheduled for deletion.");
+      if (!tenant) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Tenant not found" });
+      }
+      const isProd =
+        process.env.NODE_ENV === "production" &&
+        process.env.VERCEL_ENV === "production";
+      if (tenant.slug === "demo" && isProd) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Demo tenant cannot be scheduled for deletion in production.",
+        });
       }
 
       const expected = `DELETE ${tenant.slug}`;
       if (input.confirmationText.trim() !== expected) {
-        throw new Error(`Confirmation text mismatch. Expected: "${expected}"`);
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Confirmation text mismatch. Expected: "${expected}"`,
+        });
       }
 
       const scheduledFor = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
@@ -220,6 +238,7 @@ export const adminCoreRouter = createAdminRouter({
           .update(tenantDeletionSchedules)
           .set({
             status: "scheduled",
+            previousSubscriptionStatus: tenant.subscriptionStatus,
             reason: input.reason ?? null,
             scheduledFor,
             cancelledAt: null,
@@ -232,6 +251,7 @@ export const adminCoreRouter = createAdminRouter({
           tenantId: input.tenantId,
           requestedByUserId: null,
           status: "scheduled",
+          previousSubscriptionStatus: tenant.subscriptionStatus,
           reason: input.reason ?? null,
           scheduledFor,
         });
@@ -282,9 +302,16 @@ export const adminCoreRouter = createAdminRouter({
         .set({ status: "cancelled", cancelledAt: new Date(), updatedAt: new Date() })
         .where(eq(tenantDeletionSchedules.tenantId, input.tenantId));
 
+      const [schedule] = await db
+        .select({ previousSubscriptionStatus: tenantDeletionSchedules.previousSubscriptionStatus })
+        .from(tenantDeletionSchedules)
+        .where(eq(tenantDeletionSchedules.tenantId, input.tenantId))
+        .limit(1);
+      const restoredStatus = schedule?.previousSubscriptionStatus ?? "active";
+
       await db
         .update(tenants)
-        .set({ subscriptionStatus: "active", updatedAt: new Date() })
+        .set({ subscriptionStatus: restoredStatus, updatedAt: new Date() })
         .where(eq(tenants.id, input.tenantId));
 
       await writeAuditLog(ctx, {
@@ -313,6 +340,62 @@ export const adminCoreRouter = createAdminRouter({
     console.info("Manual tenant deletion cleanup executed", result);
     return result;
   }),
+
+  debugHardDeleteNow: procedure
+    .input(
+      z.object({
+        tenantId: z.string().uuid(),
+        confirmationText: z.string().min(1),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const isProd =
+        process.env.NODE_ENV === "production" &&
+        process.env.VERCEL_ENV === "production";
+      if (isProd) {
+        throw new Error("Debug hard-delete is disabled in production.");
+      }
+
+      const [tenant] = await db
+        .select({ id: tenants.id, slug: tenants.slug })
+        .from(tenants)
+        .where(eq(tenants.id, input.tenantId))
+        .limit(1);
+      if (!tenant) {
+        throw new Error("Tenant not found");
+      }
+
+      const expected = `DELETE NOW ${tenant.slug}`;
+      if (input.confirmationText.trim() !== expected) {
+        throw new Error(`Confirmation text mismatch. Expected: "${expected}"`);
+      }
+
+      const [schedule] = await db
+        .select({ id: tenantDeletionSchedules.id })
+        .from(tenantDeletionSchedules)
+        .where(
+          and(
+            eq(tenantDeletionSchedules.tenantId, input.tenantId),
+            eq(tenantDeletionSchedules.status, "scheduled")
+          )
+        )
+        .limit(1);
+      if (!schedule) {
+        throw new Error("Tenant must be deactivated first before debug hard-delete.");
+      }
+
+      await writeAuditLog(ctx, {
+        tenantId: input.tenantId,
+        action: "delete",
+        entity: { type: "tenant", id: input.tenantId },
+        event: "admin.tenant_debug_hard_delete_executed",
+        summary: "System admin executed immediate hard-delete before 30-day deadline",
+        changes: { tenantSlug: tenant.slug },
+      });
+
+      await hardDeleteTenantById(input.tenantId);
+      return { success: true };
+    }),
 
   /**
    * Update tenant plan

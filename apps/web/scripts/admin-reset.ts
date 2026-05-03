@@ -8,6 +8,7 @@
 
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 
 // Load .env.local manually
 const envPath = path.resolve(process.cwd(), ".env.local");
@@ -49,6 +50,108 @@ import {
   getTestDataStats,
 } from "./test-data";
 import { createDefaultRoles } from "@/lib/auth/permissions";
+
+type DemoUser = (typeof TEST_DATA.users)[number];
+type ClerkUpsertResult = {
+  clerkId: string;
+  created: boolean;
+};
+
+async function clerkRequest<T>(secretKey: string, path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`https://api.clerk.com/v1${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${secretKey}`,
+      "Content-Type": "application/json",
+      ...(init?.headers ?? {}),
+    },
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Clerk API ${res.status} ${res.statusText}: ${text}`);
+  }
+
+  return (await res.json()) as T;
+}
+
+async function upsertClerkUser(
+  secretKey: string,
+  user: DemoUser
+): Promise<ClerkUpsertResult> {
+  const email = user.email.trim().toLowerCase();
+  const query = new URLSearchParams({ "email_address[]": email });
+  const existing = await clerkRequest<
+    Array<{
+      id: string;
+      email_addresses?: Array<{ email_address?: string }>;
+    }>
+  >(
+    secretKey,
+    `/users?${query.toString()}`
+  );
+  const exactMatch = existing.find((u) =>
+    (u.email_addresses ?? []).some(
+      (e) => (e.email_address ?? "").trim().toLowerCase() === email
+    )
+  );
+  if (exactMatch) {
+    return { clerkId: exactMatch.id, created: false };
+  }
+
+  const generatedPassword =
+    process.env.DEMO_USERS_PASSWORD ||
+    `Demo-${crypto.randomBytes(12).toString("base64url")}!9a`;
+
+  const created = await clerkRequest<{ id: string }>(secretKey, "/users", {
+    method: "POST",
+    body: JSON.stringify({
+      external_id: `demo-${user.role}-${email}`,
+      email_address: [email],
+      first_name: user.firstName ?? undefined,
+      last_name: user.lastName ?? undefined,
+      password: generatedPassword,
+      skip_password_checks: true,
+      skip_password_requirement: false,
+      public_metadata: {
+        demoSeed: true,
+        demoRole: user.role,
+      },
+      private_metadata: {
+        seededBy: "admin-reset.ts",
+      },
+    }),
+  });
+
+  return { clerkId: created.id, created: true };
+}
+
+async function ensureDemoClerkUsers(usersToCreate: DemoUser[]): Promise<DemoUser[]> {
+  const clerkSecretKey = process.env.CLERK_SECRET_KEY;
+  if (!clerkSecretKey) {
+    throw new Error(
+      "CLERK_SECRET_KEY missing. Required to auto-create demo users in Clerk."
+    );
+  }
+
+  console.log("🔐 Ensuring demo users exist in Clerk...");
+
+  const withIds: DemoUser[] = [];
+  let createdCount = 0;
+  let reusedCount = 0;
+  for (const user of usersToCreate) {
+    const { clerkId, created } = await upsertClerkUser(clerkSecretKey, user);
+    if (created) createdCount++;
+    else reusedCount++;
+    console.log(`  - ${user.email}: ${created ? "created" : "reused"} (${clerkId})`);
+    withIds.push({ ...user, clerkId });
+  }
+
+  console.log(
+    `  ✓ Clerk users ensured: ${withIds.length} (created: ${createdCount}, reused: ${reusedCount})`
+  );
+  return withIds;
+}
 
 async function main() {
   const DATABASE_URL = process.env.DATABASE_URL;
@@ -185,23 +288,7 @@ async function main() {
       // ────────────────────────────────────────────────────────────────────
       // CREATE USERS (fresh from TEST_DATA)
       // ────────────────────────────────────────────────────────────────────
-      const usersToCreate = [...TEST_DATA.users];
-
-      // Replace test clerkIds with real ones from env vars (DEMO_ADMIN_CLERK_ID, DEMO_VET_CLERK_ID, etc.)
-      const roleNames = ["admin", "vet", "receptionist"];
-      roleNames.forEach((roleName) => {
-        const envVarName = `DEMO_${roleName.toUpperCase()}_CLERK_ID`;
-        const realClerkId = process.env[envVarName];
-        if (realClerkId) {
-          const idx = usersToCreate.findIndex((u) => u.role === roleName);
-          if (idx !== -1) {
-            usersToCreate[idx] = {
-              ...usersToCreate[idx],
-              clerkId: realClerkId,
-            };
-          }
-        }
-      });
+      const usersToCreate = await ensureDemoClerkUsers([...TEST_DATA.users]);
 
       const createdUsers = await Promise.all(
         usersToCreate.map((u) =>
@@ -210,6 +297,20 @@ async function main() {
             .values({
               ...u,
               active: true,
+            })
+            .onConflictDoUpdate({
+              target: users.clerkId,
+              set: {
+                tenantId: u.tenantId,
+                email: u.email,
+                title: u.title,
+                firstName: u.firstName,
+                lastName: u.lastName,
+                role: u.role,
+                active: true,
+                roleId: null,
+                updatedAt: new Date(),
+              },
             })
             .returning()
             .then((r) => r[0])

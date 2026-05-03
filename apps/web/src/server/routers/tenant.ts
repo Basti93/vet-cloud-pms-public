@@ -71,6 +71,15 @@ async function scheduleTenantDeletionFor30Days(
   const scheduledFor = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
   const reactivationToken = randomBytes(32).toString("hex");
   const reactivationTokenExpiresAt = scheduledFor;
+  const [tenantRow] = await ctx.db
+    .select({ subscriptionStatus: tenants.subscriptionStatus })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
+  if (!tenantRow) {
+    throw new Error("Practice not found");
+  }
+  const previousSubscriptionStatus = tenantRow.subscriptionStatus;
 
   const [existing] = await ctx.db
     .select({ id: tenantDeletionSchedules.id })
@@ -87,6 +96,7 @@ async function scheduleTenantDeletionFor30Days(
         scheduledFor,
         cancelledAt: null,
         executedAt: null,
+        previousSubscriptionStatus,
         reactivationToken,
         reactivationTokenExpiresAt,
         updatedAt: new Date(),
@@ -97,6 +107,7 @@ async function scheduleTenantDeletionFor30Days(
       tenantId,
       requestedByUserId: actorUserId,
       status: "scheduled",
+      previousSubscriptionStatus,
       reason,
       scheduledFor,
       reactivationToken,

@@ -20,6 +20,7 @@ export async function GET(req: NextRequest) {
       .select({
         id: tenantDeletionSchedules.id,
         tenantId: tenantDeletionSchedules.tenantId,
+        previousSubscriptionStatus: tenantDeletionSchedules.previousSubscriptionStatus,
         tenantName: tenants.name,
         tenantEmail: tenants.email,
       })
@@ -51,9 +52,11 @@ export async function GET(req: NextRequest) {
       })
       .where(eq(tenantDeletionSchedules.id, schedule.id));
 
+    const restoredStatus = schedule.previousSubscriptionStatus ?? "active";
+
     await db
       .update(tenants)
-      .set({ subscriptionStatus: "active", updatedAt: new Date() })
+      .set({ subscriptionStatus: restoredStatus, updatedAt: new Date() })
       .where(eq(tenants.id, schedule.tenantId));
 
     if (schedule.tenantEmail) {

@@ -1,6 +1,6 @@
 import { and, eq, lte } from "drizzle-orm";
 import { db } from "@/lib/db/client";
-import { tenantDeletionSchedules, tenants, users } from "@/lib/db/schema";
+import { roles, tenantDeletionSchedules, tenants, users } from "@/lib/db/schema";
 import { sendTenantLifecycleEmail } from "@/lib/email/service";
 
 export async function hardDeleteTenantById(tenantId: string) {
@@ -26,10 +26,16 @@ export async function hardDeleteTenantById(tenantId: string) {
     }
   }
 
-  const deleted = await db
-    .delete(tenants)
-    .where(eq(tenants.id, tenantId))
-    .returning({ id: tenants.id, slug: tenants.slug, name: tenants.name });
+  const deleted = await db.transaction(async (tx) => {
+    // roles.tenant_id -> tenants.id has no ON DELETE CASCADE in current schema.
+    // Delete tenant-bound roles explicitly before deleting the tenant.
+    await tx.delete(roles).where(eq(roles.tenantId, tenantId));
+
+    return tx
+      .delete(tenants)
+      .where(eq(tenants.id, tenantId))
+      .returning({ id: tenants.id, slug: tenants.slug, name: tenants.name });
+  });
 
   return deleted[0] ?? null;
 }
