@@ -36,6 +36,11 @@ export const patientsRouter = createTRPCRouter({
       })
     )
     .query(async ({ ctx, input }) => {
+      const userTenantId = await getUserTenant(ctx, ctx.userId!);
+      if (userTenantId !== input.tenantId) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
       const conditions = [eq(patients.tenantId, input.tenantId)];
 
       if (input.search) {
@@ -111,6 +116,11 @@ export const patientsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      const userTenantId = await getUserTenant(ctx, ctx.userId!);
+      if (userTenantId !== input.tenantId) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
       // Create owner first
       const [owner] = await ctx.db
         .insert(owners)

@@ -37,6 +37,11 @@ export const appointmentsRouter = createTRPCRouter({
       })
     )
     .query(async ({ ctx, input }) => {
+      const userTenantId = await getUserTenant(ctx, ctx.userId!);
+      if (userTenantId !== input.tenantId) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
       const conditions = [eq(appointments.tenantId, input.tenantId)];
       if (input.from) conditions.push(gte(appointments.startTime, input.from));
       if (input.to) conditions.push(lte(appointments.endTime, input.to));
@@ -58,6 +63,11 @@ export const appointmentsRouter = createTRPCRouter({
       })
     )
     .query(async ({ ctx, input }) => {
+      const userTenantId = await getUserTenant(ctx, ctx.userId!);
+      if (userTenantId !== input.tenantId) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
       const conditions = [eq(appointments.tenantId, input.tenantId)];
       if (input.from) conditions.push(gte(appointments.startTime, input.from));
       if (input.to) conditions.push(lte(appointments.endTime, input.to));
@@ -152,6 +162,11 @@ export const appointmentsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      const userTenantId = await getUserTenant(ctx, ctx.userId!);
+      if (userTenantId !== input.tenantId) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
       const [created] = await ctx.db
         .insert(appointments)
         .values({ ...input, status: "scheduled" })
