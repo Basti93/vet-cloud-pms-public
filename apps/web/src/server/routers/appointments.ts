@@ -1,34 +1,16 @@
 import { z } from "zod";
 import { eq, and, gte, lte } from "drizzle-orm";
-import { createTRPCRouter, protectedProcedure, publicProcedure } from "@/server/trpc";
+import { createTRPCRouter, tenantProcedure, publicProcedure } from "@/server/trpc";
 import { appointments, patients, owners, users, PERMISSIONS } from "@/lib/db/schema";
-import { db as appDb } from "@/lib/db/client";
 import { TRPCError } from "@trpc/server";
 import { verifyConfirmationToken } from "@/lib/tokens/confirmation";
 import { requirePermission } from "@/server/trpc/middleware";
 import { appointmentEvents } from "@/lib/events/appointment";
 import { writeAuditLog } from "@/server/audit";
 
-async function getUserTenant(ctx: { db: typeof appDb }, userId: string) {
-  const [user] = await ctx.db
-    .select({ tenantId: users.tenantId })
-    .from(users)
-    .where(eq(users.clerkId, userId))
-    .limit(1);
-
-  if (!user?.tenantId) {
-    throw new TRPCError({
-      code: "UNAUTHORIZED",
-      message: "User not found or not assigned to a tenant",
-    });
-  }
-
-  return user.tenantId;
-}
-
 export const appointmentsRouter = createTRPCRouter({
   // ── List (simple) ──────────────────────────────────────────────────────────
-  list: protectedProcedure
+  list: tenantProcedure
     .input(
       z.object({
         tenantId: z.string().uuid(),
@@ -37,11 +19,6 @@ export const appointmentsRouter = createTRPCRouter({
       })
     )
     .query(async ({ ctx, input }) => {
-      const userTenantId = await getUserTenant(ctx, ctx.userId!);
-      if (userTenantId !== input.tenantId) {
-        throw new TRPCError({ code: "FORBIDDEN" });
-      }
-
       const conditions = [eq(appointments.tenantId, input.tenantId)];
       if (input.from) conditions.push(gte(appointments.startTime, input.from));
       if (input.to) conditions.push(lte(appointments.endTime, input.to));
@@ -54,7 +31,7 @@ export const appointmentsRouter = createTRPCRouter({
     }),
 
   // ── List with patient + owner details (for calendar & lists) ──────────────
-  listWithDetails: protectedProcedure
+  listWithDetails: tenantProcedure
     .input(
       z.object({
         tenantId: z.string().uuid(),
@@ -63,16 +40,11 @@ export const appointmentsRouter = createTRPCRouter({
       })
     )
     .query(async ({ ctx, input }) => {
-      const userTenantId = await getUserTenant(ctx, ctx.userId!);
-      if (userTenantId !== input.tenantId) {
-        throw new TRPCError({ code: "FORBIDDEN" });
-      }
-
       const conditions = [eq(appointments.tenantId, input.tenantId)];
       if (input.from) conditions.push(gte(appointments.startTime, input.from));
       if (input.to) conditions.push(lte(appointments.endTime, input.to));
 
-      const rows = await ctx.db
+      return ctx.db
         .select({
           id: appointments.id,
           tenantId: appointments.tenantId,
@@ -99,20 +71,12 @@ export const appointmentsRouter = createTRPCRouter({
         .leftJoin(users, eq(appointments.vetId, users.id))
         .where(and(...conditions))
         .orderBy(appointments.startTime);
-
-      return rows;
     }),
 
   // ── Single appointment with details ───────────────────────────────────────
-  byId: protectedProcedure
+  byId: tenantProcedure
     .input(z.object({ id: z.string().uuid(), tenantId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      const userTenantId = await getUserTenant(ctx, ctx.userId!);
-
-      if (userTenantId !== input.tenantId) {
-        throw new TRPCError({ code: "FORBIDDEN" });
-      }
-
       const rows = await ctx.db
         .select({
           id: appointments.id,
@@ -145,7 +109,7 @@ export const appointmentsRouter = createTRPCRouter({
     }),
 
   // ── Create ─────────────────────────────────────────────────────────────────
-  create: protectedProcedure
+  create: tenantProcedure
     .use(requirePermission(PERMISSIONS.APPOINTMENTS_CREATE))
     .input(
       z.object({
@@ -162,11 +126,6 @@ export const appointmentsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const userTenantId = await getUserTenant(ctx, ctx.userId!);
-      if (userTenantId !== input.tenantId) {
-        throw new TRPCError({ code: "FORBIDDEN" });
-      }
-
       const [created] = await ctx.db
         .insert(appointments)
         .values({ ...input, status: "scheduled" })
@@ -188,7 +147,6 @@ export const appointmentsRouter = createTRPCRouter({
         },
       });
 
-      // Emit event to invalidate calendar cache
       appointmentEvents.notifyChange({
         tenantId: input.tenantId,
         vetId: input.vetId,
@@ -201,7 +159,7 @@ export const appointmentsRouter = createTRPCRouter({
     }),
 
   // ── Update ─────────────────────────────────────────────────────────────────
-  update: protectedProcedure
+  update: tenantProcedure
     .use(requirePermission(PERMISSIONS.APPOINTMENTS_UPDATE))
     .input(
       z.object({
@@ -218,12 +176,6 @@ export const appointmentsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const userTenantId = await getUserTenant(ctx, ctx.userId!);
-
-      if (userTenantId !== input.tenantId) {
-        throw new TRPCError({ code: "FORBIDDEN" });
-      }
-
       const { id, tenantId, ...data } = input;
       const [updated] = await ctx.db
         .update(appointments)
@@ -234,7 +186,7 @@ export const appointmentsRouter = createTRPCRouter({
       if (!updated) throw new TRPCError({ code: "NOT_FOUND" });
 
       await writeAuditLog(ctx, {
-        tenantId: input.tenantId,
+        tenantId,
         action: "update",
         entity: { type: "appointment", id: updated.id },
         event: "appointment.updated",
@@ -242,9 +194,8 @@ export const appointmentsRouter = createTRPCRouter({
         changes: data,
       });
 
-      // Emit event to invalidate calendar cache
       appointmentEvents.notifyChange({
-        tenantId: input.tenantId,
+        tenantId,
         vetId: updated.vetId || undefined,
         appointmentId: updated.id,
         type: 'updated',
@@ -255,7 +206,7 @@ export const appointmentsRouter = createTRPCRouter({
     }),
 
   // ── List by Patient (for patient detail page) ──────────────────────────────
-  listByPatient: protectedProcedure
+  listByPatient: tenantProcedure
     .input(
       z.object({
         patientId: z.string().uuid(),
@@ -263,13 +214,7 @@ export const appointmentsRouter = createTRPCRouter({
       })
     )
     .query(async ({ ctx, input }) => {
-      const userTenantId = await getUserTenant(ctx, ctx.userId!);
-
-      if (userTenantId !== input.tenantId) {
-        throw new TRPCError({ code: "FORBIDDEN" });
-      }
-
-      const rows = await ctx.db
+      return ctx.db
         .select({
           id: appointments.id,
           title: appointments.title,
@@ -285,21 +230,13 @@ export const appointmentsRouter = createTRPCRouter({
         .leftJoin(users, eq(appointments.vetId, users.id))
         .where(and(eq(appointments.patientId, input.patientId), eq(appointments.tenantId, input.tenantId)))
         .orderBy(appointments.startTime);
-
-      return rows;
     }),
 
   // ── Delete ─────────────────────────────────────────────────────────────────
-  delete: protectedProcedure
+  delete: tenantProcedure
     .use(requirePermission(PERMISSIONS.APPOINTMENTS_CANCEL))
     .input(z.object({ id: z.string().uuid(), tenantId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const userTenantId = await getUserTenant(ctx, ctx.userId!);
-
-      if (userTenantId !== input.tenantId) {
-        throw new TRPCError({ code: "FORBIDDEN" });
-      }
-
       const [existing] = await ctx.db
         .select({ id: appointments.id, vetId: appointments.vetId })
         .from(appointments)
@@ -323,7 +260,6 @@ export const appointmentsRouter = createTRPCRouter({
         changes: { deleted: true },
       });
 
-      // Emit event to invalidate calendar cache
       appointmentEvents.notifyChange({
         tenantId: input.tenantId,
         vetId: existing.vetId || undefined,
@@ -344,7 +280,6 @@ export const appointmentsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Verify token
       const decoded = verifyConfirmationToken(input.token);
 
       if (!decoded) {
@@ -354,7 +289,6 @@ export const appointmentsRouter = createTRPCRouter({
         });
       }
 
-      // Verify appointment ID matches token
       if (decoded.appointmentId !== input.appointmentId) {
         throw new TRPCError({
           code: "UNAUTHORIZED",
@@ -362,7 +296,6 @@ export const appointmentsRouter = createTRPCRouter({
         });
       }
 
-      // Verify action is confirm
       if (decoded.action !== "confirm") {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -370,7 +303,6 @@ export const appointmentsRouter = createTRPCRouter({
         });
       }
 
-      // Get appointment to check its source
       const [appointment] = await ctx.db
         .select({ source: appointments.source })
         .from(appointments)
@@ -384,28 +316,18 @@ export const appointmentsRouter = createTRPCRouter({
         });
       }
 
-      // For online bookings, set status to "confirmed" (requires admin approval)
-      // For other appointments, set status to "completed"
       const newStatus = appointment.source === "online_booking" ? "confirmed" : "completed";
 
-      // Update appointment status
       const [updated] = await ctx.db
         .update(appointments)
-        .set({
-          status: newStatus,
-          updatedAt: new Date(),
-        })
+        .set({ status: newStatus, updatedAt: new Date() })
         .where(eq(appointments.id, input.appointmentId))
         .returning();
 
       if (!updated) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Termin nicht gefunden",
-        });
+        throw new TRPCError({ code: "NOT_FOUND", message: "Termin nicht gefunden" });
       }
 
-      // Emit event to invalidate calendar cache
       appointmentEvents.notifyChange({
         tenantId: updated.tenantId,
         vetId: updated.vetId || undefined,
