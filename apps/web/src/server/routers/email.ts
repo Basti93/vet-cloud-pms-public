@@ -9,6 +9,7 @@ import { users, emailSettings, tenants } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { sendConfirmationEmail, SendConfirmationEmailInput } from '@/lib/email/service';
+import { getSystemDomain } from '@/lib/system-name';
 
 const FIXED_REMINDER_HOURS = 24;
 
@@ -51,7 +52,7 @@ export const emailRouter = createTRPCRouter({
               reminderEmailEnabled: true,
               reminderHoursBefore: 24,
               bookingNotificationEnabled: true,
-              senderName: 'VetCloud PMS',
+              senderName: getSystemDomain(),
             })
             .returning();
 

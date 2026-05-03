@@ -1,9 +1,18 @@
 import { z } from "zod";
 import { createAdminRouter, procedure } from "../adminTrpc";
 import { db } from "@/lib/db/client";
-import { tenants, users, auditLogs, systemLogs, appointments } from "@/lib/db/schema";
-import { eq, like, desc, and, count, gte, lte, lt, sql } from "drizzle-orm";
+import {
+  tenants,
+  users,
+  auditLogs,
+  systemLogs,
+  appointments,
+  tenantDeletionSchedules,
+} from "@/lib/db/schema";
+import { eq, like, desc, and, count, gte, lte, lt, sql, inArray } from "drizzle-orm";
 import { writeAuditLog } from "@/server/audit";
+import { executeDueTenantDeletions } from "@/server/tenant-deletion";
+import { sendTenantLifecycleEmail } from "@/lib/email/service";
 
 export const adminCoreRouter = createAdminRouter({
   /**
@@ -63,8 +72,34 @@ export const adminCoreRouter = createAdminRouter({
         })
       );
 
+      const deletionSchedules = await db
+        .select({
+          tenantId: tenantDeletionSchedules.tenantId,
+          deletionStatus: tenantDeletionSchedules.status,
+          deletionScheduledFor: tenantDeletionSchedules.scheduledFor,
+        })
+        .from(tenantDeletionSchedules)
+        .where(
+          items.length > 0
+            ? inArray(
+                tenantDeletionSchedules.tenantId,
+                items.map((item) => item.id)
+              )
+            : undefined
+        );
+      const deletionMap = new Map(
+        deletionSchedules.map((row) => [row.tenantId, row])
+      );
+
       return {
-        items: tenantsWithCounts,
+        items: tenantsWithCounts.map((tenant) => {
+          const deletion = deletionMap.get(tenant.id);
+          return {
+            ...tenant,
+            deletionStatus: deletion?.deletionStatus ?? null,
+            deletionScheduledFor: deletion?.deletionScheduledFor ?? null,
+          };
+        }),
         nextCursor,
       };
     }),
@@ -146,6 +181,138 @@ export const adminCoreRouter = createAdminRouter({
 
       return { success: true };
     }),
+
+  scheduleTenantDeletion: procedure
+    .input(
+      z.object({
+        tenantId: z.string().uuid(),
+        confirmationText: z.string().min(1),
+        reason: z.string().max(1000).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [tenant] = await db
+        .select({ id: tenants.id, slug: tenants.slug, name: tenants.name, email: tenants.email })
+        .from(tenants)
+        .where(eq(tenants.id, input.tenantId))
+        .limit(1);
+
+      if (!tenant) throw new Error("Tenant not found");
+      if (tenant.slug === "demo") {
+        throw new Error("Demo tenant cannot be scheduled for deletion.");
+      }
+
+      const expected = `DELETE ${tenant.slug}`;
+      if (input.confirmationText.trim() !== expected) {
+        throw new Error(`Confirmation text mismatch. Expected: "${expected}"`);
+      }
+
+      const scheduledFor = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+      const existing = await db
+        .select({ id: tenantDeletionSchedules.id })
+        .from(tenantDeletionSchedules)
+        .where(eq(tenantDeletionSchedules.tenantId, input.tenantId))
+        .limit(1);
+
+      if (existing[0]) {
+        await db
+          .update(tenantDeletionSchedules)
+          .set({
+            status: "scheduled",
+            reason: input.reason ?? null,
+            scheduledFor,
+            cancelledAt: null,
+            executedAt: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(tenantDeletionSchedules.id, existing[0].id));
+      } else {
+        await db.insert(tenantDeletionSchedules).values({
+          tenantId: input.tenantId,
+          requestedByUserId: null,
+          status: "scheduled",
+          reason: input.reason ?? null,
+          scheduledFor,
+        });
+      }
+
+      await db
+        .update(tenants)
+        .set({ subscriptionStatus: "paused" })
+        .where(eq(tenants.id, input.tenantId));
+
+      await writeAuditLog(ctx, {
+        tenantId: input.tenantId,
+        action: "delete",
+        entity: { type: "tenant", id: input.tenantId },
+        event: "admin.tenant_deletion_scheduled",
+        summary: "Tenant deletion scheduled for +30 days",
+        changes: {
+          scheduledFor: scheduledFor.toISOString(),
+          reason: input.reason ?? null,
+        },
+      });
+
+      if (tenant.email) {
+        await sendTenantLifecycleEmail({
+          to: tenant.email,
+          practiceName: tenant.name,
+          subject: `Praxis deaktiviert: ${tenant.name}`,
+          body: `Ihre Praxis wurde durch den System-Admin deaktiviert. Geplante Löschung: ${scheduledFor.toLocaleString(
+            "de-DE"
+          )}. Bitte nutzen Sie den Reaktivierungslink aus der Deaktivierungs-Email oder kontaktieren Sie den Support.`,
+        });
+      }
+
+      return { success: true, scheduledFor: scheduledFor.toISOString() };
+    }),
+
+  cancelTenantDeletion: procedure
+    .input(z.object({ tenantId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const [tenant] = await db
+        .select({ name: tenants.name, email: tenants.email })
+        .from(tenants)
+        .where(eq(tenants.id, input.tenantId))
+        .limit(1);
+
+      await db
+        .update(tenantDeletionSchedules)
+        .set({ status: "cancelled", cancelledAt: new Date(), updatedAt: new Date() })
+        .where(eq(tenantDeletionSchedules.tenantId, input.tenantId));
+
+      await db
+        .update(tenants)
+        .set({ subscriptionStatus: "active", updatedAt: new Date() })
+        .where(eq(tenants.id, input.tenantId));
+
+      await writeAuditLog(ctx, {
+        tenantId: input.tenantId,
+        action: "delete",
+        entity: { type: "tenant", id: input.tenantId },
+        event: "admin.tenant_deletion_cancelled",
+        summary: "Scheduled tenant deletion cancelled by system admin",
+        changes: { cancelledAt: new Date().toISOString() },
+      });
+
+      if (tenant?.email) {
+        await sendTenantLifecycleEmail({
+          to: tenant.email,
+          practiceName: tenant.name,
+          subject: `Praxis reaktiviert: ${tenant.name}`,
+          body: "Die geplante Löschung wurde durch den System-Admin abgebrochen. Ihre Praxis ist wieder aktiv.",
+        });
+      }
+
+      return { success: true };
+    }),
+
+  runDeletionCleanupNow: procedure.mutation(async ({ ctx: _ctx }) => {
+    const result = await executeDueTenantDeletions();
+    console.info("Manual tenant deletion cleanup executed", result);
+    return result;
+  }),
 
   /**
    * Update tenant plan

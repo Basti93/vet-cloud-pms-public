@@ -2,16 +2,19 @@
 
 import { useState } from "react";
 import { trpc } from "@/lib/trpc/client";
+import { useRouter } from "next/navigation";
 
 export default function AccountPage() {
+  const router = useRouter();
   const [exportLoading, setExportLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
-  const [deletionEmailSent, setDeletionEmailSent] = useState(false);
+  const [deactivationMailSent, setDeactivationMailSent] = useState(false);
 
   const { data: currentUser } = trpc.admin.getCurrentUser.useQuery();
   const { data: tenant } = trpc.tenant.getCurrent.useQuery();
+  const { data: deletionStatus } = trpc.tenant.getDeletionStatus.useQuery();
   const requestDeletionMutation = trpc.tenant.requestDeletion.useMutation();
 
   const handleExportData = async () => {
@@ -57,19 +60,36 @@ export default function AccountPage() {
     try {
       setDeleteLoading(true);
       setErrorMessage("");
+      const confirmed = window.confirm(
+        "Praxis jetzt deaktivieren und Löschung in 30 Tagen planen? Diese Aktion sperrt den Zugriff sofort."
+      );
+      if (!confirmed) {
+        setDeleteLoading(false);
+        return;
+      }
       console.log("Requesting deletion for tenant:", tenant.id, "user:", currentUser.id);
 
-      await requestDeletionMutation.mutateAsync({
+      const result = await requestDeletionMutation.mutateAsync({
         tenantId: tenant.id,
         userId: currentUser.id,
       });
 
-      setDeletionEmailSent(true);
-      setSuccessMessage(
-        "Eine Bestätigungsemail wurde an " +
-          currentUser.email +
-          " gesendet. Bitte folgen Sie dem Link in der Email, um die Löschung zu bestätigen."
-      );
+      if (result.emailSent) {
+        setDeactivationMailSent(true);
+        setSuccessMessage(
+          "Eine Deaktivierungs-Email wurde an " +
+            currentUser.email +
+            " gesendet. Die Praxis ist pausiert und wird in 30 Tagen gelöscht, sofern sie nicht über den Reaktivierungslink wieder aktiviert wird."
+        );
+      } else {
+        setSuccessMessage(
+          "Die Praxis wurde pausiert und die Löschung in 30 Tagen geplant. Die Benachrichtigungs-Email konnte nicht gesendet werden."
+        );
+      }
+
+      // Force transition into the server-rendered deactivated dashboard shell.
+      router.replace("/dashboard");
+      router.refresh();
     } catch (error) {
       console.error("Delete error:", error);
       setErrorMessage(
@@ -82,6 +102,17 @@ export default function AccountPage() {
 
   return (
     <div className="space-y-8">
+      {deletionStatus?.isDeactivationScheduled && deletionStatus.scheduledFor && (
+        <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-red-900 text-sm">
+          <p className="font-semibold">Praxis ist deaktiviert</p>
+          <p>
+            Löschung geplant für{" "}
+            {new Date(deletionStatus.scheduledFor).toLocaleDateString("de-DE")}.{" "}
+            Reaktivierung ist über den E-Mail-Link oder System-Admin möglich.
+          </p>
+        </div>
+      )}
+
       {/* Error Messages */}
       {errorMessage && (
         <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm">
@@ -129,7 +160,7 @@ export default function AccountPage() {
           </p>
         </div>
 
-        {!deletionEmailSent ? (
+        {!deactivationMailSent ? (
           <>
             <div className="p-4 rounded-lg bg-red-50 border border-red-200 mb-4">
               <p className="text-sm text-red-900 font-semibold mb-3">
@@ -139,31 +170,40 @@ export default function AccountPage() {
                 <li>Stellen Sie sicher, dass Sie keine ausstehenden Verträge haben</li>
                 <li>Alle Patientendaten werden dauerhaft gelöscht</li>
                 <li>Diese Aktion kann nicht rückgängig gemacht werden</li>
-                <li>Sie erhalten eine Bestätigungsemail mit einem Link</li>
+                <li>Sie erhalten eine E-Mail mit Reaktivierungslink</li>
               </ul>
             </div>
 
             <button
               onClick={handleDeleteAccount}
-              disabled={deleteLoading || !tenant || !currentUser}
+              disabled={
+                deleteLoading ||
+                !tenant ||
+                !currentUser ||
+                Boolean(deletionStatus?.isDeactivationScheduled)
+              }
               className="px-6 py-3 rounded-lg font-medium transition-all text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
               title={!tenant || !currentUser ? "Daten werden geladen..." : ""}
             >
-              {deleteLoading ? "Wird vorbereitet..." : "Konto löschen"}
+              {deleteLoading
+                ? "Wird vorbereitet..."
+                : deletionStatus?.isDeactivationScheduled
+                ? "Bereits deaktiviert"
+                : "Konto deaktivieren"}
             </button>
 
             <p className="text-xs text-muted mt-4">
-              Ein Bestätigungslink wird an Ihre E-Mail-Adresse gesendet. Der Link ist 24 Stunden gültig.
+              Die Praxis wird sofort pausiert. In der E-Mail ist ein Reaktivierungslink enthalten.
             </p>
           </>
         ) : (
           <div className="p-4 rounded-lg bg-green-50 border border-green-200">
             <p className="text-sm text-green-900 font-semibold mb-2">
-              ✓ Bestätigungsemail gesendet
+              ✓ Deaktivierungs-Email gesendet
             </p>
             <p className="text-sm text-green-800">
-              Eine Email mit einem Bestätigungslink wurde an <strong>{currentUser?.email}</strong> gesendet.
-              Bitte folgen Sie dem Link, um die Löschung zu bestätigen. Der Link ist 24 Stunden lang gültig.
+              Eine Email mit Reaktivierungslink wurde an <strong>{currentUser?.email}</strong> gesendet.
+              Ohne Reaktivierung wird die Praxis nach 30 Tagen endgültig gelöscht.
             </p>
           </div>
         )}

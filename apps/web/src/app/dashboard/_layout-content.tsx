@@ -7,6 +7,7 @@ import { LayoutDashboard, Calendar, Users, Phone, ClipboardList, Clock, Menu, X,
 import { trpc } from "@/lib/trpc/client";
 import { useLocale } from "@/lib/user/preferences-context";
 import { usePraxis } from "@/lib/praxis/context";
+import { getSystemDomain } from "@/lib/system-name";
 
 function useNavItems() {
   const { t } = useLocale();
@@ -46,7 +47,9 @@ export default function DashboardContent({ children }: { children: ReactNode }) 
   const { praxis } = usePraxis(); // Tenant name already loaded server-side
   const { isLoading: userLoading } = trpc.admin.getCurrentUser.useQuery();
   const { data: featureFlags } = trpc.tenant.getFeatureFlags.useQuery();
+  const { data: deletionStatus } = trpc.tenant.getDeletionStatus.useQuery();
   const { t } = useLocale();
+  const systemDomain = getSystemDomain();
   const NAV_ITEMS = useNavItems();
   const BETA_NAV_ITEMS = useBetaNavItems();
   const USER_NAV_ITEMS = useUserNavItems();
@@ -69,7 +72,7 @@ export default function DashboardContent({ children }: { children: ReactNode }) 
                 {praxis?.monogram || praxis?.tenantName?.charAt(0).toUpperCase() || 'VC'}
               </div>
               <div>
-                <p className="font-bold text-sm leading-tight">{praxis?.tenantName || 'Vet Cloud'}</p>
+                <p className="font-bold text-sm leading-tight">{praxis?.tenantName || systemDomain}</p>
                 <p className="text-xs leading-tight" style={{ color: 'var(--color-accent-soft)' }}>
                   {praxis?.tenantName ? 'Praxis' : 'Praxisverwaltung'}
                 </p>
@@ -205,6 +208,23 @@ export default function DashboardContent({ children }: { children: ReactNode }) 
 
         <main className="flex-1 overflow-auto" style={{ backgroundColor: 'var(--color-bg)' }}>
           <div className="p-4 md:p-8" style={{ color: 'var(--color-fg)' }}>
+            {deletionStatus?.isDeactivationScheduled && deletionStatus.scheduledFor && (
+              <div
+                className="mb-4 rounded-lg border px-4 py-3 text-sm"
+                style={{
+                  backgroundColor: "#fef2f2",
+                  borderColor: "#fecaca",
+                  color: "#991b1b",
+                }}
+              >
+                <p className="font-semibold">Praxis ist deaktiviert</p>
+                <p>
+                  Diese Praxis wurde pausiert und zur Löschung vorgemerkt für{" "}
+                  {new Date(deletionStatus.scheduledFor).toLocaleDateString("de-DE")}.{" "}
+                  Reaktivierung ist über den E-Mail-Link möglich oder durch einen System-Admin.
+                </p>
+              </div>
+            )}
             {children}
           </div>
         </main>

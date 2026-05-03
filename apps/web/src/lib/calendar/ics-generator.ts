@@ -1,3 +1,5 @@
+import { getSystemDomain } from "@/lib/system-name";
+
 export interface ICalEventData {
   appointment: {
     id: string;
@@ -44,10 +46,11 @@ export function generateAppointmentICS(
   clinicDomain: string,
   clinicName: string
 ): string {
+  const systemDomain = getSystemDomain();
   const lines: string[] = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    `PRODID:-//Vet Cloud//Appointment Calendar//DE`,
+    `PRODID:-//${systemDomain}//Appointment Calendar//DE`,
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
   ];

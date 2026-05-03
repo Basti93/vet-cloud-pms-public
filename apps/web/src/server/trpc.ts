@@ -3,8 +3,8 @@ import { auth } from "@clerk/nextjs/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
 import { db } from "@/lib/db/client";
-import { users } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { tenantDeletionSchedules, users } from "@/lib/db/schema";
+import { and, eq } from "drizzle-orm";
 import { checkRateLimit, getRateLimitInfo } from "@/lib/rateLimit";
 import { logEvent, logEventAsync } from "./trpc/logging-middleware";
 
@@ -59,6 +59,46 @@ const enforceUserIsAuthenticated = t.middleware(({ ctx, next }) => {
     throw new TRPCError({ code: "UNAUTHORIZED" });
   }
   return next({ ctx: { ...ctx, userId: ctx.userId } });
+});
+
+const DEACTIVATION_ALLOWED_PATHS = new Set([
+  "tenant.getDeletionStatus",
+]);
+
+const enforceTenantIsActive = t.middleware(async ({ ctx, path, next }) => {
+  if (!ctx.userId) {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
+
+  const [user] = await ctx.db
+    .select({ tenantId: users.tenantId })
+    .from(users)
+    .where(eq(users.clerkId, ctx.userId))
+    .limit(1);
+
+  if (!user?.tenantId) {
+    throw new TRPCError({ code: "FORBIDDEN" });
+  }
+
+  const [scheduledDeletion] = await ctx.db
+    .select({ id: tenantDeletionSchedules.id })
+    .from(tenantDeletionSchedules)
+    .where(
+      and(
+        eq(tenantDeletionSchedules.tenantId, user.tenantId),
+        eq(tenantDeletionSchedules.status, "scheduled")
+      )
+    )
+    .limit(1);
+
+  if (scheduledDeletion && !DEACTIVATION_ALLOWED_PATHS.has(path)) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "TENANT_DEACTIVATED",
+    });
+  }
+
+  return next();
 });
 
 const enforceIsAdmin = t.middleware(({ ctx, next }) => {
@@ -212,7 +252,8 @@ export const protectedProcedure = t.procedure
   .use(systemLoggingMiddleware)
   .use(rateLimitMiddleware)
   .use(timingMiddleware)
-  .use(enforceUserIsAuthenticated);
+  .use(enforceUserIsAuthenticated)
+  .use(enforceTenantIsActive);
 
 /** Admin procedure — requires Clerk session + ADMIN_CLERK_IDS env var */
 export const adminProcedure = t.procedure

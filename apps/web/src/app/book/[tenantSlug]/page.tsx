@@ -4,6 +4,7 @@ import { use, useState, useEffect, useRef, useCallback } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { useBookingFormState } from "@/hooks/useBookingFormState";
 import { useLocale } from "@/lib/user/preferences-context";
+import { getSystemDomain } from "@/lib/system-name";
 import { ChevronLeft, ChevronRight, Check, Phone, MapPin, Clock, Calendar, AlertCircle, Loader2, Stethoscope, PawPrint } from "lucide-react";
 import { COLOR_PRESETS, TYPE_PAIRINGS, type ColorPresetKey, type TypographyPairingKey } from "@/lib/theme";
 
@@ -908,6 +909,7 @@ export default function BookingPage({
 }) {
   const { tenantSlug } = use(params);
   const { t } = useLocale();
+  const systemDomain = getSystemDomain();
 
   const { data: clinic, isLoading: clinicLoading, error: clinicError } =
     trpc.booking.getClinic.useQuery({ slug: tenantSlug });
@@ -1174,7 +1176,7 @@ export default function BookingPage({
             {/* Footer */}
             <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-center gap-1.5">
               <span className="text-xs text-gray-400">Powered by</span>
-              <span className="text-xs font-bold text-gray-500">Vet Cloud</span>
+              <span className="text-xs font-bold text-gray-500">{systemDomain}</span>
             </div>
           </div>
         </div>

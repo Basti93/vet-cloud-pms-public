@@ -14,10 +14,13 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { EnvironmentBanner } from "@/components/EnvironmentBanner";
 import type { PraxisPreferences, UserPreferences } from "@/lib/user/preferences";
+import { getSystemDomain } from "@/lib/system-name";
 import "./globals.css";
 
+const SYSTEM_DOMAIN = getSystemDomain();
+
 export const metadata: Metadata = {
-  title: "Vet Cloud PMS",
+  title: SYSTEM_DOMAIN,
   description: "Modern cloud-based veterinary practice management system",
   robots: "noindex",
 };

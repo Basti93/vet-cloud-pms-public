@@ -4,6 +4,7 @@ import { useState } from "react";
 import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { HealthStatus } from "@/components/HealthStatus";
+import { getSystemDomain } from "@/lib/system-name";
 
 export default function DashboardLayout({
   children,
@@ -11,6 +12,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const systemDomain = getSystemDomain();
 
   const closeMobileMenu = () => setMobileMenuOpen(false);
 
@@ -19,7 +21,7 @@ export default function DashboardLayout({
       {/* Sidebar */}
       <div className="w-full border-b border-gray-200 bg-white md:w-64 md:border-b-0 md:border-r md:flex md:flex-col">
         <div className="flex items-center justify-between border-b border-gray-200 p-4 md:block md:p-6">
-          <h1 className="text-xl font-bold text-gray-900">Vet Cloud Admin</h1>
+          <h1 className="text-xl font-bold text-gray-900">{systemDomain} Admin</h1>
           <button
             type="button"
             className="inline-flex items-center rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 md:hidden"

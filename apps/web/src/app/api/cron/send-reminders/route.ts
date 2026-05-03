@@ -3,10 +3,13 @@ import { db } from "@/lib/db/client";
 import { appointments, emailSettings, appointmentEmailLogs, tenants, patients, owners } from "@/lib/db/schema";
 import { and, gte, lte, inArray, eq } from "drizzle-orm";
 import { sendReminderEmail } from "@/lib/email/service";
+import { executeDueTenantDeletions } from "@/server/tenant-deletion";
+import { getSystemDomain } from "@/lib/system-name";
 
 // Vercel cron jobs require a secret for security
 const CRON_SECRET = process.env.CRON_SECRET;
 const CRON_LOOKAHEAD_HOURS = 24;
+const SYSTEM_DOMAIN = getSystemDomain();
 
 /**
  * Cron job to send reminder emails for upcoming appointments.
@@ -26,6 +29,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const now = new Date();
+    const deletionCleanup = await executeDueTenantDeletions();
 
     // Get all tenants (needed to fetch their email settings)
     const allTenants = await db
@@ -105,7 +109,7 @@ export async function GET(request: NextRequest) {
         .where(eq(tenants.id, tenant.id))
         .limit(1);
 
-      const practiceName = tenantData[0]?.name || "VetCloud PMS";
+      const practiceName = tenantData[0]?.name || SYSTEM_DOMAIN;
 
       // Send reminders for appointments that don't have one yet
       for (const appointment of newReminders) {
@@ -169,7 +173,7 @@ export async function GET(request: NextRequest) {
       {
         success: true,
         message: `Cron job completed. Sent: ${totalSent}, Failed: ${totalFailed}`,
-        stats: { totalSent, totalFailed },
+        stats: { totalSent, totalFailed, ...deletionCleanup },
       },
       { status: 200 }
     );

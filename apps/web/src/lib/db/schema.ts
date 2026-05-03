@@ -657,7 +657,7 @@ export const emailSettings = pgTable(
     reminderEmailEnabled: boolean("reminder_email_enabled").default(true).notNull(),
     reminderHoursBefore: smallint("reminder_hours_before").default(24).notNull(), // 24h default
     bookingNotificationEnabled: boolean("booking_notification_enabled").default(true).notNull(),
-    senderName: varchar("sender_name", { length: 100 }).default("VetCloud PMS").notNull(),
+    senderName: varchar("sender_name", { length: 100 }).default("System").notNull(),
     confirmationSubject: varchar("confirmation_subject", { length: 255 })
       .default("Bestätigung: Ihr Termin bei {practiceName}")
       .notNull(),
@@ -804,29 +804,44 @@ export const calendarAccessAudit = pgTable(
   })
 );
 
-export const accountDeletionRequests = pgTable(
-  "account_deletion_requests",
+export const tenantDeletionSchedules = pgTable(
+  "tenant_deletion_schedules",
   {
     id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
     tenantId: uuid("tenant_id")
       .notNull()
-      .references(() => tenants.id, { onDelete: "cascade" }),
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    token: varchar("token", { length: 255 }).notNull().unique(),
-    email: varchar("email", { length: 255 }).notNull(), // Snapshot of email for verification
-    status: varchar("status", { length: 50 }).default("pending").notNull(), // pending, confirmed, expired, cancelled
-    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(), // 24 hours from creation
-    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+      .references(() => tenants.id, { onDelete: "cascade" })
+      .unique(),
+    requestedByUserId: uuid("requested_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    status: varchar("status", { length: 30, enum: ["scheduled", "cancelled", "executed"] })
+      .default("scheduled")
+      .notNull(),
+    reason: text("reason"),
+    reactivationToken: varchar("reactivation_token", { length: 255 }),
+    reactivationTokenExpiresAt: timestamp("reactivation_token_expires_at", {
+      withTimezone: true,
+    }),
+    scheduledFor: timestamp("scheduled_for", { withTimezone: true }).notNull(),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    executedAt: timestamp("executed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
       .default(sql`now()`)
       .notNull(),
   },
   (table) => ({
-    tenantIdIdx: index("deletion_request_tenant_id_idx").on(table.tenantId),
-    tokenIdx: index("deletion_request_token_idx").on(table.token),
-    expiresAtIdx: index("deletion_request_expires_at_idx").on(table.expiresAt),
+    statusScheduledForIdx: index("tenant_deletion_schedules_status_scheduled_for_idx").on(
+      table.status,
+      table.scheduledFor
+    ),
+    tenantIdIdx: index("tenant_deletion_schedules_tenant_id_idx").on(table.tenantId),
+    reactivationTokenIdx: index("tenant_deletion_schedules_reactivation_token_idx").on(
+      table.reactivationToken
+    ),
   })
 );
 

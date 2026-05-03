@@ -17,6 +17,40 @@ export interface LogEventParams {
   correlationId?: string;
 }
 
+export function serializeLogError(value: unknown): {
+  errorMessage: string;
+  errorCode?: string;
+  errorDetails?: string;
+} {
+  if (value instanceof Error) {
+    return {
+      errorMessage: value.message,
+      errorCode: value.name,
+    };
+  }
+  if (typeof value === "string") {
+    return { errorMessage: value };
+  }
+  if (value && typeof value === "object") {
+    const maybeObj = value as Record<string, unknown>;
+    const message =
+      typeof maybeObj.message === "string" ? maybeObj.message : "Unknown error";
+    const code = typeof maybeObj.name === "string" ? maybeObj.name : undefined;
+    let details: string | undefined;
+    try {
+      details = JSON.stringify(value);
+    } catch {
+      details = String(value);
+    }
+    return {
+      errorMessage: message,
+      errorCode: code,
+      errorDetails: details,
+    };
+  }
+  return { errorMessage: String(value) };
+}
+
 /**
  * Fire-and-forget logging for non-critical events (info, debug, warn).
  * For critical events (error, critical), use await logEvent().

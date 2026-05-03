@@ -8,6 +8,8 @@ function DeletionConfirmedContent() {
   const searchParams = useSearchParams();
   const success = searchParams.get("success") === "true";
   const message = searchParams.get("message") || "Anfrage verarbeitet";
+  const flow = searchParams.get("flow") || "deletion";
+  const isReactivationFlow = flow === "reactivation";
 
   return (
     <div className="min-h-screen bg-white text-gray-900 flex items-center justify-center px-4">
@@ -19,10 +21,14 @@ function DeletionConfirmedContent() {
                 <span className="text-3xl">✓</span>
               </div>
             </div>
-            <h1 className="text-2xl font-bold text-green-600">Gelöscht</h1>
+            <h1 className="text-2xl font-bold text-green-600">
+              {isReactivationFlow ? "Praxis reaktiviert" : "Gelöscht"}
+            </h1>
             <p className="text-gray-600">{message}</p>
             <p className="text-sm text-gray-500 pt-4">
-              Ihr Konto und alle damit verbundenen Daten wurden permanent gelöscht. Sie erhalten möglicherweise noch bis zu 90 Tage alte Backup-Daten in unserem System.
+              {isReactivationFlow
+                ? "Die geplante Löschung wurde abgebrochen und der Zugriff auf die Praxis ist wieder aktiviert."
+                : "Ihr Konto und alle damit verbundenen Daten wurden permanent gelöscht. Sie erhalten möglicherweise noch bis zu 90 Tage alte Backup-Daten in unserem System."}
             </p>
           </div>
         ) : (
@@ -35,7 +41,9 @@ function DeletionConfirmedContent() {
             <h1 className="text-2xl font-bold text-red-600">Fehler</h1>
             <p className="text-gray-600">{message}</p>
             <p className="text-sm text-gray-500 pt-4">
-              Der Bestätigungslink ist möglicherweise abgelaufen oder ungültig. Bitte versuchen Sie erneut, Ihr Konto zu löschen.
+              {isReactivationFlow
+                ? "Der Reaktivierungslink ist möglicherweise abgelaufen oder ungültig. Bitte wenden Sie sich an den Support oder einen System-Admin."
+                : "Der Bestätigungslink ist möglicherweise abgelaufen oder ungültig. Bitte versuchen Sie erneut, Ihr Konto zu löschen."}
             </p>
           </div>
         )}

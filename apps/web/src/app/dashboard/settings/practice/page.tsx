@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc/client";
-import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Globe, ExternalLink, CheckCircle, Save, Trash2, AlertTriangle } from "lucide-react";
@@ -45,8 +44,8 @@ function TextInput({
 }
 
 export default function PracticePage() {
-  const router = useRouter();
   const { data: tenant } = trpc.tenant.getCurrent.useQuery();
+  const { data: deletionStatus } = trpc.tenant.getDeletionStatus.useQuery();
   const { data: embedCode } = trpc.booking.getEmbedCode.useQuery(
     { slug: tenant?.slug || "" },
     { enabled: !!tenant?.slug }
@@ -105,6 +104,16 @@ export default function PracticePage() {
 
   return (
     <div className="max-w-2xl space-y-6">
+      {deletionStatus?.isDeactivationScheduled && deletionStatus.scheduledFor && (
+        <Card className="p-5 border-red-200 bg-red-50">
+          <h2 className="text-base font-semibold text-red-700">Deaktivierung aktiv</h2>
+          <p className="mt-1 text-sm text-red-800">
+            Diese Praxis ist pausiert. Endgültige Löschung geplant für{" "}
+            {new Date(deletionStatus.scheduledFor).toLocaleDateString("de-DE")}.
+          </p>
+        </Card>
+      )}
+
       {/* Website-Status */}
       <Card className="p-5" style={{ borderColor: "var(--color-border)" }}>
         <div className="flex items-start justify-between gap-4">
@@ -323,7 +332,7 @@ export default function PracticePage() {
           <div>
             <h2 className="text-base font-semibold" style={{ color: "#dc2626" }}>Gefahrenzone</h2>
             <p className="text-sm mt-1" style={{ color: "var(--color-muted)" }}>
-              Löschen Sie diese Praxis dauerhaft. Diese Aktion kann nicht rückgängig gemacht werden.
+              Deaktiviert die Praxis sofort und plant die endgültige Löschung nach 30 Tagen.
             </p>
           </div>
         </div>
@@ -363,11 +372,7 @@ export default function PracticePage() {
                   if (deleteConfirmText === tenant?.name && tenant?.id) {
                     deletePractice.mutate(
                       { tenantId: tenant.id },
-                      {
-                        onSuccess: () => {
-                          setTimeout(() => router.push("/"), 1000);
-                        },
-                      }
+                      {}
                     );
                   }
                 }}
@@ -378,7 +383,7 @@ export default function PracticePage() {
                   opacity: deleteConfirmText === tenant?.name ? 1 : 0.5,
                 }}
               >
-                {deletePractice.isPending ? "Wird gelöscht..." : "Ja, löschen"}
+                {deletePractice.isPending ? "Wird geplant..." : "Ja, deaktivieren & Löschung planen"}
               </Button>
               <Button
                 variant="outline"
@@ -394,6 +399,12 @@ export default function PracticePage() {
             {deletePractice.error && (
               <p className="text-sm" style={{ color: "#dc2626" }}>
                 Fehler: {deletePractice.error.message}
+              </p>
+            )}
+            {deletePractice.data?.success && (
+              <p className="text-sm" style={{ color: "#166534" }}>
+                Praxis deaktiviert. Endgültige Löschung geplant für{" "}
+                {new Date(deletePractice.data.scheduledFor).toLocaleDateString("de-DE")}.
               </p>
             )}
           </div>

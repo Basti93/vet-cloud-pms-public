@@ -24,6 +24,17 @@ export default function TenantsPage() {
       refetchInterval: 60000, // Refetch every minute
     }
   );
+  const utils = trpc.useUtils();
+  const scheduleDeletion = trpc.adminDashboard.core.scheduleTenantDeletion.useMutation({
+    onSuccess: async () => {
+      await utils.adminDashboard.core.listTenants.invalidate();
+    },
+  });
+  const cancelDeletion = trpc.adminDashboard.core.cancelTenantDeletion.useMutation({
+    onSuccess: async () => {
+      await utils.adminDashboard.core.listTenants.invalidate();
+    },
+  });
 
   if (error) {
     return (
@@ -125,7 +136,7 @@ export default function TenantsPage() {
                   Erstellt
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Aktion
+                  Aktionen
                 </th>
               </tr>
             </thead>
@@ -163,12 +174,49 @@ export default function TenantsPage() {
                     })}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <Link
-                      href={`/dashboard/tenants/${tenant.id}`}
-                      className="text-blue-600 hover:text-blue-700 font-medium"
-                    >
-                      Details
-                    </Link>
+                    <div className="flex flex-col gap-2">
+                      <Link
+                        href={`/dashboard/tenants/${tenant.id}`}
+                        className="text-blue-600 hover:text-blue-700 font-medium"
+                      >
+                        Details
+                      </Link>
+                      {tenant.deletionStatus === "scheduled" && tenant.deletionScheduledFor ? (
+                        <>
+                          <span className="inline-flex w-fit rounded-full bg-red-100 px-2 py-1 text-xs font-semibold text-red-800">
+                            Löschung geplant:{" "}
+                            {new Date(tenant.deletionScheduledFor).toLocaleDateString("de-DE")}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => cancelDeletion.mutate({ tenantId: tenant.id })}
+                            className="w-fit rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                            disabled={cancelDeletion.isPending}
+                          >
+                            Löschung abbrechen
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const confirmText = window.prompt(
+                              `Zum Planen der Löschung bitte exakt eingeben: DELETE ${tenant.slug}`
+                            );
+                            if (!confirmText) return;
+                            scheduleDeletion.mutate({
+                              tenantId: tenant.id,
+                              confirmationText: confirmText,
+                              reason: "Scheduled by system admin",
+                            });
+                          }}
+                          className="w-fit rounded border border-red-300 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50"
+                          disabled={scheduleDeletion.isPending}
+                        >
+                          Löschen planen (+30 Tage)
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

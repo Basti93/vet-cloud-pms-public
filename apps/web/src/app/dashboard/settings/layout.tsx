@@ -40,7 +40,11 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  const { data: permissions } = trpc.admin.getUserPermissions.useQuery();
+  const {
+    data: permissions,
+    isLoading: permissionsLoading,
+    isFetched: permissionsFetched,
+  } = trpc.admin.getUserPermissions.useQuery();
 
   // Prevent hydration mismatch
   useEffect(() => {
@@ -49,13 +53,19 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
 
   // Check permission and redirect if user doesn't have SETTINGS_MANAGE
   useEffect(() => {
-    if (mounted && permissions && !permissions.includes(PERMISSIONS.SETTINGS_MANAGE)) {
+    if (
+      mounted &&
+      permissionsFetched &&
+      !permissionsLoading &&
+      permissions &&
+      !permissions.includes(PERMISSIONS.SETTINGS_MANAGE)
+    ) {
       router.push("/dashboard");
     }
-  }, [permissions, mounted, router]);
+  }, [permissions, permissionsFetched, permissionsLoading, mounted, router]);
 
   // Don't render until permission check is complete
-  if (!mounted) return null;
+  if (!mounted || permissionsLoading) return null;
 
   return (
     <div className="space-y-4 sm:space-y-6">

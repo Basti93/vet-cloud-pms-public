@@ -1,10 +1,20 @@
 import { Resend } from "resend";
 import { emailTemplates, EmailPlaceholders } from "./templates";
+import { getSystemDomain } from "@/lib/system-name";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
+const SYSTEM_DOMAIN = getSystemDomain();
 
 // Use configured FROM_EMAIL or default to Resend's onboarding domain for testing
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
+
+function systemSender() {
+  return `${SYSTEM_DOMAIN} <${FROM_EMAIL}>`;
+}
+
+function tenantSender(tenantName: string) {
+  return `${tenantName} <${FROM_EMAIL}>`;
+}
 
 export interface SendConfirmationEmailInput {
   to: string;
@@ -47,6 +57,20 @@ export interface SendAccountDeletionEmailInput {
   expiresAt: string;
 }
 
+export interface SendTenantDeactivationEmailInput {
+  to: string;
+  practiceName: string;
+  scheduledFor: string;
+  reactivateUrl: string;
+}
+
+export interface SendTenantLifecycleEmailInput {
+  to: string;
+  practiceName: string;
+  subject: string;
+  body: string;
+}
+
 /**
  * Send appointment confirmation email to patient owner
  */
@@ -72,7 +96,7 @@ export async function sendConfirmationEmail(input: SendConfirmationEmailInput) {
 
   try {
     const result = await resend.emails.send({
-      from: `${input.practiceName} <${FROM_EMAIL}>`,
+      from: tenantSender(input.practiceName),
       to: input.to,
       subject,
       text: body,
@@ -115,7 +139,7 @@ export async function sendReminderEmail(input: SendReminderEmailInput) {
 
   try {
     const result = await resend.emails.send({
-      from: `${input.practiceName} <${FROM_EMAIL}>`,
+      from: tenantSender(input.practiceName),
       to: input.to,
       subject,
       text: body,
@@ -161,7 +185,7 @@ export async function sendBookingNotificationEmail(input: SendBookingNotificatio
 
   try {
     const result = await resend.emails.send({
-      from: `VetCloud PMS <${FROM_EMAIL}>`,
+      from: systemSender(),
       to: input.to,
       subject,
       text: body,
@@ -209,12 +233,12 @@ WARNUNG: Nach der Bestätigung werden folgende Daten permanent gelöscht:
 Diese Aktion kann nicht rückgängig gemacht werden.
 
 Mit freundlichen Grüßen,
-Ihr VetCloud PMS Team
+Ihr ${SYSTEM_DOMAIN} Team
   `.trim();
 
   try {
     const result = await resend.emails.send({
-      from: `VetCloud PMS <${FROM_EMAIL}>`,
+      from: systemSender(),
       to: input.to,
       subject,
       text: body,
@@ -228,6 +252,59 @@ Ihr VetCloud PMS Team
     return { success: true, messageId: result.data?.id };
   } catch (error) {
     console.error("Error sending account deletion email:", error);
+    return { success: false, error };
+  }
+}
+
+export async function sendTenantDeactivationEmail(
+  input: SendTenantDeactivationEmailInput
+) {
+  const subject = `Praxis deaktiviert: ${input.practiceName}`;
+  const body = `
+Hallo,
+
+Ihre Praxis "${input.practiceName}" wurde deaktiviert und zur endgültigen Löschung vorgemerkt.
+
+Geplantes Löschdatum: ${input.scheduledFor}
+
+Wenn dies ein Versehen war, können Sie die Deaktivierung über folgenden Link rückgängig machen:
+${input.reactivateUrl}
+
+Nach dem Löschdatum werden alle Daten permanent entfernt.
+
+Mit freundlichen Grüßen,
+Ihr ${SYSTEM_DOMAIN} Team
+  `.trim();
+
+  try {
+    const result = await resend.emails.send({
+      from: systemSender(),
+      to: input.to,
+      subject,
+      text: body,
+    });
+    if (result.error) {
+      return { success: false, error: result.error };
+    }
+    return { success: true, messageId: result.data?.id };
+  } catch (error) {
+    return { success: false, error };
+  }
+}
+
+export async function sendTenantLifecycleEmail(input: SendTenantLifecycleEmailInput) {
+  try {
+    const result = await resend.emails.send({
+      from: systemSender(),
+      to: input.to,
+      subject: input.subject,
+      text: input.body,
+    });
+    if (result.error) {
+      return { success: false, error: result.error };
+    }
+    return { success: true, messageId: result.data?.id };
+  } catch (error) {
     return { success: false, error };
   }
 }

@@ -1,12 +1,18 @@
 import { createTRPCRouter, publicProcedure, protectedProcedure } from "@/server/trpc";
 import { z } from "zod";
-import { tenants, users, featureFlags, accountDeletionRequests } from "@/lib/db/schema";
+import {
+  tenants,
+  users,
+  featureFlags,
+  tenantDeletionSchedules,
+} from "@/lib/db/schema";
 import { db as appDb } from "@/lib/db/client";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { randomUUID, randomBytes } from "crypto";
-import { sendAccountDeletionEmail } from "@/lib/email/service";
+import { sendTenantDeactivationEmail } from "@/lib/email/service";
 import { getMainDomain } from "@/lib/env";
 import { writeAuditLog } from "@/server/audit";
+import { logEventAsync, serializeLogError } from "@/server/trpc/logging-middleware";
 
 // Helper function to generate a unique slug from tenant name
 async function generateUniqueSlug(
@@ -42,6 +48,116 @@ async function generateUniqueSlug(
   }
 
   return finalSlug;
+}
+
+async function scheduleTenantDeletionFor30Days(
+  ctx: { db: typeof appDb; userId: string | null },
+  {
+    tenantId,
+    actorUserId,
+    actorEmail,
+    tenantEmail,
+    practiceName,
+    reason,
+  }: {
+    tenantId: string;
+    actorUserId: string;
+    actorEmail: string;
+    tenantEmail?: string | null;
+    practiceName: string;
+    reason: string;
+  }
+) {
+  const scheduledFor = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  const reactivationToken = randomBytes(32).toString("hex");
+  const reactivationTokenExpiresAt = scheduledFor;
+
+  const [existing] = await ctx.db
+    .select({ id: tenantDeletionSchedules.id })
+    .from(tenantDeletionSchedules)
+    .where(eq(tenantDeletionSchedules.tenantId, tenantId))
+    .limit(1);
+
+  if (existing) {
+    await ctx.db
+      .update(tenantDeletionSchedules)
+      .set({
+        status: "scheduled",
+        reason,
+        scheduledFor,
+        cancelledAt: null,
+        executedAt: null,
+        reactivationToken,
+        reactivationTokenExpiresAt,
+        updatedAt: new Date(),
+      })
+      .where(eq(tenantDeletionSchedules.id, existing.id));
+  } else {
+    await ctx.db.insert(tenantDeletionSchedules).values({
+      tenantId,
+      requestedByUserId: actorUserId,
+      status: "scheduled",
+      reason,
+      scheduledFor,
+      reactivationToken,
+      reactivationTokenExpiresAt,
+    });
+  }
+
+  await ctx.db
+    .update(tenants)
+    .set({ subscriptionStatus: "paused", updatedAt: new Date() })
+    .where(eq(tenants.id, tenantId));
+
+  const recipient = actorEmail || tenantEmail || "";
+  if (!recipient) {
+    logEventAsync({
+      level: "warn",
+      category: "email",
+      eventType: "tenant_deactivation_email_missing_recipient",
+      message: "Tenant deactivation email was not sent: no recipient available",
+      tenantId,
+      userId: actorUserId,
+      metadata: { reason, practiceName },
+    });
+    console.warn(
+      "Tenant deactivation completed without notification email: no recipient email available."
+    );
+    return { scheduledFor, emailSent: false };
+  }
+
+  const reactivateUrl = `${getMainDomain()}/api/tenant/reactivate?token=${reactivationToken}`;
+  const emailResult = await sendTenantDeactivationEmail({
+    to: recipient,
+    practiceName,
+    scheduledFor: scheduledFor.toLocaleString("de-DE"),
+    reactivateUrl,
+  });
+  if (!emailResult.success) {
+    const serializedError = serializeLogError(emailResult.error);
+    logEventAsync({
+      level: "error",
+      category: "email",
+      eventType: "tenant_deactivation_email_failed",
+      message: "Tenant deactivation completed, but notification email failed",
+      tenantId,
+      userId: actorUserId,
+      metadata: {
+        recipient,
+        reason,
+        practiceName,
+        operation: "tenant_deactivation_notification",
+        provider: "resend",
+        ...serializedError,
+      },
+    });
+    console.warn(
+      "Tenant deactivation completed, but notification email failed.",
+      emailResult.error
+    );
+  }
+
+  return { scheduledFor, emailSent: emailResult.success };
 }
 
 export const tenantRouter = createTRPCRouter({
@@ -228,6 +344,55 @@ export const tenantRouter = createTRPCRouter({
     return tenant || null;
   }),
 
+  getDeletionStatus: protectedProcedure.query(async ({ ctx }) => {
+    const [user] = await ctx.db
+      .select({ tenantId: users.tenantId })
+      .from(users)
+      .where(eq(users.clerkId, ctx.userId))
+      .limit(1);
+
+    if (!user?.tenantId) return null;
+
+    const [tenant] = await ctx.db
+      .select({
+        id: tenants.id,
+        name: tenants.name,
+        slug: tenants.slug,
+        subscriptionStatus: tenants.subscriptionStatus,
+      })
+      .from(tenants)
+      .where(eq(tenants.id, user.tenantId))
+      .limit(1);
+
+    if (!tenant) return null;
+
+    const [schedule] = await ctx.db
+      .select({
+        status: tenantDeletionSchedules.status,
+        scheduledFor: tenantDeletionSchedules.scheduledFor,
+        cancelledAt: tenantDeletionSchedules.cancelledAt,
+      })
+      .from(tenantDeletionSchedules)
+      .where(
+        and(
+          eq(tenantDeletionSchedules.tenantId, tenant.id),
+          eq(tenantDeletionSchedules.status, "scheduled")
+        )
+      )
+      .limit(1);
+
+    return {
+      tenantId: tenant.id,
+      tenantName: tenant.name,
+      tenantSlug: tenant.slug,
+      subscriptionStatus: tenant.subscriptionStatus,
+      isDeactivationScheduled: Boolean(schedule),
+      scheduledFor: schedule?.scheduledFor ?? null,
+      deletionStatus: schedule?.status ?? null,
+      cancelledAt: schedule?.cancelledAt ?? null,
+    };
+  }),
+
   update: protectedProcedure
     .input(
       z.object({
@@ -289,7 +454,7 @@ export const tenantRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       // Get current user's role and tenantId
       const [user] = await ctx.db
-        .select({ tenantId: users.tenantId, role: users.role })
+        .select({ id: users.id, tenantId: users.tenantId, role: users.role, email: users.email })
         .from(users)
         .where(eq(users.clerkId, ctx.userId))
         .limit(1);
@@ -302,54 +467,39 @@ export const tenantRouter = createTRPCRouter({
         throw new Error("Can only delete your own practice");
       }
 
-      // Get all users in this tenant to delete from Clerk
-      const tenantUsers = await ctx.db
-        .select({ clerkId: users.clerkId })
-        .from(users)
-        .where(eq(users.tenantId, input.tenantId));
-
-      // Delete from Clerk (best effort - continue even if Clerk deletion fails)
-      const clerkSecretKey = process.env.CLERK_SECRET_KEY;
-      if (clerkSecretKey && tenantUsers.length > 0) {
-        try {
-          for (const u of tenantUsers) {
-            const response = await fetch(`https://api.clerk.com/v1/users/${u.clerkId}`, {
-              method: "DELETE",
-              headers: {
-                Authorization: `Bearer ${clerkSecretKey}`,
-              },
-            });
-            if (!response.ok && response.status !== 404) {
-              console.error(`Failed to delete Clerk user ${u.clerkId}:`, response.statusText);
-            }
-          }
-        } catch (error) {
-          console.error("Error deleting Clerk users:", error);
-          // Don't fail the entire operation if Clerk deletion fails
-        }
-      }
-
-      // Delete the tenant (cascades delete all related data)
-      const [deletedTenant] = await ctx.db
-        .delete(tenants)
+      const [tenant] = await ctx.db
+        .select({ id: tenants.id, slug: tenants.slug, name: tenants.name, email: tenants.email })
+        .from(tenants)
         .where(eq(tenants.id, input.tenantId))
-        .returning();
+        .limit(1);
 
-      if (!deletedTenant) {
+      if (!tenant) {
         throw new Error("Practice not found");
       }
+
+      const result = await scheduleTenantDeletionFor30Days(ctx, {
+        tenantId: input.tenantId,
+        actorUserId: user.id,
+        actorEmail: user.email ?? "",
+        tenantEmail: tenant.email,
+        practiceName: tenant.name,
+        reason: "Requested from practice settings",
+      });
 
       await writeAuditLog(ctx, {
         tenantId: input.tenantId,
         action: "delete",
         entity: { type: "tenant", id: input.tenantId },
-        event: "tenant.deleted",
-        summary: "Tenant deleted by admin",
-        changes: { deletedSlug: deletedTenant.slug },
+        event: "tenant.deactivation_scheduled",
+        summary: "Tenant deletion scheduled (+30 days) from practice settings",
+        changes: { slug: tenant.slug, scheduledFor: result.scheduledFor.toISOString() },
       });
 
-      console.log(`Practice deleted: ${deletedTenant.slug} (${deletedTenant.id})`);
-      return { success: true, deletedSlug: deletedTenant.slug };
+      return {
+        success: true,
+        scheduledFor: result.scheduledFor.toISOString(),
+        emailSent: result.emailSent,
+      };
     }),
 
   getFeatureFlags: protectedProcedure.query(async ({ ctx }) => {
@@ -471,128 +621,35 @@ export const tenantRouter = createTRPCRouter({
         throw new Error("Can only request deletion for your own account");
       }
 
-      // Generate deletion token
-      const token = randomBytes(32).toString("hex");
-      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      const [tenant] = await ctx.db
+        .select({ name: tenants.name, email: tenants.email })
+        .from(tenants)
+        .where(eq(tenants.id, input.tenantId))
+        .limit(1);
+      if (!tenant) throw new Error("Practice not found");
 
-      // Create deletion request
-      const [deletionRequest] = await ctx.db
-        .insert(accountDeletionRequests)
-        .values({
-          id: randomUUID(),
-          tenantId: input.tenantId,
-          userId: input.userId,
-          token,
-          email: user.email,
-          expiresAt,
-          status: "pending",
-        })
-        .returning();
+      const result = await scheduleTenantDeletionFor30Days(ctx, {
+        tenantId: input.tenantId,
+        actorUserId: user.id,
+        actorEmail: user.email ?? "",
+        tenantEmail: tenant.email,
+        practiceName: tenant.name,
+        reason: "Requested from account settings",
+      });
 
       await writeAuditLog(ctx, {
         tenantId: input.tenantId,
         action: "delete",
-        entity: { type: "account_deletion_request", id: deletionRequest.id },
-        event: "tenant.deletion_requested",
-        summary: "Tenant deletion requested",
-        changes: { expiresAt: deletionRequest.expiresAt.toISOString() },
+        entity: { type: "tenant", id: input.tenantId },
+        event: "tenant.deactivation_scheduled",
+        summary: "Tenant deactivated and deletion scheduled (+30 days)",
+        changes: { scheduledFor: result.scheduledFor.toISOString() },
       });
 
-      // Send confirmation email
-      const domain = getMainDomain();
-      const confirmUrl = `${domain}/api/tenant/confirm-deletion?token=${token}`;
-
-      try {
-        await sendAccountDeletionEmail({
-          to: user.email || "",
-          confirmUrl,
-          expiresAt: expiresAt.toLocaleString("de-DE"),
-        });
-      } catch (error) {
-        console.error("Failed to send deletion email:", error);
-        // Delete the request if email fails
-        await ctx.db.delete(accountDeletionRequests).where(eq(accountDeletionRequests.id, deletionRequest.id));
-        throw new Error("Failed to send confirmation email");
-      }
-
-      return { success: true, message: "Confirmation email sent" };
-    }),
-
-  confirmDeletion: publicProcedure
-    .input(z.object({ token: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      // Find valid deletion request
-      const [deletionRequest] = await ctx.db
-        .select()
-        .from(accountDeletionRequests)
-        .where(eq(accountDeletionRequests.token, input.token))
-        .limit(1);
-
-      if (!deletionRequest) {
-        throw new Error("Invalid or expired deletion token");
-      }
-
-      if (deletionRequest.status !== "pending") {
-        throw new Error("This deletion request has already been processed");
-      }
-
-      if (new Date() > deletionRequest.expiresAt) {
-        throw new Error("Deletion token has expired (24 hours)");
-      }
-
-      // Mark as confirmed
-      await ctx.db
-        .update(accountDeletionRequests)
-        .set({ status: "confirmed", confirmedAt: new Date() })
-        .where(eq(accountDeletionRequests.id, deletionRequest.id));
-
-      await writeAuditLog(ctx, {
-        tenantId: deletionRequest.tenantId,
-        action: "delete",
-        entity: { type: "account_deletion_request", id: deletionRequest.id },
-        event: "tenant.deletion_confirmed",
-        summary: "Tenant deletion confirmed via token",
-        changes: { confirmedAt: new Date().toISOString() },
-      });
-
-      // Get all users in this tenant to delete from Clerk
-      const tenantUsers = await ctx.db
-        .select({ clerkId: users.clerkId })
-        .from(users)
-        .where(eq(users.tenantId, deletionRequest.tenantId));
-
-      // Delete from Clerk (best effort)
-      const clerkSecretKey = process.env.CLERK_SECRET_KEY;
-      if (clerkSecretKey && tenantUsers.length > 0) {
-        try {
-          for (const u of tenantUsers) {
-            const response = await fetch(`https://api.clerk.com/v1/users/${u.clerkId}`, {
-              method: "DELETE",
-              headers: {
-                Authorization: `Bearer ${clerkSecretKey}`,
-              },
-            });
-            if (!response.ok && response.status !== 404) {
-              console.error(`Failed to delete Clerk user ${u.clerkId}:`, response.statusText);
-            }
-          }
-        } catch (error) {
-          console.error("Error deleting Clerk users:", error);
-        }
-      }
-
-      // Delete the tenant (cascades all related data)
-      const [deletedTenant] = await ctx.db
-        .delete(tenants)
-        .where(eq(tenants.id, deletionRequest.tenantId))
-        .returning();
-
-      if (!deletedTenant) {
-        throw new Error("Practice not found");
-      }
-
-      console.log(`Practice deleted via email confirmation: ${deletedTenant.slug} (${deletedTenant.id})`);
-
-      return { success: true, message: "Account and all data have been deleted" };
+      return {
+        success: true,
+        scheduledFor: result.scheduledFor.toISOString(),
+        emailSent: result.emailSent,
+      };
     }),
 });
