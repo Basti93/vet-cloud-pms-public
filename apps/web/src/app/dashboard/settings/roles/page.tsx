@@ -69,6 +69,7 @@ interface RoleWithPermissions {
   name: string;
   description: string;
   isSystem: boolean;
+  isEditableByTenant: boolean;
   tenantId: string;
   permissions: string[];
 }
@@ -183,6 +184,19 @@ export default function RolesPage() {
       <div className="space-y-4">
         {(roles as RoleWithPermissions[]).map((role) => (
           <Card key={role.id} className="p-6 border" style={{ borderColor: "var(--color-border)" }}>
+            {role.isSystem && !role.isEditableByTenant && (
+              <div
+                className="mb-4 rounded-lg border px-3 py-2 text-xs"
+                style={{
+                  borderColor: "var(--color-border)",
+                  backgroundColor: "var(--color-surface)",
+                  color: "var(--color-muted)",
+                }}
+              >
+                Diese Systemrolle ist für Ihren Mandanten gesperrt. Änderungen sind nur möglich,
+                wenn ein Systemadministrator die Bearbeitung freischaltet.
+              </div>
+            )}
             {/* Role Header */}
             <div className="flex items-start justify-between mb-6">
               <div>
@@ -219,19 +233,28 @@ export default function RolesPage() {
                         const isEnabled = role.permissions.includes(permission);
                         const permissionId = `${role.id}-${permission}`;
                         const isLoading = loadingPermission === permissionId;
+                        const isLockedSystemRole = role.isSystem && !role.isEditableByTenant;
+                        const isDisabled = isLoading || isLockedSystemRole;
 
                         return (
                           <label
                             key={permission}
-                            className="flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
+                            className="flex items-center gap-3 p-3 rounded-lg transition-opacity"
                             style={{
                               backgroundColor: "var(--color-surface)",
+                              opacity: isDisabled ? 0.7 : 1,
+                              cursor: isDisabled ? "not-allowed" : "pointer",
                             }}
+                            title={
+                              isLockedSystemRole
+                                ? "Systemrolle ist gesperrt. Bearbeitung kann nur durch einen Systemadministrator aktiviert werden."
+                                : undefined
+                            }
                           >
                             <input
                               type="checkbox"
                               checked={isEnabled}
-                              disabled={isLoading}
+                              disabled={isDisabled}
                               onChange={() =>
                                 handleTogglePermission(role, permission)
                               }

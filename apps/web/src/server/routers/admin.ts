@@ -598,48 +598,47 @@ export const adminRouter = createTRPCRouter({
         });
       }
 
-      // Self-lockout guard: current tenant admin must not remove their own last grant
-      const [currentDbUser] = await ctx.db
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.clerkId, ctx.userId!))
-        .limit(1);
-      if (!currentDbUser) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Current user not found" });
-      }
-      const currentAssignments = await ctx.db
-        .select({ roleId: userRoles.roleId })
-        .from(userRoles)
-        .where(eq(userRoles.userId, currentDbUser.id));
-      const assignedRoleIds = currentAssignments.map((r) => r.roleId);
-      if (assignedRoleIds.includes(input.roleId)) {
-        const permsRows = assignedRoleIds.length
-          ? await ctx.db
-              .select({
-                roleId: rolePermissions.roleId,
-                permission: rolePermissions.permission,
-              })
-              .from(rolePermissions)
-              .where(inArray(rolePermissions.roleId, assignedRoleIds))
-          : [];
-        const stillHasPermissionAfterRemoval = permsRows.some(
-          (row) => row.permission === input.permission && row.roleId !== input.roleId
-        );
-        if (!stillHasPermissionAfterRemoval) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message:
-              "Cannot remove this permission because it would lock you out from managing roles.",
-          });
+      // Self-lockout guard should only apply to critical management permissions.
+      if (CRITICAL_ADMIN_PERMISSIONS.includes(input.permission as (typeof CRITICAL_ADMIN_PERMISSIONS)[number])) {
+        const [currentDbUser] = await ctx.db
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.clerkId, ctx.userId!))
+          .limit(1);
+        if (!currentDbUser) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Current user not found" });
+        }
+        const currentAssignments = await ctx.db
+          .select({ roleId: userRoles.roleId })
+          .from(userRoles)
+          .where(eq(userRoles.userId, currentDbUser.id));
+        const assignedRoleIds = currentAssignments.map((r) => r.roleId);
+        if (assignedRoleIds.includes(input.roleId)) {
+          const permsRows = assignedRoleIds.length
+            ? await ctx.db
+                .select({
+                  roleId: rolePermissions.roleId,
+                  permission: rolePermissions.permission,
+                })
+                .from(rolePermissions)
+                .where(inArray(rolePermissions.roleId, assignedRoleIds))
+            : [];
+          const stillHasPermissionAfterRemoval = permsRows.some(
+            (row) => row.permission === input.permission && row.roleId !== input.roleId
+          );
+          if (!stillHasPermissionAfterRemoval) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message:
+                "Cannot remove this permission because it would lock you out from managing roles.",
+            });
+          }
         }
       }
 
       await ctx.db
         .delete(rolePermissions)
-        .where(
-          eq(rolePermissions.roleId, input.roleId) &&
-          eq(rolePermissions.permission, input.permission)
-        );
+        .where(and(eq(rolePermissions.roleId, input.roleId), eq(rolePermissions.permission, input.permission)));
 
       return { success: true };
     }),
