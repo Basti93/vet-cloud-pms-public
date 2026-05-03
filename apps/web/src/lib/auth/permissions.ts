@@ -5,10 +5,18 @@ import {
   roles,
   rolePermissions,
   userRoles,
-  PERMISSIONS,
 } from "@/lib/db/schema";
+import { DEFAULT_ROLE_DEFINITIONS, SYSTEM_ROLES_VERSION } from "@/lib/auth/roles";
 
 export type Database = typeof db;
+
+const syncedTenants = new Set<string>();
+
+async function ensureTenantSystemRolesSynced(tenantId: string) {
+  if (!tenantId || syncedTenants.has(tenantId)) return;
+  await createDefaultRoles(tenantId);
+  syncedTenants.add(tenantId);
+}
 
 /**
  * Get all permissions for a user by looking up all assigned roles
@@ -23,7 +31,7 @@ export type Database = typeof db;
 export async function getUserPermissions(userId: string): Promise<Set<string>> {
   // Step 1: Find user by clerkId
   const [user] = await db
-    .select({ id: users.id })
+    .select({ id: users.id, tenantId: users.tenantId })
     .from(users)
     .where(eq(users.clerkId, userId))
     .limit(1);
@@ -31,6 +39,9 @@ export async function getUserPermissions(userId: string): Promise<Set<string>> {
   if (!user) {
     return new Set(); // User not found
   }
+
+  // Keep system roles aligned with code defaults automatically per tenant.
+  await ensureTenantSystemRolesSynced(user.tenantId);
 
   // Step 2: Get all roleIds assigned to this user
   const assignedRoles = await db
@@ -62,68 +73,58 @@ export async function hasPermission(
 }
 
 export async function createDefaultRoles(tenantId: string) {
-  const defaultRoles = [
-    {
-      name: "Admin",
-      description: "Full access",
-      permissions: Object.values(PERMISSIONS),
-      isSystem: true,
-    },
-    {
-      name: "Vet",
-      description: "Medical access + appointments + patients + schedule management",
-      permissions: [
-        PERMISSIONS.MEDICAL_READ,
-        PERMISSIONS.MEDICAL_CREATE,
-        PERMISSIONS.MEDICAL_UPDATE,
-        PERMISSIONS.APPOINTMENTS_READ,
-        PERMISSIONS.APPOINTMENTS_UPDATE,
-        PERMISSIONS.PATIENTS_READ,
-        PERMISSIONS.PATIENTS_CREATE,
-        PERMISSIONS.PATIENTS_UPDATE,
-        PERMISSIONS.SCHEDULE_MANAGE,
-      ],
-      isSystem: true,
-    },
-    {
-      name: "Receptionist",
-      description: "Appointments + patient data",
-      permissions: [
-        PERMISSIONS.APPOINTMENTS_READ,
-        PERMISSIONS.APPOINTMENTS_CREATE,
-        PERMISSIONS.APPOINTMENTS_CANCEL,
-        PERMISSIONS.PATIENTS_READ,
-        PERMISSIONS.PATIENTS_CREATE,
-        PERMISSIONS.PATIENTS_UPDATE,
-      ],
-      isSystem: true,
-    },
-  ];
-
-  for (const role of defaultRoles) {
-    const [created] = await db
+  for (const role of DEFAULT_ROLE_DEFINITIONS) {
+    const [createdOrExisting] = await db
       .insert(roles)
       .values({
         tenantId,
+        code: role.code,
         name: role.name,
         description: role.description,
         isSystem: role.isSystem,
+        baseVersion: role.baseVersion,
       })
-      .onConflictDoNothing()
-      .returning();
+      .onConflictDoUpdate({
+        target: [roles.tenantId, roles.code],
+        set: {
+          name: role.name,
+          description: role.description,
+          isSystem: true,
+          baseVersion: SYSTEM_ROLES_VERSION,
+        },
+      })
+      .returning({
+        id: roles.id,
+        isEditableByTenant: roles.isEditableByTenant,
+      });
 
-    if (!created) {
-      continue;
-    }
+    if (!createdOrExisting) continue;
 
-    for (const perm of role.permissions) {
+    // For locked system roles, enforce canonical permissions from code defaults.
+    if (!createdOrExisting.isEditableByTenant) {
       await db
-        .insert(rolePermissions)
-        .values({
-          roleId: created.id,
-          permission: perm,
-        })
-        .onConflictDoNothing();
+        .delete(rolePermissions)
+        .where(eq(rolePermissions.roleId, createdOrExisting.id));
+      for (const perm of role.permissions) {
+        await db
+          .insert(rolePermissions)
+          .values({
+            roleId: createdOrExisting.id,
+            permission: perm,
+          })
+          .onConflictDoNothing();
+      }
+    } else {
+      // For tenant-editable roles, only ensure baseline permissions are present.
+      for (const perm of role.permissions) {
+        await db
+          .insert(rolePermissions)
+          .values({
+            roleId: createdOrExisting.id,
+            permission: perm,
+          })
+          .onConflictDoNothing();
+      }
     }
   }
 }
