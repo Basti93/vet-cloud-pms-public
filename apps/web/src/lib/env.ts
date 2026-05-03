@@ -24,5 +24,10 @@ export function getEnvironmentLabel(): string {
 }
 
 export function getMainDomain(): string {
-  return process.env.NEXT_PUBLIC_MAIN_DOMAIN || "example.com";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (!appUrl) {
+    throw new Error("NEXT_PUBLIC_APP_URL is required.");
+  }
+
+  return appUrl.replace(/\/$/, "");
 }

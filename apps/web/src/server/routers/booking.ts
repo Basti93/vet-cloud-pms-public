@@ -325,7 +325,8 @@ export const bookingRouter = createTRPCRouter({
 
       // Check domain restrictions if configured
       const allowedDomains = (tenant.allowedEmbeddingDomains as string[] | null) || [];
-      const mainDomain = getMainDomain();
+      const mainDomainUrl = getMainDomain();
+      const mainDomainHost = new URL(mainDomainUrl).hostname;
 
       if (allowedDomains.length > 0) {
         const referer = ctx.headers.get("referer");
@@ -338,7 +339,7 @@ export const bookingRouter = createTRPCRouter({
             const hostname = url.hostname;
 
             // Always allow main domain, plus any configured domains
-            const allAllowedDomains = [...new Set([mainDomain, ...allowedDomains])];
+            const allAllowedDomains = [...new Set([mainDomainHost, ...allowedDomains])];
             const isAllowed = allAllowedDomains.some(domain =>
               hostname === domain || hostname === `www.${domain}` || domain === `www.${hostname}`
             );
@@ -907,7 +908,7 @@ export const bookingRouter = createTRPCRouter({
   getEmbedCode: publicProcedure
     .input(z.object({ slug: z.string().min(1) }))
     .query(({ input }) => {
-      const bookingUrl = `https://${getMainDomain()}/book/${input.slug}`;
+      const bookingUrl = `${getMainDomain()}/book/${input.slug}`;
 
       const iframeCode = `<iframe src="${bookingUrl}" width="100%" height="600" frameborder="0" style="border:none;border-radius:8px" allow="payment"></iframe>`;
 
