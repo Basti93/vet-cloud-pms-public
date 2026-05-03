@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { useRouter } from "next/navigation";
+import { PERMISSIONS } from "@/lib/db/schema";
 
 export default function AccountPage() {
   const router = useRouter();
@@ -13,9 +14,14 @@ export default function AccountPage() {
   const [deactivationMailSent, setDeactivationMailSent] = useState(false);
 
   const { data: currentUser } = trpc.admin.getCurrentUser.useQuery();
+  const { data: permissions, isLoading: permissionsLoading } =
+    trpc.admin.getUserPermissions.useQuery();
   const { data: tenant } = trpc.tenant.getCurrent.useQuery();
   const { data: deletionStatus } = trpc.tenant.getDeletionStatus.useQuery();
   const requestDeletionMutation = trpc.tenant.requestDeletion.useMutation();
+  const canManageSettings = Boolean(
+    permissions?.includes(PERMISSIONS.SETTINGS_MANAGE)
+  );
 
   const handleExportData = async () => {
     try {
@@ -127,88 +133,99 @@ export default function AccountPage() {
         </div>
       )}
 
-      {/* Data Export Section */}
-      <div className="bg-surface rounded-2xl border border-border shadow-sm p-6">
-        <div className="mb-6">
-          <h2 className="text-lg font-semibold text-fg mb-2">Datenexport (DSGVO Art. 20)</h2>
-          <p className="text-sm text-muted">
-            Laden Sie eine Kopie aller Ihrer Daten herunter. Dies umfasst alle Praxisinformationen, Patientendaten, Termine und andere personenbezogene Daten.
-          </p>
-        </div>
-
-        <button
-          onClick={handleExportData}
-          disabled={exportLoading}
-          className="px-6 py-3 rounded-lg font-medium transition-all text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {exportLoading ? "Wird exportiert..." : "Daten exportieren"}
-        </button>
-
-        <p className="text-xs text-muted mt-4">
-          Die Daten werden als JSON-Datei heruntergeladen und können in anderen Systemen importiert werden.
-        </p>
-      </div>
-
-      {/* Account Deletion Section */}
-      <div className="bg-surface rounded-2xl border border-red-200 shadow-sm p-6">
-        <div className="mb-6">
-          <h2 className="text-lg font-semibold text-red-600 mb-2">
-            Konto löschen (DSGVO Art. 17)
-          </h2>
-          <p className="text-sm text-muted">
-            Dieses Konto und alle zugehörigen Daten werden permanent gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.
-          </p>
-        </div>
-
-        {!deactivationMailSent ? (
-          <>
-            <div className="p-4 rounded-lg bg-red-50 border border-red-200 mb-4">
-              <p className="text-sm text-red-900 font-semibold mb-3">
-                ⚠️ Vor dem Löschen:
+      {canManageSettings ? (
+        <>
+          {/* Data Export Section */}
+          <div className="bg-surface rounded-2xl border border-border shadow-sm p-6">
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold text-fg mb-2">Datenexport (DSGVO Art. 20)</h2>
+              <p className="text-sm text-muted">
+                Laden Sie eine Kopie aller Ihrer Daten herunter. Dies umfasst alle Praxisinformationen, Patientendaten, Termine und andere personenbezogene Daten.
               </p>
-              <ul className="text-sm text-red-800 list-disc list-inside space-y-1">
-                <li>Stellen Sie sicher, dass Sie keine ausstehenden Verträge haben</li>
-                <li>Alle Patientendaten werden dauerhaft gelöscht</li>
-                <li>Diese Aktion kann nicht rückgängig gemacht werden</li>
-                <li>Sie erhalten eine E-Mail mit Reaktivierungslink</li>
-              </ul>
             </div>
 
             <button
-              onClick={handleDeleteAccount}
-              disabled={
-                deleteLoading ||
-                !tenant ||
-                !currentUser ||
-                Boolean(deletionStatus?.isDeactivationScheduled)
-              }
-              className="px-6 py-3 rounded-lg font-medium transition-all text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              title={!tenant || !currentUser ? "Daten werden geladen..." : ""}
+              onClick={handleExportData}
+              disabled={exportLoading}
+              className="px-6 py-3 rounded-lg font-medium transition-all text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {deleteLoading
-                ? "Wird vorbereitet..."
-                : deletionStatus?.isDeactivationScheduled
-                ? "Bereits deaktiviert"
-                : "Konto deaktivieren"}
+              {exportLoading ? "Wird exportiert..." : "Daten exportieren"}
             </button>
 
             <p className="text-xs text-muted mt-4">
-              Die Praxis wird sofort pausiert. In der E-Mail ist ein Reaktivierungslink enthalten.
-            </p>
-          </>
-        ) : (
-          <div className="p-4 rounded-lg bg-green-50 border border-green-200">
-            <p className="text-sm text-green-900 font-semibold mb-2">
-              ✓ Deaktivierungs-Email gesendet
-            </p>
-            <p className="text-sm text-green-800">
-              Eine Email mit Reaktivierungslink wurde an <strong>{currentUser?.email}</strong> gesendet.
-              Ohne Reaktivierung wird die Praxis nach 30 Tagen endgültig gelöscht.
+              Die Daten werden als JSON-Datei heruntergeladen und können in anderen Systemen importiert werden.
             </p>
           </div>
-        )}
 
-      </div>
+          {/* Account Deletion Section */}
+          <div className="bg-surface rounded-2xl border border-red-200 shadow-sm p-6">
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold text-red-600 mb-2">
+                Konto löschen (DSGVO Art. 17)
+              </h2>
+              <p className="text-sm text-muted">
+                Dieses Konto und alle zugehörigen Daten werden permanent gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.
+              </p>
+            </div>
+
+            {!deactivationMailSent ? (
+              <>
+                <div className="p-4 rounded-lg bg-red-50 border border-red-200 mb-4">
+                  <p className="text-sm text-red-900 font-semibold mb-3">
+                    ⚠️ Vor dem Löschen:
+                  </p>
+                  <ul className="text-sm text-red-800 list-disc list-inside space-y-1">
+                    <li>Stellen Sie sicher, dass Sie keine ausstehenden Verträge haben</li>
+                    <li>Alle Patientendaten werden dauerhaft gelöscht</li>
+                    <li>Diese Aktion kann nicht rückgängig gemacht werden</li>
+                    <li>Sie erhalten eine E-Mail mit Reaktivierungslink</li>
+                  </ul>
+                </div>
+
+                <button
+                  onClick={handleDeleteAccount}
+                  disabled={
+                    deleteLoading ||
+                    !tenant ||
+                    !currentUser ||
+                    Boolean(deletionStatus?.isDeactivationScheduled)
+                  }
+                  className="px-6 py-3 rounded-lg font-medium transition-all text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={!tenant || !currentUser ? "Daten werden geladen..." : ""}
+                >
+                  {deleteLoading
+                    ? "Wird vorbereitet..."
+                    : deletionStatus?.isDeactivationScheduled
+                    ? "Bereits deaktiviert"
+                    : "Konto deaktivieren"}
+                </button>
+
+                <p className="text-xs text-muted mt-4">
+                  Die Praxis wird sofort pausiert. In der E-Mail ist ein Reaktivierungslink enthalten.
+                </p>
+              </>
+            ) : (
+              <div className="p-4 rounded-lg bg-green-50 border border-green-200">
+                <p className="text-sm text-green-900 font-semibold mb-2">
+                  ✓ Deaktivierungs-Email gesendet
+                </p>
+                <p className="text-sm text-green-800">
+                  Eine Email mit Reaktivierungslink wurde an <strong>{currentUser?.email}</strong> gesendet.
+                  Ohne Reaktivierung wird die Praxis nach 30 Tagen endgültig gelöscht.
+                </p>
+              </div>
+            )}
+          </div>
+        </>
+      ) : !permissionsLoading ? (
+        <div className="bg-surface rounded-2xl border border-border shadow-sm p-6">
+          <h2 className="text-lg font-semibold text-fg mb-2">Administrator erforderlich</h2>
+          <p className="text-sm text-muted">
+            Datenexport und Kontolöschung sind nur für Praxis-Administratoren verfügbar.
+            Bitte wenden Sie sich an einen Admin Ihrer Praxis.
+          </p>
+        </div>
+      ) : null}
 
       {/* DSGVO Rights Information */}
       <div className="bg-surface rounded-2xl border border-border shadow-sm p-6">

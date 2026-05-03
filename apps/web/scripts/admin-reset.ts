@@ -9,20 +9,12 @@
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
+import dotenv from "dotenv";
 
-// Load .env.local manually
+// Load .env.local with dotenv (handles quoted values and special chars correctly)
 const envPath = path.resolve(process.cwd(), ".env.local");
 if (fs.existsSync(envPath)) {
-  const envContent = fs.readFileSync(envPath, "utf-8");
-  envContent.split("\n").forEach((line) => {
-    const trimmed = line.trim();
-    if (trimmed && !trimmed.startsWith("#")) {
-      const [key, ...valueParts] = trimmed.split("=");
-      if (key && valueParts.length > 0) {
-        process.env[key.trim()] = valueParts.join("=").trim();
-      }
-    }
-  });
+  dotenv.config({ path: envPath, override: true });
 }
 
 import { drizzle } from "drizzle-orm/postgres-js";
@@ -126,6 +118,34 @@ async function upsertClerkUser(
   return { clerkId: created.id, created: true };
 }
 
+async function setClerkUserPassword(
+  secretKey: string,
+  clerkUserId: string,
+  password: string
+): Promise<void> {
+  await clerkRequest(secretKey, `/users/${clerkUserId}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      password,
+      skip_password_checks: true,
+      skip_password_requirement: false,
+    }),
+  });
+}
+
+async function disableClerkUserMfa(secretKey: string, clerkUserId: string): Promise<void> {
+  try {
+    await fetch(`https://api.clerk.com/v1/users/${clerkUserId}/mfa`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${secretKey}`,
+      },
+    });
+  } catch (error) {
+    console.warn(`  - ${clerkUserId}: failed to disable MFA enrollments`, error);
+  }
+}
+
 async function ensureDemoClerkUsers(usersToCreate: DemoUser[]): Promise<DemoUser[]> {
   const clerkSecretKey = process.env.CLERK_SECRET_KEY;
   if (!clerkSecretKey) {
@@ -139,8 +159,13 @@ async function ensureDemoClerkUsers(usersToCreate: DemoUser[]): Promise<DemoUser
   const withIds: DemoUser[] = [];
   let createdCount = 0;
   let reusedCount = 0;
+  const demoPassword = process.env.DEMO_USERS_PASSWORD?.trim();
   for (const user of usersToCreate) {
     const { clerkId, created } = await upsertClerkUser(clerkSecretKey, user);
+    await disableClerkUserMfa(clerkSecretKey, clerkId);
+    if (demoPassword) {
+      await setClerkUserPassword(clerkSecretKey, clerkId, demoPassword);
+    }
     if (created) createdCount++;
     else reusedCount++;
     console.log(`  - ${user.email}: ${created ? "created" : "reused"} (${clerkId})`);
@@ -150,6 +175,9 @@ async function ensureDemoClerkUsers(usersToCreate: DemoUser[]): Promise<DemoUser
   console.log(
     `  ✓ Clerk users ensured: ${withIds.length} (created: ${createdCount}, reused: ${reusedCount})`
   );
+  if (demoPassword) {
+    console.log("  ✓ Demo user passwords synchronized from DEMO_USERS_PASSWORD");
+  }
   return withIds;
 }
 

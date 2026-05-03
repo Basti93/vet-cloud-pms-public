@@ -1,8 +1,10 @@
 import { createTRPCRouter, protectedProcedure } from "@/server/trpc";
 import { z } from "zod";
-import { calendarAccessTokens, calendarAccessAudit, users } from "@/lib/db/schema";
+import { calendarAccessTokens, calendarAccessAudit, users, PERMISSIONS } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { randomUUID } from "crypto";
+import { hasPermission } from "@/lib/auth/permissions";
+import { TRPCError } from "@trpc/server";
 
 export const calendarRouter = createTRPCRouter({
   generateToken: protectedProcedure
@@ -12,12 +14,11 @@ export const calendarRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Get current user to ensure they're a vet
+      // Get current user context
       const [currentUser] = await ctx.db
         .select({
           id: users.id,
           tenantId: users.tenantId,
-          role: users.role,
         })
         .from(users)
         .where(eq(users.clerkId, ctx.userId))
@@ -27,11 +28,16 @@ export const calendarRouter = createTRPCRouter({
         throw new Error("User not found");
       }
 
-      // Only vets (and admins who act as vets) can generate calendar tokens
-      if (currentUser.role !== "vet" && currentUser.role !== "admin") {
-        const vetOnlyError = new Error("Only veterinarians can generate calendar tokens") as Error & { code?: string };
-        vetOnlyError.code = "VET_ONLY";
-        throw vetOnlyError;
+      // Permission-based guard (replaces role hard-coding)
+      const canManageSchedule = await hasPermission(
+        ctx.userId!,
+        PERMISSIONS.SCHEDULE_MANAGE
+      );
+      if (!canManageSchedule) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: `Missing permission: ${PERMISSIONS.SCHEDULE_MANAGE}`,
+        });
       }
 
       // Generate non-guessable UUID token

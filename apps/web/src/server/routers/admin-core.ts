@@ -9,11 +9,13 @@ import {
   systemLogs,
   appointments,
   tenantDeletionSchedules,
+  featureFlags,
 } from "@/lib/db/schema";
 import { eq, like, desc, and, count, gte, lte, lt, sql, inArray } from "drizzle-orm";
 import { writeAuditLog } from "@/server/audit";
 import { executeDueTenantDeletions, hardDeleteTenantById } from "@/server/tenant-deletion";
 import { sendTenantLifecycleEmail } from "@/lib/email/service";
+import { randomUUID } from "crypto";
 
 export const adminCoreRouter = createAdminRouter({
   /**
@@ -126,9 +128,18 @@ export const adminCoreRouter = createAdminRouter({
         .from(users)
         .where(eq(users.tenantId, tenant.id));
 
+      const [flags] = await db
+        .select({ aiReceptionEnabled: featureFlags.aiReceptionEnabled })
+        .from(featureFlags)
+        .where(eq(featureFlags.tenantId, tenant.id))
+        .limit(1);
+
       return {
         ...tenant,
         userCount: userCountResult?.count ?? 0,
+        featureFlags: {
+          aiReceptionEnabled: flags?.aiReceptionEnabled ?? false,
+        },
       };
     }),
 
@@ -178,6 +189,63 @@ export const adminCoreRouter = createAdminRouter({
         event: "admin.tenant_unsuspended",
         summary: "Tenant unsuspended by system admin",
         changes: { status: "active" },
+      });
+
+      return { success: true };
+    }),
+
+  updateFeatureFlags: procedure
+    .input(
+      z.object({
+        tenantId: z.string().uuid(),
+        aiReceptionEnabled: z.boolean().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [tenant] = await db
+        .select({ id: tenants.id })
+        .from(tenants)
+        .where(eq(tenants.id, input.tenantId))
+        .limit(1);
+      if (!tenant) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Tenant not found" });
+      }
+
+      const [existing] = await db
+        .select({ id: featureFlags.id })
+        .from(featureFlags)
+        .where(eq(featureFlags.tenantId, input.tenantId))
+        .limit(1);
+
+      const updateData: Record<string, unknown> = {
+        updatedAt: new Date(),
+      };
+      if (input.aiReceptionEnabled !== undefined) {
+        updateData.aiReceptionEnabled = input.aiReceptionEnabled;
+      }
+
+      if (existing) {
+        await db
+          .update(featureFlags)
+          .set(updateData)
+          .where(eq(featureFlags.tenantId, input.tenantId));
+      } else {
+        await db.insert(featureFlags).values({
+          id: randomUUID(),
+          tenantId: input.tenantId,
+          ...updateData,
+        });
+      }
+
+      await writeAuditLog(ctx, {
+        tenantId: input.tenantId,
+        action: "config_change",
+        entity: { type: "feature_flags", id: input.tenantId },
+        event: "admin.tenant_feature_flags_updated",
+        summary: "Tenant feature flags updated by system admin",
+        changes: {
+          aiReceptionEnabled: input.aiReceptionEnabled,
+        },
       });
 
       return { success: true };

@@ -8,6 +8,7 @@ import { trpc } from "@/lib/trpc/client";
 import { useLocale } from "@/lib/user/preferences-context";
 import { usePraxis } from "@/lib/praxis/context";
 import { getSystemDomain } from "@/lib/system-name";
+import { PERMISSIONS } from "@/lib/db/schema";
 
 function useNavItems() {
   const { t } = useLocale();
@@ -45,7 +46,8 @@ export default function DashboardContent({ children }: { children: ReactNode }) 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsExpanded, setSettingsExpanded] = useState(false);
   const { praxis } = usePraxis(); // Tenant name already loaded server-side
-  const { isLoading: userLoading } = trpc.admin.getCurrentUser.useQuery();
+  const { data: permissions, isLoading: permissionsLoading, isFetched: permissionsFetched } =
+    trpc.admin.getUserPermissions.useQuery();
   const { data: featureFlags } = trpc.tenant.getFeatureFlags.useQuery();
   const { data: deletionStatus } = trpc.tenant.getDeletionStatus.useQuery();
   const { t } = useLocale();
@@ -54,6 +56,11 @@ export default function DashboardContent({ children }: { children: ReactNode }) 
   const BETA_NAV_ITEMS = useBetaNavItems();
   const USER_NAV_ITEMS = useUserNavItems();
   const ADMIN_NAV_ITEMS = useAdminNavItems();
+  const canManageSettings = Boolean(
+    permissionsFetched &&
+      permissions &&
+      permissions.includes(PERMISSIONS.SETTINGS_MANAGE)
+  );
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ backgroundColor: 'var(--color-bg)' }}>
@@ -162,8 +169,8 @@ export default function DashboardContent({ children }: { children: ReactNode }) 
                   </Link>
                 ))}
 
-                {/* Admin Settings - Only if user is loaded and has permission */}
-                {!userLoading && ADMIN_NAV_ITEMS.length > 0 && (
+                {/* Admin Settings - hidden by default until permissions are loaded */}
+                {!permissionsLoading && canManageSettings && ADMIN_NAV_ITEMS.length > 0 && (
                   <>
                     <div className="my-1" style={{ borderColor: 'var(--color-accent-soft)', borderTopWidth: '1px', opacity: 0.2 }} />
                     {ADMIN_NAV_ITEMS.map(({ href, icon: Icon, label }) => (

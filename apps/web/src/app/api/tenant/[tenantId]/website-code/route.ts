@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { db } from '@/lib/db/client';
-import { tenants, users } from '@/lib/db/schema';
+import { tenants, users, PERMISSIONS } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
+import { hasPermission } from '@/lib/auth/permissions';
 
 type Params = Promise<{ tenantId: string }>;
 
@@ -36,10 +37,10 @@ export async function POST(
       );
     }
 
-    // Check if user is admin
-    if (user[0].role !== 'admin') {
+    const canManageSettings = await hasPermission(userId, PERMISSIONS.SETTINGS_MANAGE);
+    if (!canManageSettings) {
       return NextResponse.json(
-        { error: 'Only admins can update website code' },
+        { error: 'Missing permission: settings:manage' },
         { status: 403 }
       );
     }
@@ -104,9 +105,17 @@ export async function DELETE(
       .where(eq(users.clerkId, userId))
       .limit(1);
 
-    if (!user.length || user[0].tenantId !== tenantId || user[0].role !== 'admin') {
+    if (!user.length || user[0].tenantId !== tenantId) {
       return NextResponse.json(
         { error: 'Forbidden' },
+        { status: 403 }
+      );
+    }
+
+    const canManageSettings = await hasPermission(userId, PERMISSIONS.SETTINGS_MANAGE);
+    if (!canManageSettings) {
+      return NextResponse.json(
+        { error: 'Missing permission: settings:manage' },
         { status: 403 }
       );
     }

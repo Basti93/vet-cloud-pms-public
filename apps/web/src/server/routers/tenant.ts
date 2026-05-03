@@ -5,6 +5,7 @@ import {
   users,
   featureFlags,
   tenantDeletionSchedules,
+  PERMISSIONS,
 } from "@/lib/db/schema";
 import { db as appDb } from "@/lib/db/client";
 import { and, eq } from "drizzle-orm";
@@ -13,6 +14,7 @@ import { sendTenantDeactivationEmail } from "@/lib/email/service";
 import { getMainDomain } from "@/lib/env";
 import { writeAuditLog } from "@/server/audit";
 import { logEventAsync, serializeLogError } from "@/server/trpc/logging-middleware";
+import { requirePermission } from "@/server/trpc/middleware";
 
 // Helper function to generate a unique slug from tenant name
 async function generateUniqueSlug(
@@ -461,17 +463,18 @@ export const tenantRouter = createTRPCRouter({
     }),
 
   delete: protectedProcedure
+    .use(requirePermission(PERMISSIONS.SETTINGS_MANAGE))
     .input(z.object({ tenantId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      // Get current user's role and tenantId
+      // Get current user's tenant context
       const [user] = await ctx.db
-        .select({ id: users.id, tenantId: users.tenantId, role: users.role, email: users.email })
+        .select({ id: users.id, tenantId: users.tenantId, email: users.email })
         .from(users)
         .where(eq(users.clerkId, ctx.userId))
         .limit(1);
 
-      if (!user || user.role !== "admin") {
-        throw new Error("Only admins can delete a practice");
+      if (!user) {
+        throw new Error("User not found");
       }
 
       if (user.tenantId !== input.tenantId) {
@@ -551,76 +554,19 @@ export const tenantRouter = createTRPCRouter({
     }
   }),
 
-  updateFeatureFlags: protectedProcedure
-    .input(
-      z.object({
-        aiReceptionEnabled: z.boolean().optional(),
-      })
-    )
-    .mutation(async ({ ctx, input }) => {
-      // Get current user's tenant and role
-      const [user] = await ctx.db
-        .select({ tenantId: users.tenantId, role: users.role })
-        .from(users)
-        .where(eq(users.clerkId, ctx.userId))
-        .limit(1);
-
-      if (!user || user.role !== "admin") {
-        throw new Error("Only admins can update feature flags");
-      }
-
-      // Check if feature flags exist for this tenant
-      const [existing] = await ctx.db
-        .select({ id: featureFlags.id })
-        .from(featureFlags)
-        .where(eq(featureFlags.tenantId, user.tenantId))
-        .limit(1);
-
-      const updateData: Record<string, unknown> = {};
-      if (input.aiReceptionEnabled !== undefined) {
-        updateData.aiReceptionEnabled = input.aiReceptionEnabled;
-      }
-      updateData.updatedAt = new Date();
-
-      if (existing) {
-        // Update existing
-        await ctx.db
-          .update(featureFlags)
-          .set(updateData)
-          .where(eq(featureFlags.tenantId, user.tenantId));
-      } else {
-        // Create new
-        await ctx.db.insert(featureFlags).values({
-          id: randomUUID(),
-          tenantId: user.tenantId,
-          ...updateData,
-        });
-      }
-
-      await writeAuditLog(ctx, {
-        tenantId: user.tenantId,
-        action: "config_change",
-        entity: { type: "feature_flags", id: user.tenantId },
-        event: "tenant.feature_flags_updated",
-        summary: "Tenant feature flags updated",
-        changes: input,
-      });
-
-      return { success: true };
-    }),
-
   requestDeletion: protectedProcedure
+    .use(requirePermission(PERMISSIONS.SETTINGS_MANAGE))
     .input(z.object({ tenantId: z.string().uuid(), userId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       // Get current user
       const [user] = await ctx.db
-        .select({ id: users.id, tenantId: users.tenantId, email: users.email, role: users.role })
+        .select({ id: users.id, tenantId: users.tenantId, email: users.email })
         .from(users)
         .where(eq(users.clerkId, ctx.userId))
         .limit(1);
 
-      if (!user || user.role !== "admin") {
-        throw new Error("Only admins can request account deletion");
+      if (!user) {
+        throw new Error("User not found");
       }
 
       if (user.tenantId !== input.tenantId) {

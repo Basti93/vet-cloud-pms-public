@@ -20,7 +20,10 @@ import "./globals.css";
 const SYSTEM_DOMAIN = getSystemDomain();
 
 export const metadata: Metadata = {
-  title: SYSTEM_DOMAIN,
+  title: {
+    default: `Vet Cloud PMS (${SYSTEM_DOMAIN})`,
+    template: `%s | Vet Cloud PMS`,
+  },
   description: "Modern cloud-based veterinary practice management system",
   robots: "noindex",
 };

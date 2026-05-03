@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Globe, ExternalLink, CheckCircle, Save, Trash2, AlertTriangle } from "lucide-react";
+import { Globe, ExternalLink, CheckCircle, Save } from "lucide-react";
 import { EmbedHelpSection } from "@/components/settings/EmbedHelpSection";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -51,7 +51,6 @@ export default function PracticePage() {
     { enabled: !!tenant?.slug }
   );
   const update = trpc.tenant.update.useMutation();
-  const deletePractice = trpc.tenant.delete.useMutation();
 
   const [form, setForm] = useState({
     name: "",
@@ -65,8 +64,6 @@ export default function PracticePage() {
     allowedEmbeddingDomains: [] as string[],
   });
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [newDomain, setNewDomain] = useState("");
 
   useEffect(() => {
@@ -319,97 +316,6 @@ export default function PracticePage() {
         </div>
       </Card>
 
-      {/* Danger Zone */}
-      <Card
-        className="p-6 border-red-200"
-        style={{
-          borderColor: "#fca5a5",
-          backgroundColor: "rgba(127, 29, 29, 0.05)"
-        }}
-      >
-        <div className="flex items-start gap-3 mb-4">
-          <AlertTriangle size={20} style={{ color: "#dc2626" }} className="flex-shrink-0 mt-0.5" />
-          <div>
-            <h2 className="text-base font-semibold" style={{ color: "#dc2626" }}>Gefahrenzone</h2>
-            <p className="text-sm mt-1" style={{ color: "var(--color-muted)" }}>
-              Deaktiviert die Praxis sofort und plant die endgültige Löschung nach 30 Tagen.
-            </p>
-          </div>
-        </div>
-
-        {!showDeleteConfirm ? (
-          <Button
-            variant="destructive"
-            onClick={() => setShowDeleteConfirm(true)}
-            className="gap-2"
-            style={{ backgroundColor: "#dc2626", color: "white" }}
-          >
-            <Trash2 size={15} />
-            Praxis löschen
-          </Button>
-        ) : (
-          <div className="space-y-4">
-            <p className="text-sm" style={{ color: "var(--color-fg)" }}>
-              Geben Sie den Praxisnamen ein, um zu bestätigen:
-            </p>
-            <div>
-              <input
-                type="text"
-                value={deleteConfirmText}
-                onChange={(e) => setDeleteConfirmText(e.target.value)}
-                placeholder={tenant?.name || "Praxisname"}
-                className="w-full px-3 py-2 rounded-lg border text-sm"
-                style={{
-                  borderColor: deleteConfirmText === tenant?.name ? "#dc2626" : "var(--color-border)",
-                  backgroundColor: "var(--color-bg)",
-                  color: "var(--color-fg)",
-                }}
-              />
-            </div>
-            <div className="flex gap-3">
-              <Button
-                onClick={() => {
-                  if (deleteConfirmText === tenant?.name && tenant?.id) {
-                    deletePractice.mutate(
-                      { tenantId: tenant.id },
-                      {}
-                    );
-                  }
-                }}
-                disabled={deleteConfirmText !== tenant?.name || deletePractice.isPending}
-                style={{
-                  backgroundColor: "#dc2626",
-                  color: "white",
-                  opacity: deleteConfirmText === tenant?.name ? 1 : 0.5,
-                }}
-              >
-                {deletePractice.isPending ? "Wird geplant..." : "Ja, deaktivieren & Löschung planen"}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowDeleteConfirm(false);
-                  setDeleteConfirmText("");
-                }}
-                disabled={deletePractice.isPending}
-              >
-                Abbrechen
-              </Button>
-            </div>
-            {deletePractice.error && (
-              <p className="text-sm" style={{ color: "#dc2626" }}>
-                Fehler: {deletePractice.error.message}
-              </p>
-            )}
-            {deletePractice.data?.success && (
-              <p className="text-sm" style={{ color: "#166534" }}>
-                Praxis deaktiviert. Endgültige Löschung geplant für{" "}
-                {new Date(deletePractice.data.scheduledFor).toLocaleDateString("de-DE")}.
-              </p>
-            )}
-          </div>
-        )}
-      </Card>
     </div>
   );
 }

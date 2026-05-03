@@ -62,10 +62,24 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
     ) {
       router.push("/dashboard");
     }
-  }, [permissions, permissionsFetched, permissionsLoading, mounted, router]);
+  }, [
+    permissions,
+    permissionsFetched,
+    permissionsLoading,
+    mounted,
+    router,
+  ]);
 
   // Don't render until permission check is complete
-  if (!mounted || permissionsLoading) return null;
+  if (
+    !mounted ||
+    permissionsLoading ||
+    !permissionsFetched ||
+    !permissions ||
+    !permissions.includes(PERMISSIONS.SETTINGS_MANAGE)
+  ) {
+    return null;
+  }
 
   return (
     <div className="space-y-4 sm:space-y-6">

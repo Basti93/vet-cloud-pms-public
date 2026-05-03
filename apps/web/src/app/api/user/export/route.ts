@@ -20,6 +20,8 @@ import {
   auditLogs,
 } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { hasPermission } from "@/lib/auth/permissions";
+import { PERMISSIONS } from "@/lib/db/schema";
 
 /**
  * GET /api/user/export
@@ -52,6 +54,17 @@ export async function GET(_request: NextRequest) {
       return NextResponse.json(
         { error: "User not found" },
         { status: 404 }
+      );
+    }
+
+    const canManageSettings = await hasPermission(
+      userId,
+      PERMISSIONS.SETTINGS_MANAGE
+    );
+    if (!canManageSettings) {
+      return NextResponse.json(
+        { error: "Forbidden: settings_manage permission required" },
+        { status: 403 }
       );
     }
 
