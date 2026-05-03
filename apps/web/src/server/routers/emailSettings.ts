@@ -1,8 +1,7 @@
 import { z } from "zod";
 import { eq } from "drizzle-orm";
-import { createTRPCRouter, protectedProcedure } from "@/server/trpc";
-import { emailSettings, tenants, users } from "@/lib/db/schema";
-import { db as appDb } from "@/lib/db/client";
+import { createTRPCRouter, tenantProcedure } from "@/server/trpc";
+import { emailSettings, tenants } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
 import { requirePermission } from "@/server/trpc/middleware";
 import { PERMISSIONS } from "@/lib/db/schema";
@@ -10,42 +9,18 @@ import { sendConfirmationEmail, SendConfirmationEmailInput } from "@/lib/email/s
 
 const FIXED_REMINDER_HOURS = 24;
 
-async function getUserTenant(ctx: { db: typeof appDb }, userId: string) {
-  const [user] = await ctx.db
-    .select({ tenantId: users.tenantId })
-    .from(users)
-    .where(eq(users.clerkId, userId))
-    .limit(1);
-
-  if (!user?.tenantId) {
-    throw new TRPCError({
-      code: "UNAUTHORIZED",
-      message: "User not found or not assigned to a tenant",
-    });
-  }
-
-  return user.tenantId;
-}
-
 export const emailSettingsRouter = createTRPCRouter({
   // ── Get Settings ────────────────────────────────────────────────────────
-  get: protectedProcedure
+  get: tenantProcedure
     .use(requirePermission(PERMISSIONS.SETTINGS_MANAGE))
     .input(z.object({ tenantId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      const userTenantId = await getUserTenant(ctx, ctx.userId!);
-
-      if (userTenantId !== input.tenantId) {
-        throw new TRPCError({ code: "FORBIDDEN" });
-      }
-
       const [settings] = await ctx.db
         .select()
         .from(emailSettings)
         .where(eq(emailSettings.tenantId, input.tenantId))
         .limit(1);
 
-      // If no settings exist, create defaults
       if (!settings) {
         const [created] = await ctx.db
           .insert(emailSettings)
@@ -58,14 +33,14 @@ export const emailSettingsRouter = createTRPCRouter({
     }),
 
   // ── Update Settings ─────────────────────────────────────────────────────
-  update: protectedProcedure
+  update: tenantProcedure
     .use(requirePermission(PERMISSIONS.SETTINGS_MANAGE))
     .input(
       z.object({
         tenantId: z.string().uuid(),
         confirmationEmailEnabled: z.boolean().optional(),
         reminderEmailEnabled: z.boolean().optional(),
-        reminderHoursBefore: z.number().int().min(1).max(168).optional(), // 1 hour to 1 week
+        reminderHoursBefore: z.number().int().min(1).max(168).optional(),
         bookingNotificationEnabled: z.boolean().optional(),
         senderName: z.string().max(100).optional(),
         confirmationSubject: z.string().max(255).optional(),
@@ -75,12 +50,6 @@ export const emailSettingsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const userTenantId = await getUserTenant(ctx, ctx.userId!);
-
-      if (userTenantId !== input.tenantId) {
-        throw new TRPCError({ code: "FORBIDDEN" });
-      }
-
       const { tenantId, ...updateData } = input;
       const normalizedUpdateData = {
         ...updateData,
@@ -94,7 +63,6 @@ export const emailSettingsRouter = createTRPCRouter({
         .limit(1);
 
       if (!existing) {
-        // Create if doesn't exist
         const [created] = await ctx.db
           .insert(emailSettings)
           .values({ tenantId, ...normalizedUpdateData })
@@ -112,7 +80,7 @@ export const emailSettingsRouter = createTRPCRouter({
     }),
 
   // ── Send Test Email ─────────────────────────────────────────────────────
-  sendTestEmail: protectedProcedure
+  sendTestEmail: tenantProcedure
     .use(requirePermission(PERMISSIONS.SETTINGS_MANAGE))
     .input(
       z.object({
@@ -122,13 +90,6 @@ export const emailSettingsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const userTenantId = await getUserTenant(ctx, ctx.userId!);
-
-      if (userTenantId !== input.tenantId) {
-        throw new TRPCError({ code: "FORBIDDEN" });
-      }
-
-      // Get tenant name for test email
       const [tenant] = await ctx.db
         .select({ name: tenants.name })
         .from(tenants)
@@ -139,7 +100,6 @@ export const emailSettingsRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Tenant not found" });
       }
 
-      // Send test email
       const testEmailData: SendConfirmationEmailInput = {
         to: input.recipientEmail,
         practiceName: tenant.name,

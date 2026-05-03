@@ -3,6 +3,8 @@
 import { useRef, useState, useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
 import type FullCalendarType from "@fullcalendar/react";
+import type { EventClickArg, DateSelectArg, DatesSetArg, EventContentArg } from "@fullcalendar/core";
+import type { DateClickArg } from "@fullcalendar/interaction";
 import { Plus, ChevronLeft, ChevronRight, Share2 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -306,15 +308,15 @@ export default function SchedulePage() {
                     selectMirror
                     nowIndicator
                     allDaySlot={false}
-                    eventClick={(info) => openEdit(info.event.extendedProps as ApptDetail)}
-                    dateClick={(info) => openNew(new Date(info.date))}
-                    select={(info) => openNew(new Date(info.start))}
-                    datesSet={(info) => setCurrentTitle(info.view.title)}
+                    eventClick={(info: EventClickArg) => openEdit(info.event.extendedProps as ApptDetail)}
+                    dateClick={(info: DateClickArg) => openNew(new Date(info.date))}
+                    select={(info: DateSelectArg) => openNew(new Date(info.start))}
+                    datesSet={(info: DatesSetArg) => setCurrentTitle(info.view.title)}
                     slotLabelFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
                     eventTimeFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
                     businessHours={businessHours}
                     noEventsText="Keine Termine in diesem Zeitraum"
-                    eventContent={(info) => (
+                    eventContent={(info: EventContentArg) => (
                       <div className="px-1.5 py-0.5 overflow-hidden cursor-pointer">
                         <p className="text-xs font-semibold truncate leading-tight">{info.event.title}</p>
                         <p className="text-[10px] opacity-80">{info.timeText}</p>

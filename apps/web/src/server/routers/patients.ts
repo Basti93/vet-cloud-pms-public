@@ -1,32 +1,14 @@
 import { z } from "zod";
 import { eq, and, ilike } from "drizzle-orm";
-import { createTRPCRouter, protectedProcedure } from "@/server/trpc";
-import { patients, owners, users, PERMISSIONS } from "@/lib/db/schema";
-import { db as appDb } from "@/lib/db/client";
+import { createTRPCRouter, tenantProcedure } from "@/server/trpc";
+import { patients, owners, PERMISSIONS } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
 import { requirePermission } from "@/server/trpc/middleware";
 import { writeAuditLog } from "@/server/audit";
 
-async function getUserTenant(ctx: { db: typeof appDb }, userId: string) {
-  const [user] = await ctx.db
-    .select({ tenantId: users.tenantId })
-    .from(users)
-    .where(eq(users.clerkId, userId))
-    .limit(1);
-
-  if (!user?.tenantId) {
-    throw new TRPCError({
-      code: "UNAUTHORIZED",
-      message: "User not found or not assigned to a tenant",
-    });
-  }
-
-  return user.tenantId;
-}
-
 export const patientsRouter = createTRPCRouter({
   // List patients (with optional search)
-  list: protectedProcedure
+  list: tenantProcedure
     .input(
       z.object({
         tenantId: z.string().uuid(),
@@ -66,15 +48,9 @@ export const patientsRouter = createTRPCRouter({
     }),
 
   // Get single patient with owner
-  byId: protectedProcedure
+  byId: tenantProcedure
     .input(z.object({ id: z.string().uuid(), tenantId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      const userTenantId = await getUserTenant(ctx, ctx.userId!);
-
-      if (userTenantId !== input.tenantId) {
-        throw new TRPCError({ code: "FORBIDDEN" });
-      }
-
       const result = await ctx.db
         .select()
         .from(patients)
@@ -90,28 +66,25 @@ export const patientsRouter = createTRPCRouter({
     }),
 
   // Create patient + owner
-  create: protectedProcedure
+  create: tenantProcedure
     .use(requirePermission(PERMISSIONS.PATIENTS_CREATE))
     .input(
       z.object({
         tenantId: z.string().uuid(),
-        // Owner data
         ownerFirstName: z.string().min(1),
         ownerLastName: z.string().min(1),
         ownerEmail: z.string().email().optional(),
         ownerPhone: z.string().optional(),
-        // Patient data
         name: z.string().min(1).max(100),
         species: z.string().min(1),
         breed: z.string().optional(),
         birthDate: z.date().optional(),
         microchipId: z.string().optional(),
-        weight: z.number().int().optional(), // in gramm
+        weight: z.number().int().optional(),
         notes: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Create owner first
       const [owner] = await ctx.db
         .insert(owners)
         .values({
@@ -123,7 +96,6 @@ export const patientsRouter = createTRPCRouter({
         })
         .returning();
 
-      // Create patient
       const [patient] = await ctx.db
         .insert(patients)
         .values({

@@ -26,10 +26,15 @@ interface AuditInput {
   metadata?: Record<string, unknown>;
 }
 
-export async function writeAuditLog(ctx: TRPCContext, input: AuditInput) {
-  let userId: string | null = null;
+export async function writeAuditLog(
+  ctx: TRPCContext & { dbUserId?: string },
+  input: AuditInput,
+) {
+  // dbUserId is injected by enforceTenantIsActive; fall back to a DB lookup
+  // only for contexts that haven't gone through the tenant middleware (rare).
+  let userId: string | null = ctx.dbUserId ?? null;
 
-  if (ctx.userId) {
+  if (!userId && ctx.userId) {
     const [user] = await ctx.db
       .select({ id: users.id })
       .from(users)

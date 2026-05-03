@@ -1,40 +1,16 @@
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
-import { createTRPCRouter, protectedProcedure } from "@/server/trpc";
-import { diagnoses, medications, vitals, patients, users, PERMISSIONS } from "@/lib/db/schema";
-import { db as appDb } from "@/lib/db/client";
+import { createTRPCRouter, tenantProcedure, protectedProcedure } from "@/server/trpc";
+import { diagnoses, medications, vitals, patients, PERMISSIONS } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
 import { requirePermission } from "@/server/trpc/middleware";
 import { writeAuditLog } from "@/server/audit";
 
-async function getUserTenant(ctx: { db: typeof appDb }, userId: string) {
-  const [user] = await ctx.db
-    .select({ tenantId: users.tenantId })
-    .from(users)
-    .where(eq(users.clerkId, userId))
-    .limit(1);
-
-  if (!user?.tenantId) {
-    throw new TRPCError({
-      code: "UNAUTHORIZED",
-      message: "User not found or not assigned to a tenant",
-    });
-  }
-
-  return user.tenantId;
-}
-
 // Diagnoses router
 const diagnosesRouter = createTRPCRouter({
-  list: protectedProcedure
+  list: tenantProcedure
     .input(z.object({ patientId: z.string().uuid(), tenantId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      const userTenantId = await getUserTenant(ctx, ctx.userId!);
-
-      if (userTenantId !== input.tenantId) {
-        throw new TRPCError({ code: "FORBIDDEN" });
-      }
-
       const [patient] = await ctx.db
         .select()
         .from(patients)
@@ -45,13 +21,14 @@ const diagnosesRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND" });
       }
 
-      return await ctx.db
+      return ctx.db
         .select()
         .from(diagnoses)
         .where(and(eq(diagnoses.patientId, input.patientId), eq(diagnoses.tenantId, input.tenantId)))
         .orderBy(diagnoses.dateOfDiagnosis);
     }),
 
+  // No tenantId in input — derives from ctx; use protectedProcedure
   create: protectedProcedure
     .use(requirePermission(PERMISSIONS.MEDICAL_CREATE))
     .input(
@@ -66,22 +43,15 @@ const diagnosesRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const [user] = await ctx.db
-        .select({ id: users.id, tenantId: users.tenantId })
-        .from(users)
-        .where(eq(users.clerkId, ctx.userId!))
-        .limit(1);
-
-      if (!user?.tenantId) {
-        throw new TRPCError({ code: "UNAUTHORIZED" });
-      }
+      // tenantId and dbUserId are injected by enforceTenantIsActive
+      const { tenantId, dbUserId } = ctx as { tenantId: string; dbUserId: string };
 
       const [diagnosis] = await ctx.db
         .insert(diagnoses)
         .values({
-          tenantId: user.tenantId,
+          tenantId,
           patientId: input.patientId,
-          vetId: user.id,
+          vetId: dbUserId,
           title: input.title,
           description: input.description,
           icd10Code: input.icd10Code,
@@ -92,7 +62,7 @@ const diagnosesRouter = createTRPCRouter({
         .returning();
 
       await writeAuditLog(ctx, {
-        tenantId: user.tenantId,
+        tenantId,
         action: "create",
         entity: { type: "diagnosis", id: diagnosis!.id },
         event: "diagnosis.created",
@@ -108,7 +78,7 @@ const diagnosesRouter = createTRPCRouter({
       return diagnosis;
     }),
 
-  update: protectedProcedure
+  update: tenantProcedure
     .use(requirePermission(PERMISSIONS.MEDICAL_UPDATE))
     .input(
       z.object({
@@ -119,19 +89,9 @@ const diagnosesRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const userTenantId = await getUserTenant(ctx, ctx.userId!);
-
-      if (userTenantId !== input.tenantId) {
-        throw new TRPCError({ code: "FORBIDDEN" });
-      }
-
       const [diagnosis] = await ctx.db
         .update(diagnoses)
-        .set({
-          status: input.status,
-          description: input.description,
-          updatedAt: new Date(),
-        })
+        .set({ status: input.status, description: input.description, updatedAt: new Date() })
         .where(and(eq(diagnoses.id, input.diagnosisId), eq(diagnoses.tenantId, input.tenantId)))
         .returning();
 
@@ -157,15 +117,9 @@ const diagnosesRouter = createTRPCRouter({
 
 // Medications router
 const medicationsRouter = createTRPCRouter({
-  list: protectedProcedure
+  list: tenantProcedure
     .input(z.object({ patientId: z.string().uuid(), tenantId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      const userTenantId = await getUserTenant(ctx, ctx.userId!);
-
-      if (userTenantId !== input.tenantId) {
-        throw new TRPCError({ code: "FORBIDDEN" });
-      }
-
       const [patient] = await ctx.db
         .select()
         .from(patients)
@@ -176,13 +130,14 @@ const medicationsRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND" });
       }
 
-      return await ctx.db
+      return ctx.db
         .select()
         .from(medications)
         .where(and(eq(medications.patientId, input.patientId), eq(medications.tenantId, input.tenantId)))
         .orderBy(medications.startDate);
     }),
 
+  // No tenantId in input — derives from ctx; use protectedProcedure
   create: protectedProcedure
     .input(
       z.object({
@@ -198,20 +153,12 @@ const medicationsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const [user] = await ctx.db
-        .select({ id: users.id, tenantId: users.tenantId })
-        .from(users)
-        .where(eq(users.clerkId, ctx.userId!))
-        .limit(1);
-
-      if (!user?.tenantId) {
-        throw new TRPCError({ code: "UNAUTHORIZED" });
-      }
+      const { tenantId, dbUserId } = ctx as { tenantId: string; dbUserId: string };
 
       const [medication] = await ctx.db
         .insert(medications)
         .values({
-          tenantId: user.tenantId,
+          tenantId,
           patientId: input.patientId,
           diagnosisId: input.diagnosisId,
           medicationName: input.medicationName,
@@ -221,12 +168,12 @@ const medicationsRouter = createTRPCRouter({
           startDate: input.startDate,
           endDate: input.endDate,
           notes: input.notes,
-          prescribedBy: user.id,
+          prescribedBy: dbUserId,
         })
         .returning();
 
       await writeAuditLog(ctx, {
-        tenantId: user.tenantId,
+        tenantId,
         action: "create",
         entity: { type: "medication", id: medication!.id },
         event: "medication.created",
@@ -243,7 +190,7 @@ const medicationsRouter = createTRPCRouter({
       return medication;
     }),
 
-  update: protectedProcedure
+  update: tenantProcedure
     .input(
       z.object({
         medicationId: z.string().uuid(),
@@ -253,19 +200,9 @@ const medicationsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const userTenantId = await getUserTenant(ctx, ctx.userId!);
-
-      if (userTenantId !== input.tenantId) {
-        throw new TRPCError({ code: "FORBIDDEN" });
-      }
-
       const [medication] = await ctx.db
         .update(medications)
-        .set({
-          endDate: input.endDate,
-          notes: input.notes,
-          updatedAt: new Date(),
-        })
+        .set({ endDate: input.endDate, notes: input.notes, updatedAt: new Date() })
         .where(and(eq(medications.id, input.medicationId), eq(medications.tenantId, input.tenantId)))
         .returning();
 
@@ -291,15 +228,9 @@ const medicationsRouter = createTRPCRouter({
 
 // Vitals router
 const vitalsRouter = createTRPCRouter({
-  list: protectedProcedure
+  list: tenantProcedure
     .input(z.object({ patientId: z.string().uuid(), tenantId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      const userTenantId = await getUserTenant(ctx, ctx.userId!);
-
-      if (userTenantId !== input.tenantId) {
-        throw new TRPCError({ code: "FORBIDDEN" });
-      }
-
       const [patient] = await ctx.db
         .select()
         .from(patients)
@@ -310,14 +241,14 @@ const vitalsRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND" });
       }
 
-      return await ctx.db
+      return ctx.db
         .select()
         .from(vitals)
         .where(and(eq(vitals.patientId, input.patientId), eq(vitals.tenantId, input.tenantId)))
         .orderBy(vitals.recordedAt);
     }),
 
-  create: protectedProcedure
+  create: tenantProcedure
     .input(
       z.object({
         patientId: z.string().uuid(),
@@ -331,22 +262,14 @@ const vitalsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const [user] = await ctx.db
-        .select({ id: users.id, tenantId: users.tenantId })
-        .from(users)
-        .where(eq(users.clerkId, ctx.userId!))
-        .limit(1);
-
-      if (!user?.tenantId || user.tenantId !== input.tenantId) {
-        throw new TRPCError({ code: "FORBIDDEN" });
-      }
+      const { dbUserId } = ctx as { dbUserId: string };
 
       const [vital] = await ctx.db
         .insert(vitals)
         .values({
-          tenantId: user.tenantId,
+          tenantId: input.tenantId,
           patientId: input.patientId,
-          recordedBy: user.id,
+          recordedBy: dbUserId,
           weight: input.weight,
           temperature: input.temperature,
           heartRate: input.heartRate,
@@ -357,7 +280,7 @@ const vitalsRouter = createTRPCRouter({
         .returning();
 
       await writeAuditLog(ctx, {
-        tenantId: user.tenantId,
+        tenantId: input.tenantId,
         action: "create",
         entity: { type: "vital", id: vital!.id },
         event: "vital.created",
@@ -378,7 +301,7 @@ const vitalsRouter = createTRPCRouter({
 
 // Allergies router
 const allergiesRouter = createTRPCRouter({
-  update: protectedProcedure
+  update: tenantProcedure
     .input(
       z.object({
         patientId: z.string().uuid(),
@@ -387,12 +310,6 @@ const allergiesRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const userTenantId = await getUserTenant(ctx, ctx.userId!);
-
-      if (userTenantId !== input.tenantId) {
-        throw new TRPCError({ code: "FORBIDDEN" });
-      }
-
       const [patient] = await ctx.db
         .update(patients)
         .set({ allergies: input.allergies })

@@ -23,6 +23,7 @@
   "dependencies": {
     "@clerk/localizations": "^4.5.5",
     "@clerk/nextjs": "^7",
+    "@fullcalendar/core": "^6",
     "@fullcalendar/daygrid": "^6",
     "@fullcalendar/interaction": "^6",
     "@fullcalendar/list": "^6",
@@ -79,6 +80,7 @@
     "vitest": "^2"
   },
   "optionalDependencies": {
-    "@tailwindcss/oxide-linux-x64-gnu": "^4.2.4"
+    "@tailwindcss/oxide-linux-x64-gnu": "^4.2.4",
+    "@rollup/rollup-linux-x64-gnu": "4.60.2"
   }
 }

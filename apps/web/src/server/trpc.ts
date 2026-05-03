@@ -71,7 +71,7 @@ const enforceTenantIsActive = t.middleware(async ({ ctx, path, next }) => {
   }
 
   const [user] = await ctx.db
-    .select({ tenantId: users.tenantId })
+    .select({ id: users.id, tenantId: users.tenantId })
     .from(users)
     .where(eq(users.clerkId, ctx.userId))
     .limit(1);
@@ -98,6 +98,37 @@ const enforceTenantIsActive = t.middleware(async ({ ctx, path, next }) => {
     });
   }
 
+  // Inject resolved tenant into context so downstream procedures and middlewares
+  // can use ctx.tenantId / ctx.dbUserId without repeating the DB lookup.
+  // Only pass the new fields — tRPC merges them with existing ctx (including
+  // the userId: string narrowing from enforceUserIsAuthenticated).
+  return next({ ctx: { tenantId: user.tenantId, dbUserId: user.id } });
+});
+
+// Validates that input.tenantId (when present) matches the authenticated user's
+// tenant. Logs the attempt as a security event and throws FORBIDDEN on mismatch.
+const enforceTenantOwnership = t.middleware(async ({ ctx, getRawInput, path, next }) => {
+  const rawInput = await getRawInput();
+  if (rawInput !== null && typeof rawInput === "object" && !Array.isArray(rawInput)) {
+    const inputTenantId = (rawInput as Record<string, unknown>).tenantId;
+    if (typeof inputTenantId === "string") {
+      // tenantId is injected by enforceTenantIsActive which runs before this
+      const { tenantId, dbUserId } = ctx as { tenantId?: string; dbUserId?: string };
+      if (tenantId && inputTenantId !== tenantId) {
+        logEventAsync({
+          level: "warn",
+          category: "security",
+          eventType: "tenant_ownership_violation",
+          message: `Cross-tenant access attempt blocked: ${path}`,
+          tenantId,
+          userId: dbUserId,
+          metadata: { path, attemptedTenantId: inputTenantId },
+          ipAddress: ctx.headers.get("x-forwarded-for") ?? undefined,
+        });
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+    }
+  }
   return next();
 });
 
@@ -254,6 +285,20 @@ export const protectedProcedure = t.procedure
   .use(timingMiddleware)
   .use(enforceUserIsAuthenticated)
   .use(enforceTenantIsActive);
+
+/**
+ * Tenant-scoped procedure — extends protectedProcedure.
+ * Use for any procedure that accepts a tenantId in its input.
+ * Automatically validates input.tenantId === ctx.tenantId and logs
+ * cross-tenant access attempts as security events.
+ */
+export const tenantProcedure = t.procedure
+  .use(systemLoggingMiddleware)
+  .use(rateLimitMiddleware)
+  .use(timingMiddleware)
+  .use(enforceUserIsAuthenticated)
+  .use(enforceTenantIsActive)
+  .use(enforceTenantOwnership);
 
 /** Admin procedure — requires Clerk session + ADMIN_CLERK_IDS env var */
 export const adminProcedure = t.procedure
