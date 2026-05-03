@@ -17,7 +17,7 @@ async function main() {
 
   if (outOfSync.length === 0) {
     console.log(`OK: all system roles are synced at version ${SYSTEM_ROLES_VERSION}.`);
-    return;
+    process.exit(0);
   }
 
   console.error(
