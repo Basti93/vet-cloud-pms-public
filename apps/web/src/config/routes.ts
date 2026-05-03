@@ -5,6 +5,7 @@
 export const PUBLIC_ROUTES = [
   '/sign-in(.*)',
   '/sign-up(.*)',
+  '/invite/accept(.*)',
   '/book(.*)',          // Online booking pages
   '/impressum(.*)',     // Legal notice
   '/datenschutz(.*)',   // Privacy policy
@@ -15,4 +16,3 @@ export const PUBLIC_ROUTES = [
   '/api/calendar(.*)',            // JWT-protected
   '/',
 ] as const;
-
