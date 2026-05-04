@@ -1,0 +1,274 @@
+import { TRPCError } from "@trpc/server";
+import { and, desc, eq, gte, isNull, lte, sql } from "drizzle-orm";
+import { z } from "zod";
+import { PERMISSIONS, patients, users, vaccinations } from "@/lib/db/schema";
+import { createTRPCRouter, tenantProcedure } from "@/server/trpc";
+import { requirePermission } from "@/server/trpc/middleware";
+import { writeAuditLog } from "@/server/audit";
+
+export const vaccinationsRouter = createTRPCRouter({
+  list: tenantProcedure
+    .use(requirePermission(PERMISSIONS.PATIENTS_READ))
+    .input(
+      z.object({
+        tenantId: z.string().uuid(),
+        patientId: z.string().uuid(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      return ctx.db
+        .select({
+          id: vaccinations.id,
+          patientId: vaccinations.patientId,
+          type: vaccinations.type,
+          administeredDate: vaccinations.administeredDate,
+          expiryDate: vaccinations.expiryDate,
+          vetId: vaccinations.vetId,
+          batchNumber: vaccinations.batchNumber,
+          reminderSentDate: vaccinations.reminderSentDate,
+          notes: vaccinations.notes,
+          createdAt: vaccinations.createdAt,
+          updatedAt: vaccinations.updatedAt,
+          vetFirstName: users.firstName,
+          vetLastName: users.lastName,
+        })
+        .from(vaccinations)
+        .leftJoin(users, eq(vaccinations.vetId, users.id))
+        .where(
+          and(
+            eq(vaccinations.tenantId, input.tenantId),
+            eq(vaccinations.patientId, input.patientId),
+            isNull(vaccinations.deletedAt)
+          )
+        )
+        .orderBy(desc(vaccinations.administeredDate));
+    }),
+
+  create: tenantProcedure
+    .use(requirePermission(PERMISSIONS.MEDICAL_CREATE))
+    .input(
+      z.object({
+        tenantId: z.string().uuid(),
+        patientId: z.string().uuid(),
+        type: z.string().trim().min(1).max(120),
+        administeredDate: z.date(),
+        expiryDate: z.date(),
+        vetId: z.string().uuid().optional(),
+        batchNumber: z.string().trim().max(120).optional(),
+        notes: z.string().trim().max(2000).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (input.expiryDate <= input.administeredDate) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Expiry date must be after administered date.",
+        });
+      }
+
+      const [patient] = await ctx.db
+        .select({ id: patients.id })
+        .from(patients)
+        .where(and(eq(patients.id, input.patientId), eq(patients.tenantId, input.tenantId)))
+        .limit(1);
+
+      if (!patient) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Patient not found" });
+      }
+
+      const [created] = await ctx.db
+        .insert(vaccinations)
+        .values({
+          tenantId: input.tenantId,
+          patientId: input.patientId,
+          type: input.type,
+          administeredDate: input.administeredDate,
+          expiryDate: input.expiryDate,
+          vetId: input.vetId,
+          batchNumber: input.batchNumber,
+          notes: input.notes,
+        })
+        .returning();
+
+      await writeAuditLog(ctx, {
+        tenantId: input.tenantId,
+        action: "create",
+        entity: { type: "vaccination", id: created.id },
+        event: "vaccination.created",
+        summary: `Vaccination ${input.type} recorded`,
+        changes: {
+          patientId: input.patientId,
+          administeredDate: input.administeredDate.toISOString(),
+          expiryDate: input.expiryDate.toISOString(),
+        },
+      });
+
+      return created;
+    }),
+
+  update: tenantProcedure
+    .use(requirePermission(PERMISSIONS.MEDICAL_UPDATE))
+    .input(
+      z.object({
+        tenantId: z.string().uuid(),
+        vaccinationId: z.string().uuid(),
+        type: z.string().trim().min(1).max(120).optional(),
+        administeredDate: z.date().optional(),
+        expiryDate: z.date().optional(),
+        vetId: z.string().uuid().nullable().optional(),
+        batchNumber: z.string().trim().max(120).nullable().optional(),
+        notes: z.string().trim().max(2000).nullable().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [current] = await ctx.db
+        .select({
+          id: vaccinations.id,
+          administeredDate: vaccinations.administeredDate,
+          expiryDate: vaccinations.expiryDate,
+        })
+        .from(vaccinations)
+        .where(
+          and(
+            eq(vaccinations.id, input.vaccinationId),
+            eq(vaccinations.tenantId, input.tenantId),
+            isNull(vaccinations.deletedAt)
+          )
+        )
+        .limit(1);
+
+      if (!current) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Vaccination not found" });
+      }
+
+      const nextAdministered = input.administeredDate ?? current.administeredDate;
+      const nextExpiry = input.expiryDate ?? current.expiryDate;
+
+      if (nextExpiry <= nextAdministered) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Expiry date must be after administered date.",
+        });
+      }
+
+      const [updated] = await ctx.db
+        .update(vaccinations)
+        .set({
+          type: input.type,
+          administeredDate: input.administeredDate,
+          expiryDate: input.expiryDate,
+          vetId: input.vetId === undefined ? undefined : input.vetId,
+          batchNumber: input.batchNumber === undefined ? undefined : input.batchNumber,
+          notes: input.notes === undefined ? undefined : input.notes,
+          updatedAt: new Date(),
+        })
+        .where(eq(vaccinations.id, input.vaccinationId))
+        .returning();
+
+      await writeAuditLog(ctx, {
+        tenantId: input.tenantId,
+        action: "update",
+        entity: { type: "vaccination", id: input.vaccinationId },
+        event: "vaccination.updated",
+        summary: "Vaccination record updated",
+      });
+
+      return updated;
+    }),
+
+  delete: tenantProcedure
+    .use(requirePermission(PERMISSIONS.MEDICAL_UPDATE))
+    .input(
+      z.object({
+        tenantId: z.string().uuid(),
+        vaccinationId: z.string().uuid(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [deleted] = await ctx.db
+        .update(vaccinations)
+        .set({ deletedAt: new Date(), updatedAt: new Date() })
+        .where(
+          and(
+            eq(vaccinations.id, input.vaccinationId),
+            eq(vaccinations.tenantId, input.tenantId),
+            isNull(vaccinations.deletedAt)
+          )
+        )
+        .returning({ id: vaccinations.id });
+
+      if (!deleted) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Vaccination not found" });
+      }
+
+      await writeAuditLog(ctx, {
+        tenantId: input.tenantId,
+        action: "delete",
+        entity: { type: "vaccination", id: input.vaccinationId },
+        event: "vaccination.deleted",
+        summary: "Vaccination record archived",
+      });
+
+      return { success: true };
+    }),
+
+  getUpcoming: tenantProcedure
+    .use(requirePermission(PERMISSIONS.PATIENTS_READ))
+    .input(
+      z.object({
+        tenantId: z.string().uuid(),
+        patientId: z.string().uuid(),
+        days: z.number().int().min(1).max(365).default(90),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const now = new Date();
+      const until = new Date(now.getTime() + input.days * 24 * 60 * 60 * 1000);
+
+      const rows = await ctx.db
+        .select({
+          id: vaccinations.id,
+          type: vaccinations.type,
+          expiryDate: vaccinations.expiryDate,
+        })
+        .from(vaccinations)
+        .where(
+          and(
+            eq(vaccinations.tenantId, input.tenantId),
+            eq(vaccinations.patientId, input.patientId),
+            isNull(vaccinations.deletedAt),
+            gte(vaccinations.expiryDate, now),
+            lte(vaccinations.expiryDate, until)
+          )
+        )
+        .orderBy(vaccinations.expiryDate);
+
+      return rows.map((row) => ({
+        ...row,
+        daysUntilDue: Math.ceil((row.expiryDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)),
+      }));
+    }),
+
+  getScanStats: tenantProcedure
+    .use(requirePermission(PERMISSIONS.SETTINGS_MANAGE))
+    .input(z.object({ tenantId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const now = new Date();
+      const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+      const [row] = await ctx.db
+        .select({
+          totalDue: sql<number>`count(*) filter (where ${vaccinations.expiryDate} < ${now})`,
+          totalUpcoming: sql<number>`count(*) filter (where ${vaccinations.expiryDate} >= ${now} and ${vaccinations.expiryDate} <= ${in30Days})`,
+          totalTracked: sql<number>`count(*)`,
+        })
+        .from(vaccinations)
+        .where(and(eq(vaccinations.tenantId, input.tenantId), isNull(vaccinations.deletedAt)));
+
+      return {
+        totalDue: Number(row?.totalDue ?? 0),
+        totalUpcoming: Number(row?.totalUpcoming ?? 0),
+        totalTracked: Number(row?.totalTracked ?? 0),
+      };
+    }),
+});

@@ -714,6 +714,106 @@ export const appointmentEmailLogs = pgTable(
 );
 
 // ============================================================================
+// VACCINATIONS (Patient Vaccination Records + Reminder State)
+// ============================================================================
+
+export const vaccinations = pgTable(
+  "vaccinations",
+  {
+    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    patientId: uuid("patient_id")
+      .notNull()
+      .references(() => patients.id, { onDelete: "cascade" }),
+    type: varchar("type", { length: 120 }).notNull(),
+    administeredDate: timestamp("administered_date", { withTimezone: true }).notNull(),
+    expiryDate: timestamp("expiry_date", { withTimezone: true }).notNull(),
+    vetId: uuid("vet_id").references(() => users.id, { onDelete: "set null" }),
+    batchNumber: varchar("batch_number", { length: 120 }),
+    reminderSentDate: timestamp("reminder_sent_date", { withTimezone: true }),
+    notes: text("notes"),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (table) => ({
+    tenantIdIdx: index("vaccinations_tenant_id_idx").on(table.tenantId),
+    patientIdIdx: index("vaccinations_patient_id_idx").on(table.patientId),
+    expiryDateIdx: index("vaccinations_expiry_date_idx").on(table.expiryDate),
+    tenantExpiryReminderIdx: index("vaccinations_tenant_expiry_reminder_idx").on(
+      table.tenantId,
+      table.expiryDate,
+      table.reminderSentDate
+    ),
+  })
+);
+
+export const vaccinationSettings = pgTable(
+  "vaccination_settings",
+  {
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .primaryKey()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    reminderEnabled: boolean("reminder_enabled").default(true).notNull(),
+    reminderDaysBefore: integer("reminder_days_before").default(30).notNull(),
+    reminderSubject: varchar("reminder_subject", { length: 255 })
+      .default("Impf-Erinnerung für {petName}")
+      .notNull(),
+    reminderBody: text("reminder_body")
+      .default(
+        "Hallo {ownerName},\n\nfür {petName} ist die Auffrischung ({vaccinationType}) am {dueDate} fällig.\nBitte vereinbaren Sie einen Termin bei {clinicName}.\n\nViele Grüße\n{clinicName}"
+      )
+      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (table) => ({
+    tenantIdIdx: index("vaccination_settings_tenant_id_idx").on(table.tenantId),
+  })
+);
+
+export const vaccinationEmailLogs = pgTable(
+  "vaccination_email_logs",
+  {
+    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    vaccinationId: uuid("vaccination_id")
+      .notNull()
+      .references(() => vaccinations.id, { onDelete: "cascade" }),
+    emailAddress: varchar("email_address", { length: 255 }).notNull(),
+    status: varchar("status", { length: 20, enum: ["sent", "failed", "bounced"] })
+      .notNull()
+      .default("sent"),
+    messageId: varchar("message_id", { length: 255 }),
+    error: text("error"),
+    sentAt: timestamp("sent_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (table) => ({
+    tenantIdIdx: index("vaccination_email_logs_tenant_id_idx").on(table.tenantId),
+    vaccinationIdIdx: index("vaccination_email_logs_vaccination_id_idx").on(table.vaccinationId),
+    statusSentAtIdx: index("vaccination_email_logs_status_sent_at_idx").on(table.status, table.sentAt),
+  })
+);
+
+// ============================================================================
 // FEATURE_FLAGS (Per-Tenant Feature Toggle)
 // ============================================================================
 

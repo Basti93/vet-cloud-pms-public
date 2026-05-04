@@ -1,8 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db/client";
-import { appointments, emailSettings, appointmentEmailLogs, tenants, patients, owners } from "@/lib/db/schema";
-import { and, gte, lte, inArray, eq } from "drizzle-orm";
-import { sendReminderEmail } from "@/lib/email/service";
+import {
+  appointments,
+  emailSettings,
+  appointmentEmailLogs,
+  tenants,
+  patients,
+  owners,
+  vaccinations,
+  vaccinationSettings,
+  vaccinationEmailLogs,
+} from "@/lib/db/schema";
+import { and, gte, lte, inArray, eq, isNull } from "drizzle-orm";
+import { sendReminderEmail, sendVaccinationReminderEmail } from "@/lib/email/service";
 import { executeDueTenantDeletions } from "@/server/tenant-deletion";
 import { getSystemDomain } from "@/lib/system-name";
 
@@ -38,6 +48,8 @@ export async function GET(request: NextRequest) {
 
     let totalSent = 0;
     let totalFailed = 0;
+    let vaccinationRemindersSent = 0;
+    let vaccinationRemindersFailed = 0;
 
     for (const tenant of allTenants) {
       // Get email settings for this tenant
@@ -167,13 +179,100 @@ export async function GET(request: NextRequest) {
           );
         }
       }
+
+      const vaxSettings = await db
+        .select()
+        .from(vaccinationSettings)
+        .where(eq(vaccinationSettings.tenantId, tenant.id))
+        .limit(1);
+
+      const reminderEnabled = vaxSettings[0]?.reminderEnabled ?? true;
+      const reminderDaysBefore = vaxSettings[0]?.reminderDaysBefore ?? 30;
+      const reminderSubject = vaxSettings[0]?.reminderSubject ?? "Impf-Erinnerung für {petName}";
+      const reminderBody =
+        vaxSettings[0]?.reminderBody ??
+        "Hallo {ownerName},\n\nfür {petName} ist die Auffrischung ({vaccinationType}) am {dueDate} fällig.\nBitte vereinbaren Sie einen Termin bei {clinicName}.\n\nViele Grüße\n{clinicName}";
+
+      if (!reminderEnabled) {
+        continue;
+      }
+
+      const remindUntil = new Date(now.getTime() + reminderDaysBefore * 24 * 60 * 60 * 1000);
+      const dueVaccinations = await db
+        .select({
+          id: vaccinations.id,
+          expiryDate: vaccinations.expiryDate,
+          type: vaccinations.type,
+          patientName: patients.name,
+          ownerEmail: owners.email,
+          ownerFirstName: owners.firstName,
+        })
+        .from(vaccinations)
+        .innerJoin(patients, eq(vaccinations.patientId, patients.id))
+        .innerJoin(owners, eq(patients.ownerId, owners.id))
+        .where(
+          and(
+            eq(vaccinations.tenantId, tenant.id),
+            isNull(vaccinations.deletedAt),
+            isNull(vaccinations.reminderSentDate),
+            lte(vaccinations.expiryDate, remindUntil)
+          )
+        );
+
+      for (const item of dueVaccinations) {
+        if (!item.ownerEmail) continue;
+        const result = await sendVaccinationReminderEmail({
+          tenantId: tenant.id,
+          vaccinationId: item.id,
+          ownerEmail: item.ownerEmail,
+          ownerName: item.ownerFirstName,
+          petName: item.patientName,
+          vaccinationType: item.type,
+          dueDate: item.expiryDate,
+          clinicName: practiceName,
+          customSubject: reminderSubject,
+          customBody: reminderBody,
+        });
+
+        if (result.success) {
+          await db.insert(vaccinationEmailLogs).values({
+            tenantId: tenant.id,
+            vaccinationId: item.id,
+            emailAddress: item.ownerEmail,
+            status: "sent",
+            messageId: result.messageId,
+          });
+          await db
+            .update(vaccinations)
+            .set({ reminderSentDate: new Date(), updatedAt: new Date() })
+            .where(eq(vaccinations.id, item.id));
+          vaccinationRemindersSent++;
+        } else {
+          const errorMessage =
+            result.error instanceof Error ? result.error.message : String(result.error);
+          await db.insert(vaccinationEmailLogs).values({
+            tenantId: tenant.id,
+            vaccinationId: item.id,
+            emailAddress: item.ownerEmail,
+            status: "failed",
+            error: errorMessage,
+          });
+          vaccinationRemindersFailed++;
+        }
+      }
     }
 
     return NextResponse.json(
       {
         success: true,
         message: `Cron job completed. Sent: ${totalSent}, Failed: ${totalFailed}`,
-        stats: { totalSent, totalFailed, ...deletionCleanup },
+        stats: {
+          totalSent,
+          totalFailed,
+          vaccinationRemindersSent,
+          vaccinationRemindersFailed,
+          ...deletionCleanup,
+        },
       },
       { status: 200 }
     );

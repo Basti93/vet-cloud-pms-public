@@ -23,6 +23,10 @@ export default function PatientDetailPage() {
   const [showDiagnosisForm, setShowDiagnosisForm] = useState(false);
   const [showMedicationForm, setShowMedicationForm] = useState(false);
   const [showVitalsForm, setShowVitalsForm] = useState(false);
+  const [showVaccinationForm, setShowVaccinationForm] = useState(false);
+  const [vaccinationType, setVaccinationType] = useState("");
+  const [vaccinationDate, setVaccinationDate] = useState("");
+  const [vaccinationExpiry, setVaccinationExpiry] = useState("");
 
   // Fetch patient data
   const { data: patients, isLoading } = trpc.patients.list.useQuery(
@@ -50,6 +54,23 @@ export default function PatientDetailPage() {
     { patientId, tenantId: tenantId || '' },
     { enabled: !!patientId && !!tenantId }
   );
+  const { data: vaccinationsList, refetch: refetchVaccinations } = trpc.vaccinations.list.useQuery(
+    { patientId, tenantId: tenantId || "" },
+    { enabled: !!patientId && !!tenantId }
+  );
+  const { data: upcomingVaccinations } = trpc.vaccinations.getUpcoming.useQuery(
+    { patientId, tenantId: tenantId || "", days: 90 },
+    { enabled: !!patientId && !!tenantId }
+  );
+  const createVaccination = trpc.vaccinations.create.useMutation({
+    onSuccess: async () => {
+      setShowVaccinationForm(false);
+      setVaccinationType("");
+      setVaccinationDate("");
+      setVaccinationExpiry("");
+      await refetchVaccinations();
+    },
+  });
 
   if (isLoading) {
     return <div className="text-center py-12">Loading...</div>;
@@ -343,13 +364,99 @@ export default function PatientDetailPage() {
             <p className="text-gray-500 text-center py-8">Keine Vitalzeichen erfasst</p>
           )}
         </div>
+
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-gray-900">Impfhistorie</h2>
+            <button
+              onClick={() => setShowVaccinationForm(true)}
+              className="flex items-center gap-1 px-3 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded text-sm font-medium"
+            >
+              <Plus className="w-4 h-4" />
+              Impfung hinzufügen
+            </button>
+          </div>
+          <p className="mb-4 text-sm text-gray-600">
+            Anstehende Booster (90 Tage): {upcomingVaccinations?.length ?? 0}
+          </p>
+          {vaccinationsList && vaccinationsList.length > 0 ? (
+            <div className="space-y-3">
+              {vaccinationsList.map((v) => (
+                <div key={v.id} className="border border-gray-200 rounded p-3">
+                  <p className="font-semibold text-gray-900">{v.type}</p>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Verabreicht: {formatDate(v.administeredDate)} • Fällig: {formatDate(v.expiryDate)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-500 text-center py-4">Keine Impfungen erfasst</p>
+          )}
+        </div>
       </div>
 
       {/* Placeholder for Forms */}
-      {(showDiagnosisForm || showMedicationForm || showVitalsForm) && (
+      {(showDiagnosisForm || showMedicationForm || showVitalsForm || showVaccinationForm) && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <p className="text-gray-600">Forms coming in next iteration...</p>
+            {showVaccinationForm ? (
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold">Impfung erfassen</h3>
+                <input
+                  className="w-full rounded border px-3 py-2"
+                  placeholder="Impfstoff (z.B. Tollwut)"
+                  value={vaccinationType}
+                  onChange={(e) => setVaccinationType(e.target.value)}
+                />
+                <label className="block text-sm">
+                  Verabreicht am
+                  <input
+                    type="date"
+                    className="mt-1 w-full rounded border px-3 py-2"
+                    value={vaccinationDate}
+                    onChange={(e) => setVaccinationDate(e.target.value)}
+                  />
+                </label>
+                <label className="block text-sm">
+                  Fällig am
+                  <input
+                    type="date"
+                    className="mt-1 w-full rounded border px-3 py-2"
+                    value={vaccinationExpiry}
+                    onChange={(e) => setVaccinationExpiry(e.target.value)}
+                  />
+                </label>
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={() => setShowVaccinationForm(false)}
+                    className="rounded border px-3 py-2 text-sm"
+                  >
+                    Abbrechen
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (!tenantId || !vaccinationType || !vaccinationDate || !vaccinationExpiry) {
+                        return;
+                      }
+                      createVaccination.mutate({
+                        tenantId,
+                        patientId,
+                        type: vaccinationType,
+                        administeredDate: new Date(vaccinationDate),
+                        expiryDate: new Date(vaccinationExpiry),
+                      });
+                    }}
+                    className="rounded bg-black px-3 py-2 text-sm text-white"
+                    disabled={createVaccination.isPending}
+                  >
+                    Speichern
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-gray-600">Forms coming in next iteration...</p>
+            )}
           </div>
         </div>
       )}

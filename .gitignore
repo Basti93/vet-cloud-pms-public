@@ -12,6 +12,8 @@ build/
 .vercel
 coverage/
 .vitest/
-.claude/worktrees/    # Isolated git branches for parallel sessions
-.rag/                 # Generated RAG index (auto-refreshed via git hooks)
+# Isolated git branches for parallel sessions
+.claude/worktrees/
+# Generated RAG index (auto-refreshed via git hooks)
+.rag/
 *.tsbuildinfo

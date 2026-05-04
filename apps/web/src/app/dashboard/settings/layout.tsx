@@ -15,6 +15,7 @@ const ALL_TABS = [
       { href: "/dashboard/settings/practice", label: "Praxis", icon: Building2 },
       { href: "/dashboard/settings/appearance", label: "Erscheinungsbild", icon: Palette },
       { href: "/dashboard/settings/email", label: "E-Mails", icon: Mail },
+      { href: "/dashboard/settings/vaccinations", label: "Impfungen", icon: Shield },
       { href: "/dashboard/settings/availability", label: "Verfügbarkeit", icon: CalendarClock },
     ],
   },

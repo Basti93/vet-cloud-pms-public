@@ -17,6 +17,9 @@ import { statisticsRouter } from "./statistics";
 import { scheduleRouter } from "./schedule";
 import { calendarRouter } from "./calendar";
 import { userRouter } from "./user";
+import { vaccinationsRouter } from "./vaccinations";
+import { vaccinationSettingsRouter } from "./vaccinationSettings";
+import { adminVaccinationsRouter } from "./admin-vaccinations";
 
 export const appRouter = createTRPCRouter({
   appointments: appointmentsRouter,
@@ -30,6 +33,7 @@ export const appRouter = createTRPCRouter({
     health: adminHealthRouter,
     reminders: adminRemindersRouter,
     audit: adminAuditRouter,
+    vaccinations: adminVaccinationsRouter,
   }),
   medical: medicalRouter,
   vet: vetRouter,
@@ -39,6 +43,8 @@ export const appRouter = createTRPCRouter({
   schedule: scheduleRouter,
   calendar: calendarRouter,
   user: userRouter,
+  vaccinations: vaccinationsRouter,
+  vaccinationSettings: vaccinationSettingsRouter,
 });
 
 export type AppRouter = typeof appRouter;
