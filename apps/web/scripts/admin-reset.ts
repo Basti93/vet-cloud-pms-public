@@ -192,8 +192,8 @@ async function main() {
   const dbUrl =
     DATABASE_URL +
     (DATABASE_URL.includes("?") ? "&sslmode=require" : "?sslmode=require");
-  const sql = postgres(dbUrl, { max: 1 });
-  const db = drizzle(sql, {
+  const pg = postgres(dbUrl, { max: 1 });
+  const db = drizzle(pg, {
     schema: {
       tenants,
       appointments,
@@ -569,6 +569,56 @@ async function main() {
       // SUMMARY
       // ────────────────────────────────────────────────────────────────────
       const stats = getTestDataStats();
+      const [persistedUsers] = await db
+        .select({ count: sql`count(*)` })
+        .from(users)
+        .where(eq(users.tenantId, DEMO_TENANT_ID));
+      const [persistedOwners] = await db
+        .select({ count: sql`count(*)` })
+        .from(owners)
+        .where(eq(owners.tenantId, DEMO_TENANT_ID));
+      const [persistedPatients] = await db
+        .select({ count: sql`count(*)` })
+        .from(patients)
+        .where(eq(patients.tenantId, DEMO_TENANT_ID));
+      const [persistedAppointments] = await db
+        .select({ count: sql`count(*)` })
+        .from(appointments)
+        .where(eq(appointments.tenantId, DEMO_TENANT_ID));
+      const [persistedSchedules] = await db
+        .select({ count: sql`count(*)` })
+        .from(vetSchedules)
+        .where(eq(vetSchedules.tenantId, DEMO_TENANT_ID));
+      const [persistedAbsences] = await db
+        .select({ count: sql`count(*)` })
+        .from(vetAbsences)
+        .where(eq(vetAbsences.tenantId, DEMO_TENANT_ID));
+      const [appointmentRange] = await db
+        .select({
+          minStart: sql`min(${appointments.startTime})`,
+          maxStart: sql`max(${appointments.startTime})`,
+        })
+        .from(appointments)
+        .where(eq(appointments.tenantId, DEMO_TENANT_ID));
+
+      const persistedSummary = {
+        users: Number(persistedUsers?.count ?? 0),
+        owners: Number(persistedOwners?.count ?? 0),
+        patients: Number(persistedPatients?.count ?? 0),
+        appointments: Number(persistedAppointments?.count ?? 0),
+        vetSchedules: Number(persistedSchedules?.count ?? 0),
+        vetAbsences: Number(persistedAbsences?.count ?? 0),
+      };
+
+      if (
+        persistedSummary.users === 0 ||
+        persistedSummary.appointments === 0 ||
+        persistedSummary.vetSchedules === 0
+      ) {
+        throw new Error(
+          `Post-reset verification failed: ${JSON.stringify(persistedSummary)}`
+        );
+      }
 
       console.log(`✅ Reset complete!`);
       console.log(`📊 Deleted:`);
@@ -596,6 +646,23 @@ async function main() {
       console.log(`   - Diagnoses: ${stats.diagnoses}`);
       console.log(`   - Medications: ${stats.medications}`);
       console.log(`   - Vitals: ${stats.vitals}`);
+      console.log(`🔎 Persisted verification (demo tenant):`);
+      console.log(`   - Users: ${persistedSummary.users}`);
+      console.log(`   - Owners: ${persistedSummary.owners}`);
+      console.log(`   - Patients: ${persistedSummary.patients}`);
+      console.log(`   - Appointments: ${persistedSummary.appointments}`);
+      console.log(`   - Vet schedules: ${persistedSummary.vetSchedules}`);
+      console.log(`   - Vet absences: ${persistedSummary.vetAbsences}`);
+      const formatIso = (value: unknown) => {
+        if (!value) return "n/a";
+        const d = value instanceof Date ? value : new Date(String(value));
+        return Number.isNaN(d.getTime()) ? "n/a" : d.toISOString();
+      };
+      console.log(
+        `   - Appointment range: ${formatIso(
+          appointmentRange?.minStart
+        )} -> ${formatIso(appointmentRange?.maxStart)}`
+      );
     } else {
       console.log("Usage:");
       console.log(
@@ -610,7 +677,7 @@ async function main() {
     console.error("❌ Error:", error);
     process.exit(1);
   } finally {
-    await sql.end();
+    await pg.end();
     process.exit(0);
   }
 }
