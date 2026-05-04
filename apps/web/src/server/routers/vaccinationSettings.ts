@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "@/lib/db/client";
 import { PERMISSIONS, tenants, vaccinationSettings } from "@/lib/db/schema";
 import { sendVaccinationReminderEmail } from "@/lib/email/service";
+import { getMainDomain } from "@/lib/env";
 import { createTRPCRouter, tenantProcedure } from "@/server/trpc";
 import { requirePermission } from "@/server/trpc/middleware";
 
@@ -93,7 +94,7 @@ export const vaccinationSettingsRouter = createTRPCRouter({
     )
     .mutation(async ({ input }) => {
       const [tenant] = await db
-        .select({ id: tenants.id, name: tenants.name })
+        .select({ id: tenants.id, name: tenants.name, slug: tenants.slug })
         .from(tenants)
         .where(eq(tenants.id, input.tenantId))
         .limit(1);
@@ -117,6 +118,7 @@ export const vaccinationSettingsRouter = createTRPCRouter({
         vaccinationType: "Tollwut",
         dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         clinicName: tenant.name,
+        bookingUrl: `${getMainDomain()}/book/${tenant.slug}`,
         customSubject: settings?.reminderSubject ?? defaultSettings.reminderSubject,
         customBody: settings?.reminderBody ?? defaultSettings.reminderBody,
       });

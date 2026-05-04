@@ -87,7 +87,7 @@ export default function VaccinationSettingsPage() {
           </label>
 
           <div className="text-xs text-gray-500">
-            Platzhalter: {"{ownerName}"}, {"{petName}"}, {"{vaccinationType}"}, {"{dueDate}"}, {"{clinicName}"}
+            Platzhalter: {"{ownerName}"}, {"{petName}"}, {"{vaccinationType}"}, {"{dueDate}"}, {"{clinicName}"}, {"{bookingUrl}"}
           </div>
 
           <button

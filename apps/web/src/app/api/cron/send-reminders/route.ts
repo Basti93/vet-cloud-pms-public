@@ -15,6 +15,7 @@ import { and, gte, lte, inArray, eq, isNull } from "drizzle-orm";
 import { sendReminderEmail, sendVaccinationReminderEmail } from "@/lib/email/service";
 import { executeDueTenantDeletions } from "@/server/tenant-deletion";
 import { getSystemDomain } from "@/lib/system-name";
+import { getMainDomain } from "@/lib/env";
 
 // Vercel cron jobs require a secret for security
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -43,7 +44,7 @@ export async function GET(request: NextRequest) {
 
     // Get all tenants (needed to fetch their email settings)
     const allTenants = await db
-      .select({ id: tenants.id })
+      .select({ id: tenants.id, slug: tenants.slug, name: tenants.name })
       .from(tenants);
 
     let totalSent = 0;
@@ -115,13 +116,8 @@ export async function GET(request: NextRequest) {
       const newReminders = appointmentsToRemind.filter((a) => !sentIds.has(a.id));
 
       // Get tenant info for practice name
-      const tenantData = await db
-        .select({ name: tenants.name })
-        .from(tenants)
-        .where(eq(tenants.id, tenant.id))
-        .limit(1);
-
-      const practiceName = tenantData[0]?.name || SYSTEM_DOMAIN;
+      const practiceName = tenant.name || SYSTEM_DOMAIN;
+      const bookingUrl = `${getMainDomain()}/book/${tenant.slug}`;
 
       // Send reminders for appointments that don't have one yet
       for (const appointment of newReminders) {
@@ -230,6 +226,7 @@ export async function GET(request: NextRequest) {
           vaccinationType: item.type,
           dueDate: item.expiryDate,
           clinicName: practiceName,
+          bookingUrl,
           customSubject: reminderSubject,
           customBody: reminderBody,
         });

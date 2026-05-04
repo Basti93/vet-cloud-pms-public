@@ -88,6 +88,7 @@ export interface SendVaccinationReminderEmailInput {
   vaccinationType: string;
   dueDate: Date;
   clinicName: string;
+  bookingUrl?: string;
   customSubject: string;
   customBody: string;
 }
@@ -381,10 +382,14 @@ export async function sendVaccinationReminderEmail(
       .split("{petName}").join(input.petName)
       .split("{vaccinationType}").join(input.vaccinationType)
       .split("{dueDate}").join(dueDate)
-      .split("{clinicName}").join(input.clinicName);
+      .split("{clinicName}").join(input.clinicName)
+      .split("{bookingUrl}").join(input.bookingUrl ?? "");
 
   const subject = applyPlaceholders(input.customSubject);
-  const body = applyPlaceholders(input.customBody);
+  const baseBody = applyPlaceholders(input.customBody);
+  const body = input.bookingUrl && !input.customBody.includes("{bookingUrl}")
+    ? `${baseBody}\n\nDirekt Termin buchen:\n${input.bookingUrl}`
+    : baseBody;
 
   try {
     const result = await resend.emails.send({
