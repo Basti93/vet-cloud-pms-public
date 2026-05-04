@@ -79,6 +79,19 @@ export interface SendUserInvitationEmailInput {
   expiresAt: string;
 }
 
+export interface SendVaccinationReminderEmailInput {
+  tenantId: string;
+  vaccinationId: string;
+  ownerEmail: string;
+  ownerName: string;
+  petName: string;
+  vaccinationType: string;
+  dueDate: Date;
+  clinicName: string;
+  customSubject: string;
+  customBody: string;
+}
+
 /**
  * Send appointment confirmation email to patient owner
  */
@@ -345,6 +358,38 @@ Ihr ${SYSTEM_DOMAIN} Team
     const result = await resend.emails.send({
       from: systemSender(),
       to: input.to,
+      subject,
+      text: body,
+    });
+    if (result.error) {
+      return { success: false, error: result.error };
+    }
+    return { success: true, messageId: result.data?.id };
+  } catch (error) {
+    return { success: false, error };
+  }
+}
+
+export async function sendVaccinationReminderEmail(
+  input: SendVaccinationReminderEmailInput
+) {
+  const dueDate = input.dueDate.toLocaleDateString("de-DE");
+
+  const applyPlaceholders = (template: string) =>
+    template
+      .split("{ownerName}").join(input.ownerName)
+      .split("{petName}").join(input.petName)
+      .split("{vaccinationType}").join(input.vaccinationType)
+      .split("{dueDate}").join(dueDate)
+      .split("{clinicName}").join(input.clinicName);
+
+  const subject = applyPlaceholders(input.customSubject);
+  const body = applyPlaceholders(input.customBody);
+
+  try {
+    const result = await resend.emails.send({
+      from: tenantSender(input.clinicName),
+      to: input.ownerEmail,
       subject,
       text: body,
     });

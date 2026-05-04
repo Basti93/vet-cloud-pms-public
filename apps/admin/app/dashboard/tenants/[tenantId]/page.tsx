@@ -2,7 +2,7 @@
 
 import { trpc } from "@/lib/trpc";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 
 export default function TenantDetailPage() {
@@ -15,23 +15,20 @@ export default function TenantDetailPage() {
   const [selectedPlan, setSelectedPlan] = useState<
     "free" | "starter" | "pro" | "enterprise"
   >("free");
-  const [aiReceptionEnabled, setAiReceptionEnabled] = useState(false);
-  const [systemRolesEditable, setSystemRolesEditable] = useState(false);
+  const [aiReceptionOverride, setAiReceptionOverride] = useState<boolean | null>(null);
+  const [systemRolesEditableOverride, setSystemRolesEditableOverride] = useState<boolean | null>(null);
 
   const { data: tenant, isLoading, error } =
     trpc.adminDashboard.core.getTenantDetails.useQuery({
       tenantId,
     });
 
-  useEffect(() => {
-    if (!tenant) return;
-    setAiReceptionEnabled(tenant.featureFlags?.aiReceptionEnabled ?? false);
-    setSystemRolesEditable(Boolean(tenant.systemRolesEditable));
-  }, [tenant]);
-
   const { data: users } = trpc.adminDashboard.users.listTenantUsers.useQuery({
     tenantId,
   });
+
+  const aiReceptionEnabled = aiReceptionOverride ?? (tenant?.featureFlags?.aiReceptionEnabled ?? false);
+  const systemRolesEditable = systemRolesEditableOverride ?? Boolean(tenant?.systemRolesEditable);
 
   const suspendMutation = trpc.adminDashboard.core.suspendTenant.useMutation({
     onSuccess: () => {
@@ -54,13 +51,13 @@ export default function TenantDetailPage() {
   const updateFeatureFlagsMutation =
     trpc.adminDashboard.core.updateFeatureFlags.useMutation({
       onError: () => {
-        setAiReceptionEnabled(tenant?.featureFlags?.aiReceptionEnabled ?? false);
+        setAiReceptionOverride(null);
       },
     });
   const setSystemRolesEditableMutation =
     trpc.adminDashboard.core.setSystemRolesEditable.useMutation({
       onError: () => {
-        setSystemRolesEditable(Boolean(tenant?.systemRolesEditable));
+        setSystemRolesEditableOverride(null);
       },
     });
 
@@ -176,7 +173,7 @@ export default function TenantDetailPage() {
               checked={aiReceptionEnabled}
               onChange={(e) => {
                 const nextValue = e.target.checked;
-                setAiReceptionEnabled(nextValue);
+                setAiReceptionOverride(nextValue);
                 updateFeatureFlagsMutation.mutate({
                   tenantId,
                   aiReceptionEnabled: nextValue,
@@ -210,7 +207,7 @@ export default function TenantDetailPage() {
               checked={systemRolesEditable}
               onChange={(e) => {
                 const nextValue = e.target.checked;
-                setSystemRolesEditable(nextValue);
+                setSystemRolesEditableOverride(nextValue);
                 setSystemRolesEditableMutation.mutate({
                   tenantId,
                   editable: nextValue,
