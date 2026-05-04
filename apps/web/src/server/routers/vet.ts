@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { eq, and, or, count, lte, gte } from "drizzle-orm";
-import { createTRPCRouter, protectedProcedure } from "@/server/trpc";
+import { eq, and, or, count, lte, gte, inArray } from "drizzle-orm";
+import { createTRPCRouter, tenantProcedure } from "@/server/trpc";
 import { users, appointments, patients, owners, userRoles, roles } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
 import { ROLE_CODES } from "@/lib/auth/roles";
@@ -22,7 +22,7 @@ function selectVetByFairDistribution(
 
 export const vetRouter = createTRPCRouter({
   /** Protected: List all active vets for a tenant with their appointment counts */
-  list: protectedProcedure
+  list: tenantProcedure
     .input(z.object({ tenantId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       // Include both vet and admin roles - admins can be booked as vets
@@ -45,32 +45,39 @@ export const vetRouter = createTRPCRouter({
           )
         );
 
-      // Get appointment counts for each vet
-      const vetAppointmentCounts = await Promise.all(
-        vets.map(async (vet) => {
-          const [result] = await ctx.db
-            .select({ count: count() })
-            .from(appointments)
-            .where(
-              and(
-                eq(appointments.tenantId, input.tenantId),
-                eq(appointments.vetId, vet.id),
-                eq(appointments.status, "scheduled")
-              )
-            );
-
-          return {
-            ...vet,
-            appointmentCount: result.count || 0,
-          };
+      // Get appointment counts for all vets in a single query (avoid N+1)
+      const vetIds = vets.map((v) => v.id);
+      const appointmentCounts = await ctx.db
+        .select({
+          vetId: appointments.vetId,
+          appointmentCount: count(),
         })
+        .from(appointments)
+        .where(
+          and(
+            eq(appointments.tenantId, input.tenantId),
+            inArray(appointments.vetId, vetIds),
+            eq(appointments.status, "scheduled")
+          )
+        )
+        .groupBy(appointments.vetId);
+
+      // Build a map for quick lookup
+      const countMap = new Map(
+        appointmentCounts.map((r) => [r.vetId, r.appointmentCount])
       );
+
+      // Merge appointment counts with vet info
+      const vetAppointmentCounts = vets.map((vet) => ({
+        ...vet,
+        appointmentCount: countMap.get(vet.id) || 0,
+      }));
 
       return vetAppointmentCounts;
     }),
 
   /** Protected: Get appointments with optional vet filtering */
-  getAppointments: protectedProcedure
+  getAppointments: tenantProcedure
     .input(
       z.object({
         tenantId: z.string().uuid(),
@@ -131,7 +138,7 @@ export const vetRouter = createTRPCRouter({
    * Protected: Suggest the best vet based on fair distribution
    * Used when creating an appointment and user doesn't select a vet
    */
-  suggestVet: protectedProcedure
+  suggestVet: tenantProcedure
     .input(
       z.object({
         tenantId: z.string().uuid(),
