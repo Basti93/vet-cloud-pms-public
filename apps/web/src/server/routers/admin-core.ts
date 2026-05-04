@@ -18,6 +18,7 @@ import { executeDueTenantDeletions, hardDeleteTenantById } from "@/server/tenant
 import { sendTenantLifecycleEmail } from "@/lib/email/service";
 import { randomUUID } from "crypto";
 import { createDefaultRoles } from "@/lib/auth/permissions";
+import { invalidateAllRolePermissions } from "@/lib/auth/permission-cache";
 
 export const adminCoreRouter = createAdminRouter({
   /**
@@ -188,6 +189,9 @@ export const adminCoreRouter = createAdminRouter({
           : "System roles locked to platform defaults",
         changes: { editable: input.editable },
       });
+
+      // Invalidate all role permission caches since system roles were reconfigured
+      invalidateAllRolePermissions();
 
       return { success: true };
     }),
