@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { eq, and, gte, lte, lt, or, isNull } from "drizzle-orm";
-import { createTRPCRouter, publicProcedure, publicBookingProcedure, protectedProcedure } from "@/server/trpc";
+import { createTRPCRouter, publicProcedure, publicBookingProcedure, tenantProcedure } from "@/server/trpc";
 import { tenants, appointments, owners, patients, users, userRoles, roles, appointmentHolds, emailSettings, vetSchedules, vetAbsences } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
 import { sendConfirmationEmail, sendBookingNotificationEmail } from "@/lib/email/service";
@@ -126,7 +126,7 @@ async function getVetSlotsForDay(
 
 export const bookingRouter = createTRPCRouter({
   /** Protected: List all online booking requests (for admin dashboard) */
-  list: protectedProcedure
+  list: tenantProcedure
     .input(z.object({ tenantId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const bookings = await ctx.db
@@ -166,7 +166,7 @@ export const bookingRouter = createTRPCRouter({
     }),
 
   /** Protected: Confirm a booking request (status = "confirmed" = confirmed by admin) */
-  confirm: protectedProcedure
+  confirm: tenantProcedure
     .input(z.object({
       appointmentId: z.string().uuid(),
       tenantId: z.string().uuid(),
@@ -265,7 +265,7 @@ export const bookingRouter = createTRPCRouter({
     }),
 
   /** Protected: Reject a booking request (status = "cancelled") */
-  reject: protectedProcedure
+  reject: tenantProcedure
     .input(z.object({
       appointmentId: z.string().uuid(),
       tenantId: z.string().uuid(),
