@@ -982,6 +982,47 @@ export const userInvitations = pgTable(
 );
 
 // ============================================================================
+// CONTACT REQUESTS (Landing page consultation requests)
+// ============================================================================
+
+export const contactRequests = pgTable(
+  "contact_requests",
+  {
+    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+    name: varchar("name", { length: 120 }).notNull(),
+    email: varchar("email", { length: 180 }).notNull(),
+    phone: varchar("phone", { length: 80 }),
+    practiceName: varchar("practice_name", { length: 160 }),
+    role: varchar("role", { length: 120 }),
+    websiteInterest: boolean("website_interest").default(false).notNull(),
+    message: text("message"),
+    emailStatus: varchar("email_status", {
+      length: 20,
+      enum: ["pending", "sent", "failed"],
+    })
+      .default("pending")
+      .notNull(),
+    emailSentAt: timestamp("email_sent_at", { withTimezone: true }),
+    emailError: text("email_error"),
+    ipAddress: varchar("ip_address", { length: 45 }),
+    userAgent: text("user_agent"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (table) => ({
+    createdAtIdx: index("contact_requests_created_at_idx").on(table.createdAt),
+    emailStatusIdx: index("contact_requests_email_status_idx").on(table.emailStatus),
+    websiteInterestIdx: index("contact_requests_website_interest_idx").on(
+      table.websiteInterest
+    ),
+  })
+);
+
+// ============================================================================
 // SYSTEM LOGGING (Admin Dashboard, Error Tracking)
 // ============================================================================
 

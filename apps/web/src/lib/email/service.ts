@@ -16,6 +16,14 @@ function tenantSender(tenantName: string) {
   return `${tenantName} <${FROM_EMAIL}>`;
 }
 
+function getConsultationRecipient() {
+  const recipient = process.env.CONSULTATION_RECIPIENT_EMAIL?.trim();
+  if (!recipient) {
+    throw new Error("Missing CONSULTATION_RECIPIENT_EMAIL environment variable");
+  }
+  return recipient;
+}
+
 export interface SendConfirmationEmailInput {
   to: string;
   practiceName: string;
@@ -91,6 +99,56 @@ export interface SendVaccinationReminderEmailInput {
   bookingUrl?: string;
   customSubject: string;
   customBody: string;
+}
+
+export interface SendConsultationRequestEmailInput {
+  name: string;
+  email: string;
+  phone?: string;
+  practiceName?: string;
+  role?: string;
+  websiteInterest?: boolean;
+  message?: string;
+}
+
+function optionalValue(value: string | undefined) {
+  return value && value.trim().length > 0 ? value.trim() : "Nicht angegeben";
+}
+
+export async function sendConsultationRequestEmail(input: SendConsultationRequestEmailInput) {
+  const subject = `Neue Beratungsanfrage: ${input.practiceName || input.name}`;
+  const body = `
+Neue Beratungsanfrage über die Landingpage
+
+Name: ${input.name}
+E-Mail: ${input.email}
+Telefon: ${optionalValue(input.phone)}
+Praxis: ${optionalValue(input.practiceName)}
+Rolle/Funktion: ${optionalValue(input.role)}
+Website mitbuchen: ${input.websiteInterest ? "Ja" : "Nein / nicht angegeben"}
+
+Nachricht:
+${optionalValue(input.message)}
+  `.trim();
+
+  try {
+    const result = await resend.emails.send({
+      from: systemSender(),
+      to: getConsultationRecipient(),
+      subject,
+      text: body,
+    });
+
+    if (result.error) {
+      console.error("Resend error:", result.error);
+      return { success: false, error: result.error };
+    }
+
+    return { success: true, messageId: result.data?.id };
+  } catch (error) {
+    console.error("Error sending consultation request email:", error);
+    return { success: false, error };
+  }
 }
 
 /**
