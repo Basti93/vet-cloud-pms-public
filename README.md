@@ -125,11 +125,25 @@ Siehe `DEPLOYMENT.md` für Details.
 - **Product** — Product Owner, Sales  
   (Kontakt wird hinzugefügt)
 
-## 📚 Weitere Docs
+## 📚 Documentation
 
-- `SETUP.md` — Detaillierte Installationsanleitung
-- `DEPLOYMENT.md` — Vercel & Hetzner Setup
-- `.env.local.example` — Environment Template
+### For All AI Models
+- **[`docs/AI_INTEGRATION.md`](docs/AI_INTEGRATION.md)** — How to use any AI for development (Claude, ChatGPT, etc.)
+- **[`docs/CODEBASE_ARCHITECTURE.md`](docs/CODEBASE_ARCHITECTURE.md)** — Directory structure & key patterns
+- **[`docs/IMPLEMENTATION_PATTERNS.md`](docs/IMPLEMENTATION_PATTERNS.md)** — Code conventions & patterns
+- **[`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md)** — Common issues & debugging
+
+### For Claude Code Specifically
+- **[`.claude/docs/`](.claude/docs/)** — Claude-optimized guides
+  - `RAG_GUIDE.md` — Semantic code search (MCP tool)
+  - `MEMORY_STRATEGY.md` — Persistent memory across sessions
+  - And more...
+
+### Project Documentation
+- **[`docs/`](docs/)** — All project documentation (20+ guides)
+- **[`DEPLOYMENT.md`](DEPLOYMENT.md)** — Vercel & Hetzner setup
+- **[`PRODUCT.md`](PRODUCT.md)** — Product vision & market
+- And 15+ other topic-specific documents
 
 ## ✅ Commit Convention
 
