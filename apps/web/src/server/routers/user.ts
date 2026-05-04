@@ -13,13 +13,6 @@ export const userRouter = createTRPCRouter({
    * Loads all preferences at once. Called once on app initialization.
    */
   getPreferences: protectedProcedure.query(async ({ ctx }) => {
-    if (!ctx.userId) {
-      throw new TRPCError({
-        code: "UNAUTHORIZED",
-        message: "Not authenticated",
-      });
-    }
-
     const [user] = await ctx.db
       .select({
         locale: users.locale,
@@ -50,13 +43,6 @@ export const userRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      if (!ctx.userId) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "Not authenticated",
-        });
-      }
-
       try {
         // Get user's database ID by clerkId
         const [user] = await ctx.db
@@ -104,13 +90,6 @@ export const userRouter = createTRPCRouter({
    * Protected: Auth required
    */
   getLocale: protectedProcedure.query(async ({ ctx }) => {
-    if (!ctx.userId) {
-      throw new TRPCError({
-        code: "UNAUTHORIZED",
-        message: "Not authenticated",
-      });
-    }
-
     const [user] = await ctx.db
       .select({ locale: users.locale })
       .from(users)
@@ -131,13 +110,6 @@ export const userRouter = createTRPCRouter({
    * Protected: Auth required
    */
   getVetSchedule: protectedProcedure.query(async ({ ctx }) => {
-    if (!ctx.userId) {
-      throw new TRPCError({
-        code: "UNAUTHORIZED",
-        message: "Not authenticated",
-      });
-    }
-
     // Get user's database ID by clerkId
     const [user] = await ctx.db
       .select({ id: users.id, tenantId: users.tenantId })
@@ -184,13 +156,6 @@ export const userRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      if (!ctx.userId) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "Not authenticated",
-        });
-      }
-
       // Get user's database ID by clerkId
       const [user] = await ctx.db
         .select({ id: users.id, tenantId: users.tenantId })
@@ -261,13 +226,6 @@ export const userRouter = createTRPCRouter({
    * Protected: Auth required
    */
   getVetAbsences: protectedProcedure.query(async ({ ctx }) => {
-    if (!ctx.userId) {
-      throw new TRPCError({
-        code: "UNAUTHORIZED",
-        message: "Not authenticated",
-      });
-    }
-
     // Get user's database ID by clerkId
     const [user] = await ctx.db
       .select({ id: users.id, tenantId: users.tenantId })
@@ -308,13 +266,6 @@ export const userRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      if (!ctx.userId) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "Not authenticated",
-        });
-      }
-
       // Get user's database ID by clerkId
       const [user] = await ctx.db
         .select({ id: users.id, tenantId: users.tenantId })
@@ -364,13 +315,6 @@ export const userRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      if (!ctx.userId) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "Not authenticated",
-        });
-      }
-
       // Get user's database ID by clerkId
       const [user] = await ctx.db
         .select({ id: users.id })
@@ -422,13 +366,6 @@ export const userRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      if (!ctx.userId) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "Not authenticated",
-        });
-      }
-
       try {
         const [updatedUser] = await ctx.db
           .update(users)
@@ -436,21 +373,21 @@ export const userRouter = createTRPCRouter({
           .where(eq(users.clerkId, ctx.userId))
           .returning();
 
-        await writeAuditLog(ctx, {
-          tenantId: updatedUser!.tenantId,
-          action: "config_change",
-          entity: { type: "user", id: updatedUser!.id },
-          event: "user.slot_duration_updated",
-          summary: "Own slot duration updated",
-          changes: { slotDurationMin: input.slotDurationMin },
-        });
-
         if (!updatedUser) {
           throw new TRPCError({
             code: "NOT_FOUND",
             message: "User not found",
           });
         }
+
+        await writeAuditLog(ctx, {
+          tenantId: updatedUser.tenantId,
+          action: "config_change",
+          entity: { type: "user", id: updatedUser.id },
+          event: "user.slot_duration_updated",
+          summary: "Own slot duration updated",
+          changes: { slotDurationMin: input.slotDurationMin },
+        });
 
         return updatedUser;
       } catch (error) {

@@ -53,8 +53,14 @@ export async function POST(req: Request) {
   // Get the body
   const body = await req.text();
 
+  const webhookSecret = process.env.CLERK_WEBHOOK_SECRET;
+  if (!webhookSecret) {
+    console.error("CLERK_WEBHOOK_SECRET not configured");
+    return NextResponse.json({ error: "Webhook not configured" }, { status: 503 });
+  }
+
   // Create a new Webhook instance with your secret
-  const wh = new Webhook(process.env.CLERK_WEBHOOK_SECRET || "");
+  const wh = new Webhook(webhookSecret);
   let evt: { type: string; data: unknown };
 
   // Verify the webhook
