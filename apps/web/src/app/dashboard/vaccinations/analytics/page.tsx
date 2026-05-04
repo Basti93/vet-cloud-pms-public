@@ -12,23 +12,23 @@ export default function VaccinationAnalyticsPage() {
   );
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-bold">Impf-Analytics</h1>
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold text-fg">Impf-Analytics</h1>
       <div className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-xl border bg-white p-4">
-          <p className="text-sm text-gray-500">Gesamt erfasst</p>
-          <p className="mt-1 text-2xl font-semibold">{scanStats?.totalTracked ?? 0}</p>
+        <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+          <p className="text-sm text-muted">Gesamt erfasst</p>
+          <p className="mt-1 text-2xl font-semibold text-fg">{scanStats?.totalTracked ?? 0}</p>
         </div>
-        <div className="rounded-xl border bg-white p-4">
-          <p className="text-sm text-gray-500">Überfällig</p>
-          <p className="mt-1 text-2xl font-semibold">{scanStats?.totalDue ?? 0}</p>
+        <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+          <p className="text-sm text-muted">Überfällig</p>
+          <p className="mt-1 text-2xl font-semibold text-fg">{scanStats?.totalDue ?? 0}</p>
         </div>
-        <div className="rounded-xl border bg-white p-4">
-          <p className="text-sm text-gray-500">In 30 Tagen fällig</p>
-          <p className="mt-1 text-2xl font-semibold">{scanStats?.totalUpcoming ?? 0}</p>
+        <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+          <p className="text-sm text-muted">In 30 Tagen fällig</p>
+          <p className="mt-1 text-2xl font-semibold text-fg">{scanStats?.totalUpcoming ?? 0}</p>
         </div>
       </div>
-      <div className="rounded-xl border bg-white p-4 text-sm text-gray-600">
+      <div className="rounded-2xl border border-border bg-surface p-4 text-sm text-muted shadow-sm">
         Conversion-Funnel und Reminder-zu-Termin-Korrelation können als nächster Schritt auf Basis
         der vorhandenen vaccination_email_logs aktiviert werden.
       </div>

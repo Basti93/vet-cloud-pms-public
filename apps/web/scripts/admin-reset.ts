@@ -29,6 +29,7 @@ import {
   diagnoses,
   medications,
   vitals,
+  vaccinations,
   vetSchedules,
   vetAbsences,
   roles,
@@ -293,6 +294,10 @@ async function main() {
         .delete(diagnoses)
         .where(eq(diagnoses.tenantId, DEMO_TENANT_ID));
 
+      const vaccinationsCount = await db
+        .delete(vaccinations)
+        .where(eq(vaccinations.tenantId, DEMO_TENANT_ID));
+
       const appointmentsCount = await db
         .delete(appointments)
         .where(eq(appointments.tenantId, DEMO_TENANT_ID));
@@ -516,6 +521,54 @@ async function main() {
       );
 
       // ────────────────────────────────────────────────────────────────────
+      // CREATE VACCINATIONS
+      // ────────────────────────────────────────────────────────────────────
+      const vaccinationTypes = [
+        "Tollwut",
+        "Staupe",
+        "Leptospirose",
+        "Parvovirose",
+        "Katzenschnupfen",
+        "Katzenseuche",
+      ];
+      let vaccinationCount = 0;
+      await Promise.all(
+        createdPatients.map((patient, idx) => {
+          const assignedVet = allVets[idx % allVets.length];
+          if (!assignedVet) return null;
+
+          const primaryAdmin = new Date(now.getTime() - (180 + idx * 7) * 24 * 60 * 60 * 1000);
+          const primaryExpiry = new Date(now.getTime() + (idx % 3 === 0 ? -14 : 45 + idx * 2) * 24 * 60 * 60 * 1000);
+          const boosterAdmin = new Date(now.getTime() - (30 + idx * 4) * 24 * 60 * 60 * 1000);
+          const boosterExpiry = new Date(now.getTime() + (15 + idx * 5) * 24 * 60 * 60 * 1000);
+
+          vaccinationCount += 2;
+          return Promise.all([
+            db.insert(vaccinations).values({
+              tenantId: DEMO_TENANT_ID,
+              patientId: patient.id,
+              type: vaccinationTypes[idx % vaccinationTypes.length]!,
+              administeredDate: primaryAdmin,
+              expiryDate: primaryExpiry,
+              vetId: assignedVet.id,
+              batchNumber: `DEMO-${idx + 1}-A`,
+              notes: "Automatisch erzeugter Demo-Impfeintrag",
+            }),
+            db.insert(vaccinations).values({
+              tenantId: DEMO_TENANT_ID,
+              patientId: patient.id,
+              type: `${vaccinationTypes[idx % vaccinationTypes.length]} Booster`,
+              administeredDate: boosterAdmin,
+              expiryDate: boosterExpiry,
+              vetId: assignedVet.id,
+              batchNumber: `DEMO-${idx + 1}-B`,
+              notes: "Automatisch erzeugter Demo-Booster",
+            }),
+          ]);
+        })
+      );
+
+      // ────────────────────────────────────────────────────────────────────
       // CREATE INTERNAL APPOINTMENTS
       // ────────────────────────────────────────────────────────────────────
       await Promise.all(
@@ -585,6 +638,10 @@ async function main() {
         .select({ count: sql`count(*)` })
         .from(appointments)
         .where(eq(appointments.tenantId, DEMO_TENANT_ID));
+      const [persistedVaccinations] = await db
+        .select({ count: sql`count(*)` })
+        .from(vaccinations)
+        .where(eq(vaccinations.tenantId, DEMO_TENANT_ID));
       const [persistedSchedules] = await db
         .select({ count: sql`count(*)` })
         .from(vetSchedules)
@@ -606,6 +663,7 @@ async function main() {
         owners: Number(persistedOwners?.count ?? 0),
         patients: Number(persistedPatients?.count ?? 0),
         appointments: Number(persistedAppointments?.count ?? 0),
+        vaccinations: Number(persistedVaccinations?.count ?? 0),
         vetSchedules: Number(persistedSchedules?.count ?? 0),
         vetAbsences: Number(persistedAbsences?.count ?? 0),
       };
@@ -613,6 +671,7 @@ async function main() {
       if (
         persistedSummary.users === 0 ||
         persistedSummary.appointments === 0 ||
+        persistedSummary.vaccinations === 0 ||
         persistedSummary.vetSchedules === 0
       ) {
         throw new Error(
@@ -629,6 +688,7 @@ async function main() {
       console.log(`   - Medications: ${medicationsCount.count || 0}`);
       console.log(`   - Vitals: ${vitalsCount.count || 0}`);
       console.log(`   - Diagnoses: ${diagnosesCount.count || 0}`);
+      console.log(`   - Vaccinations: ${vaccinationsCount.count || 0}`);
       console.log(`   - Appointments: ${appointmentsCount.count || 0}`);
       console.log(`   - Patients: ${patientsCount.count || 0}`);
       console.log(`   - Owners: ${ownersCount.count || 0}`);
@@ -646,11 +706,13 @@ async function main() {
       console.log(`   - Diagnoses: ${stats.diagnoses}`);
       console.log(`   - Medications: ${stats.medications}`);
       console.log(`   - Vitals: ${stats.vitals}`);
+      console.log(`   - Vaccinations: ${vaccinationCount}`);
       console.log(`🔎 Persisted verification (demo tenant):`);
       console.log(`   - Users: ${persistedSummary.users}`);
       console.log(`   - Owners: ${persistedSummary.owners}`);
       console.log(`   - Patients: ${persistedSummary.patients}`);
       console.log(`   - Appointments: ${persistedSummary.appointments}`);
+      console.log(`   - Vaccinations: ${persistedSummary.vaccinations}`);
       console.log(`   - Vet schedules: ${persistedSummary.vetSchedules}`);
       console.log(`   - Vet absences: ${persistedSummary.vetAbsences}`);
       const formatIso = (value: unknown) => {

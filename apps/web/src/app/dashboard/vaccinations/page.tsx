@@ -10,7 +10,7 @@ export default function VaccinationsPage() {
   const [status, setStatus] = useState<"all" | "overdue" | "due30" | "current">("all");
 
   const { data: patients } = trpc.patients.list.useQuery(
-    { tenantId: tenantId ?? "", limit: 200 },
+    { tenantId: tenantId ?? "", limit: 100 },
     { enabled: !!tenantId }
   );
 
@@ -32,20 +32,26 @@ export default function VaccinationsPage() {
   const filtered = rows.filter((row) => status === "all" || row.state === status);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">Impfmanagement</h1>
+        <h1 className="text-3xl font-bold text-fg">Impfmanagement</h1>
         <div className="flex gap-2">
-          <Link href="/dashboard/vaccinations/analytics" className="rounded border px-3 py-2 text-sm">
+          <Link
+            href="/dashboard/vaccinations/analytics"
+            className="rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium text-fg hover:bg-muted-soft"
+          >
             Analytics
           </Link>
-          <Link href="/dashboard/settings/vaccinations" className="rounded border px-3 py-2 text-sm">
+          <Link
+            href="/dashboard/settings/vaccinations"
+            className="rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium text-fg hover:bg-muted-soft"
+          >
             Einstellungen
           </Link>
         </div>
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {[
           ["all", "Alle"],
           ["overdue", "Überfällig"],
@@ -55,16 +61,20 @@ export default function VaccinationsPage() {
           <button
             key={value}
             onClick={() => setStatus(value as typeof status)}
-            className={`rounded px-3 py-1.5 text-sm ${status === value ? "bg-black text-white" : "border"}`}
+            className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              status === value
+                ? "bg-primary text-primary-foreground"
+                : "border border-border bg-surface text-fg hover:bg-muted-soft"
+            }`}
           >
             {label}
           </button>
         ))}
       </div>
 
-      <div className="overflow-hidden rounded-xl border bg-white">
+      <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
         <table className="min-w-full text-sm">
-          <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
+          <thead className="bg-bg text-left text-xs uppercase tracking-wide text-muted">
             <tr>
               <th className="px-4 py-3">Patient</th>
               <th className="px-4 py-3">Tierart</th>
@@ -74,20 +84,20 @@ export default function VaccinationsPage() {
           </thead>
           <tbody>
             {filtered.map((row) => (
-              <tr key={row.id} className="border-t">
+              <tr key={row.id} className="border-t border-border">
                 <td className="px-4 py-3">
-                  <Link href={`/dashboard/patients/${row.id}`} className="font-medium hover:underline">
+                  <Link href={`/dashboard/patients/${row.id}`} className="font-medium text-fg hover:underline">
                     {row.name}
                   </Link>
                 </td>
-                <td className="px-4 py-3">{row.species}</td>
-                <td className="px-4 py-3">{row.owner || "-"}</td>
-                <td className="px-4 py-3">Aktuell</td>
+                <td className="px-4 py-3 text-muted">{row.species}</td>
+                <td className="px-4 py-3 text-muted">{row.owner || "-"}</td>
+                <td className="px-4 py-3 text-fg">Aktuell</td>
               </tr>
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td className="px-4 py-8 text-center text-gray-500" colSpan={4}>
+                <td className="px-4 py-8 text-center text-muted" colSpan={4}>
                   Keine Daten vorhanden.
                 </td>
               </tr>

@@ -1,10 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { trpc } from '@/lib/trpc/client';
 import { useAuth } from '@clerk/nextjs';
 import { useTenant } from '@/hooks/useTenant';
-import { useCurrentVet } from '@/hooks/useCurrentVet';
 import { TableFilters, type FilterState } from '@/components/appointments/TableFilters';
 import { AppointmentTable } from '@/components/appointments/AppointmentTable';
 import { AppointmentModal } from '@/components/appointments/AppointmentModal';
@@ -25,9 +24,8 @@ export default function AppointmentsPage() {
   };
   const { userId } = useAuth();
   const { tenantId } = useTenant();
-  const vetId = useCurrentVet();
   const [filters, setFilters] = useState<FilterState>({
-    vetId: vetId || null,
+    vetId: null,
     status: null,
     dateFrom: '',
     dateTo: '',
@@ -54,12 +52,6 @@ export default function AppointmentsPage() {
       patientName: item.patientName ?? null,
     };
   };
-
-  // Auto-set filter to current vet if they are a vet
-  useEffect(() => {
-    if (!vetId) return;
-    setFilters((prev) => (prev.vetId ? prev : { ...prev, vetId }));
-  }, [vetId]);
 
   // Fetch appointments with details
   const { data: appointments, isLoading: isFetching, refetch: refetchAppointments } =
