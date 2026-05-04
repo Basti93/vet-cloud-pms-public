@@ -38,7 +38,8 @@
     "lint": "turbo run lint",
     "rag:index": "tsx scripts/dev-rag/index.ts",
     "rag:refresh": "tsx scripts/dev-rag/refresh.ts",
-    "rag:search": "tsx scripts/dev-rag/search.ts"
+    "rag:search": "tsx scripts/dev-rag/search.ts",
+    "mcp:rag": "tsx mcp-servers/rag-server.ts"
   },
   "dependencies": {
     "@clerk/localizations": "^4.5.5",
