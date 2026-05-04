@@ -253,24 +253,36 @@ export const adminRouter = createTRPCRouter({
         .where(eq(users.tenantId, input.tenantId))
         .orderBy(users.email);
 
-      // For each user, fetch all their assigned roles
-      const usersWithRoles = await Promise.all(
-        allUsers.map(async (user) => {
-          const assignedRoles = await ctx.db
-            .select({
-              id: roles.id,
-              name: roles.name,
-            })
-            .from(userRoles)
-            .innerJoin(roles, eq(userRoles.roleId, roles.id))
-            .where(eq(userRoles.userId, user.id));
+      if (allUsers.length === 0) {
+        return [];
+      }
 
-          return {
-            ...user,
-            roles: assignedRoles,
-          };
+      // Fetch all roles for these users in a single query
+      const userIds = allUsers.map((u) => u.id);
+      const allUserRoles = await ctx.db
+        .select({
+          userId: userRoles.userId,
+          id: roles.id,
+          name: roles.name,
         })
-      );
+        .from(userRoles)
+        .innerJoin(roles, eq(userRoles.roleId, roles.id))
+        .where(inArray(userRoles.userId, userIds));
+
+      // Group roles by user ID
+      const rolesByUserId = new Map<string, Array<{ id: string; name: string }>>();
+      for (const ur of allUserRoles) {
+        if (!rolesByUserId.has(ur.userId)) {
+          rolesByUserId.set(ur.userId, []);
+        }
+        rolesByUserId.get(ur.userId)!.push({ id: ur.id, name: ur.name });
+      }
+
+      // Merge roles into users
+      const usersWithRoles = allUsers.map((user) => ({
+        ...user,
+        roles: rolesByUserId.get(user.id) || [],
+      }));
 
       return usersWithRoles;
     }),
@@ -449,20 +461,34 @@ export const adminRouter = createTRPCRouter({
         .where(eq(roles.tenantId, input.tenantId))
         .orderBy(roles.name);
 
-      // For each role, fetch its permissions
-      const rolesWithPerms = await Promise.all(
-        allRoles.map(async (role) => {
-          const perms = await ctx.db
-            .select({ permission: rolePermissions.permission })
-            .from(rolePermissions)
-            .where(eq(rolePermissions.roleId, role.id));
+      if (allRoles.length === 0) {
+        return [];
+      }
 
-          return {
-            ...role,
-            permissions: perms.map((p) => p.permission),
-          };
+      // Fetch all permissions for these roles in a single query
+      const roleIds = allRoles.map((r) => r.id);
+      const allPerms = await ctx.db
+        .select({
+          roleId: rolePermissions.roleId,
+          permission: rolePermissions.permission,
         })
-      );
+        .from(rolePermissions)
+        .where(inArray(rolePermissions.roleId, roleIds));
+
+      // Group permissions by role ID
+      const permsByRoleId = new Map<string, string[]>();
+      for (const perm of allPerms) {
+        if (!permsByRoleId.has(perm.roleId)) {
+          permsByRoleId.set(perm.roleId, []);
+        }
+        permsByRoleId.get(perm.roleId)!.push(perm.permission);
+      }
+
+      // Merge permissions into roles
+      const rolesWithPerms = allRoles.map((role) => ({
+        ...role,
+        permissions: permsByRoleId.get(role.id) || [],
+      }));
 
       return rolesWithPerms;
     }),
