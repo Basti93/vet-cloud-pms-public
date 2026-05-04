@@ -10,14 +10,6 @@ import { DEFAULT_ROLE_DEFINITIONS, SYSTEM_ROLES_VERSION } from "@/lib/auth/roles
 
 export type Database = typeof db;
 
-const syncedTenants = new Set<string>();
-
-async function ensureTenantSystemRolesSynced(tenantId: string) {
-  if (!tenantId || syncedTenants.has(tenantId)) return;
-  await createDefaultRoles(tenantId);
-  syncedTenants.add(tenantId);
-}
-
 /**
  * Get all permissions for a user by looking up all assigned roles
  * and returning the UNION of their permissions.
@@ -39,9 +31,6 @@ export async function getUserPermissions(userId: string): Promise<Set<string>> {
   if (!user) {
     return new Set(); // User not found
   }
-
-  // Keep system roles aligned with code defaults automatically per tenant.
-  await ensureTenantSystemRolesSynced(user.tenantId);
 
   // Step 2: Get all roleIds assigned to this user
   const assignedRoles = await db
