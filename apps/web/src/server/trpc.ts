@@ -19,6 +19,7 @@ export async function createTRPCContext(opts: { headers: Headers }) {
     db,
     userId,
     headers: opts.headers,
+    permissionCache: undefined,
   };
 }
 

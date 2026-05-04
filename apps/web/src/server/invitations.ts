@@ -4,6 +4,7 @@ import { TRPCError } from "@trpc/server";
 import { db } from "@/lib/db/client";
 import { roles, userInvitations, userRoles, users } from "@/lib/db/schema";
 import { INVITE_ROLE_TO_CODE } from "@/lib/auth/roles";
+import { invalidateRolePermissionCache } from "@/lib/auth/permission-cache";
 
 const INVITE_EXPIRY_DAYS = 7;
 
@@ -271,6 +272,9 @@ export async function acceptInvite(params: { token: string; clerkUserId: string 
       assignedBy: null,
     });
   });
+
+  // Invalidate role permission cache since user's roles changed
+  invalidateRolePermissionCache(targetRole.id);
 
   return {
     invitationId: invitation.id,

@@ -21,6 +21,7 @@ import {
 import { TRPCError } from "@trpc/server";
 import { requirePermission } from "@/server/trpc/middleware";
 import { getUserPermissions } from "@/lib/auth/permissions";
+import { invalidateRolePermissionCache } from "@/lib/auth/permission-cache";
 import {
   acceptInvite,
   createInvite,
@@ -363,6 +364,8 @@ export const adminRouter = createTRPCRouter({
           roleId: input.roleId,
           assignedBy: currentUser!.id,
         });
+        // Invalidate role permission cache since user's roles changed
+        invalidateRolePermissionCache(input.roleId);
         return { success: true, message: "Role assigned" };
       } catch (error: unknown) {
         const duplicate =
@@ -373,6 +376,8 @@ export const adminRouter = createTRPCRouter({
             (error as { message?: string }).message?.includes("duplicate key"));
         // Check if this is a unique constraint violation (role already assigned)
         if (duplicate) {
+          // Even if duplicate, invalidate cache to be safe
+          invalidateRolePermissionCache(input.roleId);
           return { success: true, message: "Role already assigned" };
         }
         // Re-throw other errors
@@ -430,6 +435,9 @@ export const adminRouter = createTRPCRouter({
           eq(userRoles.userId, input.userId) &&
           eq(userRoles.roleId, input.roleId)
         );
+
+      // Invalidate role permission cache since user's roles changed
+      invalidateRolePermissionCache(input.roleId);
 
       return { success: true, message: "Role removed" };
     }),
@@ -552,6 +560,8 @@ export const adminRouter = createTRPCRouter({
           roleId: input.roleId,
           permission: input.permission,
         });
+        // Invalidate role permission cache since permissions changed
+        invalidateRolePermissionCache(input.roleId);
       } catch (error: unknown) {
         const code =
           error && typeof error === "object" && "code" in error
@@ -561,6 +571,8 @@ export const adminRouter = createTRPCRouter({
         if (code !== "23505") {
           throw error;
         }
+        // Even if duplicate, invalidate cache to be safe
+        invalidateRolePermissionCache(input.roleId);
       }
 
       return { success: true };
@@ -665,6 +677,9 @@ export const adminRouter = createTRPCRouter({
       await ctx.db
         .delete(rolePermissions)
         .where(and(eq(rolePermissions.roleId, input.roleId), eq(rolePermissions.permission, input.permission)));
+
+      // Invalidate role permission cache since permissions changed
+      invalidateRolePermissionCache(input.roleId);
 
       return { success: true };
     }),
