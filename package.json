@@ -47,6 +47,7 @@
     "@vercel/speed-insights": "1.0.4",
     "drizzle-kit": "^0.18.1",
     "drizzle-orm": "0.45.2",
+    "eslint": "^9.39.4",
     "next-intl": "^4.9.2",
     "svix": "^1.92.2",
     "typescript": "^6.0.3"
