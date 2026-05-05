@@ -11,11 +11,12 @@ import {
   vaccinationSettings,
   vaccinationEmailLogs,
 } from "@/lib/db/schema";
-import { and, gte, lte, inArray, eq, isNull } from "drizzle-orm";
+import { and, gte, lte, inArray, eq, isNull, ne } from "drizzle-orm";
 import { sendReminderEmail, sendVaccinationReminderEmail } from "@/lib/email/service";
 import { executeDueTenantDeletions } from "@/server/tenant-deletion";
 import { getSystemDomain } from "@/lib/system-name";
 import { getMainDomain } from "@/lib/env";
+import { buildUnsubscribeUrl } from "@/lib/unsubscribe";
 
 // Vercel cron jobs require a secret for security
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
 
     // Get all tenants (needed to fetch their email settings)
     const allTenants = await db
-      .select({ id: tenants.id, slug: tenants.slug, name: tenants.name })
+      .select({ id: tenants.id, slug: tenants.slug, name: tenants.name, timezone: tenants.timezone })
       .from(tenants);
 
     let totalSent = 0;
@@ -138,6 +139,7 @@ export async function GET(request: NextRequest) {
             ownerFirstName: appointment.ownerFirstName,
             patientName: appointment.patientName,
             patientSpecies: appointment.patientSpecies,
+            appointmentDate,
             appointmentTime,
             appointmentDateTime,
           });
@@ -193,15 +195,32 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
-      const remindUntil = new Date(now.getTime() + reminderDaysBefore * 24 * 60 * 60 * 1000);
+      // Use tenant timezone for the due-date window so reminder fires at the
+      // right local date rather than always in UTC.
+      const tenantTz = tenant.timezone ?? "Europe/Berlin";
+      const remindUntilMs = now.getTime() + reminderDaysBefore * 24 * 60 * 60 * 1000;
+      // Shift window by UTC offset of tenant timezone to align with local midnight.
+      const tzOffset = new Intl.DateTimeFormat("en", {
+        timeZone: tenantTz,
+        timeZoneName: "shortOffset",
+      })
+        .formatToParts(now)
+        .find((p) => p.type === "timeZoneName")
+        ?.value?.replace("GMT", "") ?? "+0";
+      const [tzHours, tzMins] = tzOffset.split(":").map(Number);
+      const tzOffsetMs = ((tzHours ?? 0) * 60 + (tzMins ?? 0)) * 60 * 1000;
+      const remindUntil = new Date(remindUntilMs - tzOffsetMs);
+
       const dueVaccinations = await db
         .select({
           id: vaccinations.id,
           expiryDate: vaccinations.expiryDate,
           type: vaccinations.type,
           patientName: patients.name,
+          ownerId: owners.id,
           ownerEmail: owners.email,
           ownerFirstName: owners.firstName,
+          ownerEmailOptOut: owners.emailOptOut,
         })
         .from(vaccinations)
         .innerJoin(patients, eq(vaccinations.patientId, patients.id))
@@ -211,15 +230,36 @@ export async function GET(request: NextRequest) {
             eq(vaccinations.tenantId, tenant.id),
             isNull(vaccinations.deletedAt),
             isNull(vaccinations.reminderSentDate),
-            lte(vaccinations.expiryDate, remindUntil)
+            lte(vaccinations.expiryDate, remindUntil),
+            // Skip owners who have opted out of email reminders (GDPR Art. 21)
+            ne(owners.emailOptOut, true)
           )
         );
 
       for (const item of dueVaccinations) {
         if (!item.ownerEmail) continue;
+
+        // Deduplication: skip if we already sent a reminder for this vaccination
+        // within the last 25 hours (guards against double-run scenarios).
+        const recentLog = await db
+          .select({ id: vaccinationEmailLogs.id })
+          .from(vaccinationEmailLogs)
+          .where(
+            and(
+              eq(vaccinationEmailLogs.vaccinationId, item.id),
+              eq(vaccinationEmailLogs.status, "sent"),
+              gte(vaccinationEmailLogs.sentAt, new Date(now.getTime() - 25 * 60 * 60 * 1000))
+            )
+          )
+          .limit(1);
+
+        if (recentLog.length > 0) continue;
+
+        const unsubscribeUrl = buildUnsubscribeUrl(item.ownerId);
         const result = await sendVaccinationReminderEmail({
           tenantId: tenant.id,
           vaccinationId: item.id,
+          ownerId: item.ownerId,
           ownerEmail: item.ownerEmail,
           ownerName: item.ownerFirstName,
           petName: item.patientName,
@@ -227,6 +267,7 @@ export async function GET(request: NextRequest) {
           dueDate: item.expiryDate,
           clinicName: practiceName,
           bookingUrl,
+          unsubscribeUrl,
           customSubject: reminderSubject,
           customBody: reminderBody,
         });

@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import { emailTemplates, EmailPlaceholders } from "./templates";
+import { renderVaccinationReminderEmail } from "./VaccinationReminderEmail";
 import { getSystemDomain } from "@/lib/system-name";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -42,6 +43,7 @@ export interface SendReminderEmailInput {
   ownerFirstName: string;
   patientName: string;
   patientSpecies: string;
+  appointmentDate: string;
   appointmentTime: string;
   appointmentDateTime: string;
   vetName?: string;
@@ -91,12 +93,14 @@ export interface SendVaccinationReminderEmailInput {
   tenantId: string;
   vaccinationId: string;
   ownerEmail: string;
+  ownerId?: string;
   ownerName: string;
   petName: string;
   vaccinationType: string;
   dueDate: Date;
   clinicName: string;
   bookingUrl?: string;
+  unsubscribeUrl?: string;
   customSubject: string;
   customBody: string;
 }
@@ -203,7 +207,7 @@ export async function sendReminderEmail(input: SendReminderEmailInput) {
     ownerFirstName: input.ownerFirstName,
     patientName: input.patientName,
     patientSpecies: input.patientSpecies,
-    appointmentDate: "", // Not used in reminder
+    appointmentDate: input.appointmentDate,
     appointmentTime: input.appointmentTime,
     appointmentDateTime: input.appointmentDateTime,
     vetName: input.vetName || "Unser Team",
@@ -445,16 +449,28 @@ export async function sendVaccinationReminderEmail(
 
   const subject = applyPlaceholders(input.customSubject);
   const baseBody = applyPlaceholders(input.customBody);
-  const body = input.bookingUrl && !input.customBody.includes("{bookingUrl}")
+  const plainText = input.bookingUrl && !input.customBody.includes("{bookingUrl}")
     ? `${baseBody}\n\nDirekt Termin buchen:\n${input.bookingUrl}`
     : baseBody;
+
+  // Render professional HTML template
+  const htmlContent = renderVaccinationReminderEmail({
+    ownerName: input.ownerName,
+    petName: input.petName,
+    vaccinationType: input.vaccinationType,
+    dueDate,
+    clinicName: input.clinicName,
+    bookingUrl: input.bookingUrl,
+    unsubscribeUrl: input.unsubscribeUrl,
+  });
 
   try {
     const result = await resend.emails.send({
       from: tenantSender(input.clinicName),
       to: input.ownerEmail,
       subject,
-      text: body,
+      html: htmlContent,
+      text: plainText,
     });
     if (result.error) {
       return { success: false, error: result.error };

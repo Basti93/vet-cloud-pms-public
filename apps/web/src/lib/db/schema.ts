@@ -237,6 +237,7 @@ export const owners = pgTable(
     postalCode: varchar("postal_code", { length: 20 }),
     country: varchar("country", { length: 2 }).default("DE"),
     notes: text("notes"),
+    emailOptOut: boolean("email_opt_out").default(false).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .default(sql`now()`)
       .notNull(),

@@ -132,15 +132,19 @@ export const adminVaccinationsRouter = createAdminRouter({
         .limit(input.limit);
     }),
 
+  /**
+   * Reset a vaccination's reminderSentDate so the next cron run will retry.
+   * Failed reminders are automatically retried by cron because they don't set
+   * reminderSentDate — but if a previous successful send was incorrect, an
+   * admin can clear the flag here to force a re-send.
+   */
   retryFailedReminder: procedure
     .input(z.object({ logId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const [log] = await ctx.db
         .select({
           id: vaccinationEmailLogs.id,
-          tenantId: vaccinationEmailLogs.tenantId,
           vaccinationId: vaccinationEmailLogs.vaccinationId,
-          emailAddress: vaccinationEmailLogs.emailAddress,
         })
         .from(vaccinationEmailLogs)
         .where(eq(vaccinationEmailLogs.id, input.logId))
@@ -148,14 +152,11 @@ export const adminVaccinationsRouter = createAdminRouter({
 
       if (!log) return { success: false as const, error: "log_not_found" };
 
-      // This endpoint only clears the failure marker; actual resend occurs in cron.
-      await ctx.db.insert(vaccinationEmailLogs).values({
-        tenantId: log.tenantId,
-        vaccinationId: log.vaccinationId,
-        emailAddress: log.emailAddress,
-        status: "failed",
-        error: "queued_for_retry",
-      });
+      // Clear reminderSentDate so the next cron run picks this vaccination up again.
+      await ctx.db
+        .update(vaccinations)
+        .set({ reminderSentDate: null, updatedAt: new Date() })
+        .where(eq(vaccinations.id, log.vaccinationId));
 
       return { success: true as const };
     }),
