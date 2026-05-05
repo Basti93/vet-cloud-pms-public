@@ -1,7 +1,22 @@
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { z } from "zod";
-import { tenants, vaccinationEmailLogs, vaccinations } from "@/lib/db/schema";
+import { appointments, tenants, vaccinationEmailLogs, vaccinations } from "@/lib/db/schema";
 import { createAdminRouter, procedure } from "@/server/adminTrpc";
+
+/**
+ * SQL fragment: true if a reminder in vaccination_email_logs resulted in an
+ * appointment being booked within 14 days for the same patient.
+ * Used as a FILTER predicate inside count() / as a column.
+ */
+const conversionExists = sql<boolean>`exists (
+  select 1
+  from ${appointments} a
+  join ${vaccinations} v on v.id = ${vaccinationEmailLogs.vaccinationId}
+  where a.patient_id = v.patient_id
+    and a.tenant_id = ${vaccinationEmailLogs.tenantId}
+    and a.start_time >= ${vaccinationEmailLogs.sentAt}
+    and a.start_time <= ${vaccinationEmailLogs.sentAt} + interval '14 days'
+)`;
 
 export const adminVaccinationsRouter = createAdminRouter({
   getGlobalStats: procedure.query(async ({ ctx }) => {
@@ -10,6 +25,10 @@ export const adminVaccinationsRouter = createAdminRouter({
         total: sql<number>`count(*)`,
         sent: sql<number>`count(*) filter (where ${vaccinationEmailLogs.status} = 'sent')`,
         failed: sql<number>`count(*) filter (where ${vaccinationEmailLogs.status} = 'failed')`,
+        conversions: sql<number>`count(*) filter (
+          where ${vaccinationEmailLogs.status} = 'sent'
+          and ${conversionExists}
+        )`,
         lastScanAt: sql<Date | null>`max(${vaccinationEmailLogs.sentAt})`,
       })
       .from(vaccinationEmailLogs);
@@ -20,6 +39,10 @@ export const adminVaccinationsRouter = createAdminRouter({
         tenantName: tenants.name,
         sent: sql<number>`count(*) filter (where ${vaccinationEmailLogs.status} = 'sent')`,
         failed: sql<number>`count(*) filter (where ${vaccinationEmailLogs.status} = 'failed')`,
+        conversions: sql<number>`count(*) filter (
+          where ${vaccinationEmailLogs.status} = 'sent'
+          and ${conversionExists}
+        )`,
       })
       .from(vaccinationEmailLogs)
       .innerJoin(tenants, eq(vaccinationEmailLogs.tenantId, tenants.id))
@@ -27,22 +50,29 @@ export const adminVaccinationsRouter = createAdminRouter({
       .orderBy(desc(sql<number>`count(*)`))
       .limit(10);
 
-    const total = Number(totals?.total ?? 0);
     const sent = Number(totals?.sent ?? 0);
     const failed = Number(totals?.failed ?? 0);
+    const conversions = Number(totals?.conversions ?? 0);
 
     return {
       totalRemindersSent: sent,
       totalRemindersFailed: failed,
-      successRate: total > 0 ? Math.round((sent / total) * 1000) / 10 : 0,
+      successRate: (sent + failed) > 0 ? Math.round((sent / (sent + failed)) * 1000) / 10 : 0,
       lastScanAt: totals?.lastScanAt ?? null,
-      averageConversionRate: 0,
-      topTenants: perTenant.map((row) => ({
-        tenantId: row.tenantId,
-        tenantName: row.tenantName,
-        sent: Number(row.sent ?? 0),
-        failed: Number(row.failed ?? 0),
-      })),
+      totalConversions: conversions,
+      averageConversionRate: sent > 0 ? Math.round((conversions / sent) * 1000) / 10 : 0,
+      topTenants: perTenant.map((row) => {
+        const rowSent = Number(row.sent ?? 0);
+        const rowConversions = Number(row.conversions ?? 0);
+        return {
+          tenantId: row.tenantId,
+          tenantName: row.tenantName,
+          sent: rowSent,
+          failed: Number(row.failed ?? 0),
+          conversions: rowConversions,
+          conversionRate: rowSent > 0 ? Math.round((rowConversions / rowSent) * 1000) / 10 : 0,
+        };
+      }),
     };
   }),
 
@@ -63,6 +93,10 @@ export const adminVaccinationsRouter = createAdminRouter({
           total: sql<number>`count(*)`,
           sent: sql<number>`count(*) filter (where ${vaccinationEmailLogs.status} = 'sent')`,
           failed: sql<number>`count(*) filter (where ${vaccinationEmailLogs.status} = 'failed')`,
+          conversions: sql<number>`count(*) filter (
+            where ${vaccinationEmailLogs.status} = 'sent'
+            and ${conversionExists}
+          )`,
         })
         .from(vaccinationEmailLogs)
         .where(and(...conditions));
@@ -77,6 +111,7 @@ export const adminVaccinationsRouter = createAdminRouter({
           sentAt: vaccinationEmailLogs.sentAt,
           vaccinationType: vaccinations.type,
           expiryDate: vaccinations.expiryDate,
+          converted: conversionExists,
         })
         .from(vaccinationEmailLogs)
         .innerJoin(vaccinations, eq(vaccinationEmailLogs.vaccinationId, vaccinations.id))
@@ -84,17 +119,17 @@ export const adminVaccinationsRouter = createAdminRouter({
         .orderBy(desc(vaccinationEmailLogs.sentAt))
         .limit(100);
 
-      const total = Number(summary?.total ?? 0);
       const sent = Number(summary?.sent ?? 0);
       const failed = Number(summary?.failed ?? 0);
+      const conversions = Number(summary?.conversions ?? 0);
 
       return {
         tenantId: input.tenantId,
         remindersSentThisPeriod: sent,
-        successRate: total > 0 ? Math.round((sent / total) * 1000) / 10 : 0,
+        successRate: (sent + failed) > 0 ? Math.round((sent / (sent + failed)) * 1000) / 10 : 0,
         failedCount: failed,
-        appointmentConversions: 0,
-        conversionRate: 0,
+        appointmentConversions: conversions,
+        conversionRate: sent > 0 ? Math.round((conversions / sent) * 1000) / 10 : 0,
         recentReminders,
       };
     }),
@@ -122,7 +157,6 @@ export const adminVaccinationsRouter = createAdminRouter({
           ownerEmail: vaccinationEmailLogs.emailAddress,
           failureReason: vaccinationEmailLogs.error,
           failedAt: vaccinationEmailLogs.sentAt,
-          retryable: sql<boolean>`true`,
         })
         .from(vaccinationEmailLogs)
         .innerJoin(tenants, eq(vaccinationEmailLogs.tenantId, tenants.id))
@@ -134,9 +168,8 @@ export const adminVaccinationsRouter = createAdminRouter({
 
   /**
    * Reset a vaccination's reminderSentDate so the next cron run will retry.
-   * Failed reminders are automatically retried by cron because they don't set
-   * reminderSentDate — but if a previous successful send was incorrect, an
-   * admin can clear the flag here to force a re-send.
+   * Failed reminders are retried automatically by cron (they never set
+   * reminderSentDate). Use this to force a re-send for a prior successful send.
    */
   retryFailedReminder: procedure
     .input(z.object({ logId: z.string().uuid() }))
@@ -152,7 +185,6 @@ export const adminVaccinationsRouter = createAdminRouter({
 
       if (!log) return { success: false as const, error: "log_not_found" };
 
-      // Clear reminderSentDate so the next cron run picks this vaccination up again.
       await ctx.db
         .update(vaccinations)
         .set({ reminderSentDate: null, updatedAt: new Date() })
@@ -172,6 +204,10 @@ export const adminVaccinationsRouter = createAdminRouter({
           tenantName: tenants.name,
           sent: sql<number>`count(*) filter (where ${vaccinationEmailLogs.status} = 'sent')`,
           failed: sql<number>`count(*) filter (where ${vaccinationEmailLogs.status} = 'failed')`,
+          conversions: sql<number>`count(*) filter (
+            where ${vaccinationEmailLogs.status} = 'sent'
+            and ${conversionExists}
+          )`,
         })
         .from(vaccinationEmailLogs)
         .innerJoin(tenants, eq(vaccinationEmailLogs.tenantId, tenants.id))
@@ -184,6 +220,7 @@ export const adminVaccinationsRouter = createAdminRouter({
         items: rows.map((row) => {
           const sent = Number(row.sent ?? 0);
           const failed = Number(row.failed ?? 0);
+          const conversions = Number(row.conversions ?? 0);
           const total = sent + failed;
           return {
             tenantId: row.tenantId,
@@ -191,7 +228,9 @@ export const adminVaccinationsRouter = createAdminRouter({
             sent,
             failed,
             total,
+            conversions,
             successRate: total > 0 ? Math.round((sent / total) * 1000) / 10 : 0,
+            conversionRate: sent > 0 ? Math.round((conversions / sent) * 1000) / 10 : 0,
           };
         }),
       };
