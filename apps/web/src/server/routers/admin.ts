@@ -93,7 +93,18 @@ export const adminRouter = createTRPCRouter({
       .where(eq(users.clerkId, ctx.userId))
       .limit(1);
 
-    return user || null;
+    if (!user) return null;
+
+    const assignedRoles = await ctx.db
+      .select({ code: roles.code })
+      .from(userRoles)
+      .innerJoin(roles, eq(userRoles.roleId, roles.id))
+      .where(eq(userRoles.userId, user.id));
+
+    return {
+      ...user,
+      roleCodes: assignedRoles.map((r) => r.code.toLowerCase()),
+    };
   }),
 
   /**

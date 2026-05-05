@@ -19,7 +19,7 @@
     "@types/json-schema": "^7.0.15",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/ms": "^2.1.0",
-    "@types/node": "^20.19.39",
+    "@types/node": "^24.12.2",
     "@types/react": "^19.2.14",
     "apache-arrow": "^21.1.0",
     "debug": "^4.4.3",
@@ -47,7 +47,9 @@
     "@vercel/speed-insights": "1.0.4",
     "drizzle-kit": "^0.18.1",
     "drizzle-orm": "0.45.2",
+    "eslint": "^9.39.4",
     "next-intl": "^4.9.2",
-    "svix": "^1.92.2"
+    "svix": "^1.92.2",
+    "typescript": "^6.0.3"
   }
 }

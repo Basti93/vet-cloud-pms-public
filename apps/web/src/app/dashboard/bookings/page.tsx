@@ -16,14 +16,14 @@ export default function BookingsPage() {
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [filters, setFilters] = useState<FilterState>({
-    vetId: vetId || null,
+    vetId: null,
     status: null,
     dateFrom: '',
     dateTo: '',
     searchQuery: '',
   });
 
-  // Auto-set filter to current vet if they are a vet
+  // Auto-set filter to current vet only for real vet users.
   useEffect(() => {
     if (!vetId) return;
     setFilters((prev) => (prev.vetId ? prev : { ...prev, vetId }));
