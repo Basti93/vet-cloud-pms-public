@@ -16,6 +16,21 @@ export default clerkMiddleware(async (auth, req) => {
 
   if (isProtectedRoute(req)) {
     await auth.protect();
+
+    // Verify user is a system admin
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.redirect(new URL("/", req.url));
+    }
+
+    const adminClerkIds = process.env.ADMIN_CLERK_IDS?.split(",").map((id) =>
+      id.trim()
+    ) || [];
+
+    if (!adminClerkIds.includes(userId)) {
+      // Unauthorized: user is authenticated but not a system admin
+      return NextResponse.redirect(new URL("/", req.url));
+    }
   }
 
   const response = NextResponse.next();
