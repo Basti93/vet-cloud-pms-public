@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, gte, isNull, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNull, lte, min, sql, ne } from "drizzle-orm";
 import { z } from "zod";
-import { PERMISSIONS, patients, users, vaccinations } from "@/lib/db/schema";
+import { PERMISSIONS, owners, patients, users, vaccinations } from "@/lib/db/schema";
 import { createTRPCRouter, tenantProcedure } from "@/server/trpc";
 import { requirePermission } from "@/server/trpc/middleware";
 import { writeAuditLog } from "@/server/audit";
@@ -151,6 +151,11 @@ export const vaccinationsRouter = createTRPCRouter({
         });
       }
 
+      // If expiry date changes, clear reminderSentDate so a new reminder can be sent.
+      const expiryChanged =
+        input.expiryDate !== undefined &&
+        input.expiryDate.getTime() !== current.expiryDate.getTime();
+
       const [updated] = await ctx.db
         .update(vaccinations)
         .set({
@@ -160,6 +165,7 @@ export const vaccinationsRouter = createTRPCRouter({
           vetId: input.vetId === undefined ? undefined : input.vetId,
           batchNumber: input.batchNumber === undefined ? undefined : input.batchNumber,
           notes: input.notes === undefined ? undefined : input.notes,
+          reminderSentDate: expiryChanged ? null : undefined,
           updatedAt: new Date(),
         })
         .where(eq(vaccinations.id, input.vaccinationId))
@@ -270,5 +276,81 @@ export const vaccinationsRouter = createTRPCRouter({
         totalUpcoming: Number(row?.totalUpcoming ?? 0),
         totalTracked: Number(row?.totalTracked ?? 0),
       };
+    }),
+
+  /**
+   * Per-patient vaccination summary for the vaccination management list page.
+   * Returns each patient with their soonest-expiring vaccination status.
+   */
+  getPatientSummaryList: tenantProcedure
+    .use(requirePermission(PERMISSIONS.PATIENTS_READ))
+    .input(
+      z.object({
+        tenantId: z.string().uuid(),
+        limit: z.number().int().min(1).max(500).default(200),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const now = new Date();
+      const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+      const rows = await ctx.db
+        .select({
+          id: patients.id,
+          name: patients.name,
+          species: patients.species,
+          ownerFirstName: owners.firstName,
+          ownerLastName: owners.lastName,
+          nextDueAt: min(vaccinations.expiryDate),
+        })
+        .from(patients)
+        .leftJoin(owners, eq(patients.ownerId, owners.id))
+        .leftJoin(
+          vaccinations,
+          and(
+            eq(vaccinations.patientId, patients.id),
+            isNull(vaccinations.deletedAt)
+          )
+        )
+        .where(and(eq(patients.tenantId, input.tenantId), ne(patients.active, false)))
+        .groupBy(patients.id, patients.name, patients.species, owners.firstName, owners.lastName)
+        .orderBy(
+          // Overdue first, then due soon, then current
+          sql`CASE
+            WHEN min(${vaccinations.expiryDate}) < ${now} THEN 0
+            WHEN min(${vaccinations.expiryDate}) <= ${in30Days} THEN 1
+            ELSE 2
+          END`,
+          asc(min(vaccinations.expiryDate))
+        )
+        .limit(input.limit);
+
+      return rows.map((row) => {
+        const nextDueAt = row.nextDueAt;
+        let state: "overdue" | "due30" | "current" | "none" = "none";
+        let daysUntilDue: number | null = null;
+
+        if (nextDueAt) {
+          daysUntilDue = Math.ceil((nextDueAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+          if (nextDueAt < now) {
+            state = "overdue";
+          } else if (nextDueAt <= in30Days) {
+            state = "due30";
+          } else {
+            state = "current";
+          }
+        }
+
+        return {
+          id: row.id,
+          name: row.name,
+          species: row.species,
+          ownerFirstName: row.ownerFirstName,
+          ownerLastName: row.ownerLastName,
+          nextDueAt,
+          state,
+          daysUntilDue,
+        };
+      });
     }),
 });

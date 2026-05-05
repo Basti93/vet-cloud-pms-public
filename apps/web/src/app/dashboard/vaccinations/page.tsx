@@ -1,35 +1,59 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { useTenant } from "@/hooks/useTenant";
+import { TableSkeleton } from "@/components/ui/skeleton";
+
+const STATUS_FILTERS = [
+  { value: "all", label: "Alle" },
+  { value: "overdue", label: "Überfällig" },
+  { value: "due30", label: "In 30 Tagen fällig" },
+  { value: "current", label: "Aktuell" },
+  { value: "none", label: "Keine Impfungen" },
+] as const;
+
+type StatusFilter = (typeof STATUS_FILTERS)[number]["value"];
+
+function StatusBadge({ state }: { state: string }) {
+  if (state === "overdue")
+    return (
+      <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700">
+        Überfällig
+      </span>
+    );
+  if (state === "due30")
+    return (
+      <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+        Bald fällig
+      </span>
+    );
+  if (state === "current")
+    return (
+      <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700">
+        Aktuell
+      </span>
+    );
+  return (
+    <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-muted">
+      Keine Impfungen
+    </span>
+  );
+}
 
 export default function VaccinationsPage() {
   const { tenantId } = useTenant();
-  const [status, setStatus] = useState<"all" | "overdue" | "due30" | "current">("all");
+  const [status, setStatus] = useState<StatusFilter>("all");
 
-  const { data: patients } = trpc.patients.list.useQuery(
-    { tenantId: tenantId ?? "", limit: 100 },
+  const { data, isLoading, isError } = trpc.vaccinations.getPatientSummaryList.useQuery(
+    { tenantId: tenantId ?? "" },
     { enabled: !!tenantId }
   );
 
-  const rows = useMemo(() => {
-    const now = Date.now();
-    return (patients ?? []).map((p) => ({
-      id: p.id,
-      name: p.name,
-      species: p.species,
-      owner: `${p.ownerFirstName ?? ""} ${p.ownerLastName ?? ""}`.trim(),
-      // Placeholder until per-patient aggregation endpoint is added.
-      dueAt: null as Date | null,
-      state: "current" as "overdue" | "due30" | "current",
-      daysUntilDue: null as number | null,
-      _now: now,
-    }));
-  }, [patients]);
-
-  const filtered = rows.filter((row) => status === "all" || row.state === status);
+  const filtered = (data ?? []).filter(
+    (row) => status === "all" || row.state === status
+  );
 
   return (
     <div className="space-y-6">
@@ -52,15 +76,10 @@ export default function VaccinationsPage() {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {[
-          ["all", "Alle"],
-          ["overdue", "Überfällig"],
-          ["due30", "In 30 Tagen fällig"],
-          ["current", "Aktuell"],
-        ].map(([value, label]) => (
+        {STATUS_FILTERS.map(({ value, label }) => (
           <button
             key={value}
-            onClick={() => setStatus(value as typeof status)}
+            onClick={() => setStatus(value)}
             className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
               status === value
                 ? "bg-primary text-primary-foreground"
@@ -72,39 +91,86 @@ export default function VaccinationsPage() {
         ))}
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
-        <table className="min-w-full text-sm">
-          <thead className="bg-bg text-left text-xs uppercase tracking-wide text-muted">
-            <tr>
-              <th className="px-4 py-3">Patient</th>
-              <th className="px-4 py-3">Tierart</th>
-              <th className="px-4 py-3">Besitzer</th>
-              <th className="px-4 py-3">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((row) => (
-              <tr key={row.id} className="border-t border-border">
-                <td className="px-4 py-3">
-                  <Link href={`/dashboard/patients/${row.id}`} className="font-medium text-fg hover:underline">
-                    {row.name}
-                  </Link>
-                </td>
-                <td className="px-4 py-3 text-muted">{row.species}</td>
-                <td className="px-4 py-3 text-muted">{row.owner || "-"}</td>
-                <td className="px-4 py-3 text-fg">Aktuell</td>
-              </tr>
-            ))}
-            {filtered.length === 0 && (
+      {isError ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          Impfdaten konnten nicht geladen werden. Bitte Seite neu laden.
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
+          <table className="min-w-full text-sm">
+            <thead className="bg-bg text-left text-xs uppercase tracking-wide text-muted">
               <tr>
-                <td className="px-4 py-8 text-center text-muted" colSpan={4}>
-                  Keine Daten vorhanden.
-                </td>
+                <th className="px-4 py-3">Patient</th>
+                <th className="px-4 py-3">Tierart</th>
+                <th className="px-4 py-3">Besitzer</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Nächste Fälligkeit</th>
               </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={5} className="p-0">
+                    <TableSkeleton rows={6} />
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td className="px-4 py-8 text-center text-muted" colSpan={5}>
+                    {status === "all"
+                      ? "Keine Patienten vorhanden."
+                      : "Keine Patienten in dieser Kategorie."}
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((row) => {
+                  const owner = [row.ownerFirstName, row.ownerLastName]
+                    .filter(Boolean)
+                    .join(" ");
+                  const dueDateLabel = row.nextDueAt
+                    ? row.nextDueAt.toLocaleDateString("de-DE", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        year: "numeric",
+                      })
+                    : "—";
+
+                  return (
+                    <tr key={row.id} className="border-t border-border hover:bg-bg/50">
+                      <td className="px-4 py-3">
+                        <Link
+                          href={`/dashboard/patients/${row.id}`}
+                          className="font-medium text-fg hover:underline"
+                        >
+                          {row.name}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3 text-muted">{row.species}</td>
+                      <td className="px-4 py-3 text-muted">{owner || "—"}</td>
+                      <td className="px-4 py-3">
+                        <StatusBadge state={row.state} />
+                      </td>
+                      <td className="px-4 py-3 text-muted">
+                        {row.daysUntilDue !== null && row.daysUntilDue <= 30 && row.daysUntilDue >= 0 ? (
+                          <span className="text-amber-700">
+                            {dueDateLabel} ({row.daysUntilDue}d)
+                          </span>
+                        ) : row.state === "overdue" ? (
+                          <span className="text-red-700">
+                            {dueDateLabel} ({Math.abs(row.daysUntilDue ?? 0)}d überfällig)
+                          </span>
+                        ) : (
+                          dueDateLabel
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

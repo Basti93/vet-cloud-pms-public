@@ -15,11 +15,21 @@ import {
   Clock,
 } from 'lucide-react';
 import Link from 'next/link';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/lib/toast/context';
 
 export default function PatientDetailPage() {
   const params = useParams();
   const patientId = params.patientId as string;
   const { tenantId } = useTenant();
+  const { addToast } = useToast();
   const [showDiagnosisForm, setShowDiagnosisForm] = useState(false);
   const [showMedicationForm, setShowMedicationForm] = useState(false);
   const [showVitalsForm, setShowVitalsForm] = useState(false);
@@ -27,6 +37,8 @@ export default function PatientDetailPage() {
   const [vaccinationType, setVaccinationType] = useState("");
   const [vaccinationDate, setVaccinationDate] = useState("");
   const [vaccinationExpiry, setVaccinationExpiry] = useState("");
+  const [vaccinationBatch, setVaccinationBatch] = useState("");
+  const [vaccinationNotes, setVaccinationNotes] = useState("");
 
   // Fetch patient data
   const { data: patients, isLoading } = trpc.patients.list.useQuery(
@@ -68,7 +80,13 @@ export default function PatientDetailPage() {
       setVaccinationType("");
       setVaccinationDate("");
       setVaccinationExpiry("");
+      setVaccinationBatch("");
+      setVaccinationNotes("");
+      addToast("Impfung erfasst.", "success");
       await refetchVaccinations();
+    },
+    onError: () => {
+      addToast("Impfung konnte nicht gespeichert werden.", "error");
     },
   });
 
@@ -396,67 +414,101 @@ export default function PatientDetailPage() {
         </div>
       </div>
 
-      {/* Placeholder for Forms */}
-      {(showDiagnosisForm || showMedicationForm || showVitalsForm || showVaccinationForm) && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            {showVaccinationForm ? (
-              <div className="space-y-3">
-                <h3 className="text-lg font-semibold">Impfung erfassen</h3>
-                <input
-                  className="w-full rounded border px-3 py-2"
-                  placeholder="Impfstoff (z.B. Tollwut)"
-                  value={vaccinationType}
-                  onChange={(e) => setVaccinationType(e.target.value)}
-                />
-                <label className="block text-sm">
-                  Verabreicht am
-                  <input
-                    type="date"
-                    className="mt-1 w-full rounded border px-3 py-2"
-                    value={vaccinationDate}
-                    onChange={(e) => setVaccinationDate(e.target.value)}
-                  />
-                </label>
-                <label className="block text-sm">
-                  Fällig am
-                  <input
-                    type="date"
-                    className="mt-1 w-full rounded border px-3 py-2"
-                    value={vaccinationExpiry}
-                    onChange={(e) => setVaccinationExpiry(e.target.value)}
-                  />
-                </label>
-                <div className="flex justify-end gap-2">
-                  <button
-                    onClick={() => setShowVaccinationForm(false)}
-                    className="rounded border px-3 py-2 text-sm"
-                  >
-                    Abbrechen
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (!tenantId || !vaccinationType || !vaccinationDate || !vaccinationExpiry) {
-                        return;
-                      }
-                      createVaccination.mutate({
-                        tenantId,
-                        patientId,
-                        type: vaccinationType,
-                        administeredDate: new Date(vaccinationDate),
-                        expiryDate: new Date(vaccinationExpiry),
-                      });
-                    }}
-                    className="rounded bg-black px-3 py-2 text-sm text-white"
-                    disabled={createVaccination.isPending}
-                  >
-                    Speichern
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <p className="text-gray-600">Forms coming in next iteration...</p>
-            )}
+      {/* Vaccination Dialog */}
+      <Dialog open={showVaccinationForm} onOpenChange={setShowVaccinationForm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Impfung erfassen</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <label className="block text-sm text-fg">
+              Impfstoff *
+              <input
+                className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-fg placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                placeholder="z.B. Tollwut, Leptospirose"
+                value={vaccinationType}
+                onChange={(e) => setVaccinationType(e.target.value)}
+              />
+            </label>
+            <label className="block text-sm text-fg">
+              Verabreicht am *
+              <input
+                type="date"
+                className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-fg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                value={vaccinationDate}
+                onChange={(e) => setVaccinationDate(e.target.value)}
+              />
+            </label>
+            <label className="block text-sm text-fg">
+              Fällig am (Auffrischung) *
+              <input
+                type="date"
+                className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-fg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                value={vaccinationExpiry}
+                onChange={(e) => setVaccinationExpiry(e.target.value)}
+              />
+            </label>
+            <label className="block text-sm text-fg">
+              Chargennummer
+              <input
+                className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-fg placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                placeholder="z.B. B2024-001"
+                value={vaccinationBatch}
+                onChange={(e) => setVaccinationBatch(e.target.value)}
+              />
+            </label>
+            <label className="block text-sm text-fg">
+              Notizen
+              <textarea
+                rows={2}
+                className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-fg placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                placeholder="Optionale Anmerkungen"
+                value={vaccinationNotes}
+                onChange={(e) => setVaccinationNotes(e.target.value)}
+              />
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowVaccinationForm(false)}>
+              Abbrechen
+            </Button>
+            <Button
+              loading={createVaccination.isPending}
+              disabled={!vaccinationType || !vaccinationDate || !vaccinationExpiry}
+              onClick={() => {
+                if (!tenantId || !vaccinationType || !vaccinationDate || !vaccinationExpiry) return;
+                createVaccination.mutate({
+                  tenantId,
+                  patientId,
+                  type: vaccinationType,
+                  administeredDate: new Date(vaccinationDate),
+                  expiryDate: new Date(vaccinationExpiry),
+                  batchNumber: vaccinationBatch || undefined,
+                  notes: vaccinationNotes || undefined,
+                });
+              }}
+            >
+              Speichern
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Placeholder for other forms (diagnosis, medication, vitals) */}
+      {(showDiagnosisForm || showMedicationForm || showVitalsForm) && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-6">
+            <p className="text-muted">Formular folgt im nächsten Sprint.</p>
+            <button
+              className="mt-4 rounded border border-border px-3 py-2 text-sm text-fg"
+              onClick={() => {
+                setShowDiagnosisForm(false);
+                setShowMedicationForm(false);
+                setShowVitalsForm(false);
+              }}
+            >
+              Schließen
+            </button>
           </div>
         </div>
       )}
