@@ -42,7 +42,7 @@
     "drizzle-orm": "^0.45.2",
     "ical-generator": "^10.2.0",
     "jsonwebtoken": "^9.0.3",
-    "lucide-react": "^0.400",
+    "lucide-react": "^1.14.0",
     "next": "^16.2.4",
     "next-intl": "^4.9.2",
     "postgres": "^3",
