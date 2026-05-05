@@ -141,13 +141,13 @@ export default function SchedulePage() {
   const [editAppt, setEditAppt] = useState<ApptDetail | null>(null);
   const [defaultStart, setDefaultStart] = useState<Date | undefined>();
   const [filters, setFilters] = useState<FilterState>({
-    vetId: vetId || null,
+    vetId: null,
     status: null,
     dateFrom: '',
     dateTo: '',
   });
 
-  // Auto-set filter to current vet if they are a vet
+  // Auto-set filter to current vet only for real vet users.
   useEffect(() => {
     if (!vetId) return;
     setFilters((prev) => (prev.vetId ? prev : { ...prev, vetId }));
