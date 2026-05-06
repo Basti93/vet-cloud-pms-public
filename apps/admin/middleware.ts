@@ -20,7 +20,7 @@ export default clerkMiddleware(async (auth, req) => {
     // Verify user is a system admin
     const { userId } = await auth();
     if (!userId) {
-      return NextResponse.redirect(new URL("/", req.url));
+      return NextResponse.redirect(new URL("/sign-in", req.url));
     }
 
     const adminClerkIds = process.env.ADMIN_CLERK_IDS?.split(",").map((id) =>
@@ -28,8 +28,10 @@ export default clerkMiddleware(async (auth, req) => {
     ) || [];
 
     if (!adminClerkIds.includes(userId)) {
-      // Unauthorized: user is authenticated but not a system admin
-      return NextResponse.redirect(new URL("/", req.url));
+      // Unauthorized: user is authenticated but not a system admin.
+      // Redirect to sign-in (NOT "/") to avoid an infinite loop — the home
+      // page at "/" redirects authenticated users back to /dashboard.
+      return NextResponse.redirect(new URL("/sign-in", req.url));
     }
   }
 
