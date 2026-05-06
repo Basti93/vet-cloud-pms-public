@@ -330,8 +330,8 @@ export const vaccinationsRouter = createTRPCRouter({
         .orderBy(
           // Overdue first, then due soon, then current
           sql`CASE
-            WHEN ${subquery.nextDueAt} < ${now} THEN 0
-            WHEN ${subquery.nextDueAt} <= ${in30Days} THEN 1
+            WHEN ${subquery.nextDueAt} < ${sql.raw(`'${now.toISOString()}'`)} THEN 0
+            WHEN ${subquery.nextDueAt} <= ${sql.raw(`'${in30Days.toISOString()}'`)} THEN 1
             ELSE 2
           END`,
           asc(subquery.nextDueAt)
