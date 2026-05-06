@@ -2,9 +2,9 @@ import { Webhook } from "svix";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db/client";
-import { users, tenants } from "@/lib/db/schema";
+import { users, tenants, userInvitations } from "@/lib/db/schema";
 import { randomUUID } from "crypto";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 // Helper function to generate a unique slug
 async function generateUniqueSlug(baseName: string): Promise<string> {
@@ -112,31 +112,55 @@ export async function POST(req: Request) {
         return NextResponse.json({ success: true, alreadyExists: true });
       }
 
-      // Create a temporary tenant for this user (they'll create their practice tenant on onboarding)
-      const tempTenantId = randomUUID();
-      const placeholderName = `${firstName || "User"} ${lastName || "Placeholder"}`;
-      const uniqueSlug = await generateUniqueSlug(`temp-${placeholderName}`);
+      // Check for a pending invitation for this email.
+      // Invited users must NOT get their own placeholder tenant — they belong
+      // to the practice that invited them.  acceptInvite() will assign the
+      // correct role and (idempotently) set tenantId after sign-up.
+      const normalizedEmail = email.trim().toLowerCase();
+      const [pendingInvite] = await db
+        .select({ tenantId: userInvitations.tenantId })
+        .from(userInvitations)
+        .where(
+          and(
+            eq(userInvitations.email, normalizedEmail),
+            eq(userInvitations.status, "pending")
+          )
+        )
+        .limit(1);
 
-      // Create the user record in the database
-      // Note: tenantId will be set by the onboarding flow when they create their practice
-      // For now, we create a placeholder tenant so the user record can be created
-      const [tempTenant] = await db
-        .insert(tenants)
-        .values({
-          id: tempTenantId,
-          name: `Placeholder for ${firstName || "User"}`,
-          slug: uniqueSlug,
-          email,
-          country: "DE",
-          timezone: "Europe/Berlin",
-          subscriptionStatus: "trial",
-          subscriptionPlan: "starter",
-        })
-        .returning();
+      let assignedTenantId: string;
+
+      if (pendingInvite) {
+        // Invited user — use the destination tenant directly, no placeholder needed.
+        assignedTenantId = pendingInvite.tenantId;
+        console.log(`Invited user ${clerkId} (${email}) assigned to tenant ${assignedTenantId}`);
+      } else {
+        // Organic signup — create a temporary placeholder tenant.
+        // The onboarding flow will replace this with the real practice tenant.
+        const placeholderName = `${firstName || "User"} ${lastName || "Placeholder"}`;
+        const uniqueSlug = await generateUniqueSlug(`temp-${placeholderName}`);
+
+        const [tempTenant] = await db
+          .insert(tenants)
+          .values({
+            id: randomUUID(),
+            name: `Placeholder for ${firstName || "User"}`,
+            slug: uniqueSlug,
+            email,
+            country: "DE",
+            timezone: "Europe/Berlin",
+            subscriptionStatus: "trial",
+            subscriptionPlan: "starter",
+          })
+          .returning();
+
+        assignedTenantId = tempTenant.id;
+        console.log(`Organic signup ${clerkId} (${email}) — placeholder tenant ${assignedTenantId} created`);
+      }
 
       await db.insert(users).values({
         id: randomUUID(),
-        tenantId: tempTenant.id,
+        tenantId: assignedTenantId,
         clerkId,
         email,
         firstName,
