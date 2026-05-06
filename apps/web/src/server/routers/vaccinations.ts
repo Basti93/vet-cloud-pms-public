@@ -324,7 +324,7 @@ export const vaccinationsRouter = createTRPCRouter({
           species: subquery.species,
           ownerFirstName: subquery.ownerFirstName,
           ownerLastName: subquery.ownerLastName,
-          nextDueAt: subquery.nextDueAt as any,
+          nextDueAt: subquery.nextDueAt,
         })
         .from(subquery)
         .orderBy(
@@ -339,11 +339,11 @@ export const vaccinationsRouter = createTRPCRouter({
         .limit(input.limit);
 
       return rows.map((row) => {
-        const nextDueAt = row.nextDueAt;
+        const nextDueAt = row.nextDueAt as Date | null;
         let state: "overdue" | "due30" | "current" | "none" = "none";
         let daysUntilDue: number | null = null;
 
-        if (nextDueAt) {
+        if (nextDueAt && nextDueAt instanceof Date) {
           daysUntilDue = Math.ceil((nextDueAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
           if (nextDueAt < now) {
             state = "overdue";
