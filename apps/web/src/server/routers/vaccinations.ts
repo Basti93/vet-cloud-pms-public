@@ -264,8 +264,8 @@ export const vaccinationsRouter = createTRPCRouter({
 
       const [row] = await ctx.db
         .select({
-          totalDue: sql<number>`sum(case when ${vaccinations.expiryDate} < ${now}::timestamp with time zone then 1 else 0 end)`,
-          totalUpcoming: sql<number>`sum(case when ${vaccinations.expiryDate} >= ${now}::timestamp with time zone and ${vaccinations.expiryDate} <= ${in30Days}::timestamp with time zone then 1 else 0 end)`,
+          totalDue: sql<number>`sum(case when ${vaccinations.expiryDate} < ${sql.raw(`'${now.toISOString()}'`)} then 1 else 0 end)`,
+          totalUpcoming: sql<number>`sum(case when ${vaccinations.expiryDate} >= ${sql.raw(`'${now.toISOString()}'`)} and ${vaccinations.expiryDate} <= ${sql.raw(`'${in30Days.toISOString()}'`)} then 1 else 0 end)`,
           totalTracked: sql<number>`count(*)`,
         })
         .from(vaccinations)
@@ -302,7 +302,7 @@ export const vaccinationsRouter = createTRPCRouter({
           species: patients.species,
           ownerFirstName: owners.firstName,
           ownerLastName: owners.lastName,
-          nextDueAt: min(vaccinations.expiryDate),
+          nextDueAt: min(vaccinations.expiryDate).as("next_due_at"),
         })
         .from(patients)
         .leftJoin(owners, eq(patients.ownerId, owners.id))
