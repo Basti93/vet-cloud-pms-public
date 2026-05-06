@@ -264,8 +264,8 @@ export const vaccinationsRouter = createTRPCRouter({
 
       const [row] = await ctx.db
         .select({
-          totalDue: sql<number>`count(*) filter (where ${vaccinations.expiryDate} < ${now})`,
-          totalUpcoming: sql<number>`count(*) filter (where ${vaccinations.expiryDate} >= ${now} and ${vaccinations.expiryDate} <= ${in30Days})`,
+          totalDue: sql<number>`sum(case when ${vaccinations.expiryDate} < ${now}::timestamp with time zone then 1 else 0 end)`,
+          totalUpcoming: sql<number>`sum(case when ${vaccinations.expiryDate} >= ${now}::timestamp with time zone and ${vaccinations.expiryDate} <= ${in30Days}::timestamp with time zone then 1 else 0 end)`,
           totalTracked: sql<number>`count(*)`,
         })
         .from(vaccinations)
