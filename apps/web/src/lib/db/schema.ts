@@ -752,6 +752,53 @@ export const vaccinationTypes = pgTable(
 );
 
 // ============================================================================
+// TENANT VACCINATION TYPE CONFIG
+// Hybrid model: extends the global STIKO catalogue per tenant.
+//   - Row with vaccinationTypeId + enabled=false  → hides that global type
+//   - Row with vaccinationTypeId = null            → tenant-specific custom type
+// ============================================================================
+
+export const tenantVaccinationTypeConfig = pgTable(
+  "tenant_vaccination_type_config",
+  {
+    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    // null → custom type row; non-null → config for a global type
+    vaccinationTypeId: uuid("vaccination_type_id").references(
+      () => vaccinationTypes.id,
+      { onDelete: "cascade" }
+    ),
+    // false = this global type is hidden for this tenant (ignored for custom rows)
+    enabled: boolean("enabled").notNull().default(true),
+    // Custom type fields — only populated when vaccinationTypeId IS NULL
+    customName: varchar("custom_name", { length: 150 }),
+    customSpecies: varchar("custom_species", { length: 200 }),
+    customCategory: varchar("custom_category", { length: 20 }),
+    customIntervalMonths: integer("custom_interval_months"),
+    customRequiresBatchNumber: boolean("custom_requires_batch_number").default(false),
+    customNotes: text("custom_notes"),
+    // Display order in the form dropdown
+    sortOrder: integer("sort_order").notNull().default(100),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (table) => ({
+    tenantIdIdx: index("tenant_vax_type_config_tenant_id_idx").on(table.tenantId),
+    // One config row per global type per tenant (NULLs are distinct → custom types allowed)
+    uniquePerTenant: unique("tenant_vax_type_config_unique").on(
+      table.tenantId,
+      table.vaccinationTypeId
+    ),
+  })
+);
+
+// ============================================================================
 // VACCINATIONS (Patient Vaccination Records + Reminder State)
 // ============================================================================
 
@@ -765,12 +812,17 @@ export const vaccinations = pgTable(
     patientId: uuid("patient_id")
       .notNull()
       .references(() => patients.id, { onDelete: "cascade" }),
-    // FK to vaccination_types (null = custom/free-text type)
+    // Set when a global STIKO type was selected
     vaccinationTypeId: uuid("vaccination_type_id").references(
       () => vaccinationTypes.id,
       { onDelete: "set null" }
     ),
-    // Display name — populated from vaccinationTypes.name or free-text for custom
+    // Set when a tenant-specific custom type was selected
+    tenantVaccinationTypeConfigId: uuid("tenant_vaccination_type_config_id").references(
+      () => tenantVaccinationTypeConfig.id,
+      { onDelete: "set null" }
+    ),
+    // Display name — always populated (from type.name, custom config name, or free text)
     type: varchar("type", { length: 120 }).notNull(),
     administeredDate: timestamp("administered_date", { withTimezone: true }).notNull(),
     expiryDate: timestamp("expiry_date", { withTimezone: true }).notNull(),

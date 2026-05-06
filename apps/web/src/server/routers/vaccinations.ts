@@ -1,30 +1,280 @@
 import { TRPCError } from "@trpc/server";
-import { and, asc, desc, eq, gte, isNull, lte, min, sql, ne } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNull, lte, min, sql, ne, inArray } from "drizzle-orm";
 import { z } from "zod";
-import { PERMISSIONS, owners, patients, users, vaccinationTypes, vaccinations } from "@/lib/db/schema";
-import { createTRPCRouter, tenantProcedure, publicProcedure } from "@/server/trpc";
+import {
+  PERMISSIONS,
+  owners,
+  patients,
+  users,
+  vaccinationTypes,
+  tenantVaccinationTypeConfig,
+  vaccinations,
+} from "@/lib/db/schema";
+import { createTRPCRouter, tenantProcedure } from "@/server/trpc";
 import { requirePermission } from "@/server/trpc/middleware";
 import { writeAuditLog } from "@/server/audit";
 
+// Shape returned by getTypes — unified across global and custom types
+const effectiveTypeSchema = z.object({
+  id: z.string().uuid(),
+  code: z.string(),
+  name: z.string(),
+  species: z.string(),
+  category: z.string(),
+  defaultIntervalMonths: z.number(),
+  seriesDoses: z.number(),
+  minIntervalDays: z.number().nullable(),
+  requiresBatchNumber: z.boolean(),
+  sortOrder: z.number(),
+  notes: z.string().nullable(),
+  source: z.enum(["global", "custom"]),
+});
+
 export const vaccinationsRouter = createTRPCRouter({
   /**
-   * Global vaccination type catalogue (STIKO Vet standard).
-   * Optionally filter by species (e.g. "Hund", "Katze").
-   * Public — no auth required, no tenant data exposed.
+   * Tenant-aware vaccination type catalogue.
+   * Returns: global STIKO types (minus disabled) + tenant custom types.
+   * Optionally filtered by species string (case-insensitive substring match).
    */
-  getTypes: publicProcedure
-    .input(z.object({ species: z.string().optional() }))
+  getTypes: tenantProcedure
+    .use(requirePermission(PERMISSIONS.PATIENTS_READ))
+    .input(z.object({ tenantId: z.string().uuid(), species: z.string().optional() }))
     .query(async ({ ctx, input }) => {
-      const rows = await ctx.db
+      // 1. Load all global types
+      const globals = await ctx.db
         .select()
         .from(vaccinationTypes)
-        .where(
-          input.species
-            ? sql`${vaccinationTypes.species} ILIKE ${"%" + input.species + "%"}`
-            : undefined
-        )
         .orderBy(asc(vaccinationTypes.sortOrder), asc(vaccinationTypes.name));
-      return rows;
+
+      // 2. Load this tenant's config (disabled flags + custom types)
+      const configs = await ctx.db
+        .select()
+        .from(tenantVaccinationTypeConfig)
+        .where(eq(tenantVaccinationTypeConfig.tenantId, input.tenantId));
+
+      const disabledIds = new Set(
+        configs
+          .filter((c) => c.vaccinationTypeId !== null && !c.enabled)
+          .map((c) => c.vaccinationTypeId as string)
+      );
+
+      // 3. Merge into a unified shape
+      const speciesFilter = input.species?.toLowerCase();
+
+      const result = z.array(effectiveTypeSchema).parse([
+        // Global types not disabled by this tenant
+        ...globals
+          .filter((t) => !disabledIds.has(t.id))
+          .filter((t) =>
+            speciesFilter ? t.species.toLowerCase().includes(speciesFilter) : true
+          )
+          .map((t) => ({
+            id: t.id,
+            code: t.code,
+            name: t.name,
+            species: t.species,
+            category: t.category,
+            defaultIntervalMonths: t.defaultIntervalMonths,
+            seriesDoses: t.seriesDoses,
+            minIntervalDays: t.minIntervalDays,
+            requiresBatchNumber: t.requiresBatchNumber,
+            sortOrder: t.sortOrder,
+            notes: t.notes,
+            source: "global" as const,
+          })),
+
+        // Tenant custom types (vaccinationTypeId IS NULL, enabled=true)
+        ...configs
+          .filter((c) => c.vaccinationTypeId === null && c.enabled && c.customName)
+          .filter((c) =>
+            speciesFilter
+              ? (c.customSpecies ?? "").toLowerCase().includes(speciesFilter)
+              : true
+          )
+          .map((c) => ({
+            id: c.id,
+            code: c.customName!,
+            name: c.customName!,
+            species: c.customSpecies ?? "",
+            category: c.customCategory ?? "non-core",
+            defaultIntervalMonths: c.customIntervalMonths ?? 12,
+            seriesDoses: 1,
+            minIntervalDays: null,
+            requiresBatchNumber: c.customRequiresBatchNumber ?? false,
+            sortOrder: c.sortOrder,
+            notes: c.customNotes,
+            source: "custom" as const,
+          })),
+      ]);
+
+      return result.sort(
+        (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)
+      );
+    }),
+
+  /**
+   * Returns the full config for the settings UI:
+   * all global types with their enabled-state for this tenant,
+   * plus all custom types.
+   */
+  getTypeConfig: tenantProcedure
+    .use(requirePermission(PERMISSIONS.SETTINGS_MANAGE))
+    .input(z.object({ tenantId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const [globals, configs] = await Promise.all([
+        ctx.db
+          .select()
+          .from(vaccinationTypes)
+          .orderBy(asc(vaccinationTypes.sortOrder), asc(vaccinationTypes.name)),
+        ctx.db
+          .select()
+          .from(tenantVaccinationTypeConfig)
+          .where(eq(tenantVaccinationTypeConfig.tenantId, input.tenantId)),
+      ]);
+
+      const configByTypeId = new Map(
+        configs
+          .filter((c) => c.vaccinationTypeId !== null)
+          .map((c) => [c.vaccinationTypeId!, c])
+      );
+
+      const customTypes = configs.filter((c) => c.vaccinationTypeId === null);
+
+      return {
+        globalTypes: globals.map((t) => ({
+          ...t,
+          enabled: configByTypeId.get(t.id)?.enabled ?? true,
+          configId: configByTypeId.get(t.id)?.id ?? null,
+        })),
+        customTypes,
+      };
+    }),
+
+  /** Toggle a global type on/off for this tenant. */
+  setGlobalTypeEnabled: tenantProcedure
+    .use(requirePermission(PERMISSIONS.SETTINGS_MANAGE))
+    .input(
+      z.object({
+        tenantId: z.string().uuid(),
+        vaccinationTypeId: z.string().uuid(),
+        enabled: z.boolean(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db
+        .insert(tenantVaccinationTypeConfig)
+        .values({
+          tenantId: input.tenantId,
+          vaccinationTypeId: input.vaccinationTypeId,
+          enabled: input.enabled,
+        })
+        .onConflictDoUpdate({
+          target: [
+            tenantVaccinationTypeConfig.tenantId,
+            tenantVaccinationTypeConfig.vaccinationTypeId,
+          ],
+          set: {
+            enabled: input.enabled,
+            updatedAt: new Date(),
+          },
+        });
+      return { success: true };
+    }),
+
+  /** Add a tenant-specific custom vaccination type. */
+  addCustomType: tenantProcedure
+    .use(requirePermission(PERMISSIONS.SETTINGS_MANAGE))
+    .input(
+      z.object({
+        tenantId: z.string().uuid(),
+        name: z.string().trim().min(1).max(150),
+        species: z.string().trim().min(1).max(200),
+        category: z.enum(["core", "recommended", "non-core"]).default("recommended"),
+        intervalMonths: z.number().int().min(1).max(120),
+        requiresBatchNumber: z.boolean().default(false),
+        notes: z.string().trim().max(500).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [created] = await ctx.db
+        .insert(tenantVaccinationTypeConfig)
+        .values({
+          tenantId: input.tenantId,
+          vaccinationTypeId: null,
+          enabled: true,
+          customName: input.name,
+          customSpecies: input.species,
+          customCategory: input.category,
+          customIntervalMonths: input.intervalMonths,
+          customRequiresBatchNumber: input.requiresBatchNumber,
+          customNotes: input.notes ?? null,
+        })
+        .returning();
+      return created;
+    }),
+
+  /** Update a tenant custom type. */
+  updateCustomType: tenantProcedure
+    .use(requirePermission(PERMISSIONS.SETTINGS_MANAGE))
+    .input(
+      z.object({
+        tenantId: z.string().uuid(),
+        configId: z.string().uuid(),
+        name: z.string().trim().min(1).max(150).optional(),
+        species: z.string().trim().min(1).max(200).optional(),
+        category: z.enum(["core", "recommended", "non-core"]).optional(),
+        intervalMonths: z.number().int().min(1).max(120).optional(),
+        requiresBatchNumber: z.boolean().optional(),
+        notes: z.string().trim().max(500).nullable().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [updated] = await ctx.db
+        .update(tenantVaccinationTypeConfig)
+        .set({
+          customName: input.name,
+          customSpecies: input.species,
+          customCategory: input.category,
+          customIntervalMonths: input.intervalMonths,
+          customRequiresBatchNumber: input.requiresBatchNumber,
+          customNotes: input.notes === undefined ? undefined : input.notes,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(tenantVaccinationTypeConfig.id, input.configId),
+            eq(tenantVaccinationTypeConfig.tenantId, input.tenantId),
+            isNull(tenantVaccinationTypeConfig.vaccinationTypeId)
+          )
+        )
+        .returning();
+
+      if (!updated) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Custom type not found" });
+      }
+      return updated;
+    }),
+
+  /** Remove a tenant custom type. */
+  removeCustomType: tenantProcedure
+    .use(requirePermission(PERMISSIONS.SETTINGS_MANAGE))
+    .input(z.object({ tenantId: z.string().uuid(), configId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const [deleted] = await ctx.db
+        .delete(tenantVaccinationTypeConfig)
+        .where(
+          and(
+            eq(tenantVaccinationTypeConfig.id, input.configId),
+            eq(tenantVaccinationTypeConfig.tenantId, input.tenantId),
+            isNull(tenantVaccinationTypeConfig.vaccinationTypeId)
+          )
+        )
+        .returning({ id: tenantVaccinationTypeConfig.id });
+
+      if (!deleted) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Custom type not found" });
+      }
+      return { success: true };
     }),
 
   list: tenantProcedure
@@ -75,7 +325,10 @@ export const vaccinationsRouter = createTRPCRouter({
       z.object({
         tenantId: z.string().uuid(),
         patientId: z.string().uuid(),
+        // Global STIKO type selected
         vaccinationTypeId: z.string().uuid().optional(),
+        // Tenant custom type selected (mutually exclusive with vaccinationTypeId)
+        tenantVaccinationTypeConfigId: z.string().uuid().optional(),
         type: z.string().trim().min(1).max(120),
         administeredDate: z.date(),
         expiryDate: z.date(),
@@ -108,6 +361,7 @@ export const vaccinationsRouter = createTRPCRouter({
           tenantId: input.tenantId,
           patientId: input.patientId,
           vaccinationTypeId: input.vaccinationTypeId,
+          tenantVaccinationTypeConfigId: input.tenantVaccinationTypeConfigId,
           type: input.type,
           administeredDate: input.administeredDate,
           expiryDate: input.expiryDate,
@@ -140,6 +394,7 @@ export const vaccinationsRouter = createTRPCRouter({
         tenantId: z.string().uuid(),
         vaccinationId: z.string().uuid(),
         vaccinationTypeId: z.string().uuid().nullable().optional(),
+        tenantVaccinationTypeConfigId: z.string().uuid().nullable().optional(),
         type: z.string().trim().min(1).max(120).optional(),
         administeredDate: z.date().optional(),
         expiryDate: z.date().optional(),
@@ -188,6 +443,10 @@ export const vaccinationsRouter = createTRPCRouter({
         .update(vaccinations)
         .set({
           vaccinationTypeId: input.vaccinationTypeId === undefined ? undefined : input.vaccinationTypeId,
+          tenantVaccinationTypeConfigId:
+            input.tenantVaccinationTypeConfigId === undefined
+              ? undefined
+              : input.tenantVaccinationTypeConfigId,
           type: input.type,
           administeredDate: input.administeredDate,
           expiryDate: input.expiryDate,

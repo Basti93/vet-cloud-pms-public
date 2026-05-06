@@ -6,6 +6,14 @@ import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/lib/toast/context";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Plus, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+
+const SPECIES_OPTIONS = ["Hund", "Katze", "Kaninchen", "Frettchen", "Pferd", "Vogel", "Hamster", "Meerschweinchen", "Reptil", "Fisch", "Sonstiges"];
+const CATEGORY_OPTIONS = [
+  { value: "core", label: "Core (STIKO)" },
+  { value: "recommended", label: "Empfohlen" },
+  { value: "non-core", label: "Optional" },
+] as const;
 
 export default function VaccinationSettingsPage() {
   const { tenantId } = useTenant();
@@ -45,6 +53,43 @@ export default function VaccinationSettingsPage() {
   const [reminderSubject, setReminderSubject] = useState("Impf-Erinnerung für {petName}");
   const [reminderBody, setReminderBody] = useState("");
   const [testEmail, setTestEmail] = useState("");
+
+  // Type catalogue management
+  const [showGlobalTypes, setShowGlobalTypes] = useState(false);
+  const [showAddCustom, setShowAddCustom] = useState(false);
+  const [customName, setCustomName] = useState("");
+  const [customSpecies, setCustomSpecies] = useState("Hund");
+  const [customCategory, setCustomCategory] = useState<"core" | "recommended" | "non-core">("recommended");
+  const [customInterval, setCustomInterval] = useState(12);
+  const [customBatchRequired, setCustomBatchRequired] = useState(false);
+  const [customNotes, setCustomNotes] = useState("");
+
+  const { data: typeConfig, isLoading: typeConfigLoading, refetch: refetchTypeConfig } =
+    trpc.vaccinations.getTypeConfig.useQuery(
+      { tenantId: tenantId ?? "" },
+      { enabled: !!tenantId }
+    );
+
+  const setEnabledMutation = trpc.vaccinations.setGlobalTypeEnabled.useMutation({
+    onSuccess: async () => { await refetchTypeConfig(); },
+    onError: () => addToast("Fehler beim Aktualisieren.", "error"),
+  });
+
+  const addCustomMutation = trpc.vaccinations.addCustomType.useMutation({
+    onSuccess: async () => {
+      await refetchTypeConfig();
+      setShowAddCustom(false);
+      setCustomName(""); setCustomSpecies("Hund"); setCustomCategory("recommended");
+      setCustomInterval(12); setCustomBatchRequired(false); setCustomNotes("");
+      addToast("Eigener Impftyp hinzugefügt.", "success");
+    },
+    onError: () => addToast("Fehler beim Hinzufügen.", "error"),
+  });
+
+  const removeCustomMutation = trpc.vaccinations.removeCustomType.useMutation({
+    onSuccess: async () => { await refetchTypeConfig(); addToast("Impftyp entfernt.", "success"); },
+    onError: () => addToast("Fehler beim Entfernen.", "error"),
+  });
 
   useEffect(() => {
     if (!data) return;
@@ -165,6 +210,195 @@ export default function VaccinationSettingsPage() {
             Test senden
           </Button>
         </div>
+      </div>
+
+      {/* ─── Impftypen-Katalog ─────────────────────────────────────────────── */}
+      <div className="rounded-xl border border-border bg-surface p-5 shadow-sm">
+        <h2 className="text-lg font-semibold text-fg">Impftypen-Katalog</h2>
+        <p className="mt-1 text-sm text-muted">
+          Aktiviere oder deaktiviere STIKO-Standardtypen für diese Praxis und füge eigene Impftypen hinzu.
+        </p>
+
+        {typeConfigLoading ? (
+          <div className="mt-4 space-y-2">
+            {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+          </div>
+        ) : (
+          <div className="mt-4 space-y-5">
+            {/* ── Custom types ──────────────────────────────────────────────── */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-semibold text-fg">Eigene Impftypen ({typeConfig?.customTypes.length ?? 0})</h3>
+                <Button size="sm" variant="outline" onClick={() => setShowAddCustom((v) => !v)}>
+                  <Plus className="w-3.5 h-3.5 mr-1" />
+                  Hinzufügen
+                </Button>
+              </div>
+
+              {showAddCustom && (
+                <div className="rounded-xl border border-border bg-bg p-4 space-y-3 mb-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="block text-xs text-fg col-span-2">
+                      Name *
+                      <input
+                        className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                        placeholder="z.B. Babesiose, Chinchilla-Distemper"
+                        value={customName}
+                        onChange={(e) => setCustomName(e.target.value)}
+                      />
+                    </label>
+                    <label className="block text-xs text-fg">
+                      Tierart *
+                      <select
+                        className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                        value={customSpecies}
+                        onChange={(e) => setCustomSpecies(e.target.value)}
+                      >
+                        {SPECIES_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </label>
+                    <label className="block text-xs text-fg">
+                      Kategorie
+                      <select
+                        className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                        value={customCategory}
+                        onChange={(e) => setCustomCategory(e.target.value as typeof customCategory)}
+                      >
+                        {CATEGORY_OPTIONS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                      </select>
+                    </label>
+                    <label className="block text-xs text-fg">
+                      Standardintervall (Monate) *
+                      <input
+                        type="number" min={1} max={120}
+                        className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                        value={customInterval}
+                        onChange={(e) => setCustomInterval(Number(e.target.value))}
+                      />
+                    </label>
+                    <label className="block text-xs text-fg col-span-2">
+                      Hinweis (optional)
+                      <input
+                        className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                        placeholder="z.B. Nur für Reise in Endemiegebiet"
+                        value={customNotes}
+                        onChange={(e) => setCustomNotes(e.target.value)}
+                      />
+                    </label>
+                    <label className="flex items-center gap-2 text-xs text-fg col-span-2">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 accent-[var(--color-accent)]"
+                        checked={customBatchRequired}
+                        onChange={(e) => setCustomBatchRequired(e.target.checked)}
+                      />
+                      Chargennummer erforderlich (z.B. für Heimtierausweis)
+                    </label>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      loading={addCustomMutation.isPending}
+                      disabled={!customName || !customSpecies}
+                      onClick={() => {
+                        if (!tenantId || !customName) return;
+                        addCustomMutation.mutate({
+                          tenantId,
+                          name: customName,
+                          species: customSpecies,
+                          category: customCategory,
+                          intervalMonths: customInterval,
+                          requiresBatchNumber: customBatchRequired,
+                          notes: customNotes || undefined,
+                        });
+                      }}
+                    >
+                      Speichern
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setShowAddCustom(false)}>
+                      Abbrechen
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {typeConfig?.customTypes.length === 0 && !showAddCustom && (
+                <p className="text-sm text-muted">Noch keine eigenen Impftypen.</p>
+              )}
+              {typeConfig?.customTypes.map((ct) => (
+                <div key={ct.id} className="flex items-center justify-between rounded-lg border border-border bg-bg px-3 py-2">
+                  <div>
+                    <span className="text-sm font-medium text-fg">{ct.customName}</span>
+                    <span className="ml-2 text-xs text-muted">{ct.customSpecies} · {ct.customIntervalMonths} Mo.</span>
+                    {ct.customNotes && <p className="text-xs text-muted mt-0.5">{ct.customNotes}</p>}
+                  </div>
+                  <button
+                    className="p-1.5 rounded hover:bg-red-50 text-muted hover:text-red-600 transition-colors"
+                    onClick={() => {
+                      if (!tenantId) return;
+                      removeCustomMutation.mutate({ tenantId, configId: ct.id });
+                    }}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* ── Global STIKO types ─────────────────────────────────────────── */}
+            <div>
+              <button
+                className="flex items-center gap-2 text-sm font-semibold text-fg hover:text-muted transition-colors"
+                onClick={() => setShowGlobalTypes((v) => !v)}
+              >
+                {showGlobalTypes ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                STIKO-Standardtypen verwalten ({typeConfig?.globalTypes.filter((t) => t.enabled).length ?? "…"} aktiv)
+              </button>
+
+              {showGlobalTypes && (
+                <div className="mt-3 space-y-1">
+                  {(["Hund", "Katze", "Kaninchen", "Frettchen", "Pferd"] as const).map((species) => {
+                    const forSpecies = typeConfig?.globalTypes.filter((t) =>
+                      t.species.includes(species)
+                    ) ?? [];
+                    if (forSpecies.length === 0) return null;
+                    return (
+                      <div key={species}>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted mt-3 mb-1">{species}</p>
+                        {forSpecies.map((t) => (
+                          <div key={t.id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2 mb-1">
+                            <div>
+                              <span className={`text-sm font-medium ${t.enabled ? "text-fg" : "text-muted line-through"}`}>
+                                {t.name}
+                              </span>
+                              <span className="ml-2 text-xs text-muted">{t.defaultIntervalMonths} Mo.</span>
+                            </div>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <span className="text-xs text-muted">{t.enabled ? "Aktiv" : "Aus"}</span>
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 accent-[var(--color-accent)]"
+                                checked={t.enabled}
+                                onChange={(e) => {
+                                  if (!tenantId) return;
+                                  setEnabledMutation.mutate({
+                                    tenantId,
+                                    vaccinationTypeId: t.id,
+                                    enabled: e.target.checked,
+                                  });
+                                }}
+                              />
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

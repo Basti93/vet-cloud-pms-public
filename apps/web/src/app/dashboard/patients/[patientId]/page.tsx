@@ -85,8 +85,11 @@ export default function PatientDetailPage() {
     { enabled: !!patientId && !!tenantId }
   );
 
-  // Vaccination type catalogue — load once, filter in-memory by patient species
-  const { data: allVacTypes } = trpc.vaccinations.getTypes.useQuery({ species: undefined });
+  // Vaccination type catalogue — tenant-aware, filtered in-memory by patient species
+  const { data: allVacTypes } = trpc.vaccinations.getTypes.useQuery(
+    { tenantId: tenantId ?? "", species: undefined },
+    { enabled: !!tenantId }
+  );
 
   const resetVaccinationForm = () => {
     setVaccinationTypeId("");
@@ -656,17 +659,25 @@ export default function PatientDetailPage() {
                 !vaccinationExpiry
               }
               onClick={() => {
-                const resolvedTypeId = vaccinationTypeId === "custom" ? undefined : vaccinationTypeId;
-                const resolvedName = vaccinationTypeId === "custom"
-                  ? vaccinationCustomType
-                  : (allVacTypes?.find((t) => t.id === vaccinationTypeId)?.name ?? "");
+                const selectedType = allVacTypes?.find((t) => t.id === vaccinationTypeId);
+                const resolvedName =
+                  vaccinationTypeId === "custom"
+                    ? vaccinationCustomType
+                    : (selectedType?.name ?? "");
                 if (!tenantId || !resolvedName || !vaccinationDate || !vaccinationExpiry) return;
+
+                // Route FK to the right column based on type source
+                const globalTypeId =
+                  selectedType?.source === "global" ? selectedType.id : null;
+                const customConfigId =
+                  selectedType?.source === "custom" ? selectedType.id : null;
 
                 if (editingVaccinationId) {
                   updateVaccination.mutate({
                     tenantId,
                     vaccinationId: editingVaccinationId,
-                    vaccinationTypeId: resolvedTypeId ?? null,
+                    vaccinationTypeId: globalTypeId,
+                    tenantVaccinationTypeConfigId: customConfigId,
                     type: resolvedName,
                     administeredDate: new Date(vaccinationDate),
                     expiryDate: new Date(vaccinationExpiry),
@@ -677,7 +688,8 @@ export default function PatientDetailPage() {
                   createVaccination.mutate({
                     tenantId,
                     patientId,
-                    vaccinationTypeId: resolvedTypeId,
+                    vaccinationTypeId: globalTypeId ?? undefined,
+                    tenantVaccinationTypeConfigId: customConfigId ?? undefined,
                     type: resolvedName,
                     administeredDate: new Date(vaccinationDate),
                     expiryDate: new Date(vaccinationExpiry),
