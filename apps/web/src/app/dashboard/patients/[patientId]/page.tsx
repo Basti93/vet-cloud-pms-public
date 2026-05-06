@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/lib/toast/context';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 
 export default function PatientDetailPage() {
   const params = useParams();
@@ -34,7 +35,10 @@ export default function PatientDetailPage() {
   const [showMedicationForm, setShowMedicationForm] = useState(false);
   const [showVitalsForm, setShowVitalsForm] = useState(false);
   const [showVaccinationForm, setShowVaccinationForm] = useState(false);
-  const [vaccinationType, setVaccinationType] = useState("");
+  // Selected vaccination type id ("custom" for free-text)
+  const [vaccinationTypeId, setVaccinationTypeId] = useState("");
+  // Free-text name when vaccinationTypeId === "custom"
+  const [vaccinationCustomType, setVaccinationCustomType] = useState("");
   const [vaccinationDate, setVaccinationDate] = useState("");
   const [vaccinationExpiry, setVaccinationExpiry] = useState("");
   const [vaccinationBatch, setVaccinationBatch] = useState("");
@@ -74,14 +78,48 @@ export default function PatientDetailPage() {
     { patientId, tenantId: tenantId || "", days: 90 },
     { enabled: !!patientId && !!tenantId }
   );
+
+  // Vaccination type catalogue — load once, filter in-memory by patient species
+  const { data: allVacTypes } = trpc.vaccinations.getTypes.useQuery({ species: undefined });
+
+  const resetVaccinationForm = () => {
+    setVaccinationTypeId("");
+    setVaccinationCustomType("");
+    setVaccinationDate("");
+    setVaccinationExpiry("");
+    setVaccinationBatch("");
+    setVaccinationNotes("");
+  };
+
+  // Auto-fill expiry date when type + administered date are both set
+  const handleVacTypeChange = (typeId: string) => {
+    setVaccinationTypeId(typeId);
+    if (typeId === "custom") return;
+    const vt = allVacTypes?.find((t) => t.id === typeId);
+    if (vt && vaccinationDate) {
+      const administered = new Date(vaccinationDate);
+      const expiry = new Date(administered);
+      expiry.setMonth(expiry.getMonth() + vt.defaultIntervalMonths);
+      setVaccinationExpiry(expiry.toISOString().split("T")[0]);
+    }
+  };
+
+  const handleVacDateChange = (dateStr: string) => {
+    setVaccinationDate(dateStr);
+    if (!vaccinationTypeId || vaccinationTypeId === "custom") return;
+    const vt = allVacTypes?.find((t) => t.id === vaccinationTypeId);
+    if (vt && dateStr) {
+      const administered = new Date(dateStr);
+      const expiry = new Date(administered);
+      expiry.setMonth(expiry.getMonth() + vt.defaultIntervalMonths);
+      setVaccinationExpiry(expiry.toISOString().split("T")[0]);
+    }
+  };
+
   const createVaccination = trpc.vaccinations.create.useMutation({
     onSuccess: async () => {
       setShowVaccinationForm(false);
-      setVaccinationType("");
-      setVaccinationDate("");
-      setVaccinationExpiry("");
-      setVaccinationBatch("");
-      setVaccinationNotes("");
+      resetVaccinationForm();
       addToast("Impfung erfasst.", "success");
       await refetchVaccinations();
     },
@@ -398,45 +436,119 @@ export default function PatientDetailPage() {
             Anstehende Booster (90 Tage): {upcomingVaccinations?.length ?? 0}
           </p>
           {vaccinationsList && vaccinationsList.length > 0 ? (
-            <div className="space-y-3">
-              {vaccinationsList.map((v) => (
-                <div key={v.id} className="border border-gray-200 rounded p-3">
-                  <p className="font-semibold text-gray-900">{v.type}</p>
-                  <p className="text-sm text-gray-600 mt-1">
-                    Verabreicht: {formatDate(v.administeredDate)} • Fällig: {formatDate(v.expiryDate)}
-                  </p>
-                </div>
-              ))}
+            <div className="space-y-2">
+              {vaccinationsList.map((v) => {
+                const now = new Date();
+                const expiry = new Date(v.expiryDate);
+                const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+                const isOverdue = expiry < now;
+                const isDueSoon = !isOverdue && daysLeft <= 30;
+                return (
+                  <div key={v.id} className="flex items-start justify-between rounded-xl border border-border bg-surface p-3 shadow-sm">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-fg text-sm">{v.type}</span>
+                        {v.typeCategory && (
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                            v.typeCategory === "core"
+                              ? "bg-blue-100 text-blue-700"
+                              : v.typeCategory === "recommended"
+                              ? "bg-amber-100 text-amber-700"
+                              : "bg-muted-soft text-muted"
+                          }`}>
+                            {v.typeCategory === "core" ? "Core" : v.typeCategory === "recommended" ? "Empfohlen" : "Optional"}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted mt-1">
+                        Verabreicht: {formatDate(v.administeredDate)}
+                        {v.vetFirstName && ` · ${v.vetFirstName} ${v.vetLastName ?? ""}`}
+                        {v.batchNumber && ` · Charge: ${v.batchNumber}`}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0 ml-3">
+                      <span className={`text-xs font-medium ${isOverdue ? "text-red-600" : isDueSoon ? "text-amber-600" : "text-green-600"}`}>
+                        {isOverdue
+                          ? `Überfällig seit ${Math.abs(daysLeft)} T.`
+                          : isDueSoon
+                          ? `Fällig in ${daysLeft} T.`
+                          : formatDate(v.expiryDate)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           ) : (
-            <p className="text-gray-500 text-center py-4">Keine Impfungen erfasst</p>
+            <p className="text-muted text-center py-4 text-sm">Keine Impfungen erfasst</p>
           )}
         </div>
       </div>
 
       {/* Vaccination Dialog */}
-      <Dialog open={showVaccinationForm} onOpenChange={setShowVaccinationForm}>
+      <Dialog open={showVaccinationForm} onOpenChange={(open) => { setShowVaccinationForm(open); if (!open) resetVaccinationForm(); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Impfung erfassen</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <label className="block text-sm text-fg">
-              Impfstoff *
-              <input
-                className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-fg placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
-                placeholder="z.B. Tollwut, Leptospirose"
-                value={vaccinationType}
-                onChange={(e) => setVaccinationType(e.target.value)}
-              />
-            </label>
+            {/* Vaccination type selector — species-filtered */}
+            {(() => {
+              const speciesTypes = (allVacTypes ?? []).filter((t) =>
+                patient?.species ? t.species.toLowerCase().includes(patient.species.toLowerCase()) : true
+              );
+              const typeOptions = [
+                ...speciesTypes.map((t) => ({
+                  value: t.id,
+                  label: t.name,
+                  searchText: `${t.code} ${t.category}`,
+                })),
+                { value: "custom", label: "Sonstiges (frei eingeben)" },
+              ];
+              const selectedVt = allVacTypes?.find((t) => t.id === vaccinationTypeId);
+              return (
+                <>
+                  <SearchableSelect
+                    label="Impfstoff *"
+                    placeholder="Impftyp suchen (z.B. Leptospirose, RCP…)"
+                    value={vaccinationTypeId}
+                    onChange={handleVacTypeChange}
+                    options={typeOptions}
+                  />
+                  {/* Custom free-text input */}
+                  {vaccinationTypeId === "custom" && (
+                    <label className="block text-sm text-fg">
+                      Bezeichnung *
+                      <input
+                        className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-fg placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                        placeholder="z.B. Combo XY, Spezialimpfung"
+                        value={vaccinationCustomType}
+                        onChange={(e) => setVaccinationCustomType(e.target.value)}
+                      />
+                    </label>
+                  )}
+                  {/* Info bar for selected type */}
+                  {selectedVt && (
+                    <div className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 text-xs text-blue-700 space-y-0.5">
+                      <div className="font-semibold">{selectedVt.name} ({selectedVt.code})</div>
+                      <div>Standardintervall: {selectedVt.defaultIntervalMonths} Monate · Kategorie: {selectedVt.category === "core" ? "Core-Impfung" : selectedVt.category === "recommended" ? "Empfohlen" : "Optional"}</div>
+                      {selectedVt.notes && <div className="text-blue-600">{selectedVt.notes}</div>}
+                      {selectedVt.requiresBatchNumber && (
+                        <div className="font-semibold text-amber-700">⚠ Chargennummer erforderlich (z.B. für EU-Heimtierausweis)</div>
+                      )}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+
             <label className="block text-sm text-fg">
               Verabreicht am *
               <input
                 type="date"
                 className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-fg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
                 value={vaccinationDate}
-                onChange={(e) => setVaccinationDate(e.target.value)}
+                onChange={(e) => handleVacDateChange(e.target.value)}
               />
             </label>
             <label className="block text-sm text-fg">
@@ -469,18 +581,28 @@ export default function PatientDetailPage() {
             </label>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowVaccinationForm(false)}>
+            <Button variant="outline" onClick={() => { setShowVaccinationForm(false); resetVaccinationForm(); }}>
               Abbrechen
             </Button>
             <Button
               loading={createVaccination.isPending}
-              disabled={!vaccinationType || !vaccinationDate || !vaccinationExpiry}
+              disabled={
+                !vaccinationTypeId ||
+                (vaccinationTypeId === "custom" && !vaccinationCustomType) ||
+                !vaccinationDate ||
+                !vaccinationExpiry
+              }
               onClick={() => {
-                if (!tenantId || !vaccinationType || !vaccinationDate || !vaccinationExpiry) return;
+                const resolvedTypeId = vaccinationTypeId === "custom" ? undefined : vaccinationTypeId;
+                const resolvedName = vaccinationTypeId === "custom"
+                  ? vaccinationCustomType
+                  : (allVacTypes?.find((t) => t.id === vaccinationTypeId)?.name ?? "");
+                if (!tenantId || !resolvedName || !vaccinationDate || !vaccinationExpiry) return;
                 createVaccination.mutate({
                   tenantId,
                   patientId,
-                  type: vaccinationType,
+                  vaccinationTypeId: resolvedTypeId,
+                  type: resolvedName,
                   administeredDate: new Date(vaccinationDate),
                   expiryDate: new Date(vaccinationExpiry),
                   batchNumber: vaccinationBatch || undefined,

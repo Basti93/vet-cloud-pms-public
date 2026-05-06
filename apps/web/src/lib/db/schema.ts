@@ -715,6 +715,43 @@ export const appointmentEmailLogs = pgTable(
 );
 
 // ============================================================================
+// VACCINATION TYPES (Global catalogue — STIKO Vet standard, no tenant_id)
+// ============================================================================
+
+export const vaccinationTypes = pgTable(
+  "vaccination_types",
+  {
+    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+    // Short machine code used in seed data ("SHP", "L4", "RCP", "Myxo")
+    code: varchar("code", { length: 30 }).notNull().unique(),
+    // German display name shown in the UI
+    name: varchar("name", { length: 150 }).notNull(),
+    // Comma-separated list of applicable species: "Hund", "Katze", "Kaninchen", etc.
+    species: varchar("species", { length: 200 }).notNull(),
+    // "core" | "recommended" | "non-core"
+    category: varchar("category", { length: 20 }).notNull().default("recommended"),
+    // Default reminder interval in months (e.g. 12 for Leptospirose, 36 for SHP)
+    defaultIntervalMonths: integer("default_interval_months").notNull(),
+    // For series (puppy Grundimmunisierung): how many doses needed? 1 = single shot
+    seriesDoses: integer("series_doses").notNull().default(1),
+    // Minimum days between doses in a series (null if no series)
+    minIntervalDays: integer("min_interval_days"),
+    // If true, batchNumber is required (Tollwut for EU Pet Passport)
+    requiresBatchNumber: boolean("requires_batch_number").notNull().default(false),
+    // Display order in form dropdown
+    sortOrder: integer("sort_order").notNull().default(100),
+    // Optional vet-facing note (e.g. "Bei Auslandsreise erforderlich")
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (table) => ({
+    codeIdx: index("vaccination_types_code_idx").on(table.code),
+  })
+);
+
+// ============================================================================
 // VACCINATIONS (Patient Vaccination Records + Reminder State)
 // ============================================================================
 
@@ -728,6 +765,12 @@ export const vaccinations = pgTable(
     patientId: uuid("patient_id")
       .notNull()
       .references(() => patients.id, { onDelete: "cascade" }),
+    // FK to vaccination_types (null = custom/free-text type)
+    vaccinationTypeId: uuid("vaccination_type_id").references(
+      () => vaccinationTypes.id,
+      { onDelete: "set null" }
+    ),
+    // Display name — populated from vaccinationTypes.name or free-text for custom
     type: varchar("type", { length: 120 }).notNull(),
     administeredDate: timestamp("administered_date", { withTimezone: true }).notNull(),
     expiryDate: timestamp("expiry_date", { withTimezone: true }).notNull(),

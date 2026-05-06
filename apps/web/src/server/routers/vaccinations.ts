@@ -1,12 +1,32 @@
 import { TRPCError } from "@trpc/server";
 import { and, asc, desc, eq, gte, isNull, lte, min, sql, ne } from "drizzle-orm";
 import { z } from "zod";
-import { PERMISSIONS, owners, patients, users, vaccinations } from "@/lib/db/schema";
-import { createTRPCRouter, tenantProcedure } from "@/server/trpc";
+import { PERMISSIONS, owners, patients, users, vaccinationTypes, vaccinations } from "@/lib/db/schema";
+import { createTRPCRouter, tenantProcedure, publicProcedure } from "@/server/trpc";
 import { requirePermission } from "@/server/trpc/middleware";
 import { writeAuditLog } from "@/server/audit";
 
 export const vaccinationsRouter = createTRPCRouter({
+  /**
+   * Global vaccination type catalogue (STIKO Vet standard).
+   * Optionally filter by species (e.g. "Hund", "Katze").
+   * Public — no auth required, no tenant data exposed.
+   */
+  getTypes: publicProcedure
+    .input(z.object({ species: z.string().optional() }))
+    .query(async ({ ctx, input }) => {
+      const rows = await ctx.db
+        .select()
+        .from(vaccinationTypes)
+        .where(
+          input.species
+            ? sql`${vaccinationTypes.species} ILIKE ${"%" + input.species + "%"}`
+            : undefined
+        )
+        .orderBy(asc(vaccinationTypes.sortOrder), asc(vaccinationTypes.name));
+      return rows;
+    }),
+
   list: tenantProcedure
     .use(requirePermission(PERMISSIONS.PATIENTS_READ))
     .input(
@@ -20,7 +40,11 @@ export const vaccinationsRouter = createTRPCRouter({
         .select({
           id: vaccinations.id,
           patientId: vaccinations.patientId,
+          vaccinationTypeId: vaccinations.vaccinationTypeId,
           type: vaccinations.type,
+          typeCategory: vaccinationTypes.category,
+          typeDefaultIntervalMonths: vaccinationTypes.defaultIntervalMonths,
+          typeRequiresBatchNumber: vaccinationTypes.requiresBatchNumber,
           administeredDate: vaccinations.administeredDate,
           expiryDate: vaccinations.expiryDate,
           vetId: vaccinations.vetId,
@@ -34,6 +58,7 @@ export const vaccinationsRouter = createTRPCRouter({
         })
         .from(vaccinations)
         .leftJoin(users, eq(vaccinations.vetId, users.id))
+        .leftJoin(vaccinationTypes, eq(vaccinations.vaccinationTypeId, vaccinationTypes.id))
         .where(
           and(
             eq(vaccinations.tenantId, input.tenantId),
@@ -50,6 +75,7 @@ export const vaccinationsRouter = createTRPCRouter({
       z.object({
         tenantId: z.string().uuid(),
         patientId: z.string().uuid(),
+        vaccinationTypeId: z.string().uuid().optional(),
         type: z.string().trim().min(1).max(120),
         administeredDate: z.date(),
         expiryDate: z.date(),
@@ -81,6 +107,7 @@ export const vaccinationsRouter = createTRPCRouter({
         .values({
           tenantId: input.tenantId,
           patientId: input.patientId,
+          vaccinationTypeId: input.vaccinationTypeId,
           type: input.type,
           administeredDate: input.administeredDate,
           expiryDate: input.expiryDate,
@@ -112,6 +139,7 @@ export const vaccinationsRouter = createTRPCRouter({
       z.object({
         tenantId: z.string().uuid(),
         vaccinationId: z.string().uuid(),
+        vaccinationTypeId: z.string().uuid().nullable().optional(),
         type: z.string().trim().min(1).max(120).optional(),
         administeredDate: z.date().optional(),
         expiryDate: z.date().optional(),
@@ -159,6 +187,7 @@ export const vaccinationsRouter = createTRPCRouter({
       const [updated] = await ctx.db
         .update(vaccinations)
         .set({
+          vaccinationTypeId: input.vaccinationTypeId === undefined ? undefined : input.vaccinationTypeId,
           type: input.type,
           administeredDate: input.administeredDate,
           expiryDate: input.expiryDate,
