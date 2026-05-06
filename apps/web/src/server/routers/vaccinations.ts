@@ -294,7 +294,8 @@ export const vaccinationsRouter = createTRPCRouter({
       const now = new Date();
       const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-      const rows = await ctx.db
+      // Use subquery to compute min date, then order by it safely in GROUP BY context
+      const subquery = ctx.db
         .select({
           id: patients.id,
           name: patients.name,
@@ -314,14 +315,26 @@ export const vaccinationsRouter = createTRPCRouter({
         )
         .where(and(eq(patients.tenantId, input.tenantId), ne(patients.active, false)))
         .groupBy(patients.id, patients.name, patients.species, owners.firstName, owners.lastName)
+        .as("patient_summary");
+
+      const rows = await ctx.db
+        .select({
+          id: subquery.id,
+          name: subquery.name,
+          species: subquery.species,
+          ownerFirstName: subquery.ownerFirstName,
+          ownerLastName: subquery.ownerLastName,
+          nextDueAt: subquery.nextDueAt as any,
+        })
+        .from(subquery)
         .orderBy(
           // Overdue first, then due soon, then current
           sql`CASE
-            WHEN min(${vaccinations.expiryDate}) < ${now} THEN 0
-            WHEN min(${vaccinations.expiryDate}) <= ${in30Days} THEN 1
+            WHEN ${subquery.nextDueAt} < ${now} THEN 0
+            WHEN ${subquery.nextDueAt} <= ${in30Days} THEN 1
             ELSE 2
           END`,
-          asc(min(vaccinations.expiryDate))
+          asc(subquery.nextDueAt)
         )
         .limit(input.limit);
 
