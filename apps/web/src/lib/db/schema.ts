@@ -123,7 +123,7 @@ export const roles = pgTable(
     id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
     tenantId: uuid("tenant_id")
       .notNull()
-      .references(() => tenants.id),
+      .references(() => tenants.id, { onDelete: "cascade" }),
     name: varchar("name", { length: 100 }).notNull(),
     code: varchar("code", { length: 50 }).notNull(),
     description: text("description"),
