@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, asc, desc, eq, gte, isNull, lte, min, sql, ne, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNull, lte, min, sql, ne } from "drizzle-orm";
 import { z } from "zod";
 import {
   PERMISSIONS,
