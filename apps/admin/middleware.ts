@@ -5,6 +5,11 @@ const isProtectedRoute = createRouteMatcher([
   "/dashboard(.*)",
 ]);
 
+const isPublicRoute = createRouteMatcher([
+  "/sign-in(.*)",
+  "/access-denied",
+]);
+
 export default clerkMiddleware(async (auth, req) => {
   // Guard against accidental document navigation to RSC/Flight URLs.
   // Internal Next.js RSC fetches include the `rsc: 1` header and should pass through.
@@ -28,10 +33,10 @@ export default clerkMiddleware(async (auth, req) => {
     ) || [];
 
     if (!adminClerkIds.includes(userId)) {
-      // Unauthorized: user is authenticated but not a system admin.
-      // Redirect to sign-in (NOT "/") to avoid an infinite loop — the home
-      // page at "/" redirects authenticated users back to /dashboard.
-      return NextResponse.redirect(new URL("/sign-in", req.url));
+      // Redirect to a static page that is NOT behind auth.
+      // /sign-in loops because Clerk auto-redirects already-signed-in users
+      // back to "/", and "/" sends authenticated users to /dashboard again.
+      return NextResponse.redirect(new URL("/access-denied", req.url));
     }
   }
 
