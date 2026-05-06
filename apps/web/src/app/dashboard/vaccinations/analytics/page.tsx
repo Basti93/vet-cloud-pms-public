@@ -72,14 +72,6 @@ export default function VaccinationAnalyticsPage() {
             </div>
           </div>
 
-          {/* Reminder effectiveness note */}
-          <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
-            <p className="text-sm font-medium text-fg">Erinnerungsversand & Konversion</p>
-            <p className="mt-1 text-sm text-muted">
-              Detaillierte Reminder-Statistiken und Konversionsraten (Reminder → Termin, 14-Tage-Fenster)
-              sind im Admin-Dashboard unter <span className="font-medium text-fg">Vaccination Analytics</span> verfügbar.
-            </p>
-          </div>
         </>
       )}
     </div>
