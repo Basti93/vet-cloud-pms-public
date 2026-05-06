@@ -13,6 +13,8 @@ import {
   AlertTriangle,
   Calendar,
   Clock,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -35,6 +37,10 @@ export default function PatientDetailPage() {
   const [showMedicationForm, setShowMedicationForm] = useState(false);
   const [showVitalsForm, setShowVitalsForm] = useState(false);
   const [showVaccinationForm, setShowVaccinationForm] = useState(false);
+  // null = create mode, string id = edit mode
+  const [editingVaccinationId, setEditingVaccinationId] = useState<string | null>(null);
+  // id of the vaccination pending delete confirmation
+  const [deletingVaccinationId, setDeletingVaccinationId] = useState<string | null>(null);
   // Selected vaccination type id ("custom" for free-text)
   const [vaccinationTypeId, setVaccinationTypeId] = useState("");
   // Free-text name when vaccinationTypeId === "custom"
@@ -116,6 +122,25 @@ export default function PatientDetailPage() {
     }
   };
 
+  type VaccinationRow = NonNullable<typeof vaccinationsList>[number];
+
+  const openEditDialog = (v: VaccinationRow) => {
+    setEditingVaccinationId(v.id);
+    // Restore type selection
+    if (v.vaccinationTypeId) {
+      setVaccinationTypeId(v.vaccinationTypeId);
+      setVaccinationCustomType("");
+    } else {
+      setVaccinationTypeId("custom");
+      setVaccinationCustomType(v.type);
+    }
+    setVaccinationDate(new Date(v.administeredDate).toISOString().split("T")[0]);
+    setVaccinationExpiry(new Date(v.expiryDate).toISOString().split("T")[0]);
+    setVaccinationBatch(v.batchNumber ?? "");
+    setVaccinationNotes(v.notes ?? "");
+    setShowVaccinationForm(true);
+  };
+
   const createVaccination = trpc.vaccinations.create.useMutation({
     onSuccess: async () => {
       setShowVaccinationForm(false);
@@ -125,6 +150,30 @@ export default function PatientDetailPage() {
     },
     onError: () => {
       addToast("Impfung konnte nicht gespeichert werden.", "error");
+    },
+  });
+
+  const updateVaccination = trpc.vaccinations.update.useMutation({
+    onSuccess: async () => {
+      setShowVaccinationForm(false);
+      setEditingVaccinationId(null);
+      resetVaccinationForm();
+      addToast("Impfung aktualisiert.", "success");
+      await refetchVaccinations();
+    },
+    onError: () => {
+      addToast("Impfung konnte nicht aktualisiert werden.", "error");
+    },
+  });
+
+  const deleteVaccination = trpc.vaccinations.delete.useMutation({
+    onSuccess: async () => {
+      setDeletingVaccinationId(null);
+      addToast("Impfung gelöscht.", "success");
+      await refetchVaccinations();
+    },
+    onError: () => {
+      addToast("Impfung konnte nicht gelöscht werden.", "error");
     },
   });
 
@@ -444,9 +493,9 @@ export default function PatientDetailPage() {
                 const isOverdue = expiry < now;
                 const isDueSoon = !isOverdue && daysLeft <= 30;
                 return (
-                  <div key={v.id} className="flex items-start justify-between rounded-xl border border-border bg-surface p-3 shadow-sm">
-                    <div>
-                      <div className="flex items-center gap-2">
+                  <div key={v.id} className="flex items-start justify-between rounded-xl border border-border bg-surface p-3 shadow-sm group">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium text-fg text-sm">{v.type}</span>
                         {v.typeCategory && (
                           <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -466,7 +515,7 @@ export default function PatientDetailPage() {
                         {v.batchNumber && ` · Charge: ${v.batchNumber}`}
                       </p>
                     </div>
-                    <div className="text-right shrink-0 ml-3">
+                    <div className="flex items-center gap-2 shrink-0 ml-3">
                       <span className={`text-xs font-medium ${isOverdue ? "text-red-600" : isDueSoon ? "text-amber-600" : "text-green-600"}`}>
                         {isOverdue
                           ? `Überfällig seit ${Math.abs(daysLeft)} T.`
@@ -474,6 +523,20 @@ export default function PatientDetailPage() {
                           ? `Fällig in ${daysLeft} T.`
                           : formatDate(v.expiryDate)}
                       </span>
+                      <button
+                        onClick={() => openEditDialog(v)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-muted-soft text-muted hover:text-fg"
+                        title="Bearbeiten"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setDeletingVaccinationId(v.id)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-red-50 text-muted hover:text-red-600"
+                        title="Löschen"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
                 );
@@ -486,10 +549,10 @@ export default function PatientDetailPage() {
       </div>
 
       {/* Vaccination Dialog */}
-      <Dialog open={showVaccinationForm} onOpenChange={(open) => { setShowVaccinationForm(open); if (!open) resetVaccinationForm(); }}>
+      <Dialog open={showVaccinationForm} onOpenChange={(open) => { setShowVaccinationForm(open); if (!open) { resetVaccinationForm(); setEditingVaccinationId(null); } }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Impfung erfassen</DialogTitle>
+            <DialogTitle>{editingVaccinationId ? "Impfung bearbeiten" : "Impfung erfassen"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             {/* Vaccination type selector — species-filtered */}
@@ -581,11 +644,11 @@ export default function PatientDetailPage() {
             </label>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowVaccinationForm(false); resetVaccinationForm(); }}>
+            <Button variant="outline" onClick={() => { setShowVaccinationForm(false); setEditingVaccinationId(null); resetVaccinationForm(); }}>
               Abbrechen
             </Button>
             <Button
-              loading={createVaccination.isPending}
+              loading={createVaccination.isPending || updateVaccination.isPending}
               disabled={
                 !vaccinationTypeId ||
                 (vaccinationTypeId === "custom" && !vaccinationCustomType) ||
@@ -598,19 +661,58 @@ export default function PatientDetailPage() {
                   ? vaccinationCustomType
                   : (allVacTypes?.find((t) => t.id === vaccinationTypeId)?.name ?? "");
                 if (!tenantId || !resolvedName || !vaccinationDate || !vaccinationExpiry) return;
-                createVaccination.mutate({
-                  tenantId,
-                  patientId,
-                  vaccinationTypeId: resolvedTypeId,
-                  type: resolvedName,
-                  administeredDate: new Date(vaccinationDate),
-                  expiryDate: new Date(vaccinationExpiry),
-                  batchNumber: vaccinationBatch || undefined,
-                  notes: vaccinationNotes || undefined,
-                });
+
+                if (editingVaccinationId) {
+                  updateVaccination.mutate({
+                    tenantId,
+                    vaccinationId: editingVaccinationId,
+                    vaccinationTypeId: resolvedTypeId ?? null,
+                    type: resolvedName,
+                    administeredDate: new Date(vaccinationDate),
+                    expiryDate: new Date(vaccinationExpiry),
+                    batchNumber: vaccinationBatch || null,
+                    notes: vaccinationNotes || null,
+                  });
+                } else {
+                  createVaccination.mutate({
+                    tenantId,
+                    patientId,
+                    vaccinationTypeId: resolvedTypeId,
+                    type: resolvedName,
+                    administeredDate: new Date(vaccinationDate),
+                    expiryDate: new Date(vaccinationExpiry),
+                    batchNumber: vaccinationBatch || undefined,
+                    notes: vaccinationNotes || undefined,
+                  });
+                }
               }}
             >
-              Speichern
+              {editingVaccinationId ? "Aktualisieren" : "Speichern"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete vaccination confirmation dialog */}
+      <Dialog open={!!deletingVaccinationId} onOpenChange={(open) => { if (!open) setDeletingVaccinationId(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Impfung löschen?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted">Diese Aktion kann nicht rückgängig gemacht werden. Der Impfeintrag wird dauerhaft gelöscht.</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeletingVaccinationId(null)}>
+              Abbrechen
+            </Button>
+            <Button
+              variant="destructive"
+              loading={deleteVaccination.isPending}
+              onClick={() => {
+                if (!tenantId || !deletingVaccinationId) return;
+                deleteVaccination.mutate({ tenantId, vaccinationId: deletingVaccinationId });
+              }}
+            >
+              Löschen
             </Button>
           </DialogFooter>
         </DialogContent>

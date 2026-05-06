@@ -39,8 +39,8 @@ interface VetOption {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const SPECIES_OPTIONS = [
-  "Hund", "Katze", "Vogel", "Kaninchen", "Meerschweinchen",
-  "Hamster", "Fisch", "Reptil", "Sonstige",
+  "Hund", "Katze", "Kaninchen", "Frettchen", "Pferd",
+  "Vogel", "Hamster", "Meerschweinchen", "Fisch", "Reptil", "Sonstiges",
 ];
 
 /**
