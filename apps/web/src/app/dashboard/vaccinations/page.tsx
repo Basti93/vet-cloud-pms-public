@@ -5,7 +5,7 @@ import { useState } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { useTenant } from "@/hooks/useTenant";
 import { Skeleton, TableSkeleton } from "@/components/ui/skeleton";
-import { ArrowRight, CheckCircle, Clock, MailX } from "lucide-react";
+import { ArrowRight, CheckCircle, Clock, Mail, MailX, TrendingUp, XCircle } from "lucide-react";
 
 const STATUS_FILTERS = [
   { value: "all", label: "Alle" },
@@ -61,6 +61,12 @@ export default function VaccinationsPage() {
       { enabled: !!tenantId }
     );
 
+  const { data: reminderStats, isLoading: reminderStatsLoading } =
+    trpc.vaccinations.getReminderStats.useQuery(
+      { tenantId: tenantId ?? "" },
+      { enabled: !!tenantId }
+    );
+
   const { data, isLoading, isError } =
     trpc.vaccinations.getPatientSummaryList.useQuery(
       { tenantId: tenantId ?? "", hideOptOut: true },
@@ -84,7 +90,7 @@ export default function VaccinationsPage() {
         </Link>
       </div>
 
-      {/* Inline analytics */}
+      {/* Impfstatus — patient health row */}
       <div className="grid gap-4 sm:grid-cols-3">
         {[
           { label: "Gesamt erfasst", value: scanStats?.totalTracked, color: "text-fg" },
@@ -100,6 +106,77 @@ export default function VaccinationsPage() {
             )}
           </div>
         ))}
+      </div>
+
+      {/* E-Mail-Erinnerungen — reminder monitoring row */}
+      <div>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">
+          E-Mail-Erinnerungen
+        </p>
+        <div className="grid gap-4 sm:grid-cols-3">
+          {/* Sent */}
+          <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+            <div className="flex items-center gap-2 text-sm text-muted">
+              <Mail className="h-3.5 w-3.5" />
+              Gesendet
+            </div>
+            {reminderStatsLoading ? (
+              <Skeleton className="mt-2 h-8 w-16" />
+            ) : (
+              <>
+                <p className="mt-1 text-2xl font-semibold text-fg">
+                  {reminderStats?.sent ?? 0}
+                </p>
+                {(reminderStats?.sent ?? 0) + (reminderStats?.failed ?? 0) > 0 && (
+                  <p className="mt-0.5 text-xs text-muted">
+                    {reminderStats?.successRate ?? 0}% Erfolgsquote
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Failed */}
+          <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+            <div className="flex items-center gap-2 text-sm text-muted">
+              <XCircle className="h-3.5 w-3.5" />
+              Fehlgeschlagen
+            </div>
+            {reminderStatsLoading ? (
+              <Skeleton className="mt-2 h-8 w-16" />
+            ) : (
+              <p
+                className={`mt-1 text-2xl font-semibold ${
+                  (reminderStats?.failed ?? 0) > 0 ? "text-red-600" : "text-fg"
+                }`}
+              >
+                {reminderStats?.failed ?? 0}
+              </p>
+            )}
+          </div>
+
+          {/* Conversion */}
+          <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+            <div className="flex items-center gap-2 text-sm text-muted">
+              <TrendingUp className="h-3.5 w-3.5" />
+              Terminkonversionen
+            </div>
+            {reminderStatsLoading ? (
+              <Skeleton className="mt-2 h-8 w-16" />
+            ) : (
+              <>
+                <p className="mt-1 text-2xl font-semibold text-fg">
+                  {reminderStats?.conversions ?? 0}
+                </p>
+                {(reminderStats?.sent ?? 0) > 0 && (
+                  <p className="mt-0.5 text-xs text-muted">
+                    {reminderStats?.conversionRate ?? 0}% der Erinnerungen
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Legend + note */}

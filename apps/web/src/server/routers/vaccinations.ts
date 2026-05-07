@@ -3,9 +3,11 @@ import { and, asc, desc, eq, gte, inArray, isNull, lte, sql, ne } from "drizzle-
 import { z } from "zod";
 import {
   PERMISSIONS,
+  appointments,
   owners,
   patients,
   users,
+  vaccinationEmailLogs,
   vaccinationTypes,
   tenantVaccinationTypeConfig,
   vaccinations,
@@ -689,5 +691,57 @@ export const vaccinationsRouter = createTRPCRouter({
         if (!b.nextDueAt) return -1;
         return a.nextDueAt.getTime() - b.nextDueAt.getTime();
       });
+    }),
+
+  /**
+   * Reminder email monitoring stats for the current tenant.
+   * Returns sent/failed counts, success rate, and appointment conversion metrics.
+   *
+   * Conversion = a vaccination reminder that was followed by an appointment
+   * booked for the same patient within 14 days of sending. Computed via live
+   * SQL subquery — no stored FK needed, always accurate against current data.
+   */
+  getReminderStats: tenantProcedure
+    .use(requirePermission(PERMISSIONS.PATIENTS_READ))
+    .input(z.object({ tenantId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      // Subquery: did this reminder result in an appointment within 14 days?
+      const conversionExists = sql<boolean>`exists (
+        select 1
+        from ${appointments} a
+        join ${vaccinations} v on v.id = ${vaccinationEmailLogs.vaccinationId}
+        where a.patient_id = v.patient_id
+          and a.tenant_id = ${vaccinationEmailLogs.tenantId}
+          and a.start_time >= ${vaccinationEmailLogs.sentAt}
+          and a.start_time <= ${vaccinationEmailLogs.sentAt} + interval '14 days'
+      )`;
+
+      const [summary] = await ctx.db
+        .select({
+          sent: sql<number>`count(*) filter (where ${vaccinationEmailLogs.status} = 'sent')`,
+          failed: sql<number>`count(*) filter (where ${vaccinationEmailLogs.status} = 'failed')`,
+          conversions: sql<number>`count(*) filter (
+            where ${vaccinationEmailLogs.status} = 'sent'
+            and ${conversionExists}
+          )`,
+        })
+        .from(vaccinationEmailLogs)
+        .where(eq(vaccinationEmailLogs.tenantId, input.tenantId));
+
+      const sent = Number(summary?.sent ?? 0);
+      const failed = Number(summary?.failed ?? 0);
+      const conversions = Number(summary?.conversions ?? 0);
+
+      return {
+        sent,
+        failed,
+        successRate:
+          sent + failed > 0
+            ? Math.round((sent / (sent + failed)) * 1000) / 10
+            : 0,
+        conversions,
+        conversionRate:
+          sent > 0 ? Math.round((conversions / sent) * 1000) / 10 : 0,
+      };
     }),
 });
