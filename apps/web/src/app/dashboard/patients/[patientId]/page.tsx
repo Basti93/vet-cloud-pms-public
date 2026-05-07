@@ -473,7 +473,7 @@ export default function PatientDetailPage() {
           )}
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
+        <div id="impfhistorie" className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-gray-900">Impfhistorie</h2>
             <button

@@ -5,7 +5,7 @@ import { useState } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { useTenant } from "@/hooks/useTenant";
 import { Skeleton, TableSkeleton } from "@/components/ui/skeleton";
-import { CheckCircle, Clock, MailX } from "lucide-react";
+import { ArrowRight, CheckCircle, Clock, MailX } from "lucide-react";
 
 const STATUS_FILTERS = [
   { value: "all", label: "Alle" },
@@ -158,19 +158,20 @@ export default function VaccinationsPage() {
                 <th className="px-4 py-3">Besitzer</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Fällige Impfungen</th>
-                <th className="px-4 py-3">Erinnerung</th>
+                <th className="px-4 py-3">E-Mail-Erinnerung</th>
+                <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={6} className="p-0">
+                  <td colSpan={7} className="p-0">
                     <TableSkeleton rows={6} />
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td className="px-4 py-8 text-center text-muted" colSpan={6}>
+                  <td className="px-4 py-8 text-center text-muted" colSpan={7}>
                     {status === "all"
                       ? "Keine Patienten vorhanden."
                       : "Keine Patienten in dieser Kategorie."}
@@ -199,7 +200,7 @@ export default function VaccinationsPage() {
                     <tr key={row.id} className="border-t border-border hover:bg-bg/50">
                       <td className="px-4 py-3">
                         <Link
-                          href={`/dashboard/patients/${row.id}`}
+                          href={`/dashboard/patients/${row.id}#impfhistorie`}
                           className="font-medium text-fg hover:underline"
                         >
                           {row.name}
@@ -250,19 +251,30 @@ export default function VaccinationsPage() {
                         ) : unsentCount === 0 ? (
                           <span className="flex items-center gap-1.5 text-xs text-green-600">
                             <CheckCircle className="h-3.5 w-3.5" />
-                            Alle gesendet
+                            Erinnerung gesendet
                           </span>
                         ) : sentCount === 0 ? (
                           <span className="flex items-center gap-1.5 text-xs text-amber-600">
                             <Clock className="h-3.5 w-3.5" />
-                            Ausstehend ({unsentCount})
+                            Noch keine Erinnerung gesendet
                           </span>
                         ) : (
                           <span className="flex items-center gap-1.5 text-xs text-amber-600">
                             <Clock className="h-3.5 w-3.5" />
-                            {sentCount} gesendet, {unsentCount} ausstehend
+                            {unsentCount} von {actionableVacs.length} noch nicht erinnert
                           </span>
                         )}
+                      </td>
+
+                      {/* Explicit details link */}
+                      <td className="px-4 py-3">
+                        <Link
+                          href={`/dashboard/patients/${row.id}#impfhistorie`}
+                          className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs font-medium text-fg hover:bg-muted-soft"
+                        >
+                          Details
+                          <ArrowRight className="h-3 w-3" />
+                        </Link>
                       </td>
                     </tr>
                   );
