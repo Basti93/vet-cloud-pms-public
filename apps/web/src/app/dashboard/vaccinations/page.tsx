@@ -207,7 +207,18 @@ export default function VaccinationsPage() {
                         </Link>
                       </td>
                       <td className="px-4 py-3 text-muted">{row.species}</td>
-                      <td className="px-4 py-3 text-muted">{owner || "—"}</td>
+                      <td className="px-4 py-3">
+                        <span className="text-muted">{owner || "—"}</span>
+                        {row.ownerEmail && (
+                          <a
+                            href={`mailto:${row.ownerEmail}`}
+                            className="block text-xs text-primary hover:underline mt-0.5"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {row.ownerEmail}
+                          </a>
+                        )}
+                      </td>
                       <td className="px-4 py-3">
                         <StatusBadge state={row.state} />
                       </td>

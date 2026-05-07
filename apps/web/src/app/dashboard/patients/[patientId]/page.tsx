@@ -223,9 +223,28 @@ export default function PatientDetailPage() {
               {patient.breed && ` • ${patient.breed}`}
             </p>
           </div>
-          <div className="text-right">
-            <div className="text-sm text-gray-600">Owner</div>
-            <div className="font-semibold text-gray-900">Besitzer-Info</div>
+          {/* Owner contact card */}
+          <div className="text-right space-y-0.5">
+            <div className="text-xs font-medium uppercase tracking-wide text-gray-500 mb-1">Besitzer</div>
+            <div className="font-semibold text-gray-900">
+              {[patient.ownerFirstName, patient.ownerLastName].filter(Boolean).join(" ") || "—"}
+            </div>
+            {patient.ownerPhone && (
+              <a
+                href={`tel:${patient.ownerPhone}`}
+                className="flex items-center justify-end gap-1.5 text-sm text-blue-600 hover:underline"
+              >
+                {patient.ownerPhone}
+              </a>
+            )}
+            {patient.ownerEmail && (
+              <a
+                href={`mailto:${patient.ownerEmail}`}
+                className="flex items-center justify-end gap-1.5 text-sm text-blue-600 hover:underline"
+              >
+                {patient.ownerEmail}
+              </a>
+            )}
           </div>
         </div>
       </div>

@@ -592,6 +592,7 @@ export const vaccinationsRouter = createTRPCRouter({
           species: patients.species,
           ownerFirstName: owners.firstName,
           ownerLastName: owners.lastName,
+          ownerEmail: owners.email,
           ownerEmailOptOut: owners.emailOptOut,
         })
         .from(patients)
@@ -665,6 +666,7 @@ export const vaccinationsRouter = createTRPCRouter({
           species: patient.species,
           ownerFirstName: patient.ownerFirstName,
           ownerLastName: patient.ownerLastName,
+          ownerEmail: patient.ownerEmail,
           ownerEmailOptOut: patient.ownerEmailOptOut ?? false,
           nextDueAt,
           state,
