@@ -5,7 +5,7 @@ import { useState } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { useTenant } from "@/hooks/useTenant";
 import { Skeleton, TableSkeleton } from "@/components/ui/skeleton";
-import { CheckCircle, Clock, Mail, MailX } from "lucide-react";
+import { CheckCircle, Clock, MailX } from "lucide-react";
 
 const STATUS_FILTERS = [
   { value: "all", label: "Alle" },

@@ -187,10 +187,6 @@ export async function GET(request: NextRequest) {
 
       const reminderEnabled = vaxSettings[0]?.reminderEnabled ?? true;
       const reminderDaysBefore = vaxSettings[0]?.reminderDaysBefore ?? 30;
-      const reminderSubject = vaxSettings[0]?.reminderSubject ?? "Impf-Erinnerung für {petName}";
-      const reminderBody =
-        vaxSettings[0]?.reminderBody ??
-        "Hallo {ownerName},\n\nfür {petName} ist die Auffrischung ({vaccinationType}) am {dueDate} fällig.\nBitte vereinbaren Sie einen Termin bei {clinicName}.\n\nViele Grüße\n{clinicName}";
 
       if (!reminderEnabled) {
         continue;
