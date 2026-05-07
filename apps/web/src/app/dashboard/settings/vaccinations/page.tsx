@@ -8,12 +8,28 @@ import { useToast } from "@/lib/toast/context";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Check, Pencil, Plus, Trash2, ChevronDown, ChevronUp, X } from "lucide-react";
 
-const SPECIES_OPTIONS = ["Hund", "Katze", "Kaninchen", "Frettchen", "Pferd", "Vogel", "Hamster", "Meerschweinchen", "Reptil", "Fisch", "Sonstiges"];
+const SPECIES_OPTIONS = ["Hund", "Katze", "Kaninchen", "Frettchen", "Pferd", "Vogel", "Hamster", "Meerschweinchen", "Reptil", "Fisch", "Sonstiges"] as const;
 const CATEGORY_OPTIONS = [
   { value: "core", label: "Core (STIKO)" },
   { value: "recommended", label: "Empfohlen" },
   { value: "non-core", label: "Optional" },
 ] as const;
+
+type CategoryValue = (typeof CATEGORY_OPTIONS)[number]["value"];
+
+const DEFAULT_CUSTOM_TYPE: {
+  species: string;
+  category: CategoryValue;
+  intervalMonths: number;
+  requiresBatchNumber: boolean;
+  notes: string;
+} = {
+  species: SPECIES_OPTIONS[0],
+  category: "recommended",
+  intervalMonths: 12,
+  requiresBatchNumber: false,
+  notes: "",
+};
 
 export default function VaccinationSettingsPage() {
   const { tenantId } = useTenant();
@@ -62,20 +78,20 @@ export default function VaccinationSettingsPage() {
   const [showGlobalTypes, setShowGlobalTypes] = useState(false);
   const [showAddCustom, setShowAddCustom] = useState(false);
   const [customName, setCustomName] = useState("");
-  const [customSpecies, setCustomSpecies] = useState("Hund");
-  const [customCategory, setCustomCategory] = useState<"core" | "recommended" | "non-core">("recommended");
-  const [customInterval, setCustomInterval] = useState(12);
-  const [customBatchRequired, setCustomBatchRequired] = useState(false);
-  const [customNotes, setCustomNotes] = useState("");
+  const [customSpecies, setCustomSpecies] = useState<string>(DEFAULT_CUSTOM_TYPE.species);
+  const [customCategory, setCustomCategory] = useState<CategoryValue>(DEFAULT_CUSTOM_TYPE.category);
+  const [customInterval, setCustomInterval] = useState(DEFAULT_CUSTOM_TYPE.intervalMonths);
+  const [customBatchRequired, setCustomBatchRequired] = useState(DEFAULT_CUSTOM_TYPE.requiresBatchNumber);
+  const [customNotes, setCustomNotes] = useState(DEFAULT_CUSTOM_TYPE.notes);
 
   // Inline editing state for custom types
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
-  const [editSpecies, setEditSpecies] = useState("Hund");
-  const [editCategory, setEditCategory] = useState<"core" | "recommended" | "non-core">("recommended");
-  const [editInterval, setEditInterval] = useState(12);
-  const [editBatchRequired, setEditBatchRequired] = useState(false);
-  const [editNotes, setEditNotes] = useState("");
+  const [editSpecies, setEditSpecies] = useState<string>(DEFAULT_CUSTOM_TYPE.species);
+  const [editCategory, setEditCategory] = useState<CategoryValue>(DEFAULT_CUSTOM_TYPE.category);
+  const [editInterval, setEditInterval] = useState(DEFAULT_CUSTOM_TYPE.intervalMonths);
+  const [editBatchRequired, setEditBatchRequired] = useState(DEFAULT_CUSTOM_TYPE.requiresBatchNumber);
+  const [editNotes, setEditNotes] = useState(DEFAULT_CUSTOM_TYPE.notes);
 
   const { data: typeConfig, isLoading: typeConfigLoading, refetch: refetchTypeConfig } =
     trpc.vaccinations.getTypeConfig.useQuery(
@@ -92,8 +108,12 @@ export default function VaccinationSettingsPage() {
     onSuccess: async () => {
       await refetchTypeConfig();
       setShowAddCustom(false);
-      setCustomName(""); setCustomSpecies("Hund"); setCustomCategory("recommended");
-      setCustomInterval(12); setCustomBatchRequired(false); setCustomNotes("");
+      setCustomName("");
+      setCustomSpecies(DEFAULT_CUSTOM_TYPE.species);
+      setCustomCategory(DEFAULT_CUSTOM_TYPE.category);
+      setCustomInterval(DEFAULT_CUSTOM_TYPE.intervalMonths);
+      setCustomBatchRequired(DEFAULT_CUSTOM_TYPE.requiresBatchNumber);
+      setCustomNotes(DEFAULT_CUSTOM_TYPE.notes);
       addToast("Eigener Impftyp hinzugefügt.", "success");
     },
     onError: () => addToast("Fehler beim Hinzufügen.", "error"),
@@ -116,8 +136,8 @@ export default function VaccinationSettingsPage() {
   const startEdit = (ct: { id: string; customName: string | null; customSpecies: string | null; customCategory: string | null; customIntervalMonths: number | null; customRequiresBatchNumber: boolean | null; customNotes: string | null }) => {
     setEditingId(ct.id);
     setEditName(ct.customName ?? "");
-    setEditSpecies(ct.customSpecies ?? "Hund");
-    setEditCategory((ct.customCategory as "core" | "recommended" | "non-core") ?? "recommended");
+    setEditSpecies(ct.customSpecies ?? DEFAULT_CUSTOM_TYPE.species);
+    setEditCategory((ct.customCategory as CategoryValue) ?? DEFAULT_CUSTOM_TYPE.category);
     setEditInterval(ct.customIntervalMonths ?? 12);
     setEditBatchRequired(ct.customRequiresBatchNumber ?? false);
     setEditNotes(ct.customNotes ?? "");
@@ -556,7 +576,7 @@ export default function VaccinationSettingsPage() {
 
               {showGlobalTypes && (
                 <div className="mt-3 space-y-1">
-                  {(["Hund", "Katze", "Kaninchen", "Frettchen", "Pferd"] as const).map((species) => {
+                  {(["Hund", "Katze", "Kaninchen", "Frettchen", "Pferd"] satisfies typeof SPECIES_OPTIONS[number][]).map((species) => {
                     const forSpecies = typeConfig?.globalTypes.filter((t) =>
                       t.species.includes(species)
                     ) ?? [];
