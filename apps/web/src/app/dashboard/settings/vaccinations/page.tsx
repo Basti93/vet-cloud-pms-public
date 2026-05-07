@@ -50,6 +50,10 @@ export default function VaccinationSettingsPage() {
 
   const [reminderEnabled, setReminderEnabled] = useState(true);
   const [reminderDaysBefore, setReminderDaysBefore] = useState(30);
+  const [remindCore, setRemindCore] = useState(true);
+  const [remindRecommended, setRemindRecommended] = useState(true);
+  const [remindOptional, setRemindOptional] = useState(false);
+  const [remindOverdue, setRemindOverdue] = useState(true);
   const [reminderSubject, setReminderSubject] = useState("Impf-Erinnerung für {petName}");
   const [reminderBody, setReminderBody] = useState("");
   const [testEmail, setTestEmail] = useState("");
@@ -95,6 +99,10 @@ export default function VaccinationSettingsPage() {
     if (!data) return;
     setReminderEnabled(data.reminderEnabled);
     setReminderDaysBefore(data.reminderDaysBefore);
+    setRemindCore(data.remindCore);
+    setRemindRecommended(data.remindRecommended);
+    setRemindOptional(data.remindOptional);
+    setRemindOverdue(data.remindOverdue);
     setReminderSubject(data.reminderSubject);
     setReminderBody(data.reminderBody);
   }, [data]);
@@ -143,6 +151,65 @@ export default function VaccinationSettingsPage() {
               />
             </label>
 
+            {/* ── Welche Kategorien erinnert werden ─────────────────────── */}
+            <div>
+              <p className="text-sm font-medium text-fg mb-2">Welche Impfkategorien werden erinnert?</p>
+              <div className="rounded-lg border border-border bg-bg p-3 space-y-2">
+                <label className="flex items-center gap-3 text-sm text-fg cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-[var(--color-accent)]"
+                    checked={remindCore}
+                    onChange={(e) => setRemindCore(e.target.checked)}
+                  />
+                  <span>
+                    <span className="inline-block h-2 w-2 rounded-full bg-blue-500 mr-1.5 align-middle" />
+                    Pflichtimpfungen (Core / STIKO)
+                  </span>
+                </label>
+                <label className="flex items-center gap-3 text-sm text-fg cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-[var(--color-accent)]"
+                    checked={remindRecommended}
+                    onChange={(e) => setRemindRecommended(e.target.checked)}
+                  />
+                  <span>
+                    <span className="inline-block h-2 w-2 rounded-full bg-amber-400 mr-1.5 align-middle" />
+                    Empfohlene Impfungen
+                  </span>
+                </label>
+                <label className="flex items-center gap-3 text-sm text-fg cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-[var(--color-accent)]"
+                    checked={remindOptional}
+                    onChange={(e) => setRemindOptional(e.target.checked)}
+                  />
+                  <span className="text-muted">Optionale Impfungen (Non-Core)</span>
+                </label>
+                <p className="text-xs text-muted pt-1 border-t border-border">
+                  Impfungen ohne zugeordneten Impftyp werden immer erinnert.
+                </p>
+              </div>
+            </div>
+
+            {/* ── Überfällige erinnern ───────────────────────────────────── */}
+            <label className="flex cursor-pointer items-start gap-3 text-sm text-fg">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 accent-[var(--color-accent)]"
+                checked={remindOverdue}
+                onChange={(e) => setRemindOverdue(e.target.checked)}
+              />
+              <span>
+                Auch für bereits überfällige Impfungen erinnern
+                <span className="block text-xs text-muted mt-0.5">
+                  Wenn deaktiviert, werden nur Impfungen erinnert, die noch nicht abgelaufen sind.
+                </span>
+              </span>
+            </label>
+
             <label className="block text-sm text-fg">
               Betreff
               <input
@@ -174,6 +241,10 @@ export default function VaccinationSettingsPage() {
                   tenantId,
                   reminderEnabled,
                   reminderDaysBefore,
+                  remindCore,
+                  remindRecommended,
+                  remindOptional,
+                  remindOverdue,
                   reminderSubject,
                   reminderBody,
                 });

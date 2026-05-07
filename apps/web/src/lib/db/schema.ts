@@ -859,6 +859,12 @@ export const vaccinationSettings = pgTable(
       .references(() => tenants.id, { onDelete: "cascade" }),
     reminderEnabled: boolean("reminder_enabled").default(true).notNull(),
     reminderDaysBefore: integer("reminder_days_before").default(30).notNull(),
+    // Category filters — which vaccination categories trigger a reminder
+    remindCore: boolean("remind_core").default(true).notNull(),
+    remindRecommended: boolean("remind_recommended").default(true).notNull(),
+    remindOptional: boolean("remind_optional").default(false).notNull(),
+    // Also remind if the vaccination is already overdue (expiryDate < today)
+    remindOverdue: boolean("remind_overdue").default(true).notNull(),
     reminderSubject: varchar("reminder_subject", { length: 255 })
       .default("Impf-Erinnerung für {petName}")
       .notNull(),

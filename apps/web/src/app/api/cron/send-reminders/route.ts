@@ -187,6 +187,10 @@ export async function GET(request: NextRequest) {
 
       const reminderEnabled = vaxSettings[0]?.reminderEnabled ?? true;
       const reminderDaysBefore = vaxSettings[0]?.reminderDaysBefore ?? 30;
+      const remindCore = vaxSettings[0]?.remindCore ?? true;
+      const remindRecommended = vaxSettings[0]?.remindRecommended ?? true;
+      const remindOptional = vaxSettings[0]?.remindOptional ?? false;
+      const remindOverdue = vaxSettings[0]?.remindOverdue ?? true;
 
       if (!reminderEnabled) {
         continue;
@@ -218,8 +222,9 @@ export async function GET(request: NextRequest) {
           ownerEmail: owners.email,
           ownerFirstName: owners.firstName,
           ownerEmailOptOut: owners.emailOptOut,
-          // Resolved type name from catalogue (falls back to free-text type)
+          // Resolved type name + category from catalogue
           typeName: vaccinationTypes.name,
+          typeCategory: vaccinationTypes.category,
         })
         .from(vaccinations)
         .innerJoin(patients, eq(vaccinations.patientId, patients.id))
@@ -230,13 +235,26 @@ export async function GET(request: NextRequest) {
             eq(vaccinations.tenantId, tenant.id),
             isNull(vaccinations.deletedAt),
             isNull(vaccinations.reminderSentDate),
-            lte(vaccinations.expiryDate, remindUntil),
+            // Overdue filter: skip already-expired if remindOverdue is off
+            remindOverdue
+              ? lte(vaccinations.expiryDate, remindUntil)
+              : and(gte(vaccinations.expiryDate, now), lte(vaccinations.expiryDate, remindUntil)),
             // Skip owners who have opted out of email reminders (GDPR Art. 21)
             ne(owners.emailOptOut, true)
           )
         );
 
-      if (dueVaccinations.length === 0) continue;
+      // Category filter: apply in-process so free-text vaccinations (no FK) always pass through
+      const categoryFilteredVaccinations = dueVaccinations.filter((v) => {
+        const cat = v.typeCategory;
+        if (!cat) return true; // free-text vaccination → always remind
+        if (cat === "core") return remindCore;
+        if (cat === "recommended") return remindRecommended;
+        if (cat === "non-core") return remindOptional;
+        return true; // unknown category → remind to be safe
+      });
+
+      if (categoryFilteredVaccinations.length === 0) continue;
 
       // Deduplication: skip vaccinations already sent within last 25h
       const recentLogs = await db
@@ -246,7 +264,7 @@ export async function GET(request: NextRequest) {
           and(
             inArray(
               vaccinationEmailLogs.vaccinationId,
-              dueVaccinations.map((v) => v.id)
+              categoryFilteredVaccinations.map((v) => v.id)
             ),
             eq(vaccinationEmailLogs.status, "sent"),
             gte(
@@ -256,7 +274,7 @@ export async function GET(request: NextRequest) {
           )
         );
       const recentlySentIds = new Set(recentLogs.map((r) => r.vaccinationId));
-      const toSend = dueVaccinations.filter((v) => !recentlySentIds.has(v.id));
+      const toSend = categoryFilteredVaccinations.filter((v) => !recentlySentIds.has(v.id));
 
       // ── Digest: group by owner, send ONE email per owner ─────────────────
       const byOwner = new Map<
