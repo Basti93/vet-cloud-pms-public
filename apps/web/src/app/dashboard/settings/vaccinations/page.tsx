@@ -6,7 +6,7 @@ import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/lib/toast/context";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { Check, Pencil, Plus, Trash2, ChevronDown, ChevronUp, X } from "lucide-react";
 
 const SPECIES_OPTIONS = ["Hund", "Katze", "Kaninchen", "Frettchen", "Pferd", "Vogel", "Hamster", "Meerschweinchen", "Reptil", "Fisch", "Sonstiges"];
 const CATEGORY_OPTIONS = [
@@ -68,6 +68,15 @@ export default function VaccinationSettingsPage() {
   const [customBatchRequired, setCustomBatchRequired] = useState(false);
   const [customNotes, setCustomNotes] = useState("");
 
+  // Inline editing state for custom types
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editSpecies, setEditSpecies] = useState("Hund");
+  const [editCategory, setEditCategory] = useState<"core" | "recommended" | "non-core">("recommended");
+  const [editInterval, setEditInterval] = useState(12);
+  const [editBatchRequired, setEditBatchRequired] = useState(false);
+  const [editNotes, setEditNotes] = useState("");
+
   const { data: typeConfig, isLoading: typeConfigLoading, refetch: refetchTypeConfig } =
     trpc.vaccinations.getTypeConfig.useQuery(
       { tenantId: tenantId ?? "" },
@@ -94,6 +103,25 @@ export default function VaccinationSettingsPage() {
     onSuccess: async () => { await refetchTypeConfig(); addToast("Impftyp entfernt.", "success"); },
     onError: () => addToast("Fehler beim Entfernen.", "error"),
   });
+
+  const updateCustomMutation = trpc.vaccinations.updateCustomType.useMutation({
+    onSuccess: async () => {
+      await refetchTypeConfig();
+      setEditingId(null);
+      addToast("Impftyp aktualisiert.", "success");
+    },
+    onError: () => addToast("Fehler beim Speichern.", "error"),
+  });
+
+  const startEdit = (ct: { id: string; customName: string | null; customSpecies: string | null; customCategory: string | null; customIntervalMonths: number | null; customRequiresBatchNumber: boolean | null; customNotes: string | null }) => {
+    setEditingId(ct.id);
+    setEditName(ct.customName ?? "");
+    setEditSpecies(ct.customSpecies ?? "Hund");
+    setEditCategory((ct.customCategory as "core" | "recommended" | "non-core") ?? "recommended");
+    setEditInterval(ct.customIntervalMonths ?? 12);
+    setEditBatchRequired(ct.customRequiresBatchNumber ?? false);
+    setEditNotes(ct.customNotes ?? "");
+  };
 
   useEffect(() => {
     if (!data) return;
@@ -396,24 +424,124 @@ export default function VaccinationSettingsPage() {
               {typeConfig?.customTypes.length === 0 && !showAddCustom && (
                 <p className="text-sm text-muted">Noch keine eigenen Impftypen.</p>
               )}
-              {typeConfig?.customTypes.map((ct) => (
-                <div key={ct.id} className="flex items-center justify-between rounded-lg border border-border bg-bg px-3 py-2">
-                  <div>
-                    <span className="text-sm font-medium text-fg">{ct.customName}</span>
-                    <span className="ml-2 text-xs text-muted">{ct.customSpecies} · {ct.customIntervalMonths} Mo.</span>
-                    {ct.customNotes && <p className="text-xs text-muted mt-0.5">{ct.customNotes}</p>}
+              {typeConfig?.customTypes.map((ct) =>
+                editingId === ct.id ? (
+                  /* ── Inline edit form ─────────────────────────────────── */
+                  <div key={ct.id} className="rounded-xl border border-primary/40 bg-bg p-4 space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className="block text-xs text-fg col-span-2">
+                        Name *
+                        <input
+                          className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                        />
+                      </label>
+                      <label className="block text-xs text-fg">
+                        Tierart *
+                        <select
+                          className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                          value={editSpecies}
+                          onChange={(e) => setEditSpecies(e.target.value)}
+                        >
+                          {SPECIES_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </label>
+                      <label className="block text-xs text-fg">
+                        Kategorie
+                        <select
+                          className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                          value={editCategory}
+                          onChange={(e) => setEditCategory(e.target.value as typeof editCategory)}
+                        >
+                          {CATEGORY_OPTIONS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                        </select>
+                      </label>
+                      <label className="block text-xs text-fg">
+                        Standardintervall (Monate) *
+                        <input
+                          type="number" min={1} max={120}
+                          className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                          value={editInterval}
+                          onChange={(e) => setEditInterval(Number(e.target.value))}
+                        />
+                      </label>
+                      <label className="block text-xs text-fg col-span-2">
+                        Hinweis (optional)
+                        <input
+                          className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                          value={editNotes}
+                          onChange={(e) => setEditNotes(e.target.value)}
+                        />
+                      </label>
+                      <label className="flex items-center gap-2 text-xs text-fg col-span-2">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 accent-[var(--color-accent)]"
+                          checked={editBatchRequired}
+                          onChange={(e) => setEditBatchRequired(e.target.checked)}
+                        />
+                        Chargennummer erforderlich
+                      </label>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        loading={updateCustomMutation.isPending}
+                        disabled={!editName || !editSpecies}
+                        onClick={() => {
+                          if (!tenantId) return;
+                          updateCustomMutation.mutate({
+                            tenantId,
+                            configId: ct.id,
+                            name: editName,
+                            species: editSpecies,
+                            category: editCategory,
+                            intervalMonths: editInterval,
+                            requiresBatchNumber: editBatchRequired,
+                            notes: editNotes || null,
+                          });
+                        }}
+                      >
+                        <Check className="w-3.5 h-3.5 mr-1" />
+                        Speichern
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setEditingId(null)}>
+                        <X className="w-3.5 h-3.5 mr-1" />
+                        Abbrechen
+                      </Button>
+                    </div>
                   </div>
-                  <button
-                    className="p-1.5 rounded hover:bg-red-50 text-muted hover:text-red-600 transition-colors"
-                    onClick={() => {
-                      if (!tenantId) return;
-                      removeCustomMutation.mutate({ tenantId, configId: ct.id });
-                    }}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
+                ) : (
+                  /* ── Read-only row ────────────────────────────────────── */
+                  <div key={ct.id} className="flex items-center justify-between rounded-lg border border-border bg-bg px-3 py-2">
+                    <div>
+                      <span className="text-sm font-medium text-fg">{ct.customName}</span>
+                      <span className="ml-2 text-xs text-muted">{ct.customSpecies} · {ct.customIntervalMonths} Mo.</span>
+                      {ct.customNotes && <p className="text-xs text-muted mt-0.5">{ct.customNotes}</p>}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        className="p-1.5 rounded hover:bg-muted-soft text-muted hover:text-fg transition-colors"
+                        title="Bearbeiten"
+                        onClick={() => startEdit(ct)}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        className="p-1.5 rounded hover:bg-red-50 text-muted hover:text-red-600 transition-colors"
+                        title="Löschen"
+                        onClick={() => {
+                          if (!tenantId) return;
+                          removeCustomMutation.mutate({ tenantId, configId: ct.id });
+                        }}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )
+              )}
             </div>
 
             {/* ── Global STIKO types ─────────────────────────────────────────── */}
