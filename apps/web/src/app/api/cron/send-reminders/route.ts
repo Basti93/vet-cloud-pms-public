@@ -8,11 +8,12 @@ import {
   patients,
   owners,
   vaccinations,
+  vaccinationTypes,
   vaccinationSettings,
   vaccinationEmailLogs,
 } from "@/lib/db/schema";
 import { and, gte, lte, inArray, eq, isNull, ne } from "drizzle-orm";
-import { sendReminderEmail, sendVaccinationReminderEmail } from "@/lib/email/service";
+import { sendReminderEmail, sendVaccinationDigestEmail } from "@/lib/email/service";
 import { executeDueTenantDeletions } from "@/server/tenant-deletion";
 import { getSystemDomain } from "@/lib/system-name";
 import { getMainDomain } from "@/lib/env";
@@ -221,10 +222,13 @@ export async function GET(request: NextRequest) {
           ownerEmail: owners.email,
           ownerFirstName: owners.firstName,
           ownerEmailOptOut: owners.emailOptOut,
+          // Resolved type name from catalogue (falls back to free-text type)
+          typeName: vaccinationTypes.name,
         })
         .from(vaccinations)
         .innerJoin(patients, eq(vaccinations.patientId, patients.id))
         .innerJoin(owners, eq(patients.ownerId, owners.id))
+        .leftJoin(vaccinationTypes, eq(vaccinations.vaccinationTypeId, vaccinationTypes.id))
         .where(
           and(
             eq(vaccinations.tenantId, tenant.id),
@@ -236,65 +240,93 @@ export async function GET(request: NextRequest) {
           )
         );
 
-      for (const item of dueVaccinations) {
-        if (!item.ownerEmail) continue;
+      if (dueVaccinations.length === 0) continue;
 
-        // Deduplication: skip if we already sent a reminder for this vaccination
-        // within the last 25 hours (guards against double-run scenarios).
-        const recentLog = await db
-          .select({ id: vaccinationEmailLogs.id })
-          .from(vaccinationEmailLogs)
-          .where(
-            and(
-              eq(vaccinationEmailLogs.vaccinationId, item.id),
-              eq(vaccinationEmailLogs.status, "sent"),
-              gte(vaccinationEmailLogs.sentAt, new Date(now.getTime() - 25 * 60 * 60 * 1000))
+      // Deduplication: skip vaccinations already sent within last 25h
+      const recentLogs = await db
+        .select({ vaccinationId: vaccinationEmailLogs.vaccinationId })
+        .from(vaccinationEmailLogs)
+        .where(
+          and(
+            inArray(
+              vaccinationEmailLogs.vaccinationId,
+              dueVaccinations.map((v) => v.id)
+            ),
+            eq(vaccinationEmailLogs.status, "sent"),
+            gte(
+              vaccinationEmailLogs.sentAt,
+              new Date(now.getTime() - 25 * 60 * 60 * 1000)
             )
           )
-          .limit(1);
+        );
+      const recentlySentIds = new Set(recentLogs.map((r) => r.vaccinationId));
+      const toSend = dueVaccinations.filter((v) => !recentlySentIds.has(v.id));
 
-        if (recentLog.length > 0) continue;
+      // ── Digest: group by owner, send ONE email per owner ─────────────────
+      const byOwner = new Map<
+        string,
+        { ownerEmail: string; ownerFirstName: string; ownerId: string; vacs: typeof toSend }
+      >();
+      for (const v of toSend) {
+        if (!v.ownerEmail) continue;
+        if (!byOwner.has(v.ownerId)) {
+          byOwner.set(v.ownerId, {
+            ownerEmail: v.ownerEmail,
+            ownerFirstName: v.ownerFirstName,
+            ownerId: v.ownerId,
+            vacs: [],
+          });
+        }
+        byOwner.get(v.ownerId)!.vacs.push(v);
+      }
 
-        const unsubscribeUrl = buildUnsubscribeUrl(item.ownerId);
-        const result = await sendVaccinationReminderEmail({
-          tenantId: tenant.id,
-          vaccinationId: item.id,
-          ownerId: item.ownerId,
-          ownerEmail: item.ownerEmail,
-          ownerName: item.ownerFirstName,
-          petName: item.patientName,
-          vaccinationType: item.type,
-          dueDate: item.expiryDate,
+      for (const owner of byOwner.values()) {
+        const items = owner.vacs.map((v) => ({
+          petName: v.patientName,
+          vaccinationType: v.typeName ?? v.type ?? "Impfung",
+          dueDate: v.expiryDate.toLocaleDateString("de-DE"),
+        }));
+
+        const unsubscribeUrl = buildUnsubscribeUrl(owner.ownerId);
+        const result = await sendVaccinationDigestEmail({
+          ownerEmail: owner.ownerEmail,
+          ownerName: owner.ownerFirstName,
+          items,
           clinicName: practiceName,
           bookingUrl,
           unsubscribeUrl,
-          customSubject: reminderSubject,
-          customBody: reminderBody,
         });
 
         if (result.success) {
-          await db.insert(vaccinationEmailLogs).values({
-            tenantId: tenant.id,
-            vaccinationId: item.id,
-            emailAddress: item.ownerEmail,
-            status: "sent",
-            messageId: result.messageId,
-          });
-          await db
-            .update(vaccinations)
-            .set({ reminderSentDate: new Date(), updatedAt: new Date() })
-            .where(eq(vaccinations.id, item.id));
+          // Log + mark all vaccinations in this digest as sent
+          for (const v of owner.vacs) {
+            await db.insert(vaccinationEmailLogs).values({
+              tenantId: tenant.id,
+              vaccinationId: v.id,
+              emailAddress: owner.ownerEmail,
+              status: "sent",
+              messageId: result.messageId,
+            });
+            await db
+              .update(vaccinations)
+              .set({ reminderSentDate: new Date(), updatedAt: new Date() })
+              .where(eq(vaccinations.id, v.id));
+          }
           vaccinationRemindersSent++;
         } else {
           const errorMessage =
-            result.error instanceof Error ? result.error.message : String(result.error);
-          await db.insert(vaccinationEmailLogs).values({
-            tenantId: tenant.id,
-            vaccinationId: item.id,
-            emailAddress: item.ownerEmail,
-            status: "failed",
-            error: errorMessage,
-          });
+            result.error instanceof Error
+              ? result.error.message
+              : String(result.error);
+          for (const v of owner.vacs) {
+            await db.insert(vaccinationEmailLogs).values({
+              tenantId: tenant.id,
+              vaccinationId: v.id,
+              emailAddress: owner.ownerEmail,
+              status: "failed",
+              error: errorMessage,
+            });
+          }
           vaccinationRemindersFailed++;
         }
       }

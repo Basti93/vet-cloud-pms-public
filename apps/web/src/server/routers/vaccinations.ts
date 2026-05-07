@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, asc, desc, eq, gte, isNull, lte, min, sql, ne } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lte, min, sql, ne } from "drizzle-orm";
 import { z } from "zod";
 import {
   PERMISSIONS,
@@ -544,7 +544,7 @@ export const vaccinationsRouter = createTRPCRouter({
     }),
 
   getScanStats: tenantProcedure
-    .use(requirePermission(PERMISSIONS.SETTINGS_MANAGE))
+    .use(requirePermission(PERMISSIONS.PATIENTS_READ))
     .input(z.object({ tenantId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const now = new Date();
@@ -568,13 +568,15 @@ export const vaccinationsRouter = createTRPCRouter({
 
   /**
    * Per-patient vaccination summary for the vaccination management list page.
-   * Returns each patient with their soonest-expiring vaccination status.
+   * Returns each patient with their vaccinations, type names, reminder status,
+   * and overall state. Owners who opted out of email are excluded.
    */
   getPatientSummaryList: tenantProcedure
     .use(requirePermission(PERMISSIONS.PATIENTS_READ))
     .input(
       z.object({
         tenantId: z.string().uuid(),
+        hideOptOut: z.boolean().default(true),
         limit: z.number().int().min(1).max(500).default(200),
       })
     )
@@ -582,76 +584,108 @@ export const vaccinationsRouter = createTRPCRouter({
       const now = new Date();
       const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-      // Use subquery to compute min date, then order by it safely in GROUP BY context
-      const subquery = ctx.db
+      // 1. Fetch all active patients with owner info (filter opt-out if requested)
+      const patientRows = await ctx.db
         .select({
           id: patients.id,
           name: patients.name,
           species: patients.species,
           ownerFirstName: owners.firstName,
           ownerLastName: owners.lastName,
-          nextDueAt: min(vaccinations.expiryDate).as("next_due_at"),
+          ownerEmailOptOut: owners.emailOptOut,
         })
         .from(patients)
         .leftJoin(owners, eq(patients.ownerId, owners.id))
-        .leftJoin(
-          vaccinations,
+        .where(
           and(
-            eq(vaccinations.patientId, patients.id),
-            isNull(vaccinations.deletedAt)
+            eq(patients.tenantId, input.tenantId),
+            ne(patients.active, false),
+            input.hideOptOut ? ne(owners.emailOptOut, true) : undefined,
           )
-        )
-        .where(and(eq(patients.tenantId, input.tenantId), ne(patients.active, false)))
-        .groupBy(patients.id, patients.name, patients.species, owners.firstName, owners.lastName)
-        .as("patient_summary");
-
-      const rows = await ctx.db
-        .select({
-          id: subquery.id,
-          name: subquery.name,
-          species: subquery.species,
-          ownerFirstName: subquery.ownerFirstName,
-          ownerLastName: subquery.ownerLastName,
-          nextDueAt: subquery.nextDueAt,
-        })
-        .from(subquery)
-        .orderBy(
-          // Overdue first, then due soon, then current
-          sql`CASE
-            WHEN ${subquery.nextDueAt} < ${sql.raw(`'${now.toISOString()}'`)} THEN 0
-            WHEN ${subquery.nextDueAt} <= ${sql.raw(`'${in30Days.toISOString()}'`)} THEN 1
-            ELSE 2
-          END`,
-          asc(subquery.nextDueAt)
         )
         .limit(input.limit);
 
-      return rows.map((row) => {
-        const nextDueAt = row.nextDueAt as Date | null;
+      if (patientRows.length === 0) return [];
+
+      const patientIds = patientRows.map((p) => p.id);
+
+      // 2. Fetch all non-deleted vaccinations for these patients, joining type names
+      const vaccinationRows = await ctx.db
+        .select({
+          id: vaccinations.id,
+          patientId: vaccinations.patientId,
+          type: vaccinations.type,
+          expiryDate: vaccinations.expiryDate,
+          reminderSentDate: vaccinations.reminderSentDate,
+          typeName: vaccinationTypes.name,
+          typeCategory: vaccinationTypes.category,
+        })
+        .from(vaccinations)
+        .leftJoin(vaccinationTypes, eq(vaccinations.vaccinationTypeId, vaccinationTypes.id))
+        .where(
+          and(
+            inArray(vaccinations.patientId, patientIds),
+            isNull(vaccinations.deletedAt),
+          )
+        )
+        .orderBy(asc(vaccinations.expiryDate));
+
+      // 3. Group vaccinations by patientId
+      const vacsByPatient = new Map<string, typeof vaccinationRows>();
+      for (const v of vaccinationRows) {
+        if (!vacsByPatient.has(v.patientId)) vacsByPatient.set(v.patientId, []);
+        vacsByPatient.get(v.patientId)!.push(v);
+      }
+
+      // 4. Build and sort result
+      const result = patientRows.map((patient) => {
+        const vacs = vacsByPatient.get(patient.id) ?? [];
+
+        // Find soonest-expiring vaccination for overall state
+        let nextDueAt: Date | null = null;
+        for (const v of vacs) {
+          const d = v.expiryDate as Date | null;
+          if (d && (!nextDueAt || d < nextDueAt)) nextDueAt = d;
+        }
+
         let state: "overdue" | "due30" | "current" | "none" = "none";
         let daysUntilDue: number | null = null;
-
-        if (nextDueAt && nextDueAt instanceof Date) {
-          daysUntilDue = Math.ceil((nextDueAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
-          if (nextDueAt < now) {
-            state = "overdue";
-          } else if (nextDueAt <= in30Days) {
-            state = "due30";
-          } else {
-            state = "current";
-          }
+        if (nextDueAt) {
+          daysUntilDue = Math.ceil(
+            (nextDueAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)
+          );
+          if (nextDueAt < now) state = "overdue";
+          else if (nextDueAt <= in30Days) state = "due30";
+          else state = "current";
         }
 
         return {
-          id: row.id,
-          name: row.name,
-          species: row.species,
-          ownerFirstName: row.ownerFirstName,
-          ownerLastName: row.ownerLastName,
+          id: patient.id,
+          name: patient.name,
+          species: patient.species,
+          ownerFirstName: patient.ownerFirstName,
+          ownerLastName: patient.ownerLastName,
+          ownerEmailOptOut: patient.ownerEmailOptOut ?? false,
           nextDueAt,
           state,
           daysUntilDue,
+          vaccinations: vacs.map((v) => ({
+            id: v.id,
+            typeName: v.typeName ?? v.type ?? "Unbekannt",
+            category: v.typeCategory ?? null,
+            expiryDate: v.expiryDate as Date | null,
+            reminderSentDate: v.reminderSentDate as Date | null,
+          })),
         };
+      });
+
+      // Sort: overdue → due30 → current → none, then by nextDueAt ascending
+      const ORDER = { overdue: 0, due30: 1, current: 2, none: 3 } as const;
+      return result.sort((a, b) => {
+        if (ORDER[a.state] !== ORDER[b.state]) return ORDER[a.state] - ORDER[b.state];
+        if (!a.nextDueAt) return 1;
+        if (!b.nextDueAt) return -1;
+        return a.nextDueAt.getTime() - b.nextDueAt.getTime();
       });
     }),
 });

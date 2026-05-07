@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { useTenant } from "@/hooks/useTenant";
-import { TableSkeleton } from "@/components/ui/skeleton";
+import { Skeleton, TableSkeleton } from "@/components/ui/skeleton";
+import { CheckCircle, Clock, Mail, MailX } from "lucide-react";
 
 const STATUS_FILTERS = [
   { value: "all", label: "Alle" },
@@ -42,14 +43,29 @@ function StatusBadge({ state }: { state: string }) {
   );
 }
 
+function CategoryDot({ category }: { category: string | null }) {
+  if (category === "core")
+    return <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500" title="Pflichtimpfung" />;
+  if (category === "recommended")
+    return <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400" title="Empfohlen" />;
+  return null;
+}
+
 export default function VaccinationsPage() {
   const { tenantId } = useTenant();
   const [status, setStatus] = useState<StatusFilter>("all");
 
-  const { data, isLoading, isError } = trpc.vaccinations.getPatientSummaryList.useQuery(
-    { tenantId: tenantId ?? "" },
-    { enabled: !!tenantId }
-  );
+  const { data: scanStats, isLoading: statsLoading } =
+    trpc.vaccinations.getScanStats.useQuery(
+      { tenantId: tenantId ?? "" },
+      { enabled: !!tenantId }
+    );
+
+  const { data, isLoading, isError } =
+    trpc.vaccinations.getPatientSummaryList.useQuery(
+      { tenantId: tenantId ?? "", hideOptOut: true },
+      { enabled: !!tenantId }
+    );
 
   const filtered = (data ?? []).filter(
     (row) => status === "all" || row.state === status
@@ -57,24 +73,60 @@ export default function VaccinationsPage() {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-3xl font-bold text-fg">Impfmanagement</h1>
-        <div className="flex gap-2">
-          <Link
-            href="/dashboard/vaccinations/analytics"
-            className="rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium text-fg hover:bg-muted-soft"
-          >
-            Analytics
-          </Link>
-          <Link
-            href="/dashboard/settings/vaccinations"
-            className="rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium text-fg hover:bg-muted-soft"
-          >
-            Einstellungen
-          </Link>
-        </div>
+        <Link
+          href="/dashboard/settings/vaccinations"
+          className="rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium text-fg hover:bg-muted-soft"
+        >
+          Einstellungen
+        </Link>
       </div>
 
+      {/* Inline analytics */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        {[
+          { label: "Gesamt erfasst", value: scanStats?.totalTracked, color: "text-fg" },
+          { label: "Überfällig", value: scanStats?.totalDue, color: "text-red-600" },
+          { label: "In 30 Tagen fällig", value: scanStats?.totalUpcoming, color: "text-amber-600" },
+        ].map(({ label, value, color }) => (
+          <div key={label} className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+            <p className="text-sm text-muted">{label}</p>
+            {statsLoading ? (
+              <Skeleton className="mt-2 h-8 w-16" />
+            ) : (
+              <p className={`mt-1 text-2xl font-semibold ${color}`}>{value ?? 0}</p>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Legend + note */}
+      <div className="flex flex-wrap items-center gap-4 text-xs text-muted">
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500" />
+          Pflichtimpfung (Core)
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />
+          Empfohlen
+        </span>
+        <span className="flex items-center gap-1.5">
+          <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+          Erinnerung gesendet
+        </span>
+        <span className="flex items-center gap-1.5">
+          <Clock className="h-3.5 w-3.5 text-amber-500" />
+          Erinnerung ausstehend
+        </span>
+        <span className="ml-auto flex items-center gap-1.5">
+          <MailX className="h-3.5 w-3.5 text-muted" />
+          Opt-out-Besitzer werden nicht angezeigt
+        </span>
+      </div>
+
+      {/* Status filters */}
       <div className="flex flex-wrap gap-2">
         {STATUS_FILTERS.map(({ value, label }) => (
           <button
@@ -91,6 +143,7 @@ export default function VaccinationsPage() {
         ))}
       </div>
 
+      {/* Table */}
       {isError ? (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           Impfdaten konnten nicht geladen werden. Bitte Seite neu laden.
@@ -104,19 +157,20 @@ export default function VaccinationsPage() {
                 <th className="px-4 py-3">Tierart</th>
                 <th className="px-4 py-3">Besitzer</th>
                 <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Nächste Fälligkeit</th>
+                <th className="px-4 py-3">Fällige Impfungen</th>
+                <th className="px-4 py-3">Erinnerung</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={5} className="p-0">
+                  <td colSpan={6} className="p-0">
                     <TableSkeleton rows={6} />
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td className="px-4 py-8 text-center text-muted" colSpan={5}>
+                  <td className="px-4 py-8 text-center text-muted" colSpan={6}>
                     {status === "all"
                       ? "Keine Patienten vorhanden."
                       : "Keine Patienten in dieser Kategorie."}
@@ -127,13 +181,19 @@ export default function VaccinationsPage() {
                   const owner = [row.ownerFirstName, row.ownerLastName]
                     .filter(Boolean)
                     .join(" ");
-                  const dueDateLabel = row.nextDueAt
-                    ? row.nextDueAt.toLocaleDateString("de-DE", {
-                        day: "2-digit",
-                        month: "2-digit",
-                        year: "numeric",
-                      })
-                    : "—";
+
+                  const now = new Date();
+                  const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+                  // Only show actionable vaccinations in the detail column
+                  const actionableVacs = row.vaccinations.filter((v) => {
+                    if (!v.expiryDate) return false;
+                    return v.expiryDate <= in30Days; // overdue or due soon
+                  });
+
+                  // Reminder status: any unsent reminders for actionable vacs?
+                  const unsentCount = actionableVacs.filter((v) => !v.reminderSentDate).length;
+                  const sentCount = actionableVacs.filter((v) => !!v.reminderSentDate).length;
 
                   return (
                     <tr key={row.id} className="border-t border-border hover:bg-bg/50">
@@ -150,17 +210,58 @@ export default function VaccinationsPage() {
                       <td className="px-4 py-3">
                         <StatusBadge state={row.state} />
                       </td>
-                      <td className="px-4 py-3 text-muted">
-                        {row.daysUntilDue !== null && row.daysUntilDue <= 30 && row.daysUntilDue >= 0 ? (
-                          <span className="text-amber-700">
-                            {dueDateLabel} ({row.daysUntilDue}d)
+
+                      {/* Vaccination types column */}
+                      <td className="px-4 py-3">
+                        {actionableVacs.length === 0 ? (
+                          <span className="text-muted">—</span>
+                        ) : (
+                          <div className="flex flex-col gap-1">
+                            {actionableVacs.map((v) => {
+                              const expiry = v.expiryDate
+                                ? v.expiryDate.toLocaleDateString("de-DE", {
+                                    day: "2-digit",
+                                    month: "2-digit",
+                                    year: "numeric",
+                                  })
+                                : "—";
+                              const isOverdue = v.expiryDate && v.expiryDate < now;
+                              return (
+                                <span
+                                  key={v.id}
+                                  className="flex items-center gap-1.5 text-xs"
+                                >
+                                  <CategoryDot category={v.category} />
+                                  <span className={isOverdue ? "text-red-600" : "text-fg"}>
+                                    {v.typeName}
+                                  </span>
+                                  <span className="text-muted">({expiry})</span>
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Reminder status column */}
+                      <td className="px-4 py-3">
+                        {actionableVacs.length === 0 ? (
+                          <span className="text-muted">—</span>
+                        ) : unsentCount === 0 ? (
+                          <span className="flex items-center gap-1.5 text-xs text-green-600">
+                            <CheckCircle className="h-3.5 w-3.5" />
+                            Alle gesendet
                           </span>
-                        ) : row.state === "overdue" ? (
-                          <span className="text-red-700">
-                            {dueDateLabel} ({Math.abs(row.daysUntilDue ?? 0)}d überfällig)
+                        ) : sentCount === 0 ? (
+                          <span className="flex items-center gap-1.5 text-xs text-amber-600">
+                            <Clock className="h-3.5 w-3.5" />
+                            Ausstehend ({unsentCount})
                           </span>
                         ) : (
-                          dueDateLabel
+                          <span className="flex items-center gap-1.5 text-xs text-amber-600">
+                            <Clock className="h-3.5 w-3.5" />
+                            {sentCount} gesendet, {unsentCount} ausstehend
+                          </span>
                         )}
                       </td>
                     </tr>
@@ -171,6 +272,16 @@ export default function VaccinationsPage() {
           </table>
         </div>
       )}
+
+      {/* Reminder note */}
+      <p className="text-xs text-muted">
+        Erinnerungen werden täglich automatisch versendet — gebündelt pro Besitzer,
+        sobald eine Impfung innerhalb der konfigurierten Frist fällig ist.
+        Nur Pflicht- und empfohlene Impfungen werden standardmäßig erinnert.{" "}
+        <Link href="/dashboard/settings/vaccinations" className="underline hover:text-fg">
+          Einstellungen anpassen
+        </Link>
+      </p>
     </div>
   );
 }
