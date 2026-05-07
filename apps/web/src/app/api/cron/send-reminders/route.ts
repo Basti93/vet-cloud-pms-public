@@ -8,14 +8,16 @@ import {
   patients,
   owners,
   vaccinations,
+  vaccinationTypes,
   vaccinationSettings,
   vaccinationEmailLogs,
 } from "@/lib/db/schema";
-import { and, gte, lte, inArray, eq, isNull } from "drizzle-orm";
-import { sendReminderEmail, sendVaccinationReminderEmail } from "@/lib/email/service";
+import { and, gte, lte, inArray, eq, isNull, ne } from "drizzle-orm";
+import { sendReminderEmail, sendVaccinationDigestEmail } from "@/lib/email/service";
 import { executeDueTenantDeletions } from "@/server/tenant-deletion";
 import { getSystemDomain } from "@/lib/system-name";
 import { getMainDomain } from "@/lib/env";
+import { buildUnsubscribeUrl } from "@/lib/unsubscribe";
 
 // Vercel cron jobs require a secret for security
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -44,7 +46,7 @@ export async function GET(request: NextRequest) {
 
     // Get all tenants (needed to fetch their email settings)
     const allTenants = await db
-      .select({ id: tenants.id, slug: tenants.slug, name: tenants.name })
+      .select({ id: tenants.id, slug: tenants.slug, name: tenants.name, timezone: tenants.timezone })
       .from(tenants);
 
     let totalSent = 0;
@@ -138,6 +140,7 @@ export async function GET(request: NextRequest) {
             ownerFirstName: appointment.ownerFirstName,
             patientName: appointment.patientName,
             patientSpecies: appointment.patientSpecies,
+            appointmentDate,
             appointmentTime,
             appointmentDateTime,
           });
@@ -184,76 +187,160 @@ export async function GET(request: NextRequest) {
 
       const reminderEnabled = vaxSettings[0]?.reminderEnabled ?? true;
       const reminderDaysBefore = vaxSettings[0]?.reminderDaysBefore ?? 30;
-      const reminderSubject = vaxSettings[0]?.reminderSubject ?? "Impf-Erinnerung für {petName}";
-      const reminderBody =
-        vaxSettings[0]?.reminderBody ??
-        "Hallo {ownerName},\n\nfür {petName} ist die Auffrischung ({vaccinationType}) am {dueDate} fällig.\nBitte vereinbaren Sie einen Termin bei {clinicName}.\n\nViele Grüße\n{clinicName}";
+      const remindCore = vaxSettings[0]?.remindCore ?? true;
+      const remindRecommended = vaxSettings[0]?.remindRecommended ?? true;
+      const remindOptional = vaxSettings[0]?.remindOptional ?? false;
+      const remindOverdue = vaxSettings[0]?.remindOverdue ?? true;
 
       if (!reminderEnabled) {
         continue;
       }
 
-      const remindUntil = new Date(now.getTime() + reminderDaysBefore * 24 * 60 * 60 * 1000);
+      // Use tenant timezone for the due-date window so reminder fires at the
+      // right local date rather than always in UTC.
+      const tenantTz = tenant.timezone ?? "Europe/Berlin";
+      const remindUntilMs = now.getTime() + reminderDaysBefore * 24 * 60 * 60 * 1000;
+      // Shift window by UTC offset of tenant timezone to align with local midnight.
+      const tzOffset = new Intl.DateTimeFormat("en", {
+        timeZone: tenantTz,
+        timeZoneName: "shortOffset",
+      })
+        .formatToParts(now)
+        .find((p) => p.type === "timeZoneName")
+        ?.value?.replace("GMT", "") ?? "+0";
+      const [tzHours, tzMins] = tzOffset.split(":").map(Number);
+      const tzOffsetMs = ((tzHours ?? 0) * 60 + (tzMins ?? 0)) * 60 * 1000;
+      const remindUntil = new Date(remindUntilMs - tzOffsetMs);
+
       const dueVaccinations = await db
         .select({
           id: vaccinations.id,
           expiryDate: vaccinations.expiryDate,
           type: vaccinations.type,
           patientName: patients.name,
+          ownerId: owners.id,
           ownerEmail: owners.email,
           ownerFirstName: owners.firstName,
+          ownerEmailOptOut: owners.emailOptOut,
+          // Resolved type name + category from catalogue
+          typeName: vaccinationTypes.name,
+          typeCategory: vaccinationTypes.category,
         })
         .from(vaccinations)
         .innerJoin(patients, eq(vaccinations.patientId, patients.id))
         .innerJoin(owners, eq(patients.ownerId, owners.id))
+        .leftJoin(vaccinationTypes, eq(vaccinations.vaccinationTypeId, vaccinationTypes.id))
         .where(
           and(
             eq(vaccinations.tenantId, tenant.id),
             isNull(vaccinations.deletedAt),
             isNull(vaccinations.reminderSentDate),
-            lte(vaccinations.expiryDate, remindUntil)
+            // Overdue filter: skip already-expired if remindOverdue is off
+            remindOverdue
+              ? lte(vaccinations.expiryDate, remindUntil)
+              : and(gte(vaccinations.expiryDate, now), lte(vaccinations.expiryDate, remindUntil)),
+            // Skip owners who have opted out of email reminders (GDPR Art. 21)
+            ne(owners.emailOptOut, true)
           )
         );
 
-      for (const item of dueVaccinations) {
-        if (!item.ownerEmail) continue;
-        const result = await sendVaccinationReminderEmail({
-          tenantId: tenant.id,
-          vaccinationId: item.id,
-          ownerEmail: item.ownerEmail,
-          ownerName: item.ownerFirstName,
-          petName: item.patientName,
-          vaccinationType: item.type,
-          dueDate: item.expiryDate,
+      // Category filter: apply in-process so free-text vaccinations (no FK) always pass through
+      const categoryFilteredVaccinations = dueVaccinations.filter((v) => {
+        const cat = v.typeCategory;
+        if (!cat) return true; // free-text vaccination → always remind
+        if (cat === "core") return remindCore;
+        if (cat === "recommended") return remindRecommended;
+        if (cat === "non-core") return remindOptional;
+        return true; // unknown category → remind to be safe
+      });
+
+      if (categoryFilteredVaccinations.length === 0) continue;
+
+      // Deduplication: skip vaccinations already sent within last 25h
+      const recentLogs = await db
+        .select({ vaccinationId: vaccinationEmailLogs.vaccinationId })
+        .from(vaccinationEmailLogs)
+        .where(
+          and(
+            inArray(
+              vaccinationEmailLogs.vaccinationId,
+              categoryFilteredVaccinations.map((v) => v.id)
+            ),
+            eq(vaccinationEmailLogs.status, "sent"),
+            gte(
+              vaccinationEmailLogs.sentAt,
+              new Date(now.getTime() - 25 * 60 * 60 * 1000)
+            )
+          )
+        );
+      const recentlySentIds = new Set(recentLogs.map((r) => r.vaccinationId));
+      const toSend = categoryFilteredVaccinations.filter((v) => !recentlySentIds.has(v.id));
+
+      // ── Digest: group by owner, send ONE email per owner ─────────────────
+      const byOwner = new Map<
+        string,
+        { ownerEmail: string; ownerFirstName: string; ownerId: string; vacs: typeof toSend }
+      >();
+      for (const v of toSend) {
+        if (!v.ownerEmail) continue;
+        if (!byOwner.has(v.ownerId)) {
+          byOwner.set(v.ownerId, {
+            ownerEmail: v.ownerEmail,
+            ownerFirstName: v.ownerFirstName,
+            ownerId: v.ownerId,
+            vacs: [],
+          });
+        }
+        byOwner.get(v.ownerId)!.vacs.push(v);
+      }
+
+      for (const owner of byOwner.values()) {
+        const items = owner.vacs.map((v) => ({
+          petName: v.patientName,
+          vaccinationType: v.typeName ?? v.type ?? "Impfung",
+          dueDate: v.expiryDate.toLocaleDateString("de-DE"),
+        }));
+
+        const unsubscribeUrl = buildUnsubscribeUrl(owner.ownerId);
+        const result = await sendVaccinationDigestEmail({
+          ownerEmail: owner.ownerEmail,
+          ownerName: owner.ownerFirstName,
+          items,
           clinicName: practiceName,
           bookingUrl,
-          customSubject: reminderSubject,
-          customBody: reminderBody,
+          unsubscribeUrl,
         });
 
         if (result.success) {
-          await db.insert(vaccinationEmailLogs).values({
-            tenantId: tenant.id,
-            vaccinationId: item.id,
-            emailAddress: item.ownerEmail,
-            status: "sent",
-            messageId: result.messageId,
-          });
-          await db
-            .update(vaccinations)
-            .set({ reminderSentDate: new Date(), updatedAt: new Date() })
-            .where(eq(vaccinations.id, item.id));
+          // Log + mark all vaccinations in this digest as sent
+          for (const v of owner.vacs) {
+            await db.insert(vaccinationEmailLogs).values({
+              tenantId: tenant.id,
+              vaccinationId: v.id,
+              emailAddress: owner.ownerEmail,
+              status: "sent",
+              messageId: result.messageId,
+            });
+            await db
+              .update(vaccinations)
+              .set({ reminderSentDate: new Date(), updatedAt: new Date() })
+              .where(eq(vaccinations.id, v.id));
+          }
           vaccinationRemindersSent++;
         } else {
           const errorMessage =
-            result.error instanceof Error ? result.error.message : String(result.error);
-          await db.insert(vaccinationEmailLogs).values({
-            tenantId: tenant.id,
-            vaccinationId: item.id,
-            emailAddress: item.ownerEmail,
-            status: "failed",
-            error: errorMessage,
-          });
+            result.error instanceof Error
+              ? result.error.message
+              : String(result.error);
+          for (const v of owner.vacs) {
+            await db.insert(vaccinationEmailLogs).values({
+              tenantId: tenant.id,
+              vaccinationId: v.id,
+              emailAddress: owner.ownerEmail,
+              status: "failed",
+              error: errorMessage,
+            });
+          }
           vaccinationRemindersFailed++;
         }
       }

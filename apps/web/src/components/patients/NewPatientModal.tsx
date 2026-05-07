@@ -15,8 +15,8 @@ interface NewPatientModalProps {
 }
 
 const SPECIES_OPTIONS = [
-  "Hund", "Katze", "Vogel", "Kaninchen", "Hamster",
-  "Meerschweinchen", "Reptil", "Fisch", "Sonstiges",
+  "Hund", "Katze", "Kaninchen", "Frettchen", "Pferd",
+  "Vogel", "Hamster", "Meerschweinchen", "Reptil", "Fisch", "Sonstiges",
 ];
 
 export function NewPatientModal({

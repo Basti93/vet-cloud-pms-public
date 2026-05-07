@@ -237,6 +237,7 @@ export const owners = pgTable(
     postalCode: varchar("postal_code", { length: 20 }),
     country: varchar("country", { length: 2 }).default("DE"),
     notes: text("notes"),
+    emailOptOut: boolean("email_opt_out").default(false).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .default(sql`now()`)
       .notNull(),
@@ -714,6 +715,90 @@ export const appointmentEmailLogs = pgTable(
 );
 
 // ============================================================================
+// VACCINATION TYPES (Global catalogue — STIKO Vet standard, no tenant_id)
+// ============================================================================
+
+export const vaccinationTypes = pgTable(
+  "vaccination_types",
+  {
+    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+    // Short machine code used in seed data ("SHP", "L4", "RCP", "Myxo")
+    code: varchar("code", { length: 30 }).notNull().unique(),
+    // German display name shown in the UI
+    name: varchar("name", { length: 150 }).notNull(),
+    // Comma-separated list of applicable species: "Hund", "Katze", "Kaninchen", etc.
+    species: varchar("species", { length: 200 }).notNull(),
+    // "core" | "recommended" | "non-core"
+    category: varchar("category", { length: 20 }).notNull().default("recommended"),
+    // Default reminder interval in months (e.g. 12 for Leptospirose, 36 for SHP)
+    defaultIntervalMonths: integer("default_interval_months").notNull(),
+    // For series (puppy Grundimmunisierung): how many doses needed? 1 = single shot
+    seriesDoses: integer("series_doses").notNull().default(1),
+    // Minimum days between doses in a series (null if no series)
+    minIntervalDays: integer("min_interval_days"),
+    // If true, batchNumber is required (Tollwut for EU Pet Passport)
+    requiresBatchNumber: boolean("requires_batch_number").notNull().default(false),
+    // Display order in form dropdown
+    sortOrder: integer("sort_order").notNull().default(100),
+    // Optional vet-facing note (e.g. "Bei Auslandsreise erforderlich")
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (table) => ({
+    codeIdx: index("vaccination_types_code_idx").on(table.code),
+  })
+);
+
+// ============================================================================
+// TENANT VACCINATION TYPE CONFIG
+// Hybrid model: extends the global STIKO catalogue per tenant.
+//   - Row with vaccinationTypeId + enabled=false  → hides that global type
+//   - Row with vaccinationTypeId = null            → tenant-specific custom type
+// ============================================================================
+
+export const tenantVaccinationTypeConfig = pgTable(
+  "tenant_vaccination_type_config",
+  {
+    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    // null → custom type row; non-null → config for a global type
+    vaccinationTypeId: uuid("vaccination_type_id").references(
+      () => vaccinationTypes.id,
+      { onDelete: "cascade" }
+    ),
+    // false = this global type is hidden for this tenant (ignored for custom rows)
+    enabled: boolean("enabled").notNull().default(true),
+    // Custom type fields — only populated when vaccinationTypeId IS NULL
+    customName: varchar("custom_name", { length: 150 }),
+    customSpecies: varchar("custom_species", { length: 200 }),
+    customCategory: varchar("custom_category", { length: 20 }),
+    customIntervalMonths: integer("custom_interval_months"),
+    customRequiresBatchNumber: boolean("custom_requires_batch_number").default(false),
+    customNotes: text("custom_notes"),
+    // Display order in the form dropdown
+    sortOrder: integer("sort_order").notNull().default(100),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (table) => ({
+    tenantIdIdx: index("tenant_vax_type_config_tenant_id_idx").on(table.tenantId),
+    // One config row per global type per tenant (NULLs are distinct → custom types allowed)
+    uniquePerTenant: unique("tenant_vax_type_config_unique").on(
+      table.tenantId,
+      table.vaccinationTypeId
+    ),
+  })
+);
+
+// ============================================================================
 // VACCINATIONS (Patient Vaccination Records + Reminder State)
 // ============================================================================
 
@@ -727,6 +812,17 @@ export const vaccinations = pgTable(
     patientId: uuid("patient_id")
       .notNull()
       .references(() => patients.id, { onDelete: "cascade" }),
+    // Set when a global STIKO type was selected
+    vaccinationTypeId: uuid("vaccination_type_id").references(
+      () => vaccinationTypes.id,
+      { onDelete: "set null" }
+    ),
+    // Set when a tenant-specific custom type was selected
+    tenantVaccinationTypeConfigId: uuid("tenant_vaccination_type_config_id").references(
+      () => tenantVaccinationTypeConfig.id,
+      { onDelete: "set null" }
+    ),
+    // Display name — always populated (from type.name, custom config name, or free text)
     type: varchar("type", { length: 120 }).notNull(),
     administeredDate: timestamp("administered_date", { withTimezone: true }).notNull(),
     expiryDate: timestamp("expiry_date", { withTimezone: true }).notNull(),
@@ -763,6 +859,12 @@ export const vaccinationSettings = pgTable(
       .references(() => tenants.id, { onDelete: "cascade" }),
     reminderEnabled: boolean("reminder_enabled").default(true).notNull(),
     reminderDaysBefore: integer("reminder_days_before").default(30).notNull(),
+    // Category filters — which vaccination categories trigger a reminder
+    remindCore: boolean("remind_core").default(true).notNull(),
+    remindRecommended: boolean("remind_recommended").default(true).notNull(),
+    remindOptional: boolean("remind_optional").default(false).notNull(),
+    // Also remind if the vaccination is already overdue (expiryDate < today)
+    remindOverdue: boolean("remind_overdue").default(true).notNull(),
     reminderSubject: varchar("reminder_subject", { length: 255 })
       .default("Impf-Erinnerung für {petName}")
       .notNull(),

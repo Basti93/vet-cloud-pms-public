@@ -11,6 +11,10 @@ import { requirePermission } from "@/server/trpc/middleware";
 const defaultSettings = {
   reminderEnabled: true,
   reminderDaysBefore: 30,
+  remindCore: true,
+  remindRecommended: true,
+  remindOptional: false,
+  remindOverdue: true,
   reminderSubject: "Impf-Erinnerung für {petName}",
   reminderBody:
     "Hallo {ownerName},\n\nfür {petName} ist die Auffrischung ({vaccinationType}) am {dueDate} fällig.\nBitte vereinbaren Sie einen Termin bei {clinicName}.\n\nViele Grüße\n{clinicName}",
@@ -44,44 +48,37 @@ export const vaccinationSettingsRouter = createTRPCRouter({
         tenantId: z.string().uuid(),
         reminderEnabled: z.boolean(),
         reminderDaysBefore: z.number().int().min(1).max(365),
+        remindCore: z.boolean(),
+        remindRecommended: z.boolean(),
+        remindOptional: z.boolean(),
+        remindOverdue: z.boolean(),
         reminderSubject: z.string().trim().min(1).max(255),
         reminderBody: z.string().trim().min(1).max(5000),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const [existing] = await ctx.db
-        .select({ tenantId: vaccinationSettings.tenantId })
-        .from(vaccinationSettings)
-        .where(eq(vaccinationSettings.tenantId, input.tenantId))
-        .limit(1);
+      const values = {
+        tenantId: input.tenantId,
+        reminderEnabled: input.reminderEnabled,
+        reminderDaysBefore: input.reminderDaysBefore,
+        remindCore: input.remindCore,
+        remindRecommended: input.remindRecommended,
+        remindOptional: input.remindOptional,
+        remindOverdue: input.remindOverdue,
+        reminderSubject: input.reminderSubject,
+        reminderBody: input.reminderBody,
+      };
 
-      if (!existing) {
-        const [created] = await ctx.db
-          .insert(vaccinationSettings)
-          .values({
-            tenantId: input.tenantId,
-            reminderEnabled: input.reminderEnabled,
-            reminderDaysBefore: input.reminderDaysBefore,
-            reminderSubject: input.reminderSubject,
-            reminderBody: input.reminderBody,
-          })
-          .returning();
-        return created;
-      }
-
-      const [updated] = await ctx.db
-        .update(vaccinationSettings)
-        .set({
-          reminderEnabled: input.reminderEnabled,
-          reminderDaysBefore: input.reminderDaysBefore,
-          reminderSubject: input.reminderSubject,
-          reminderBody: input.reminderBody,
-          updatedAt: new Date(),
+      const [result] = await ctx.db
+        .insert(vaccinationSettings)
+        .values(values)
+        .onConflictDoUpdate({
+          target: vaccinationSettings.tenantId,
+          set: { ...values, updatedAt: new Date() },
         })
-        .where(eq(vaccinationSettings.tenantId, input.tenantId))
         .returning();
 
-      return updated;
+      return result;
     }),
 
   sendTestReminder: tenantProcedure

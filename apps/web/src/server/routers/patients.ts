@@ -38,6 +38,8 @@ export const patientsRouter = createTRPCRouter({
           ownerFirstName: owners.firstName,
           ownerLastName: owners.lastName,
           ownerPhone: owners.phone,
+          ownerEmail: owners.email,
+          ownerEmailOptOut: owners.emailOptOut,
         })
         .from(patients)
         .leftJoin(owners, eq(patients.ownerId, owners.id))
