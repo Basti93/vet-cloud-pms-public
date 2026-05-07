@@ -43,6 +43,7 @@ import {
 } from "../src/lib/db/schema";
 import { TEST_DATA, DEMO_TENANT_ID, getTestDataStats } from "./test-data";
 import { createDefaultRoles } from "../src/lib/auth/permissions";
+import { seedVaccinationTypes } from "../src/lib/db/seed-vaccination-types";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
@@ -71,6 +72,13 @@ const db = drizzle(sql, {
 async function seed() {
   try {
     console.log("🌱 Starting seed from test-data.ts...\n");
+
+    // ────────────────────────────────────────────────────────────────────────
+    // 0. SEED GLOBAL REFERENCE DATA (vaccination types catalogue)
+    // ────────────────────────────────────────────────────────────────────────
+    console.log("💉 Seeding vaccination types catalogue...");
+    await seedVaccinationTypes();
+    console.log("");
 
     // ────────────────────────────────────────────────────────────────────────
     // 1. CREATE TENANT
