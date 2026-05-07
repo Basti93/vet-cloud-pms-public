@@ -17,7 +17,7 @@ export const TEST_DATA = {
     id: DEMO_TENANT_ID,
     name: "Tierarztpraxis Demo",
     slug: DEMO_TENANT_SLUG,
-    email: "demo@example.com",
+    email: "user+demo-praxis@example.com",
     phone: "+49 30 123456",
     address: "Schönhauser Allee 42",
     city: "Berlin",
@@ -88,7 +88,7 @@ export const TEST_DATA = {
     {
       firstName: "Max",
       lastName: "Mustermann",
-      email: "max@example.com",
+      email: "user+demo-owner1@example.com",
       phone: "+49 123 111111",
       address: "Beispielstraße 1",
       city: "Berlin",
@@ -98,7 +98,7 @@ export const TEST_DATA = {
     {
       firstName: "Erika",
       lastName: "Beispiel",
-      email: "erika@example.com",
+      email: "user+demo-owner2@example.com",
       phone: "+49 123 222222",
       address: "Beispielstraße 1",
       city: "Musterstadt",
@@ -108,7 +108,7 @@ export const TEST_DATA = {
     {
       firstName: "Thomas",
       lastName: "Test",
-      email: "thomas@example.com",
+      email: "user+demo-owner3@example.com",
       phone: "+49 123 333333",
       address: "Beispielstraße 1",
       city: "Hamburg",
@@ -118,7 +118,7 @@ export const TEST_DATA = {
     {
       firstName: "Julia",
       lastName: "Fischer",
-      email: "julia@example.com",
+      email: "user+demo-owner4@example.com",
       phone: "+49 123 444444",
       address: "Beispielstraße 1",
       city: "Köln",
