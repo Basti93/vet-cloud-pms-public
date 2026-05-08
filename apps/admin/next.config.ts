@@ -1,8 +1,5 @@
 import type { NextConfig } from "next";
-import { fileURLToPath } from "url";
 import path from "path";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
   output: "standalone",
@@ -10,7 +7,8 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   turbopack: {
-    root: path.resolve(__dirname, "../.."),
+    // process.cwd() = apps/admin when the workspace build script runs
+    root: path.resolve(process.cwd(), "../.."),
   },
 };
 
