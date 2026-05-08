@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
-import { createTRPCRouter, tenantProcedure, protectedProcedure } from "@/server/trpc";
+import { createTRPCRouter, tenantProcedure } from "@/server/trpc";
 import { diagnoses, medications, vitals, patients, PERMISSIONS } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
 import { requirePermission } from "@/server/trpc/middleware";
@@ -28,11 +28,11 @@ const diagnosesRouter = createTRPCRouter({
         .orderBy(diagnoses.dateOfDiagnosis);
     }),
 
-  // No tenantId in input — derives from ctx; use protectedProcedure
-  create: protectedProcedure
+  create: tenantProcedure
     .use(requirePermission(PERMISSIONS.MEDICAL_CREATE))
     .input(
       z.object({
+        tenantId: z.string().uuid(),
         patientId: z.string().uuid(),
         title: z.string().min(1),
         description: z.string().optional(),
@@ -43,8 +43,17 @@ const diagnosesRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // tenantId and dbUserId are injected by enforceTenantIsActive
       const { tenantId, dbUserId } = ctx as { tenantId: string; dbUserId: string };
+
+      const [patient] = await ctx.db
+        .select({ id: patients.id })
+        .from(patients)
+        .where(and(eq(patients.id, input.patientId), eq(patients.tenantId, tenantId)))
+        .limit(1);
+
+      if (!patient) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Patient not found" });
+      }
 
       const [diagnosis] = await ctx.db
         .insert(diagnoses)
@@ -62,7 +71,7 @@ const diagnosesRouter = createTRPCRouter({
         .returning();
 
       await writeAuditLog(ctx, {
-        tenantId,
+        tenantId: input.tenantId,
         action: "create",
         entity: { type: "diagnosis", id: diagnosis!.id },
         event: "diagnosis.created",
@@ -137,10 +146,10 @@ const medicationsRouter = createTRPCRouter({
         .orderBy(medications.startDate);
     }),
 
-  // No tenantId in input — derives from ctx; use protectedProcedure
-  create: protectedProcedure
+  create: tenantProcedure
     .input(
       z.object({
+        tenantId: z.string().uuid(),
         patientId: z.string().uuid(),
         medicationName: z.string().min(1),
         dosage: z.string().min(1),
@@ -154,6 +163,16 @@ const medicationsRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const { tenantId, dbUserId } = ctx as { tenantId: string; dbUserId: string };
+
+      const [patient] = await ctx.db
+        .select({ id: patients.id })
+        .from(patients)
+        .where(and(eq(patients.id, input.patientId), eq(patients.tenantId, tenantId)))
+        .limit(1);
+
+      if (!patient) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Patient not found" });
+      }
 
       const [medication] = await ctx.db
         .insert(medications)
@@ -173,7 +192,7 @@ const medicationsRouter = createTRPCRouter({
         .returning();
 
       await writeAuditLog(ctx, {
-        tenantId,
+        tenantId: input.tenantId,
         action: "create",
         entity: { type: "medication", id: medication!.id },
         event: "medication.created",
@@ -263,6 +282,16 @@ const vitalsRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const { dbUserId } = ctx as { dbUserId: string };
+
+      const [patient] = await ctx.db
+        .select({ id: patients.id })
+        .from(patients)
+        .where(and(eq(patients.id, input.patientId), eq(patients.tenantId, input.tenantId)))
+        .limit(1);
+
+      if (!patient) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Patient not found" });
+      }
 
       const [vital] = await ctx.db
         .insert(vitals)
