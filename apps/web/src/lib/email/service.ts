@@ -4,7 +4,15 @@ import { renderVaccinationReminderEmail } from "./VaccinationReminderEmail";
 import { renderVaccinationDigestEmail, type VaccinationDigestItem } from "./VaccinationDigestEmail";
 import { getSystemDomain } from "@/lib/system-name";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy — safe to import during Next.js static page generation without RESEND_API_KEY.
+let _resend: Resend | undefined;
+function getResend(): Resend {
+  if (!_resend) {
+    _resend = new Resend(process.env.RESEND_API_KEY);
+  }
+  return _resend;
+}
+
 const SYSTEM_DOMAIN = getSystemDomain();
 
 // Use configured FROM_EMAIL or default to Resend's onboarding domain for testing
@@ -137,7 +145,7 @@ ${optionalValue(input.message)}
   `.trim();
 
   try {
-    const result = await resend.emails.send({
+    const result = await getResend().emails.send({
       from: systemSender(),
       to: getConsultationRecipient(),
       subject,
@@ -180,7 +188,7 @@ export async function sendConfirmationEmail(input: SendConfirmationEmailInput) {
     .replace("{practiceName}", input.practiceName);
 
   try {
-    const result = await resend.emails.send({
+    const result = await getResend().emails.send({
       from: tenantSender(input.practiceName),
       to: input.to,
       subject,
@@ -223,7 +231,7 @@ export async function sendReminderEmail(input: SendReminderEmailInput) {
     .replace("{practiceName}", input.practiceName);
 
   try {
-    const result = await resend.emails.send({
+    const result = await getResend().emails.send({
       from: tenantSender(input.practiceName),
       to: input.to,
       subject,
@@ -269,7 +277,7 @@ export async function sendBookingNotificationEmail(input: SendBookingNotificatio
     .replace("{appointmentDate}", input.appointmentDate);
 
   try {
-    const result = await resend.emails.send({
+    const result = await getResend().emails.send({
       from: systemSender(),
       to: input.to,
       subject,
@@ -322,7 +330,7 @@ Ihr ${SYSTEM_DOMAIN} Team
   `.trim();
 
   try {
-    const result = await resend.emails.send({
+    const result = await getResend().emails.send({
       from: systemSender(),
       to: input.to,
       subject,
@@ -362,7 +370,7 @@ Ihr ${SYSTEM_DOMAIN} Team
   `.trim();
 
   try {
-    const result = await resend.emails.send({
+    const result = await getResend().emails.send({
       from: systemSender(),
       to: input.to,
       subject,
@@ -379,7 +387,7 @@ Ihr ${SYSTEM_DOMAIN} Team
 
 export async function sendTenantLifecycleEmail(input: SendTenantLifecycleEmailInput) {
   try {
-    const result = await resend.emails.send({
+    const result = await getResend().emails.send({
       from: systemSender(),
       to: input.to,
       subject: input.subject,
@@ -419,7 +427,7 @@ Ihr ${SYSTEM_DOMAIN} Team
   `.trim();
 
   try {
-    const result = await resend.emails.send({
+    const result = await getResend().emails.send({
       from: systemSender(),
       to: input.to,
       subject,
@@ -476,7 +484,7 @@ export async function sendVaccinationDigestEmail(
   ].join("\n");
 
   try {
-    const result = await resend.emails.send({
+    const result = await getResend().emails.send({
       from: tenantSender(input.clinicName),
       to: input.ownerEmail,
       subject,
@@ -522,7 +530,7 @@ export async function sendVaccinationReminderEmail(
   });
 
   try {
-    const result = await resend.emails.send({
+    const result = await getResend().emails.send({
       from: tenantSender(input.clinicName),
       to: input.ownerEmail,
       subject,
