@@ -36,10 +36,14 @@ COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static     ./apps/web/.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public           ./apps/web/public
 
-# Migration runner — drizzle-orm is already in node_modules from the build
-COPY --from=builder --chown=nextjs:nodejs /app/apps/web/drizzle          ./drizzle
-COPY --from=builder --chown=nextjs:nodejs /app/apps/web/migrate.mjs      ./migrate.mjs
-COPY --from=builder                       /app/apps/web/entrypoint.sh    ./entrypoint.sh
+# Migration runner + its dependencies.
+# Turbopack bundles drizzle-orm/postgres into server chunks so they are not
+# automatically included in the standalone node_modules — copy them explicitly.
+COPY --from=deps    --chown=nextjs:nodejs /app/node_modules/drizzle-orm  ./node_modules/drizzle-orm
+COPY --from=deps    --chown=nextjs:nodejs /app/node_modules/postgres      ./node_modules/postgres
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/drizzle           ./drizzle
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/migrate.mjs       ./migrate.mjs
+COPY --from=builder                       /app/apps/web/entrypoint.sh     ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh
 
 USER nextjs
