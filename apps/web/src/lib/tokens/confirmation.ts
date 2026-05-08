@@ -15,6 +15,8 @@ export interface ConfirmationTokenPayload {
 
 const TOKEN_EXPIRY = '24h'; // 24 hours
 
+// Lazy — validated on first use so the module can be imported safely
+// during Next.js static page generation without JWT_SECRET present.
 function getSecret(): string {
   const secret = process.env.JWT_SECRET;
   if (!secret || secret === 'your-secret-key-change-this') {
@@ -25,8 +27,6 @@ function getSecret(): string {
   }
   return secret;
 }
-
-const SECRET = getSecret();
 
 /**
  * Generate a confirmation token for an appointment
@@ -42,7 +42,7 @@ export function generateConfirmationToken(
     action,
   };
 
-  return jwt.sign(payload, SECRET, {
+  return jwt.sign(payload, getSecret(), {
     expiresIn: TOKEN_EXPIRY,
     algorithm: 'HS256',
   });
@@ -53,7 +53,7 @@ export function generateConfirmationToken(
  */
 export function verifyConfirmationToken(token: string): ConfirmationTokenPayload | null {
   try {
-    const decoded = jwt.verify(token, SECRET, {
+    const decoded = jwt.verify(token, getSecret(), {
       algorithms: ['HS256'],
     });
 
