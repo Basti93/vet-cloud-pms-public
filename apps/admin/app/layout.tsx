@@ -14,6 +14,10 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// All admin pages are auth-gated and data-driven — never statically prerender.
+// This prevents build failures when NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is absent.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Vet Cloud PMS Admin",
   description: "Vet Cloud PMS Admin admin command center",
