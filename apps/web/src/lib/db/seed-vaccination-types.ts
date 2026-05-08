@@ -10,6 +10,7 @@
 import { db } from "./client";
 import { vaccinationTypes } from "./schema";
 import { sql } from "drizzle-orm";
+import { pathToFileURL } from "url";
 
 const TYPES = [
   // ─── HUND — Core ───────────────────────────────────────────────────────────
@@ -282,10 +283,17 @@ export async function seedVaccinationTypes(): Promise<void> {
   console.log("✅ Vaccination types seeded.");
 }
 
-// Run when executed directly (tsx src/lib/db/seed-vaccination-types.ts)
-seedVaccinationTypes()
-  .then(() => process.exit(0))
-  .catch((err) => {
-    console.error(err);
-    process.exit(1);
-  });
+// Run only when executed directly (tsx src/lib/db/seed-vaccination-types.ts).
+// When this module is imported by scripts/seed.ts, it must not exit the process.
+const isDirectRun =
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isDirectRun) {
+  seedVaccinationTypes()
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error(err);
+      process.exit(1);
+    });
+}

@@ -50,9 +50,10 @@ if (!DATABASE_URL) {
   throw new Error("DATABASE_URL not set — check .env.local");
 }
 
-const dbUrl =
-  DATABASE_URL +
-  (DATABASE_URL.includes("?") ? "&sslmode=require" : "?sslmode=require");
+const dbUrl = DATABASE_URL.includes("sslmode=")
+  ? DATABASE_URL
+  : DATABASE_URL +
+    (DATABASE_URL.includes("?") ? "&sslmode=require" : "?sslmode=require");
 const sql = postgres(dbUrl, { max: 1 });
 const db = drizzle(sql, {
   schema: {

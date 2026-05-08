@@ -190,9 +190,10 @@ async function main() {
     process.exit(1);
   }
 
-  const dbUrl =
-    DATABASE_URL +
-    (DATABASE_URL.includes("?") ? "&sslmode=require" : "?sslmode=require");
+  const dbUrl = DATABASE_URL.includes("sslmode=")
+    ? DATABASE_URL
+    : DATABASE_URL +
+      (DATABASE_URL.includes("?") ? "&sslmode=require" : "?sslmode=require");
   const pg = postgres(dbUrl, { max: 1 });
   const db = drizzle(pg, {
     schema: {

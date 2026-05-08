@@ -43,6 +43,13 @@
       "when": 1777059132880,
       "tag": "0005_freezing_maestro",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1778275311333,
+      "tag": "0014_add_vaccination_tables",
+      "breakpoints": true
     }
   ]
 }

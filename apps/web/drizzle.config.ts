@@ -24,12 +24,18 @@ if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL is not set. Set it in environment or .env files");
 }
 
+const databaseUrl = process.env.DATABASE_URL;
+const migrationUrl =
+  databaseUrl.includes("sslmode=")
+    ? databaseUrl
+    : databaseUrl + (databaseUrl.includes("?") ? "&sslmode=require" : "?sslmode=require");
+
 const drizzleConfig = {
   schema: "./src/lib/db/schema.ts",
   out: "./drizzle",
   dialect: "postgresql",
   dbCredentials: {
-    url: process.env.DATABASE_URL + (process.env.DATABASE_URL?.includes("?") ? "&sslmode=require" : "?sslmode=require"),
+    url: migrationUrl,
   },
   strict: true,
   verbose: true,
