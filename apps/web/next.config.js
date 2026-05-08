@@ -30,6 +30,7 @@ const clerkScriptSrc = [
   "https://cdn.clerk.com",
   "https://*.clerk.com",
   "https://*.clerk.accounts.dev",
+  "https://clerk.example.com",
   "https://va.vercel-scripts.com",
   clerkFrontendOrigin,
 ]
@@ -41,6 +42,8 @@ const clerkConnectSrc = [
   "https://*.clerk.com",
   "https://*.clerk.accounts.dev",
   "https://clerk-telemetry.com",
+  "https://clerk.example.com",
+  "https://accounts.example.com",
   "https://va.vercel-scripts.com",
   clerkFrontendOrigin,
   clerkAccountsOrigin,
@@ -52,6 +55,7 @@ const clerkFrameSrc = [
   "https://clerk.com",
   "https://*.clerk.com",
   "https://*.clerk.accounts.dev",
+  "https://accounts.example.com",
   clerkAccountsOrigin,
 ]
   .filter(Boolean)
