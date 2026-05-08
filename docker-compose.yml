@@ -1,22 +1,28 @@
 version: '3.8'
 
+# Local development database — matches production schema.
+# Start with: docker compose up -d
+# Stop with:  docker compose down
+# Wipe data:  docker compose down -v
+
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: vet-cloud-pms-postgres
+    container_name: vet-cloud-postgres-dev
     environment:
-      POSTGRES_USER: neondb_owner
-      POSTGRES_PASSWORD: password123
-      POSTGRES_DB: neondb
+      POSTGRES_USER: vetcloud
+      POSTGRES_PASSWORD: vetcloud
+      POSTGRES_DB: vetcloud
     ports:
-      - "5432:6432"
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U neondb_owner"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U vetcloud -d vetcloud"]
+      interval: 5s
       timeout: 5s
       retries: 5
 
 volumes:
   postgres_data:
+    driver: local
