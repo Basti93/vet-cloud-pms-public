@@ -1,3 +1,8 @@
+import { fileURLToPath } from "url";
+import path from "path";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 /** @type {import('next').NextConfig} */
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
 let clerkFrontendOrigin = "";
@@ -55,6 +60,9 @@ const clerkFrameSrc = [
 const nextConfig = {
   reactStrictMode: true,
   output: "standalone",
+  turbopack: {
+    root: path.resolve(__dirname, "../.."),
+  },
 
   // Security & Rate Limiting Headers
   async headers() {
