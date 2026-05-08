@@ -1,25 +1,29 @@
+/**
+ * Environment detection.
+ *
+ * Set NEXT_PUBLIC_APP_ENV in Coolify:
+ *   production apps → "production"
+ *   staging apps    → "staging"
+ *   (local dev)     → unset, falls through to NODE_ENV check
+ */
+
 export function isProduction(): boolean {
-  return process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production";
+  return process.env.NEXT_PUBLIC_APP_ENV === "production" ||
+    (process.env.NODE_ENV === "production" && !process.env.NEXT_PUBLIC_APP_ENV);
 }
 
 export function isDevelopment(): boolean {
   return process.env.NODE_ENV === "development";
 }
 
-export function isPreview(): boolean {
-  return process.env.VERCEL_ENV === "preview" || process.env.VERCEL_ENV === "development";
+export function isStaging(): boolean {
+  return process.env.NEXT_PUBLIC_APP_ENV === "staging";
 }
 
 export function getEnvironmentLabel(): string {
-  if (isProduction()) {
-    return "Production";
-  }
-  if (isPreview()) {
-    return "Preview";
-  }
-  if (isDevelopment()) {
-    return "Development";
-  }
+  if (isStaging()) return "Staging";
+  if (isDevelopment()) return "Development";
+  if (isProduction()) return "Production";
   return "Unknown";
 }
 
