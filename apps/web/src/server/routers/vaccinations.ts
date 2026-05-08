@@ -456,7 +456,7 @@ export const vaccinationsRouter = createTRPCRouter({
           reminderSentDate: expiryChanged ? null : undefined,
           updatedAt: new Date(),
         })
-        .where(eq(vaccinations.id, input.vaccinationId))
+        .where(and(eq(vaccinations.id, input.vaccinationId), eq(vaccinations.tenantId, input.tenantId)))
         .returning();
 
       await writeAuditLog(ctx, {
@@ -552,8 +552,8 @@ export const vaccinationsRouter = createTRPCRouter({
 
       const [row] = await ctx.db
         .select({
-          totalDue: sql<number>`sum(case when ${vaccinations.expiryDate} < ${sql.raw(`'${now.toISOString()}'`)} then 1 else 0 end)`,
-          totalUpcoming: sql<number>`sum(case when ${vaccinations.expiryDate} >= ${sql.raw(`'${now.toISOString()}'`)} and ${vaccinations.expiryDate} <= ${sql.raw(`'${in30Days.toISOString()}'`)} then 1 else 0 end)`,
+          totalDue: sql<number>`sum(case when ${vaccinations.expiryDate} < ${now} then 1 else 0 end)`,
+          totalUpcoming: sql<number>`sum(case when ${vaccinations.expiryDate} >= ${now} and ${vaccinations.expiryDate} <= ${in30Days} then 1 else 0 end)`,
           totalTracked: sql<number>`count(*)`,
         })
         .from(vaccinations)
