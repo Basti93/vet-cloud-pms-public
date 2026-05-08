@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "crypto";
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
+import { db } from "@/lib/db/client";
 import {
   tenants,
   appointments,
@@ -12,306 +11,271 @@ import {
 } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
-const DEMO_TENANT_ID = process.env.NEXT_PUBLIC_DEMO_TENANT_ID!;
 const DEMO_TENANT_SLUG = "demo";
+
+function getDemoTenantId(): string {
+  const id = process.env.NEXT_PUBLIC_DEMO_TENANT_ID;
+  if (!id) throw new Error("NEXT_PUBLIC_DEMO_TENANT_ID is not set");
+  return id;
+}
 
 /**
  * Protect with a simple secret token (use environment variable in production)
- * Usage: POST /api/admin/reset-demo?action=reset&token=YOUR_SECRET
- *        POST /api/admin/reset-demo?action=set-slug&token=YOUR_SECRET
+ * Usage: POST /api/admin/reset-demo?action=reset
+ *        POST /api/admin/reset-demo?action=set-slug
+ * Header: Authorization: Bearer <ADMIN_API_TOKEN>
  */
 async function resetDemo() {
-  const DATABASE_URL = process.env.DATABASE_URL;
-  if (!DATABASE_URL) {
-    throw new Error("DATABASE_URL not configured");
-  }
+  const DEMO_TENANT_ID = getDemoTenantId();
 
-  const dbUrl =
-    DATABASE_URL +
-    (DATABASE_URL.includes("?") ? "&sslmode=require" : "?sslmode=require");
-  const sql = postgres(dbUrl, { max: 1 });
-  const db = drizzle(sql, {
-    schema: { tenants, appointments, patients, owners, voiceCalls, users },
-  });
+  // Delete voice calls
+  await db.delete(voiceCalls).where(eq(voiceCalls.tenantId, DEMO_TENANT_ID));
 
-  try {
-    // Delete voice calls
-    await db.delete(voiceCalls).where(eq(voiceCalls.tenantId, DEMO_TENANT_ID));
+  // Delete appointments
+  await db.delete(appointments).where(eq(appointments.tenantId, DEMO_TENANT_ID));
 
-    // Delete appointments
-    await db
-      .delete(appointments)
-      .where(eq(appointments.tenantId, DEMO_TENANT_ID));
+  // Delete patients
+  await db.delete(patients).where(eq(patients.tenantId, DEMO_TENANT_ID));
 
-    // Delete patients
-    await db.delete(patients).where(eq(patients.tenantId, DEMO_TENANT_ID));
+  // Delete owners
+  await db.delete(owners).where(eq(owners.tenantId, DEMO_TENANT_ID));
 
-    // Delete owners
-    await db.delete(owners).where(eq(owners.tenantId, DEMO_TENANT_ID));
+  // Get first active vet for this tenant
+  const [vet] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.tenantId, DEMO_TENANT_ID))
+    .limit(1);
 
-    // ✅ Create sample test data
-    // Get first active vet for this tenant
-    const [vet] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(
-        eq(users.tenantId, DEMO_TENANT_ID)
-      )
-      .limit(1);
-
-    if (vet) {
-      // Create multiple sample owners
-      const ownersList = [
-        {
-          firstName: "Max",
-          lastName: "Müller",
-          email: "max.mueller@example.de",
-          phone: "+49123456789",
-          address: "Hauptstraße 42",
-          city: "Berlin",
-          postalCode: "10115",
-        },
-        {
-          firstName: "Sarah",
-          lastName: "Schmidt",
-          email: "sarah.schmidt@example.de",
-          phone: "+49987654321",
-          address: "Blumenweg 15",
-          city: "Musterstadt",
-          postalCode: "80331",
-        },
-        {
-          firstName: "Thomas",
-          lastName: "Weber",
-          email: "thomas.weber@example.de",
-          phone: "+49555123456",
-          address: "Gartenstraße 8",
-          city: "Hamburg",
-          postalCode: "20095",
-        },
-        {
-          firstName: "Julia",
-          lastName: "Fischer",
-          email: "julia.fischer@example.de",
-          phone: "+49666789012",
-          address: "Waldweg 23",
-          city: "Köln",
-          postalCode: "50667",
-        },
-      ];
-
-      const createdOwners = await Promise.all(
-        ownersList.map((o) =>
-          db
-            .insert(owners)
-            .values({
-              tenantId: DEMO_TENANT_ID,
-              ...o,
-              country: "DE",
-            })
-            .returning()
-            .then((r) => r[0])
-        )
-      );
-
-      // Create multiple patients
-      const patientsList = [
-        {
-          ownerId: createdOwners[0].id,
-          name: "Bella",
-          species: "Hund",
-          breed: "Labrador Retriever",
-          color: "Golden",
-          weight: 32000,
-        },
-        {
-          ownerId: createdOwners[0].id,
-          name: "Mittens",
-          species: "Katze",
-          breed: "Britisch Kurzhaar",
-          color: "Grau",
-          weight: 4500,
-        },
-        {
-          ownerId: createdOwners[1].id,
-          name: "Luna",
-          species: "Hund",
-          breed: "Golden Retriever",
-          color: "Creme",
-          weight: 28000,
-        },
-        {
-          ownerId: createdOwners[1].id,
-          name: "Whiskers",
-          species: "Katze",
-          breed: "Perser",
-          color: "Weiß",
-          weight: 5200,
-        },
-        {
-          ownerId: createdOwners[2].id,
-          name: "Rex",
-          species: "Hund",
-          breed: "Deutscher Schäferhund",
-          color: "Braun-Schwarz",
-          weight: 38000,
-        },
-        {
-          ownerId: createdOwners[3].id,
-          name: "Tweety",
-          species: "Vogel",
-          breed: "Wellensittich",
-          color: "Blau",
-          weight: 35,
-        },
-      ];
-
-      const createdPatients = await Promise.all(
-        patientsList.map((p) =>
-          db
-            .insert(patients)
-            .values({
-              tenantId: DEMO_TENANT_ID,
-              ...p,
-            })
-            .returning()
-            .then((r) => r[0])
-        )
-      );
-
-      // Create rich appointment history
-      const now = new Date();
-
-      const appointmentsList = [
-        // Historische abgeschlossene Termine (letzte Woche)
-        {
-          patientId: createdPatients[0].id,
-          startTime: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
-          title: "Routineuntersuchung",
-          status: "completed" as const,
-        },
-        {
-          patientId: createdPatients[1].id,
-          startTime: new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000),
-          title: "Zahnreinigung",
-          status: "completed" as const,
-        },
-        {
-          patientId: createdPatients[2].id,
-          startTime: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000),
-          title: "Impfung (Tollwut)",
-          status: "completed" as const,
-        },
-        {
-          patientId: createdPatients[3].id,
-          startTime: new Date(now.getTime() - 4 * 24 * 60 * 60 * 1000),
-          title: "Parasitenkontrolle",
-          status: "completed" as const,
-        },
-        // No-Show Beispiel
-        {
-          patientId: createdPatients[4].id,
-          startTime: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000),
-          title: "Untersuchung",
-          status: "no-show" as const,
-        },
-        // Cancelled Beispiel
-        {
-          patientId: createdPatients[5].id,
-          startTime: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000),
-          title: "Gesundheitscheck",
-          status: "cancelled" as const,
-        },
-        // Zukünftige geplante Termine
-        {
-          patientId: createdPatients[0].id,
-          startTime: new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000),
-          title: "Nachuntersuchung",
-          status: "scheduled" as const,
-        },
-        {
-          patientId: createdPatients[2].id,
-          startTime: new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000),
-          title: "Impfauffrischung",
-          status: "scheduled" as const,
-        },
-        {
-          patientId: createdPatients[1].id,
-          startTime: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
-          title: "Routine Checkup",
-          status: "scheduled" as const,
-        },
-      ];
-
-      // Insert all appointments
-      for (const apt of appointmentsList) {
-        const endTime = new Date(apt.startTime.getTime() + 30 * 60 * 1000);
-        await db.insert(appointments).values({
-          tenantId: DEMO_TENANT_ID,
-          patientId: apt.patientId,
-          vetId: vet.id,
-          startTime: apt.startTime,
-          endTime,
-          title: apt.title,
-          description: `Demo appointment: ${apt.title}`,
-          status: apt.status,
-          source: "manual",
-        });
-      }
-    }
-
-    await sql.end();
-
-    return {
-      success: true,
-      message: "Demo tenant reset and seeded with test data",
-      stats: {
-        ownersCreated: 2,
-        patientsCreated: 3,
-        appointmentsCreated: 2,
+  if (vet) {
+    // Create multiple sample owners
+    const ownersList = [
+      {
+        firstName: "Max",
+        lastName: "Müller",
+        email: "max.mueller@example.de",
+        phone: "+49123456789",
+        address: "Hauptstraße 42",
+        city: "Berlin",
+        postalCode: "10115",
       },
-    };
-  } catch (error) {
-    await sql.end();
-    throw error;
+      {
+        firstName: "Sarah",
+        lastName: "Schmidt",
+        email: "sarah.schmidt@example.de",
+        phone: "+49987654321",
+        address: "Blumenweg 15",
+        city: "Musterstadt",
+        postalCode: "80331",
+      },
+      {
+        firstName: "Thomas",
+        lastName: "Weber",
+        email: "thomas.weber@example.de",
+        phone: "+49555123456",
+        address: "Gartenstraße 8",
+        city: "Hamburg",
+        postalCode: "20095",
+      },
+      {
+        firstName: "Julia",
+        lastName: "Fischer",
+        email: "julia.fischer@example.de",
+        phone: "+49666789012",
+        address: "Waldweg 23",
+        city: "Köln",
+        postalCode: "50667",
+      },
+    ];
+
+    const createdOwners = await Promise.all(
+      ownersList.map((o) =>
+        db
+          .insert(owners)
+          .values({
+            tenantId: DEMO_TENANT_ID,
+            ...o,
+            country: "DE",
+          })
+          .returning()
+          .then((r) => r[0])
+      )
+    );
+
+    // Create multiple patients
+    const patientsList = [
+      {
+        ownerId: createdOwners[0].id,
+        name: "Bella",
+        species: "Hund",
+        breed: "Labrador Retriever",
+        color: "Golden",
+        weight: 32000,
+      },
+      {
+        ownerId: createdOwners[0].id,
+        name: "Mittens",
+        species: "Katze",
+        breed: "Britisch Kurzhaar",
+        color: "Grau",
+        weight: 4500,
+      },
+      {
+        ownerId: createdOwners[1].id,
+        name: "Luna",
+        species: "Hund",
+        breed: "Golden Retriever",
+        color: "Creme",
+        weight: 28000,
+      },
+      {
+        ownerId: createdOwners[1].id,
+        name: "Whiskers",
+        species: "Katze",
+        breed: "Perser",
+        color: "Weiß",
+        weight: 5200,
+      },
+      {
+        ownerId: createdOwners[2].id,
+        name: "Rex",
+        species: "Hund",
+        breed: "Deutscher Schäferhund",
+        color: "Braun-Schwarz",
+        weight: 38000,
+      },
+      {
+        ownerId: createdOwners[3].id,
+        name: "Tweety",
+        species: "Vogel",
+        breed: "Wellensittich",
+        color: "Blau",
+        weight: 35,
+      },
+    ];
+
+    const createdPatients = await Promise.all(
+      patientsList.map((p) =>
+        db
+          .insert(patients)
+          .values({
+            tenantId: DEMO_TENANT_ID,
+            ...p,
+          })
+          .returning()
+          .then((r) => r[0])
+      )
+    );
+
+    // Create rich appointment history
+    const now = new Date();
+
+    const appointmentsList = [
+      // Historische abgeschlossene Termine (letzte Woche)
+      {
+        patientId: createdPatients[0].id,
+        startTime: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
+        title: "Routineuntersuchung",
+        status: "completed" as const,
+      },
+      {
+        patientId: createdPatients[1].id,
+        startTime: new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000),
+        title: "Zahnreinigung",
+        status: "completed" as const,
+      },
+      {
+        patientId: createdPatients[2].id,
+        startTime: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000),
+        title: "Impfung (Tollwut)",
+        status: "completed" as const,
+      },
+      {
+        patientId: createdPatients[3].id,
+        startTime: new Date(now.getTime() - 4 * 24 * 60 * 60 * 1000),
+        title: "Parasitenkontrolle",
+        status: "completed" as const,
+      },
+      // No-Show Beispiel
+      {
+        patientId: createdPatients[4].id,
+        startTime: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000),
+        title: "Untersuchung",
+        status: "no-show" as const,
+      },
+      // Cancelled Beispiel
+      {
+        patientId: createdPatients[5].id,
+        startTime: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000),
+        title: "Gesundheitscheck",
+        status: "cancelled" as const,
+      },
+      // Zukünftige geplante Termine
+      {
+        patientId: createdPatients[0].id,
+        startTime: new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000),
+        title: "Nachuntersuchung",
+        status: "scheduled" as const,
+      },
+      {
+        patientId: createdPatients[2].id,
+        startTime: new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000),
+        title: "Impfauffrischung",
+        status: "scheduled" as const,
+      },
+      {
+        patientId: createdPatients[1].id,
+        startTime: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
+        title: "Routine Checkup",
+        status: "scheduled" as const,
+      },
+    ];
+
+    for (const apt of appointmentsList) {
+      const endTime = new Date(apt.startTime.getTime() + 30 * 60 * 1000);
+      await db.insert(appointments).values({
+        tenantId: DEMO_TENANT_ID,
+        patientId: apt.patientId,
+        vetId: vet.id,
+        startTime: apt.startTime,
+        endTime,
+        title: apt.title,
+        description: `Demo appointment: ${apt.title}`,
+        status: apt.status,
+        source: "manual",
+      });
+    }
   }
+
+  return {
+    success: true,
+    message: "Demo tenant reset and seeded with test data",
+    stats: {
+      ownersCreated: 4,
+      patientsCreated: 6,
+      appointmentsCreated: 9,
+    },
+  };
 }
 
 async function setSlug() {
-  const DATABASE_URL = process.env.DATABASE_URL;
-  if (!DATABASE_URL) {
-    throw new Error("DATABASE_URL not configured");
+  const DEMO_TENANT_ID = getDemoTenantId();
+
+  const [tenant] = await db
+    .update(tenants)
+    .set({ slug: DEMO_TENANT_SLUG })
+    .where(eq(tenants.id, DEMO_TENANT_ID))
+    .returning();
+
+  if (!tenant) {
+    throw new Error("Demo tenant not found");
   }
 
-  const dbUrl =
-    DATABASE_URL +
-    (DATABASE_URL.includes("?") ? "&sslmode=require" : "?sslmode=require");
-  const sql = postgres(dbUrl, { max: 1 });
-  const db = drizzle(sql, { schema: { tenants } });
-
-  try {
-    const [tenant] = await db
-      .update(tenants)
-      .set({ slug: DEMO_TENANT_SLUG })
-      .where(eq(tenants.id, DEMO_TENANT_ID))
-      .returning();
-
-    await sql.end();
-
-    if (!tenant) {
-      throw new Error("Demo tenant not found");
-    }
-
-    return { success: true, slug: tenant.slug };
-  } catch (error) {
-    await sql.end();
-    throw error;
-  }
+  return { success: true, slug: tenant.slug };
 }
 
 export async function POST(request: NextRequest) {
   try {
-    // Check if endpoint is configured
     const expectedToken = process.env.ADMIN_API_TOKEN;
     if (!expectedToken) {
       return NextResponse.json(
@@ -320,7 +284,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get token from Authorization header
     const authHeader = request.headers.get("authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return NextResponse.json(
@@ -329,26 +292,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const token = authHeader.slice(7); // Remove "Bearer " prefix
+    const token = authHeader.slice(7);
 
-    // Use timing-safe comparison
     try {
       const match = timingSafeEqual(
         Buffer.from(token),
         Buffer.from(expectedToken)
       );
       if (!match) {
-        return NextResponse.json(
-          { error: "Unauthorized" },
-          { status: 401 }
-        );
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
     } catch {
-      // timingSafeEqual throws if lengths don't match
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const action = request.nextUrl.searchParams.get("action");

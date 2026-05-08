@@ -14,5 +14,6 @@ export const PUBLIC_ROUTES = [
   '/api/trpc/tenant(.*)',         // publicProcedure
   '/api/trpc/adminDashboard(.*)', // adminProcedure + ADMIN_CLERK_IDS
   '/api/calendar(.*)',            // JWT-protected
+  '/api/admin(.*)',               // Bearer-token protected (ADMIN_API_TOKEN)
   '/',
 ] as const;
