@@ -54,6 +54,7 @@ const clerkFrameSrc = [
 
 const nextConfig = {
   reactStrictMode: true,
+  output: "standalone",
 
   // Security & Rate Limiting Headers
   async headers() {
