@@ -38,8 +38,6 @@
     "@trpc/react-query": "^11",
     "@trpc/server": "^11",
     "@vapi-ai/web": "^2",
-    "@vercel/analytics": "^2.0.1",
-    "@vercel/speed-insights": "^2.0.0",
     "drizzle-orm": "^0.45.2",
     "ical-generator": "^10.2.0",
     "jsonwebtoken": "^9.0.3",

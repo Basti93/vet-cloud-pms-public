@@ -43,8 +43,6 @@
   },
   "dependencies": {
     "@clerk/localizations": "^4.5.5",
-    "@vercel/analytics": "^2.0.1",
-    "@vercel/speed-insights": "^2.0.0",
     "drizzle-kit": "^0.31.10",
     "drizzle-orm": "^0.45.2",
     "eslint": "^9.39.4",
