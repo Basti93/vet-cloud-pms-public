@@ -19,14 +19,13 @@ import { getSystemDomain } from "@/lib/system-name";
 import { getMainDomain } from "@/lib/env";
 import { buildUnsubscribeUrl } from "@/lib/unsubscribe";
 
-// Vercel cron jobs require a secret for security
 const CRON_SECRET = process.env.CRON_SECRET;
 const CRON_LOOKAHEAD_HOURS = 24;
 const SYSTEM_DOMAIN = getSystemDomain();
 
 /**
  * Cron job to send reminder emails for upcoming appointments.
- * On Vercel Hobby this runs once per day, so we scan a 24h window.
+ * Runs daily via Coolify scheduled task, scanning a 24h window.
  *
  * Security: Requires CRON_SECRET header to match environment variable
  */
@@ -373,5 +372,4 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Configure this route for Vercel cron jobs
-export const maxDuration = 60; // 60 seconds timeout for serverless
+export const maxDuration = 60;

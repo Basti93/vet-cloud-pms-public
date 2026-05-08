@@ -10,8 +10,6 @@ import { UserPreferencesProvider } from "@/lib/user/preferences-context";
 import { ToastProvider } from "@/lib/toast/context";
 import { ToastContainer } from "@/components/ui/toast";
 import { DynamicFavicon } from "@/components/DynamicFavicon";
-import { Analytics } from "@vercel/analytics/next";
-import { SpeedInsights } from "@vercel/speed-insights/next";
 import { EnvironmentBanner } from "@/components/EnvironmentBanner";
 import type { PraxisPreferences, UserPreferences } from "@/lib/user/preferences";
 import { getSystemDomain } from "@/lib/system-name";
@@ -95,8 +93,6 @@ export default async function RootLayout({
               </UserPreferencesProvider>
             </PraxisProvider>
           </TRPCProvider>
-          <Analytics />
-          <SpeedInsights />
         </body>
       </html>
     </ClerkProviderWrapper>

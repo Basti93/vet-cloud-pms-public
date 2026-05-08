@@ -4,7 +4,7 @@ import { db } from "@/lib/db/client";
 /**
  * GET /api/health
  *
- * Health check endpoint for monitoring tools (Vercel, Sentry, etc.)
+ * Health check endpoint for monitoring tools (Coolify, uptime checks, etc.)
  * Returns the status of the application and database connectivity.
  *
  * Response: { status: "ok", db: "ok", timestamp: ISO8601 }

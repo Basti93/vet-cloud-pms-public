@@ -328,9 +328,8 @@ export const adminCoreRouter = createAdminRouter({
       if (!tenant) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Tenant not found" });
       }
-      const isProd =
-        process.env.NODE_ENV === "production" &&
-        process.env.VERCEL_ENV === "production";
+      const isProd = process.env.NODE_ENV === "production" &&
+        process.env.NEXT_PUBLIC_APP_ENV === "production";
       if (tenant.slug === "demo" && isProd) {
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -470,9 +469,8 @@ export const adminCoreRouter = createAdminRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const isProd =
-        process.env.NODE_ENV === "production" &&
-        process.env.VERCEL_ENV === "production";
+      const isProd = process.env.NODE_ENV === "production" &&
+        process.env.NEXT_PUBLIC_APP_ENV === "production";
       if (isProd) {
         throw new Error("Debug hard-delete is disabled in production.");
       }
