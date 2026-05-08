@@ -1,0 +1,10 @@
+node_modules
+**/node_modules
+**/.next
+**/dist
+**/build
+**/.turbo
+**/coverage
+.git
+.env*
+!.env.production.example
