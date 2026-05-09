@@ -13,23 +13,33 @@ export default function LogsPage() {
   const [hours, setHours] = useState(24);
 
   const tenants = trpc.adminDashboard.core.listTenants.useQuery(
-    { limit: 200 },
-    { refetchInterval: 60000 }
+    { limit: 100 },
+    {
+      refetchInterval: 600_000,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+    }
   );
 
   const summary = trpc.adminDashboard.logs.getSummary.useQuery(
     { hours, tenantId },
-    { refetchInterval: 30000 }
+    {
+      refetchInterval: 300_000,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+    }
   );
 
   const { data, isLoading, error } = trpc.adminDashboard.logs.queryLogs.useQuery(
     {
       level,
       tenantId,
-      limit: 100,
+      limit: 50,
     },
     {
-      refetchInterval: 30000, // Refetch every 30 seconds
+      refetchInterval: 300_000,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
     }
   );
 

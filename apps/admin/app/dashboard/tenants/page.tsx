@@ -21,7 +21,9 @@ export default function TenantsPage() {
       limit: 50,
     },
     {
-      refetchInterval: 60000, // Refetch every minute
+      refetchInterval: 300_000,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
     }
   );
   const utils = trpc.useUtils();

@@ -13,16 +13,22 @@ export default function RemindersPage() {
   const { data: summary, isLoading: summaryLoading, error: summaryError } =
     trpc.adminDashboard.reminders.getSummary.useQuery(
       { hours },
-      { refetchInterval: 30000 }
+      {
+        refetchInterval: 300_000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+      }
     );
 
   const { data, isLoading, error } = trpc.adminDashboard.reminders.listLogs.useQuery(
     {
       status,
-      limit: 100,
+      limit: 50,
     },
     {
-      refetchInterval: 30000,
+      refetchInterval: 300_000,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
     }
   );
 
@@ -190,4 +196,3 @@ function MetricCard({
     </div>
   );
 }
-

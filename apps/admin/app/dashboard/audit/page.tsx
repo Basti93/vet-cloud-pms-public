@@ -14,8 +14,12 @@ export default function AuditPage() {
   const [tenantId, setTenantId] = useState<string | undefined>();
 
   const tenants = trpc.adminDashboard.core.listTenants.useQuery(
-    { limit: 200 },
-    { refetchInterval: 60000 }
+    { limit: 100 },
+    {
+      refetchInterval: 600_000,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+    }
   );
 
   const {
@@ -24,7 +28,11 @@ export default function AuditPage() {
     error: summaryError,
   } = trpc.adminDashboard.audit.getSummary.useQuery(
     { hours, tenantId },
-    { refetchInterval: 30000 }
+    {
+      refetchInterval: 300_000,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+    }
   );
 
   const { data, isLoading, error } = trpc.adminDashboard.audit.list.useQuery(
@@ -32,10 +40,12 @@ export default function AuditPage() {
       action,
       tenantId,
       entityType: entityType || undefined,
-      limit: 150,
+      limit: 75,
     },
     {
-      refetchInterval: 30000,
+      refetchInterval: 300_000,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
     }
   );
 

@@ -27,7 +27,7 @@ export default function DashboardPage() {
   const [toDate, setToDate] = useState<string>(toDateInputValue(today));
 
   const tenants = trpc.adminDashboard.core.listTenants.useQuery({
-    limit: 200,
+    limit: 100,
     search: undefined,
     plan: undefined,
     status: undefined,
@@ -36,12 +36,16 @@ export default function DashboardPage() {
   const overview = trpc.adminDashboard.core.getTenantOverviewStats.useQuery(
     {
       hours: 24 * 7,
-      limit: 50,
+      limit: 30,
       tenantId: tenantId === "all" ? undefined : tenantId,
       from: toIsoStart(fromDate),
       to: toIsoEnd(toDate),
     },
-    { refetchInterval: 30000 }
+    {
+      refetchInterval: 300_000,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+    }
   );
 
   const items = useMemo(() => overview.data?.items ?? [], [overview.data?.items]);

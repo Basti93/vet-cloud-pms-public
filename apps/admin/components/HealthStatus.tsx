@@ -4,7 +4,9 @@ import { trpc } from "@/lib/trpc";
 
 export function HealthStatus() {
   const { data, isLoading } = trpc.adminDashboard.health.getStatus.useQuery(undefined, {
-    refetchInterval: 30_000,
+    refetchInterval: 300_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   if (isLoading) {
