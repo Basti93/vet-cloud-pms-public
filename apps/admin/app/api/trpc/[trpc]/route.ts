@@ -60,6 +60,7 @@ async function proxy(req: NextRequest, trpcPath: string) {
   const body =
     req.method === "GET" || req.method === "HEAD" ? undefined : await req.text();
   const requestId = req.headers.get("x-request-id") ?? randomUUID();
+  const startedAt = Date.now();
 
   const upstreamHeaders = new Headers();
   const contentType = req.headers.get("content-type");
@@ -70,12 +71,17 @@ async function proxy(req: NextRequest, trpcPath: string) {
   upstreamHeaders.set("x-admin-proxy", "1");
 
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
     const upstream = await fetch(targetUrl.toString(), {
       method: req.method,
       headers: upstreamHeaders,
       body,
       redirect: "manual",
+      cache: "no-store",
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
 
     const resHeaders = new Headers();
     const upstreamContentType = upstream.headers.get("content-type");
@@ -87,7 +93,16 @@ async function proxy(req: NextRequest, trpcPath: string) {
       status: upstream.status,
       headers: resHeaders,
     });
-  } catch {
+  } catch (error) {
+    const durationMs = Date.now() - startedAt;
+    console.error("[admin-trpc-proxy] upstream request failed", {
+      requestId,
+      trpcPath,
+      target: targetUrl.origin,
+      durationMs,
+      error: error instanceof Error ? error.message : String(error),
+    });
+
     return NextResponse.json(
       { error: "Upstream admin API unavailable", requestId },
       { status: 502, headers: { "cache-control": "no-store", "x-request-id": requestId } }
