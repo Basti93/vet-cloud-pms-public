@@ -28,7 +28,7 @@ export const adminContactRequestsRouter = createAdminRouter({
         status: z.enum(["pending", "sent", "failed"]).optional(),
         websiteInterest: z.boolean().optional(),
         search: z.string().trim().max(120).optional(),
-        limit: z.number().int().min(1).max(200).default(50),
+        limit: z.number().int().min(1).max(20).default(20),
       })
     )
     .query(async ({ ctx, input }) => {

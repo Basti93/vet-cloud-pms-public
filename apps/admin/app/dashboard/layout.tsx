@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
-import { HealthStatus } from "@/components/HealthStatus";
 import { getSystemDomain } from "@/lib/system-name";
 
 export default function DashboardLayout({
@@ -92,7 +91,6 @@ export default function DashboardLayout({
         </nav>
 
         <div className="space-y-3 border-t border-gray-200 p-4 md:mt-auto">
-          <HealthStatus />
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-700">Admin</span>
             <UserButton afterSignOutUrl="/sign-in" />

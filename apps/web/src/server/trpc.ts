@@ -2,7 +2,7 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import { auth } from "@clerk/nextjs/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
-import { db } from "@/lib/db/client";
+import { adminDb, db } from "@/lib/db/client";
 import { tenantDeletionSchedules, users } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
 import { checkRateLimit, getRateLimitInfo } from "@/lib/rateLimit";
@@ -17,6 +17,7 @@ export async function createTRPCContext(opts: { headers: Headers }) {
 
   return {
     db,
+    adminDb,
     userId,
     headers: opts.headers,
     permissionCache: undefined,
@@ -303,6 +304,7 @@ export const tenantProcedure = t.procedure
 
 /** Admin procedure — requires Clerk session + ADMIN_CLERK_IDS env var */
 export const adminProcedure = t.procedure
+  .use(({ ctx, next }) => next({ ctx: { ...ctx, db: ctx.adminDb } }))
   .use(rateLimitMiddleware)
   .use(timingMiddleware)
   .use(enforceIsAdmin);
