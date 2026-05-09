@@ -61,6 +61,20 @@ const clerkFrameSrc = [
   .filter(Boolean)
   .join(" ");
 
+const appContentSecurityPolicy =
+  "default-src 'self'; " +
+  `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${clerkScriptSrc}; ` +
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+  "font-src 'self' https://fonts.gstatic.com; " +
+  "img-src 'self' data: https: blob:; " +
+  `connect-src 'self' ${clerkConnectSrc} https://neon.tech https://api.resend.com https://vapi.ai https://*.vapi.ai; ` +
+  `frame-src 'self' ${clerkFrameSrc}; ` +
+  "worker-src 'self' blob:; " +
+  "object-src 'none'; " +
+  "base-uri 'self'; " +
+  "form-action 'self'; " +
+  "upgrade-insecure-requests;";
+
 const nextConfig = {
   reactStrictMode: true,
   output: "standalone",
@@ -82,19 +96,7 @@ const nextConfig = {
           // CSP - Prevent XSS/script injection
           {
             key: "Content-Security-Policy",
-            value:
-              "default-src 'self'; " +
-              `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${clerkScriptSrc}; ` +
-              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
-              "font-src 'self' https://fonts.gstatic.com; " +
-              "img-src 'self' data: https: blob:; " +
-              `connect-src 'self' ${clerkConnectSrc} https://neon.tech https://api.resend.com https://vapi.ai https://*.vapi.ai; ` +
-              `frame-src 'self' ${clerkFrameSrc}; ` +
-              "worker-src 'self' blob:; " +
-              "object-src 'none'; " +
-              "base-uri 'self'; " +
-              "form-action 'self'; " +
-              "upgrade-insecure-requests;",
+            value: appContentSecurityPolicy,
           },
           // X-Content-Type-Options
           { key: "X-Content-Type-Options", value: "nosniff" },

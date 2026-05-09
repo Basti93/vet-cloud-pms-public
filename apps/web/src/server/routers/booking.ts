@@ -15,6 +15,17 @@ import { ROLE_CODES } from "@/lib/auth/roles";
 
 type Db = PostgresJsDatabase<typeof schema>;
 
+function normalizeEmbeddingDomain(domain: string) {
+  const trimmed = domain.trim().toLowerCase();
+  if (!trimmed) return null;
+
+  try {
+    return new URL(trimmed.includes("://") ? trimmed : `https://${trimmed}`).hostname;
+  } catch {
+    return trimmed.split("/")[0]?.split(":")[0] || null;
+  }
+}
+
 /**
  * Convert a local date+time in a given IANA timezone to a UTC Date.
  * Uses Intl (built-in, no extra deps) and correctly handles DST.
@@ -339,7 +350,13 @@ export const bookingRouter = createTRPCRouter({
             const hostname = url.hostname;
 
             // Always allow main domain, plus any configured domains
-            const allAllowedDomains = [...new Set([mainDomainHost, ...allowedDomains])];
+            const allAllowedDomains = [
+              ...new Set(
+                [mainDomainHost, ...allowedDomains]
+                  .map((domain) => normalizeEmbeddingDomain(domain))
+                  .filter((domain): domain is string => Boolean(domain))
+              ),
+            ];
             const isAllowed = allAllowedDomains.some(domain =>
               hostname === domain || hostname === `www.${domain}` || domain === `www.${hostname}`
             );
