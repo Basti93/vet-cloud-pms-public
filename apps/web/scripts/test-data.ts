@@ -476,7 +476,7 @@ export const TEST_DATA = {
   ],
 
   // ────────────────────────────────────────────────────────────────────────
-  // REMINDER DEFAULTS (used by both seed.ts and admin-reset.ts)
+  // REMINDER DEFAULTS (used by demo fixture generation/reset)
   // ────────────────────────────────────────────────────────────────────────
   demoReminderDefaults: {
     appointmentRemindersEnabled: false,
@@ -485,7 +485,7 @@ export const TEST_DATA = {
   },
 
   // ────────────────────────────────────────────────────────────────────────
-  // VACCINATION DEMO GENERATION RULES (used by both seed.ts and admin-reset.ts)
+  // VACCINATION DEMO GENERATION RULES (used by demo fixture generation/reset)
   // ────────────────────────────────────────────────────────────────────────
   vaccinationDemoConfig: {
     typeCycle: [
