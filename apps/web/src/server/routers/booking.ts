@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq, and, gte, lte, lt, or, isNull } from "drizzle-orm";
+import { eq, and, gte, lte, lt, or, isNull, count } from "drizzle-orm";
 import { createTRPCRouter, publicProcedure, publicBookingProcedure, tenantProcedure } from "@/server/trpc";
 import { tenants, appointments, owners, patients, users, userRoles, roles, appointmentHolds, emailSettings, vetSchedules, vetAbsences } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
@@ -10,21 +10,14 @@ import { getMainDomain } from "@/lib/env";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import type * as schema from "@/lib/db/schema";
 import { ROLE_CODES } from "@/lib/auth/roles";
+import {
+  isRequestAllowedByEmbeddingDomains,
+  normalizeEmbeddingDomains,
+} from "@/lib/booking/embed-origin";
 
 // ── Slot generation ───────────────────────────────────────────────────────────
 
 type Db = PostgresJsDatabase<typeof schema>;
-
-function normalizeEmbeddingDomain(domain: string) {
-  const trimmed = domain.trim().toLowerCase();
-  if (!trimmed) return null;
-
-  try {
-    return new URL(trimmed.includes("://") ? trimmed : `https://${trimmed}`).hostname;
-  } catch {
-    return trimmed.split("/")[0]?.split(":")[0] || null;
-  }
-}
 
 /**
  * Convert a local date+time in a given IANA timezone to a UTC Date.
@@ -131,6 +124,68 @@ async function getVetSlotsForDay(
     .find((h) => h.dayOfWeek === dayOfWeek);
 
   return generateSlotsFromRanges(localDateStr, practiceDay?.slots ?? [], timezone, slotDurationMin);
+}
+
+async function getAllowedEmbeddingDomainsForTenant(
+  db: Db,
+  tenantId: string
+): Promise<string[]> {
+  const [tenant] = await db
+    .select({ allowedEmbeddingDomains: tenants.allowedEmbeddingDomains })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
+
+  return normalizeEmbeddingDomains(
+    (tenant?.allowedEmbeddingDomains as string[] | null) || []
+  );
+}
+
+async function getAllowedEmbeddingDomainsForSlug(
+  db: Db,
+  slug: string
+): Promise<string[]> {
+  const [tenant] = await db
+    .select({ allowedEmbeddingDomains: tenants.allowedEmbeddingDomains })
+    .from(tenants)
+    .where(eq(tenants.slug, slug))
+    .limit(1);
+
+  return normalizeEmbeddingDomains(
+    (tenant?.allowedEmbeddingDomains as string[] | null) || []
+  );
+}
+
+async function assertEmbeddingOriginAllowed(
+  db: Db,
+  headers: Headers,
+  opts: { tenantId?: string; slug?: string }
+) {
+  const allowedDomains = opts.tenantId
+    ? await getAllowedEmbeddingDomainsForTenant(db, opts.tenantId)
+    : opts.slug
+      ? await getAllowedEmbeddingDomainsForSlug(db, opts.slug)
+      : [];
+
+  // No allowlist configured => keep current open behavior
+  if (allowedDomains.length === 0) return;
+
+  if (!isRequestAllowedByEmbeddingDomains(headers, allowedDomains)) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Diese Domain ist nicht autorisiert, das Buchungs-Widget einzubinden",
+    });
+  }
+}
+
+function selectVetByFairDistribution(
+  vets: Array<{ id: string; appointmentCount: number }>
+): string {
+  if (vets.length === 0) {
+    throw new Error("No vets available for assignment");
+  }
+
+  return vets.sort((a, b) => a.appointmentCount - b.appointmentCount)[0].id;
 }
 
 // ── Router ────────────────────────────────────────────────────────────────────
@@ -334,46 +389,118 @@ export const bookingRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Praxis nicht gefunden" });
       }
 
-      // Check domain restrictions if configured
-      const allowedDomains = (tenant.allowedEmbeddingDomains as string[] | null) || [];
-      const mainDomainUrl = getMainDomain();
-      const mainDomainHost = new URL(mainDomainUrl).hostname;
-
-      if (allowedDomains.length > 0) {
-        const referer = ctx.headers.get("referer");
-        const origin = ctx.headers.get("origin");
-        const requestDomain = referer || origin;
-
-        if (requestDomain) {
-          try {
-            const url = new URL(requestDomain);
-            const hostname = url.hostname;
-
-            // Always allow main domain, plus any configured domains
-            const allAllowedDomains = [
-              ...new Set(
-                [mainDomainHost, ...allowedDomains]
-                  .map((domain) => normalizeEmbeddingDomain(domain))
-                  .filter((domain): domain is string => Boolean(domain))
-              ),
-            ];
-            const isAllowed = allAllowedDomains.some(domain =>
-              hostname === domain || hostname === `www.${domain}` || domain === `www.${hostname}`
-            );
-
-            if (!isAllowed) {
-              throw new TRPCError({
-                code: "FORBIDDEN",
-                message: "Diese Domain ist nicht autorisiert, das Buchungs-Widget einzubinden"
-              });
-            }
-          } catch (err) {
-            if (err instanceof TRPCError) throw err;
-          }
-        }
-      }
+      await assertEmbeddingOriginAllowed(ctx.db, ctx.headers, { slug: input.slug });
 
       return tenant;
+    }),
+
+  /** Public: List vets for booking widget */
+  listPublicVets: publicProcedure
+    .input(z.object({ tenantId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      await assertEmbeddingOriginAllowed(ctx.db, ctx.headers, {
+        tenantId: input.tenantId,
+      });
+
+      const vets = await ctx.db
+        .select({
+          id: users.id,
+          title: users.title,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          email: users.email,
+        })
+        .from(users)
+        .innerJoin(userRoles, eq(userRoles.userId, users.id))
+        .innerJoin(roles, eq(roles.id, userRoles.roleId))
+        .where(
+          and(
+            eq(users.tenantId, input.tenantId),
+            or(eq(roles.code, ROLE_CODES.VET), eq(roles.code, ROLE_CODES.ADMIN)),
+            eq(users.active, true)
+          )
+        );
+
+      return vets;
+    }),
+
+  /** Public: Suggest the best vet based on fair distribution */
+  suggestPublicVet: publicBookingProcedure
+    .input(
+      z.object({
+        tenantId: z.string().uuid(),
+        startTime: z.date().optional(),
+        endTime: z.date().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      await assertEmbeddingOriginAllowed(ctx.db, ctx.headers, {
+        tenantId: input.tenantId,
+      });
+
+      const vets = await ctx.db
+        .select({
+          id: users.id,
+          title: users.title,
+          firstName: users.firstName,
+          lastName: users.lastName,
+        })
+        .from(users)
+        .innerJoin(userRoles, eq(userRoles.userId, users.id))
+        .innerJoin(roles, eq(roles.id, userRoles.roleId))
+        .where(
+          and(
+            eq(users.tenantId, input.tenantId),
+            or(eq(roles.code, ROLE_CODES.VET), eq(roles.code, ROLE_CODES.ADMIN)),
+            eq(users.active, true)
+          )
+        );
+
+      if (vets.length === 0) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Kein Tierarzt konfiguriert",
+        });
+      }
+
+      const vetWithCounts = await Promise.all(
+        vets.map(async (vet) => {
+          const baseConditions = [
+            eq(appointments.tenantId, input.tenantId),
+            eq(appointments.vetId, vet.id),
+            eq(appointments.status, "scheduled"),
+          ];
+
+          const whereClause =
+            input.startTime && input.endTime
+              ? and(
+                  ...baseConditions,
+                  and(
+                    lte(appointments.startTime, input.endTime),
+                    gte(appointments.endTime, input.startTime)
+                  )
+                )
+              : and(...baseConditions);
+
+          const [result] = await ctx.db
+            .select({ count: count() })
+            .from(appointments)
+            .where(whereClause);
+
+          return {
+            id: vet.id,
+            title: vet.title,
+            firstName: vet.firstName,
+            lastName: vet.lastName,
+            appointmentCount: result.count || 0,
+          };
+        })
+      );
+
+      const suggestedVetId = selectVetByFairDistribution(vetWithCounts);
+      const suggestedVet = vetWithCounts.find((v) => v.id === suggestedVetId)!;
+
+      return suggestedVet;
     }),
 
   /** Public: Return available 30-min slots for a given tenant + calendar date (optionally filtered by vet) */
@@ -386,6 +513,10 @@ export const bookingRouter = createTRPCRouter({
       })
     )
     .query(async ({ ctx, input }) => {
+      await assertEmbeddingOriginAllowed(ctx.db, ctx.headers, {
+        tenantId: input.tenantId,
+      });
+
       const dayStart = new Date(input.date);
       dayStart.setHours(0, 0, 0, 0);
       const dayEnd = new Date(input.date);
@@ -488,6 +619,10 @@ export const bookingRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      await assertEmbeddingOriginAllowed(ctx.db, ctx.headers, {
+        tenantId: input.tenantId,
+      });
+
       // Verify tenant exists + slot is still in the future
       if (input.slotStart <= new Date()) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Dieser Zeitslot liegt in der Vergangenheit" });
@@ -671,6 +806,10 @@ export const bookingRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      await assertEmbeddingOriginAllowed(ctx.db, ctx.headers, {
+        tenantId: input.tenantId,
+      });
+
       const now = new Date();
 
       // Fetch vet's slot duration if specified, otherwise default to 30 min
@@ -775,6 +914,18 @@ export const bookingRouter = createTRPCRouter({
   releaseHold: publicProcedure
     .input(z.object({ holdToken: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
+      const [hold] = await ctx.db
+        .select({ tenantId: appointmentHolds.tenantId })
+        .from(appointmentHolds)
+        .where(eq(appointmentHolds.sessionToken, input.holdToken))
+        .limit(1);
+
+      if (hold?.tenantId) {
+        await assertEmbeddingOriginAllowed(ctx.db, ctx.headers, {
+          tenantId: hold.tenantId,
+        });
+      }
+
       await ctx.db
         .delete(appointmentHolds)
         .where(eq(appointmentHolds.sessionToken, input.holdToken));
@@ -791,6 +942,10 @@ export const bookingRouter = createTRPCRouter({
       })
     )
     .query(async ({ ctx, input }) => {
+      await assertEmbeddingOriginAllowed(ctx.db, ctx.headers, {
+        tenantId: input.tenantId,
+      });
+
       const now = new Date();
 
       // Fetch vet's slot duration if specified, otherwise default to 30 min
@@ -848,6 +1003,10 @@ export const bookingRouter = createTRPCRouter({
   getVetAvailability: publicProcedure
     .input(z.object({ tenantId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
+      await assertEmbeddingOriginAllowed(ctx.db, ctx.headers, {
+        tenantId: input.tenantId,
+      });
+
       // Get all active vets
       const vets = await ctx.db
         .select({

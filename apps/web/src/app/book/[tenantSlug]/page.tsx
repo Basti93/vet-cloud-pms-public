@@ -33,7 +33,7 @@ interface VetOption {
   title?: string | null;
   firstName: string | null;
   lastName: string | null;
-  appointmentCount: number;
+  appointmentCount?: number;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -910,9 +910,13 @@ export default function BookingPage({
   const { tenantSlug } = use(params);
   const { t } = useLocale();
   const systemDomain = getSystemDomain();
+  const autoSuggestAttemptedRef = useRef<string | null>(null);
 
   const { data: clinic, isLoading: clinicLoading, error: clinicError } =
-    trpc.booking.getClinic.useQuery({ slug: tenantSlug });
+    trpc.booking.getClinic.useQuery(
+      { slug: tenantSlug },
+      { retry: false }
+    );
 
   // Extract theme settings from tenant
   const primaryColor = clinic
@@ -923,9 +927,9 @@ export default function BookingPage({
     ? TYPE_PAIRINGS[(clinic.typographyPreference as TypographyPairingKey) || "modern"]
     : TYPE_PAIRINGS.modern;
 
-  const { data: vets } = trpc.vet.list.useQuery(
+  const { data: vets } = trpc.booking.listPublicVets.useQuery(
     { tenantId: clinic?.id || "" },
-    { enabled: !!clinic?.id }
+    { enabled: !!clinic?.id, retry: false }
   );
 
   const { data: vetAvailability } = trpc.booking.getVetAvailability.useQuery(
@@ -933,7 +937,7 @@ export default function BookingPage({
     { enabled: !!clinic?.id }
   );
 
-  const suggestVetMutation = trpc.vet.suggestVet.useMutation();
+  const suggestVetMutation = trpc.booking.suggestPublicVet.useMutation();
   const releaseHoldMutation = trpc.booking.releaseHold.useMutation();
 
   // Persistent form state via localStorage
@@ -996,7 +1000,15 @@ export default function BookingPage({
 
   // Auto-suggest vet if "Automatisch zuweisen" (empty selectedVetId) and moving to date step
   useEffect(() => {
+    if (step !== "date") {
+      autoSuggestAttemptedRef.current = null;
+      return;
+    }
+
     if (step === "date" && !selectedVetId && clinic?.id && !suggestVetMutation.isPending) {
+      if (autoSuggestAttemptedRef.current === clinic.id) return;
+      autoSuggestAttemptedRef.current = clinic.id;
+
       suggestVetMutation.mutate(
         { tenantId: clinic.id },
         {
