@@ -454,7 +454,7 @@ export const bookingRouter = createTRPCRouter({
         .where(
           and(
             eq(users.tenantId, input.tenantId),
-            or(eq(roles.code, ROLE_CODES.VET), eq(roles.code, ROLE_CODES.ADMIN)),
+            eq(roles.code, ROLE_CODES.VET),
             eq(users.active, true)
           )
         );
@@ -491,7 +491,7 @@ export const bookingRouter = createTRPCRouter({
         .where(
           and(
             eq(users.tenantId, input.tenantId),
-            or(eq(roles.code, ROLE_CODES.VET), eq(roles.code, ROLE_CODES.ADMIN)),
+            eq(roles.code, ROLE_CODES.VET),
             eq(users.active, true)
           )
         );

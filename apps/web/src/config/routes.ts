@@ -13,6 +13,8 @@ export const PUBLIC_ROUTES = [
   '/api/trpc/booking(.*)',        // publicBookingProcedure
   '/api/trpc/tenant(.*)',         // publicProcedure
   '/api/trpc/adminDashboard(.*)', // adminProcedure + ADMIN_CLERK_IDS
+  '/api/cron/send-reminders',     // CRON_SECRET-protected scheduled job
+  '/api/unsubscribe',             // token-protected unsubscribe link from emails
   '/api/calendar(.*)',            // JWT-protected
   '/api/admin(.*)',               // Bearer-token protected (ADMIN_API_TOKEN)
   '/',

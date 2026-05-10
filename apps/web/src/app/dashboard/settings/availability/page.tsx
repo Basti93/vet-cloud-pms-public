@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { trpc } from '@/lib/trpc/client';
 import { Clock, User, CalendarOff, Plus, Trash2, CheckCircle, ChevronDown, ChevronUp, X } from 'lucide-react';
-import type { DaySchedule, TimeRange } from '@/lib/schedule-types';
+import { DEFAULT_OPENING_HOURS, normalizeWeekSchedule, type DaySchedule, type TimeRange } from '@/lib/schedule-types';
 
 const DAY_SHORT = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 // Display order: Mon first
@@ -169,7 +169,8 @@ export default function AvailabilityPage() {
   });
   const [practiceSaved, setPracticeSaved] = useState(false);
   const [practiceEdits, setPracticeEdits] = useState<DaySchedule[] | null>(null);
-  const practiceHours = practiceEdits ?? practiceHoursQuery.data ?? DAY_ORDER.map(defaultDay);
+  const serverPracticeHours = normalizeWeekSchedule(practiceHoursQuery.data, { fallback: DEFAULT_OPENING_HOURS });
+  const practiceHours = normalizeWeekSchedule(practiceEdits ?? serverPracticeHours, { fallback: DEFAULT_OPENING_HOURS });
 
   // ── Vet schedules ───────────────────────────────────────────────────────────
   const vetSchedulesQuery = trpc.schedule.getVetSchedules.useQuery(
@@ -270,7 +271,7 @@ export default function AvailabilityPage() {
                   key={dayOfWeek}
                   day={day}
                   onChange={(updated) => {
-                    const base = practiceEdits ?? practiceHoursQuery.data ?? DAY_ORDER.map(defaultDay);
+                    const base = normalizeWeekSchedule(practiceEdits ?? serverPracticeHours, { fallback: DEFAULT_OPENING_HOURS });
                     setPracticeEdits(base.map((d) => d.dayOfWeek === dayOfWeek ? updated : d));
                   }}
                 />
@@ -281,7 +282,7 @@ export default function AvailabilityPage() {
 
         <div className="flex items-center gap-3 pt-1">
           <button
-            onClick={() => updatePracticeHours.mutate({ tenantId, hours: practiceHours as DaySchedule[] })}
+            onClick={() => updatePracticeHours.mutate({ tenantId, hours: practiceHours })}
             disabled={updatePracticeHours.isPending}
             className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
             style={{ backgroundColor: 'var(--color-accent)' }}

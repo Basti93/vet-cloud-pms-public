@@ -241,7 +241,7 @@ export default function EmailSettingsPage() {
                     className="w-32 cursor-not-allowed px-3 py-2 border border-[var(--color-border)] rounded-lg bg-bg text-fg disabled:opacity-60"
                   />
                   <p className="mt-2 text-xs text-muted">
-                    Vorübergehend fixiert auf 24h (Hobby-Cron kompatibel).
+                    Erinnerungen werden aktuell automatisch 24 Stunden vor dem Termin versendet.
                   </p>
                 </div>
 

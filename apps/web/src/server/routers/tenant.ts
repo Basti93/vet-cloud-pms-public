@@ -6,11 +6,13 @@ import {
   roles,
   userRoles,
   featureFlags,
+  emailSettings,
+  vaccinationSettings,
   tenantDeletionSchedules,
   PERMISSIONS,
 } from "@/lib/db/schema";
 import { db as appDb } from "@/lib/db/client";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { randomUUID, randomBytes } from "crypto";
 import { sendTenantDeactivationEmail } from "@/lib/email/service";
 import { getMainDomain } from "@/lib/env";
@@ -233,13 +235,19 @@ export const tenantRouter = createTRPCRouter({
 
       // Ensure tenant default roles exist and assign Admin role in user_roles (source of truth)
       await createDefaultRoles(currentUser.tenantId);
-      const [adminRole] = await ctx.db
-        .select({ id: roles.id })
+      const tenantRoles = await ctx.db
+        .select({ id: roles.id, code: roles.code })
         .from(roles)
-        .where(and(eq(roles.tenantId, currentUser.tenantId), eq(roles.code, ROLE_CODES.ADMIN)))
-        .limit(1);
-      if (!adminRole) {
-        throw new Error("Admin role not found after role initialization");
+        .where(
+          and(
+            eq(roles.tenantId, currentUser.tenantId),
+            inArray(roles.code, [ROLE_CODES.ADMIN, ROLE_CODES.VET])
+          )
+        );
+      const adminRole = tenantRoles.find((role) => role.code === ROLE_CODES.ADMIN);
+      const vetRole = tenantRoles.find((role) => role.code === ROLE_CODES.VET);
+      if (!adminRole || !vetRole) {
+        throw new Error("Admin or Vet role not found after role initialization");
       }
 
       const [dbUser] = await ctx.db
@@ -252,11 +260,18 @@ export const tenantRouter = createTRPCRouter({
       }
 
       await ctx.db.delete(userRoles).where(eq(userRoles.userId, dbUser.id));
-      await ctx.db.insert(userRoles).values({
-        userId: dbUser.id,
-        roleId: adminRole.id,
-        assignedBy: dbUser.id,
-      });
+      await ctx.db.insert(userRoles).values([
+        {
+          userId: dbUser.id,
+          roleId: adminRole.id,
+          assignedBy: dbUser.id,
+        },
+        {
+          userId: dbUser.id,
+          roleId: vetRole.id,
+          assignedBy: dbUser.id,
+        },
+      ]);
 
       await ctx.db
         .update(users)
@@ -276,6 +291,24 @@ export const tenantRouter = createTRPCRouter({
       } catch (_error) {
         // Feature flags already exist, that's fine
       }
+
+      // Ensure default notification settings exist for every newly onboarded tenant.
+      // This avoids missing-row fallbacks and keeps cron behavior predictable.
+      await ctx.db
+        .insert(emailSettings)
+        .values({ tenantId: currentUser.tenantId, reminderHoursBefore: 24 })
+        .onConflictDoUpdate({
+          target: emailSettings.tenantId,
+          set: { updatedAt: new Date() },
+        });
+
+      await ctx.db
+        .insert(vaccinationSettings)
+        .values({ tenantId: currentUser.tenantId })
+        .onConflictDoUpdate({
+          target: vaccinationSettings.tenantId,
+          set: { updatedAt: new Date() },
+        });
 
       console.log(`Practice created: ${updatedTenant.slug} (${updatedTenant.id})`);
 

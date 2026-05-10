@@ -1,9 +1,9 @@
 /**
  * Test Data Definition — Single Source of Truth
- * Used by both seed.ts and admin-reset.ts
+ * Used by admin-reset.ts (demo tenant lifecycle)
  *
  * Keep this file as the authoritative source for all test data.
- * Changes here automatically apply to both scripts.
+ * Changes here automatically apply to demo reseeding/reset.
  */
 
 export const DEMO_TENANT_ID = "00000000-0000-4000-8000-000000000003";
@@ -29,11 +29,13 @@ export const TEST_DATA = {
     typographyPreference: "modern" as const,
     websiteTemplate: "klassik" as const,
     openingHours: [
+      { dayOfWeek: 0, slots: [] },
       { dayOfWeek: 1, slots: [{ startHour: 9, startMin: 0, endHour: 11, endMin: 30 }, { startHour: 16, startMin: 0, endHour: 19, endMin: 0 }] },
       { dayOfWeek: 2, slots: [{ startHour: 15, startMin: 0, endHour: 18, endMin: 0 }] },
       { dayOfWeek: 3, slots: [{ startHour: 9, startMin: 0, endHour: 11, endMin: 30 }, { startHour: 16, startMin: 0, endHour: 19, endMin: 0 }] },
       { dayOfWeek: 4, slots: [{ startHour: 9, startMin: 0, endHour: 11, endMin: 30 }, { startHour: 16, startMin: 0, endHour: 19, endMin: 0 }] },
       { dayOfWeek: 5, slots: [{ startHour: 9, startMin: 0, endHour: 12, endMin: 0 }] },
+      { dayOfWeek: 6, slots: [] },
     ],
     subscriptionStatus: "trial" as const,
     subscriptionPlan: "starter" as const,
@@ -51,6 +53,7 @@ export const TEST_DATA = {
       firstName: "Admin",
       lastName: "User",
       role: "admin" as const,
+      additionalRoles: ["vet"] as const,
     },
     {
       clerkId: "user_demo_vet_001",
@@ -471,6 +474,42 @@ export const TEST_DATA = {
     { vetIndex: 1, startDate: "2026-04-28", endDate: "2026-04-29", type: "sick" as const, note: null },
     { vetIndex: 2, startDate: "2026-05-19", endDate: "2026-05-29", type: "vacation" as const, note: "Urlaub" },
   ],
+
+  // ────────────────────────────────────────────────────────────────────────
+  // REMINDER DEFAULTS (used by demo fixture generation/reset)
+  // ────────────────────────────────────────────────────────────────────────
+  demoReminderDefaults: {
+    appointmentRemindersEnabled: false,
+    vaccinationRemindersEnabled: false,
+    appointmentReminderHoursBefore: 24,
+  },
+
+  // ────────────────────────────────────────────────────────────────────────
+  // VACCINATION DEMO GENERATION RULES (used by demo fixture generation/reset)
+  // ────────────────────────────────────────────────────────────────────────
+  vaccinationDemoConfig: {
+    typeCycle: [
+      "Tollwut",
+      "Staupe",
+      "Leptospirose",
+      "Parvovirose",
+      "Katzenschnupfen",
+      "Katzenseuche",
+    ],
+    primaryAdminDaysAgoBase: 180,
+    primaryAdminDaysAgoStep: 7,
+    primaryExpiryOverdueEveryNth: 3,
+    primaryExpiryOverdueDays: -14,
+    primaryExpiryUpcomingDaysBase: 45,
+    primaryExpiryUpcomingDaysStep: 2,
+    boosterAdminDaysAgoBase: 30,
+    boosterAdminDaysAgoStep: 4,
+    boosterExpiryDaysBase: 15,
+    boosterExpiryDaysStep: 5,
+    notesPrimary: "Automatisch erzeugter Demo-Impfeintrag",
+    notesBooster: "Automatisch erzeugter Demo-Booster",
+    batchPrefix: "DEMO",
+  },
 };
 
 // ────────────────────────────────────────────────────────────────────────
@@ -488,8 +527,12 @@ export function getTestDataStats() {
     onlineBookings: TEST_DATA.onlineBookings.length,
     totalAppointments:
       TEST_DATA.internalAppointments.length + TEST_DATA.onlineBookings.length,
-    vets: TEST_DATA.users.filter((u) => u.role === "vet").length,
+    vets: TEST_DATA.users.filter(
+      (u) => u.role === "vet" || u.additionalRoles?.includes("vet")
+    ).length,
     vetSchedules: TEST_DATA.vetSchedules.length,
     vetAbsences: TEST_DATA.vetAbsences.length,
+    vaccinationsPerPatient: 2,
+    totalVaccinations: TEST_DATA.patients.length * 2,
   };
 }

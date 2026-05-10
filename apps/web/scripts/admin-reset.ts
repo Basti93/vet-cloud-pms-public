@@ -35,6 +35,8 @@ import {
   roles,
   rolePermissions,
   userRoles,
+  emailSettings,
+  vaccinationSettings,
 } from "@/lib/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import {
@@ -44,6 +46,10 @@ import {
   getTestDataStats,
 } from "./test-data";
 import { createDefaultRoles } from "@/lib/auth/permissions";
+import {
+  buildDemoVaccinationRows,
+  getDemoReminderDefaults,
+} from "./lib/demo-fixtures";
 
 type DemoUser = (typeof TEST_DATA.users)[number];
 type ClerkUpsertResult = {
@@ -322,6 +328,40 @@ async function main() {
       await createDefaultRoles(DEMO_TENANT_ID);
 
       // ────────────────────────────────────────────────────────────────────
+      // DEMO SAFETY SETTINGS (avoid nightly reminder spam)
+      // ────────────────────────────────────────────────────────────────────
+      const reminderDefaults = getDemoReminderDefaults();
+      await db
+        .insert(emailSettings)
+        .values({
+          tenantId: DEMO_TENANT_ID,
+          reminderEmailEnabled: reminderDefaults.appointmentRemindersEnabled,
+          reminderHoursBefore: reminderDefaults.appointmentReminderHoursBefore,
+        })
+        .onConflictDoUpdate({
+          target: emailSettings.tenantId,
+          set: {
+            reminderEmailEnabled: reminderDefaults.appointmentRemindersEnabled,
+            reminderHoursBefore: reminderDefaults.appointmentReminderHoursBefore,
+            updatedAt: new Date(),
+          },
+        });
+
+      await db
+        .insert(vaccinationSettings)
+        .values({
+          tenantId: DEMO_TENANT_ID,
+          reminderEnabled: reminderDefaults.vaccinationRemindersEnabled,
+        })
+        .onConflictDoUpdate({
+          target: vaccinationSettings.tenantId,
+          set: {
+            reminderEnabled: reminderDefaults.vaccinationRemindersEnabled,
+            updatedAt: new Date(),
+          },
+        });
+
+      // ────────────────────────────────────────────────────────────────────
       // CREATE USERS (fresh from TEST_DATA)
       // ────────────────────────────────────────────────────────────────────
       const usersToCreate = await ensureDemoClerkUsers([...TEST_DATA.users]);
@@ -371,16 +411,24 @@ async function main() {
       await Promise.all(
         createdUsers.map((u, idx) => {
           if (!u) return Promise.resolve(null);
-          const roleId = rolesByCode[usersToCreate[idx].role.toLowerCase()];
-          if (!roleId) return Promise.resolve(null);
-          return db
-            .insert(userRoles)
-            .values({
-              userId: u.id,
-              roleId,
-              assignedBy: u.id,
+          const roleCodes = [
+            usersToCreate[idx].role,
+            ...(usersToCreate[idx].additionalRoles ?? []),
+          ];
+          return Promise.all(
+            roleCodes.map((roleCode) => {
+              const roleId = rolesByCode[roleCode.toLowerCase()];
+              if (!roleId) return Promise.resolve(null);
+              return db
+                .insert(userRoles)
+                .values({
+                  userId: u.id,
+                  roleId,
+                  assignedBy: u.id,
+                })
+                .onConflictDoNothing();
             })
-            .onConflictDoNothing();
+          );
         })
       );
       console.log("  ✓ Roles assigned\n");
@@ -524,50 +572,16 @@ async function main() {
       // ────────────────────────────────────────────────────────────────────
       // CREATE VACCINATIONS
       // ────────────────────────────────────────────────────────────────────
-      const vaccinationTypes = [
-        "Tollwut",
-        "Staupe",
-        "Leptospirose",
-        "Parvovirose",
-        "Katzenschnupfen",
-        "Katzenseuche",
-      ];
-      let vaccinationCount = 0;
-      await Promise.all(
-        createdPatients.map((patient, idx) => {
-          const assignedVet = allVets[idx % allVets.length];
-          if (!assignedVet) return null;
-
-          const primaryAdmin = new Date(now.getTime() - (180 + idx * 7) * 24 * 60 * 60 * 1000);
-          const primaryExpiry = new Date(now.getTime() + (idx % 3 === 0 ? -14 : 45 + idx * 2) * 24 * 60 * 60 * 1000);
-          const boosterAdmin = new Date(now.getTime() - (30 + idx * 4) * 24 * 60 * 60 * 1000);
-          const boosterExpiry = new Date(now.getTime() + (15 + idx * 5) * 24 * 60 * 60 * 1000);
-
-          vaccinationCount += 2;
-          return Promise.all([
-            db.insert(vaccinations).values({
-              tenantId: DEMO_TENANT_ID,
-              patientId: patient.id,
-              type: vaccinationTypes[idx % vaccinationTypes.length]!,
-              administeredDate: primaryAdmin,
-              expiryDate: primaryExpiry,
-              vetId: assignedVet.id,
-              batchNumber: `DEMO-${idx + 1}-A`,
-              notes: "Automatisch erzeugter Demo-Impfeintrag",
-            }),
-            db.insert(vaccinations).values({
-              tenantId: DEMO_TENANT_ID,
-              patientId: patient.id,
-              type: `${vaccinationTypes[idx % vaccinationTypes.length]} Booster`,
-              administeredDate: boosterAdmin,
-              expiryDate: boosterExpiry,
-              vetId: assignedVet.id,
-              batchNumber: `DEMO-${idx + 1}-B`,
-              notes: "Automatisch erzeugter Demo-Booster",
-            }),
-          ]);
-        })
-      );
+      const vaccinationRows = buildDemoVaccinationRows({
+        tenantId: DEMO_TENANT_ID,
+        patientIds: createdPatients.map((p) => p.id),
+        vetIds: allVets.map((v) => v.id),
+        now,
+      });
+      if (vaccinationRows.length > 0) {
+        await db.insert(vaccinations).values(vaccinationRows);
+      }
+      const vaccinationCount = vaccinationRows.length;
 
       // ────────────────────────────────────────────────────────────────────
       // CREATE INTERNAL APPOINTMENTS

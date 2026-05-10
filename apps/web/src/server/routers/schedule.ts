@@ -1,10 +1,11 @@
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
 import { createTRPCRouter, protectedProcedure } from "@/server/trpc";
-import { tenants, vetSchedules, vetAbsences, users } from "@/lib/db/schema";
+import { tenants, vetSchedules, vetAbsences, users, userRoles, roles } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
-import { DEFAULT_OPENING_HOURS, type DaySchedule } from "@/lib/schedule-types";
+import { DEFAULT_OPENING_HOURS, normalizeWeekSchedule, type DaySchedule } from "@/lib/schedule-types";
 import { writeAuditLog } from "@/server/audit";
+import { ROLE_CODES } from "@/lib/auth/roles";
 
 const timeRangeSchema = z.object({
   startHour: z.number().int().min(0).max(23),
@@ -32,18 +33,22 @@ export const scheduleRouter = createTRPCRouter({
 
       if (!tenant) throw new TRPCError({ code: "NOT_FOUND" });
 
-      return (tenant.openingHours as DaySchedule[] | null) ?? DEFAULT_OPENING_HOURS;
+      return normalizeWeekSchedule(tenant.openingHours as DaySchedule[] | null, {
+        fallback: DEFAULT_OPENING_HOURS,
+      });
     }),
 
   updatePracticeHours: protectedProcedure
     .input(z.object({
       tenantId: z.string().uuid(),
-      hours: z.array(dayScheduleSchema).length(7),
+      hours: z.array(dayScheduleSchema).min(0).max(7),
     }))
     .mutation(async ({ ctx, input }) => {
+      const normalizedHours = normalizeWeekSchedule(input.hours);
+
       await ctx.db
         .update(tenants)
-        .set({ openingHours: input.hours, updatedAt: new Date() })
+        .set({ openingHours: normalizedHours, updatedAt: new Date() })
         .where(eq(tenants.id, input.tenantId));
 
       await writeAuditLog(ctx, {
@@ -52,7 +57,7 @@ export const scheduleRouter = createTRPCRouter({
         entity: { type: "tenant_schedule", id: input.tenantId },
         event: "schedule.practice_hours_updated",
         summary: "Practice opening hours updated",
-        changes: { daysConfigured: input.hours.length },
+        changes: { daysConfigured: normalizedHours.length },
       });
       return { success: true };
     }),
@@ -71,7 +76,15 @@ export const scheduleRouter = createTRPCRouter({
           slotDurationMin: users.slotDurationMin,
         })
         .from(users)
-        .where(and(eq(users.tenantId, input.tenantId), eq(users.active, true)));
+        .innerJoin(userRoles, eq(userRoles.userId, users.id))
+        .innerJoin(roles, eq(roles.id, userRoles.roleId))
+        .where(
+          and(
+            eq(users.tenantId, input.tenantId),
+            eq(users.active, true),
+            eq(roles.code, ROLE_CODES.VET)
+          )
+        );
 
       const schedules = await ctx.db
         .select()
