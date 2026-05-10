@@ -81,11 +81,25 @@ function getEmbeddingOrigin() {
   }
 }
 
-function getDisplayHostFromOrigin(origin: string) {
+function getProviderUrl(origin?: string) {
+  if (origin) {
+    return origin.endsWith("/") ? origin : `${origin}/`;
+  }
+
+  if (typeof window !== "undefined" && window.location?.origin) {
+    const currentOrigin = window.location.origin;
+    return currentOrigin.endsWith("/") ? currentOrigin : `${currentOrigin}/`;
+  }
+
+  const fallbackDomain = getSystemDomain();
+  const hasProtocol = /^https?:\/\//i.test(fallbackDomain);
+  const asUrl = hasProtocol ? fallbackDomain : `https://${fallbackDomain}`;
+
   try {
-    return new URL(origin).host;
+    const normalized = new URL(asUrl).origin;
+    return normalized.endsWith("/") ? normalized : `${normalized}/`;
   } catch {
-    return origin.replace(/^https?:\/\//, "");
+    return asUrl.endsWith("/") ? asUrl : `${asUrl}/`;
   }
 }
 
@@ -943,12 +957,9 @@ export default function BookingPage({
 }) {
   const { tenantSlug } = use(params);
   const { t } = useLocale();
-  const systemDomain = getSystemDomain();
   const autoSuggestAttemptedRef = useRef<string | null>(null);
   const embeddingOrigin = getEmbeddingOrigin();
-  const poweredByLabel = embeddingOrigin
-    ? getDisplayHostFromOrigin(embeddingOrigin)
-    : systemDomain;
+  const poweredByLabel = getProviderUrl();
 
   const { data: clinic, isLoading: clinicLoading, error: clinicError } =
     trpc.booking.getClinic.useQuery(
