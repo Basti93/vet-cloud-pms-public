@@ -21,6 +21,29 @@ export const DEFAULT_OPENING_HOURS: DaySchedule[] = [
   { dayOfWeek: 6, slots: [] },
 ];
 
+/**
+ * Normalizes any weekly schedule payload to exactly 7 unique days (0..6).
+ * Missing days are filled as closed by default unless a fallback is provided.
+ */
+export function normalizeWeekSchedule(
+  hours: DaySchedule[] | null | undefined,
+  options?: { fallback?: DaySchedule[] | null }
+): DaySchedule[] {
+  const source = hours && hours.length > 0 ? hours : options?.fallback ?? [];
+
+  const byDay = new Map<number, DaySchedule>();
+  for (const day of source) {
+    if (day.dayOfWeek < 0 || day.dayOfWeek > 6) continue;
+    if (!byDay.has(day.dayOfWeek)) {
+      byDay.set(day.dayOfWeek, day);
+    }
+  }
+
+  return [0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => (
+    byDay.get(dayOfWeek) ?? { dayOfWeek, slots: [] }
+  ));
+}
+
 /** Format a time range as "09:00–11:30" */
 export function formatTimeRange(r: TimeRange): string {
   const fmt = (h: number, m: number) =>
