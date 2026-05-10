@@ -9,7 +9,8 @@ Cloud-basiertes Veterinary Practice Management System (SaaS) für Tierarztpraxen
 cd apps/web
 npm install
 npm run db:push    # Neon PostgreSQL Schema initialisieren
-npm run db:seed    # Demo-Daten laden
+npm run db:seed    # Globale Referenzdaten (tenant-unabhängig)
+npm run db:seed:demo  # Demo-Tenant vollständig neu aufbauen
 npm run dev        # http://localhost:3000
 ```
 
@@ -91,7 +92,10 @@ Drizzle ORM mit PostgreSQL:
 - **voice_calls** — Vapi Call-Logs
 - **audit_logs** — Änderungsverlauf
 
-Migration & Seeding: `npm run db:push` + `npm run db:seed`
+Migration & Seeding:
+- `npm run db:push` (Schema)
+- `npm run db:seed` (globale Referenzdaten)
+- `npm run db:seed:demo` (Demo-Tenant Reset/Reseed)
 
 ## 🔗 API Routes (tRPC)
 
