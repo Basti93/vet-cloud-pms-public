@@ -23,6 +23,38 @@ const CRON_SECRET = process.env.CRON_SECRET;
 const CRON_LOOKAHEAD_HOURS = 24;
 const SYSTEM_DOMAIN = getSystemDomain();
 
+function stringifyError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  if (!error || typeof error !== "object") return String(error);
+
+  const maybeError = error as {
+    name?: string;
+    message?: string;
+    code?: string | number;
+    statusCode?: number;
+    type?: string;
+  };
+
+  const compact = {
+    name: maybeError.name,
+    message: maybeError.message,
+    code: maybeError.code,
+    statusCode: maybeError.statusCode,
+    type: maybeError.type,
+  };
+
+  if (compact.name || compact.message || compact.code || compact.statusCode || compact.type) {
+    return JSON.stringify(compact);
+  }
+
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return Object.prototype.toString.call(error);
+  }
+}
+
 /**
  * Cron job to send reminder emails for upcoming appointments.
  * Runs daily via Coolify scheduled task, scanning a 24h window.
@@ -235,9 +267,7 @@ export async function GET(request: NextRequest) {
                 tenantStats.appointment.sent++;
               } else {
                 // Log the failed email
-                const errorMsg = result.error instanceof Error
-                  ? result.error.message
-                  : String(result.error);
+                const errorMsg = stringifyError(result.error);
                 await db.insert(appointmentEmailLogs).values({
                   tenantId: tenant.id,
                   appointmentId: appointment.id,
@@ -430,10 +460,7 @@ export async function GET(request: NextRequest) {
           vaccinationRemindersSent++;
           tenantStats.vaccination.digestSent++;
         } else {
-          const errorMessage =
-            result.error instanceof Error
-              ? result.error.message
-              : String(result.error);
+          const errorMessage = stringifyError(result.error);
           for (const v of owner.vacs) {
             await db.insert(vaccinationEmailLogs).values({
               tenantId: tenant.id,
