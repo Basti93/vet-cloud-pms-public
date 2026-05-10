@@ -10,6 +10,7 @@ import { UserPreferencesProvider } from "@/lib/user/preferences-context";
 import { ToastProvider } from "@/lib/toast/context";
 import { ToastContainer } from "@/components/ui/toast";
 import { DynamicFavicon } from "@/components/DynamicFavicon";
+import { GlobalQueryActivity } from "@/components/ui/global-query-activity";
 import { EnvironmentBanner } from "@/components/EnvironmentBanner";
 import type { PraxisPreferences, UserPreferences } from "@/lib/user/preferences";
 import { getSystemDomain } from "@/lib/system-name";
@@ -87,6 +88,7 @@ export default async function RootLayout({
               <UserPreferencesProvider preferences={userPreferences}>
                 <ToastProvider>
                   <DynamicFavicon />
+                  <GlobalQueryActivity />
                   {children}
                   <ToastContainer />
                 </ToastProvider>

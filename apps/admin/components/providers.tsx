@@ -7,6 +7,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import superjson from "superjson";
 import { trpc } from "@/lib/trpc";
 import { queryClient, getBaseUrl } from "@/lib/trpc-client";
+import { GlobalQueryActivity } from "@/components/global-query-activity";
 
 export function TRPCProvider({ children }: { children: React.ReactNode }) {
   const { getToken } = useAuth();
@@ -29,6 +30,7 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <trpc.Provider client={trpcClient} queryClient={queryClient}>
+        <GlobalQueryActivity />
         {children}
       </trpc.Provider>
     </QueryClientProvider>
