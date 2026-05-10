@@ -61,120 +61,124 @@ export async function GET(request: NextRequest) {
         .where(eq(emailSettings.tenantId, tenant.id))
         .limit(1);
 
-      if (!settings[0] || !settings[0].reminderEmailEnabled) {
-        continue; // Skip if reminders are disabled
-      }
-
-      const reminderHoursBefore = settings[0].reminderHoursBefore;
-      // Daily cron (Hobby-compatible): scan a 24h window around the configured threshold.
-      const windowStart = new Date(
-        now.getTime() + reminderHoursBefore * 60 * 60 * 1000
-      );
-      const windowEnd = new Date(
-        windowStart.getTime() + CRON_LOOKAHEAD_HOURS * 60 * 60 * 1000
-      );
-
-      // Find appointments in the reminder window that haven't been sent reminders yet
-      const appointmentsToRemind = await db
-        .select({
-          id: appointments.id,
-          startTime: appointments.startTime,
-          title: appointments.title,
-          patientName: patients.name,
-          patientSpecies: patients.species,
-          ownerFirstName: owners.firstName,
-          ownerLastName: owners.lastName,
-          ownerEmail: owners.email,
-        })
-        .from(appointments)
-        .innerJoin(patients, eq(appointments.patientId, patients.id))
-        .innerJoin(owners, eq(patients.ownerId, owners.id))
-        .where(
-          and(
-            eq(appointments.tenantId, tenant.id),
-            eq(appointments.status, "scheduled"),
-            gte(appointments.startTime, windowStart),
-            lte(appointments.startTime, windowEnd)
-          )
-        );
-
-      // Filter out appointments that already have sent reminders
-      const appointmentIds = appointmentsToRemind.map((a) => a.id);
-      if (appointmentIds.length === 0) continue;
-
-      const sentReminders = await db
-        .select({ appointmentId: appointmentEmailLogs.appointmentId })
-        .from(appointmentEmailLogs)
-        .where(
-          and(
-            inArray(appointmentEmailLogs.appointmentId, appointmentIds),
-            eq(appointmentEmailLogs.emailType, "reminder"),
-            eq(appointmentEmailLogs.status, "sent")
-          )
-        );
-
-      const sentIds = new Set(sentReminders.map((r) => r.appointmentId));
-      const newReminders = appointmentsToRemind.filter((a) => !sentIds.has(a.id));
+      const tenantEmailSettings = settings[0];
+      const reminderEmailEnabled =
+        tenantEmailSettings?.reminderEmailEnabled ?? true;
+      const reminderHoursBefore = tenantEmailSettings?.reminderHoursBefore ?? 24;
 
       // Get tenant info for practice name
       const practiceName = tenant.name || SYSTEM_DOMAIN;
       const bookingUrl = `${getMainDomain()}/book/${tenant.slug}`;
 
-      // Send reminders for appointments that don't have one yet
-      for (const appointment of newReminders) {
-        try {
-          if (!appointment.ownerEmail) continue;
+      if (reminderEmailEnabled) {
+        // Daily cron (Hobby-compatible): scan a 24h window around the configured threshold.
+        const windowStart = new Date(
+          now.getTime() + reminderHoursBefore * 60 * 60 * 1000
+        );
+        const windowEnd = new Date(
+          windowStart.getTime() + CRON_LOOKAHEAD_HOURS * 60 * 60 * 1000
+        );
 
-          // Send the reminder email
-          const appointmentTime = appointment.startTime.toLocaleTimeString("de-DE", {
-            hour: "2-digit",
-            minute: "2-digit",
-          });
-          const appointmentDate = appointment.startTime.toLocaleDateString("de-DE");
-          const appointmentDateTime = `${appointmentDate} ${appointmentTime}`;
-
-          const result = await sendReminderEmail({
-            to: appointment.ownerEmail,
-            practiceName,
-            ownerFirstName: appointment.ownerFirstName,
-            patientName: appointment.patientName,
-            patientSpecies: appointment.patientSpecies,
-            appointmentDate,
-            appointmentTime,
-            appointmentDateTime,
-          });
-
-          if (result.success) {
-            // Log the sent email
-            await db.insert(appointmentEmailLogs).values({
-              tenantId: tenant.id,
-              appointmentId: appointment.id,
-              emailType: "reminder",
-              recipientEmail: appointment.ownerEmail,
-              status: "sent",
-            });
-            totalSent++;
-          } else {
-            // Log the failed email
-            const errorMsg = result.error instanceof Error
-              ? result.error.message
-              : String(result.error);
-            await db.insert(appointmentEmailLogs).values({
-              tenantId: tenant.id,
-              appointmentId: appointment.id,
-              emailType: "reminder",
-              recipientEmail: appointment.ownerEmail,
-              status: "failed",
-              errorMessage: errorMsg,
-            });
-            totalFailed++;
-          }
-        } catch (error) {
-          totalFailed++;
-          console.error(
-            `Failed to send reminder for appointment ${appointment.id}:`,
-            error
+        // Find appointments in the reminder window that haven't been sent reminders yet
+        const appointmentsToRemind = await db
+          .select({
+            id: appointments.id,
+            startTime: appointments.startTime,
+            title: appointments.title,
+            patientName: patients.name,
+            patientSpecies: patients.species,
+            ownerFirstName: owners.firstName,
+            ownerLastName: owners.lastName,
+            ownerEmail: owners.email,
+          })
+          .from(appointments)
+          .innerJoin(patients, eq(appointments.patientId, patients.id))
+          .innerJoin(owners, eq(patients.ownerId, owners.id))
+          .where(
+            and(
+              eq(appointments.tenantId, tenant.id),
+              inArray(appointments.status, ["scheduled", "confirmed"]),
+              gte(appointments.startTime, windowStart),
+              lte(appointments.startTime, windowEnd)
+            )
           );
+
+        // Filter out appointments that already have sent reminders
+        const appointmentIds = appointmentsToRemind.map((a) => a.id);
+        if (appointmentIds.length > 0) {
+          const sentReminders = await db
+            .select({ appointmentId: appointmentEmailLogs.appointmentId })
+            .from(appointmentEmailLogs)
+            .where(
+              and(
+                inArray(appointmentEmailLogs.appointmentId, appointmentIds),
+                eq(appointmentEmailLogs.emailType, "reminder"),
+                eq(appointmentEmailLogs.status, "sent")
+              )
+            );
+
+          const sentIds = new Set(sentReminders.map((r) => r.appointmentId));
+          const newReminders = appointmentsToRemind.filter((a) => !sentIds.has(a.id));
+
+          // Send reminders for appointments that don't have one yet
+          for (const appointment of newReminders) {
+            try {
+              if (!appointment.ownerEmail) continue;
+
+              // Send the reminder email
+              const appointmentTime = appointment.startTime.toLocaleTimeString("de-DE", {
+                hour: "2-digit",
+                minute: "2-digit",
+              });
+              const appointmentDate = appointment.startTime.toLocaleDateString("de-DE");
+              const appointmentDateTime = `${appointmentDate} ${appointmentTime}`;
+
+              const result = await sendReminderEmail({
+                to: appointment.ownerEmail,
+                practiceName,
+                ownerFirstName: appointment.ownerFirstName,
+                patientName: appointment.patientName,
+                patientSpecies: appointment.patientSpecies,
+                appointmentDate,
+                appointmentTime,
+                appointmentDateTime,
+                customSubject: tenantEmailSettings?.reminderSubject,
+                customBody: tenantEmailSettings?.reminderBody,
+              });
+
+              if (result.success) {
+                // Log the sent email
+                await db.insert(appointmentEmailLogs).values({
+                  tenantId: tenant.id,
+                  appointmentId: appointment.id,
+                  emailType: "reminder",
+                  recipientEmail: appointment.ownerEmail,
+                  status: "sent",
+                });
+                totalSent++;
+              } else {
+                // Log the failed email
+                const errorMsg = result.error instanceof Error
+                  ? result.error.message
+                  : String(result.error);
+                await db.insert(appointmentEmailLogs).values({
+                  tenantId: tenant.id,
+                  appointmentId: appointment.id,
+                  emailType: "reminder",
+                  recipientEmail: appointment.ownerEmail,
+                  status: "failed",
+                  errorMessage: errorMsg,
+                });
+                totalFailed++;
+              }
+            } catch (error) {
+              totalFailed++;
+              console.error(
+                `Failed to send reminder for appointment ${appointment.id}:`,
+                error
+              );
+            }
+          }
         }
       }
 
@@ -191,9 +195,7 @@ export async function GET(request: NextRequest) {
       const remindOptional = vaxSettings[0]?.remindOptional ?? false;
       const remindOverdue = vaxSettings[0]?.remindOverdue ?? true;
 
-      if (!reminderEnabled) {
-        continue;
-      }
+      if (!reminderEnabled) continue;
 
       // Use tenant timezone for the due-date window so reminder fires at the
       // right local date rather than always in UTC.

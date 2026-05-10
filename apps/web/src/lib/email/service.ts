@@ -56,6 +56,8 @@ export interface SendReminderEmailInput {
   appointmentTime: string;
   appointmentDateTime: string;
   vetName?: string;
+  customSubject?: string;
+  customBody?: string;
 }
 
 export interface SendBookingNotificationInput {
@@ -222,13 +224,11 @@ export async function sendReminderEmail(input: SendReminderEmailInput) {
     vetName: input.vetName || "Unser Team",
   };
 
-  const body = emailTemplates.reminder.render(
-    emailTemplates.reminder.defaultBody,
-    placeholders
-  );
-
-  const subject = emailTemplates.reminder.defaultSubject
-    .replace("{practiceName}", input.practiceName);
+  const bodyTemplate = input.customBody?.trim() || emailTemplates.reminder.defaultBody;
+  const subjectTemplate =
+    input.customSubject?.trim() || emailTemplates.reminder.defaultSubject;
+  const body = emailTemplates.reminder.render(bodyTemplate, placeholders);
+  const subject = emailTemplates.reminder.render(subjectTemplate, placeholders);
 
   try {
     const result = await getResend().emails.send({
