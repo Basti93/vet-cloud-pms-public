@@ -81,6 +81,14 @@ function getEmbeddingOrigin() {
   }
 }
 
+function getDisplayHostFromOrigin(origin: string) {
+  try {
+    return new URL(origin).host;
+  } catch {
+    return origin.replace(/^https?:\/\//, "");
+  }
+}
+
 /** Build next N weekdays starting from tomorrow */
 function buildWeekdays(count = 14): Date[] {
   const days: Date[] = [];
@@ -938,6 +946,9 @@ export default function BookingPage({
   const systemDomain = getSystemDomain();
   const autoSuggestAttemptedRef = useRef<string | null>(null);
   const embeddingOrigin = getEmbeddingOrigin();
+  const poweredByLabel = embeddingOrigin
+    ? getDisplayHostFromOrigin(embeddingOrigin)
+    : systemDomain;
 
   const { data: clinic, isLoading: clinicLoading, error: clinicError } =
     trpc.booking.getClinic.useQuery(
@@ -1217,7 +1228,7 @@ export default function BookingPage({
             {/* Footer */}
             <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-center gap-1.5">
               <span className="text-xs text-gray-400">Powered by</span>
-              <span className="text-xs font-bold text-gray-500">{systemDomain}</span>
+              <span className="text-xs font-bold text-gray-500">{poweredByLabel}</span>
             </div>
           </div>
         </div>

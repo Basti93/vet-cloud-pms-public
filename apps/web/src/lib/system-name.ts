@@ -14,6 +14,9 @@ export function getSystemDomain(): string {
     "";
 
   if (!raw) {
+    if (typeof window !== "undefined" && window.location?.host) {
+      return window.location.host;
+    }
     return "localhost";
   }
 
