@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, asc, desc, eq, gte, inArray, isNull, lte, sql, ne } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, sql, ne } from "drizzle-orm";
 import { z } from "zod";
 import {
   PERMISSIONS,
@@ -551,11 +551,16 @@ export const vaccinationsRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const now = new Date();
       const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      const dueCondition = lt(vaccinations.expiryDate, now);
+      const upcomingCondition = and(
+        gte(vaccinations.expiryDate, now),
+        lte(vaccinations.expiryDate, in30Days)
+      );
 
       const [row] = await ctx.db
         .select({
-          totalDue: sql<number>`sum(case when ${vaccinations.expiryDate} < ${now} then 1 else 0 end)`,
-          totalUpcoming: sql<number>`sum(case when ${vaccinations.expiryDate} >= ${now} and ${vaccinations.expiryDate} <= ${in30Days} then 1 else 0 end)`,
+          totalDue: sql<number>`count(*) filter (where ${dueCondition})`,
+          totalUpcoming: sql<number>`count(*) filter (where ${upcomingCondition})`,
           totalTracked: sql<number>`count(*)`,
         })
         .from(vaccinations)
