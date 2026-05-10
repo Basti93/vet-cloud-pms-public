@@ -9,7 +9,7 @@ import { SettingsSection } from "@/components/forms/SettingsSection";
 import { DayRow, type DaySchedule } from "@/components/forms/DayRow";
 import { trpc } from "@/lib/trpc/client";
 import { Card } from "@/components/ui/card";
-import { PERMISSIONS } from "@/lib/db/schema";
+import { ROLE_CODES } from "@/lib/auth/roles";
 
 const localeNames: Record<string, string> = {
   de: "Deutsch",
@@ -35,10 +35,9 @@ export default function UserSettingsPage() {
   const [successMessage, setSuccessMessage] = useState<string | undefined>();
   const [isLoading, setIsLoading] = useState(false);
 
-  const { data: permissions } = trpc.admin.getUserPermissions.useQuery();
   const { data: currentUser } = trpc.admin.getCurrentUser.useQuery();
 
-  const isVet = permissions?.includes(PERMISSIONS.SCHEDULE_MANAGE);
+  const isVet = currentUser?.roleCodes?.includes(ROLE_CODES.VET);
 
   // Get utils at top level (before hooks)
   const utils = trpc.useUtils();
