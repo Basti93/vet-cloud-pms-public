@@ -360,13 +360,6 @@ export const adminRouter = createTRPCRouter({
           message: "Role not found in this tenant",
         });
       }
-      if (roleExists.isSystem && !roleExists.isEditableByTenant) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "System role permissions are locked for this tenant.",
-        });
-      }
-
       // Try to insert the role assignment
       // If it already exists (unique constraint), the database will reject it
       try {
