@@ -1,9 +1,9 @@
 /**
  * Test Data Definition — Single Source of Truth
- * Used by both seed.ts and admin-reset.ts
+ * Used by admin-reset.ts (demo tenant lifecycle)
  *
  * Keep this file as the authoritative source for all test data.
- * Changes here automatically apply to both scripts.
+ * Changes here automatically apply to demo reseeding/reset.
  */
 
 export const DEMO_TENANT_ID = "00000000-0000-4000-8000-000000000003";
