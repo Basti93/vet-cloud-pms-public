@@ -52,8 +52,75 @@ export async function GET(request: NextRequest) {
     let totalFailed = 0;
     let vaccinationRemindersSent = 0;
     let vaccinationRemindersFailed = 0;
+    const tenantDebugStats: Array<{
+      tenantId: string;
+      tenantSlug: string;
+      tenantName: string;
+      appointment: {
+        settingsPresent: boolean;
+        enabled: boolean;
+        reminderHoursBefore: number;
+        candidates: number;
+        alreadySent: number;
+        toSend: number;
+        skippedMissingEmail: number;
+        sent: number;
+        failed: number;
+      };
+      vaccination: {
+        settingsPresent: boolean;
+        enabled: boolean;
+        reminderDaysBefore: number;
+        remindCore: boolean;
+        remindRecommended: boolean;
+        remindOptional: boolean;
+        remindOverdue: boolean;
+        dueRaw: number;
+        afterCategoryFilter: number;
+        dedupedRecentSent: number;
+        toSend: number;
+        ownersGrouped: number;
+        skippedMissingEmail: number;
+        digestSent: number;
+        digestFailed: number;
+      };
+    }> = [];
 
     for (const tenant of allTenants) {
+      const tenantStats = {
+        tenantId: tenant.id,
+        tenantSlug: tenant.slug,
+        tenantName: tenant.name ?? SYSTEM_DOMAIN,
+        appointment: {
+          settingsPresent: false,
+          enabled: false,
+          reminderHoursBefore: 24,
+          candidates: 0,
+          alreadySent: 0,
+          toSend: 0,
+          skippedMissingEmail: 0,
+          sent: 0,
+          failed: 0,
+        },
+        vaccination: {
+          settingsPresent: false,
+          enabled: true,
+          reminderDaysBefore: 30,
+          remindCore: true,
+          remindRecommended: true,
+          remindOptional: false,
+          remindOverdue: true,
+          dueRaw: 0,
+          afterCategoryFilter: 0,
+          dedupedRecentSent: 0,
+          toSend: 0,
+          ownersGrouped: 0,
+          skippedMissingEmail: 0,
+          digestSent: 0,
+          digestFailed: 0,
+        },
+      };
+
       // Get email settings for this tenant
       const settings = await db
         .select()
@@ -62,9 +129,12 @@ export async function GET(request: NextRequest) {
         .limit(1);
 
       const tenantEmailSettings = settings[0];
+      tenantStats.appointment.settingsPresent = !!tenantEmailSettings;
       const reminderEmailEnabled =
         tenantEmailSettings?.reminderEmailEnabled ?? true;
       const reminderHoursBefore = tenantEmailSettings?.reminderHoursBefore ?? 24;
+      tenantStats.appointment.enabled = reminderEmailEnabled;
+      tenantStats.appointment.reminderHoursBefore = reminderHoursBefore;
 
       // Get tenant info for practice name
       const practiceName = tenant.name || SYSTEM_DOMAIN;
@@ -102,6 +172,7 @@ export async function GET(request: NextRequest) {
               lte(appointments.startTime, windowEnd)
             )
           );
+        tenantStats.appointment.candidates = appointmentsToRemind.length;
 
         // Filter out appointments that already have sent reminders
         const appointmentIds = appointmentsToRemind.map((a) => a.id);
@@ -116,14 +187,19 @@ export async function GET(request: NextRequest) {
                 eq(appointmentEmailLogs.status, "sent")
               )
             );
+          tenantStats.appointment.alreadySent = sentReminders.length;
 
           const sentIds = new Set(sentReminders.map((r) => r.appointmentId));
           const newReminders = appointmentsToRemind.filter((a) => !sentIds.has(a.id));
+          tenantStats.appointment.toSend = newReminders.length;
 
           // Send reminders for appointments that don't have one yet
           for (const appointment of newReminders) {
             try {
-              if (!appointment.ownerEmail) continue;
+              if (!appointment.ownerEmail) {
+                tenantStats.appointment.skippedMissingEmail++;
+                continue;
+              }
 
               // Send the reminder email
               const appointmentTime = appointment.startTime.toLocaleTimeString("de-DE", {
@@ -156,6 +232,7 @@ export async function GET(request: NextRequest) {
                   status: "sent",
                 });
                 totalSent++;
+                tenantStats.appointment.sent++;
               } else {
                 // Log the failed email
                 const errorMsg = result.error instanceof Error
@@ -170,9 +247,11 @@ export async function GET(request: NextRequest) {
                   errorMessage: errorMsg,
                 });
                 totalFailed++;
+                tenantStats.appointment.failed++;
               }
             } catch (error) {
               totalFailed++;
+              tenantStats.appointment.failed++;
               console.error(
                 `Failed to send reminder for appointment ${appointment.id}:`,
                 error
@@ -188,14 +267,24 @@ export async function GET(request: NextRequest) {
         .where(eq(vaccinationSettings.tenantId, tenant.id))
         .limit(1);
 
+      tenantStats.vaccination.settingsPresent = !!vaxSettings[0];
       const reminderEnabled = vaxSettings[0]?.reminderEnabled ?? true;
       const reminderDaysBefore = vaxSettings[0]?.reminderDaysBefore ?? 30;
       const remindCore = vaxSettings[0]?.remindCore ?? true;
       const remindRecommended = vaxSettings[0]?.remindRecommended ?? true;
       const remindOptional = vaxSettings[0]?.remindOptional ?? false;
       const remindOverdue = vaxSettings[0]?.remindOverdue ?? true;
+      tenantStats.vaccination.enabled = reminderEnabled;
+      tenantStats.vaccination.reminderDaysBefore = reminderDaysBefore;
+      tenantStats.vaccination.remindCore = remindCore;
+      tenantStats.vaccination.remindRecommended = remindRecommended;
+      tenantStats.vaccination.remindOptional = remindOptional;
+      tenantStats.vaccination.remindOverdue = remindOverdue;
 
-      if (!reminderEnabled) continue;
+      if (!reminderEnabled) {
+        tenantDebugStats.push(tenantStats);
+        continue;
+      }
 
       // Use tenant timezone for the due-date window so reminder fires at the
       // right local date rather than always in UTC.
@@ -244,6 +333,7 @@ export async function GET(request: NextRequest) {
             ne(owners.emailOptOut, true)
           )
         );
+      tenantStats.vaccination.dueRaw = dueVaccinations.length;
 
       // Category filter: apply in-process so free-text vaccinations (no FK) always pass through
       const categoryFilteredVaccinations = dueVaccinations.filter((v) => {
@@ -254,8 +344,12 @@ export async function GET(request: NextRequest) {
         if (cat === "non-core") return remindOptional;
         return true; // unknown category → remind to be safe
       });
+      tenantStats.vaccination.afterCategoryFilter = categoryFilteredVaccinations.length;
 
-      if (categoryFilteredVaccinations.length === 0) continue;
+      if (categoryFilteredVaccinations.length === 0) {
+        tenantDebugStats.push(tenantStats);
+        continue;
+      }
 
       // Deduplication: skip vaccinations already sent within last 25h
       const recentLogs = await db
@@ -274,8 +368,10 @@ export async function GET(request: NextRequest) {
             )
           )
         );
+      tenantStats.vaccination.dedupedRecentSent = recentLogs.length;
       const recentlySentIds = new Set(recentLogs.map((r) => r.vaccinationId));
       const toSend = categoryFilteredVaccinations.filter((v) => !recentlySentIds.has(v.id));
+      tenantStats.vaccination.toSend = toSend.length;
 
       // ── Digest: group by owner, send ONE email per owner ─────────────────
       const byOwner = new Map<
@@ -283,7 +379,10 @@ export async function GET(request: NextRequest) {
         { ownerEmail: string; ownerFirstName: string; ownerId: string; vacs: typeof toSend }
       >();
       for (const v of toSend) {
-        if (!v.ownerEmail) continue;
+        if (!v.ownerEmail) {
+          tenantStats.vaccination.skippedMissingEmail++;
+          continue;
+        }
         if (!byOwner.has(v.ownerId)) {
           byOwner.set(v.ownerId, {
             ownerEmail: v.ownerEmail,
@@ -294,6 +393,7 @@ export async function GET(request: NextRequest) {
         }
         byOwner.get(v.ownerId)!.vacs.push(v);
       }
+      tenantStats.vaccination.ownersGrouped = byOwner.size;
 
       for (const owner of byOwner.values()) {
         const items = owner.vacs.map((v) => ({
@@ -328,6 +428,7 @@ export async function GET(request: NextRequest) {
               .where(eq(vaccinations.id, v.id));
           }
           vaccinationRemindersSent++;
+          tenantStats.vaccination.digestSent++;
         } else {
           const errorMessage =
             result.error instanceof Error
@@ -343,8 +444,11 @@ export async function GET(request: NextRequest) {
             });
           }
           vaccinationRemindersFailed++;
+          tenantStats.vaccination.digestFailed++;
         }
       }
+
+      tenantDebugStats.push(tenantStats);
     }
 
     return NextResponse.json(
@@ -356,6 +460,8 @@ export async function GET(request: NextRequest) {
           totalFailed,
           vaccinationRemindersSent,
           vaccinationRemindersFailed,
+          tenantsProcessed: allTenants.length,
+          tenantDebugStats,
           ...deletionCleanup,
         },
       },
