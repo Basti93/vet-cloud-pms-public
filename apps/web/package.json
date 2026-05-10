@@ -38,6 +38,7 @@
     "@trpc/react-query": "^11",
     "@trpc/server": "^11",
     "@vapi-ai/web": "^2",
+    "@vercel/otel": "^2.1.2",
     "drizzle-orm": "^0.45.2",
     "ical-generator": "^10.2.0",
     "jsonwebtoken": "^9.0.3",
