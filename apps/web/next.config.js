@@ -67,7 +67,7 @@ const appContentSecurityPolicy =
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
   "font-src 'self' https://fonts.gstatic.com; " +
   "img-src 'self' data: https: blob:; " +
-  `connect-src 'self' ${clerkConnectSrc} https://neon.tech https://api.resend.com https://vapi.ai https://*.vapi.ai; ` +
+  `connect-src 'self' ${clerkConnectSrc}; ` +
   `frame-src 'self' ${clerkFrameSrc}; ` +
   "worker-src 'self' blob:; " +
   "object-src 'none'; " +
