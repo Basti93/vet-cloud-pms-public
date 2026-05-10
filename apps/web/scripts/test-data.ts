@@ -51,6 +51,7 @@ export const TEST_DATA = {
       firstName: "Admin",
       lastName: "User",
       role: "admin" as const,
+      additionalRoles: ["vet"] as const,
     },
     {
       clerkId: "user_demo_vet_001",
@@ -488,7 +489,9 @@ export function getTestDataStats() {
     onlineBookings: TEST_DATA.onlineBookings.length,
     totalAppointments:
       TEST_DATA.internalAppointments.length + TEST_DATA.onlineBookings.length,
-    vets: TEST_DATA.users.filter((u) => u.role === "vet").length,
+    vets: TEST_DATA.users.filter(
+      (u) => u.role === "vet" || u.additionalRoles?.includes("vet")
+    ).length,
     vetSchedules: TEST_DATA.vetSchedules.length,
     vetAbsences: TEST_DATA.vetAbsences.length,
   };

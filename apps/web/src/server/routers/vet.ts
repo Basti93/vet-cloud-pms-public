@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq, and, or, count, lte, gte, inArray } from "drizzle-orm";
+import { eq, and, count, lte, gte, inArray } from "drizzle-orm";
 import { createTRPCRouter, tenantProcedure } from "@/server/trpc";
 import { users, appointments, patients, owners, userRoles, roles } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
@@ -25,7 +25,7 @@ export const vetRouter = createTRPCRouter({
   list: tenantProcedure
     .input(z.object({ tenantId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      // Include both vet and admin roles - admins can be booked as vets
+      // Include only users with vet role
       const vets = await ctx.db
         .select({
           id: users.id,
@@ -40,7 +40,7 @@ export const vetRouter = createTRPCRouter({
         .where(
           and(
             eq(users.tenantId, input.tenantId),
-            or(eq(roles.code, ROLE_CODES.VET), eq(roles.code, ROLE_CODES.ADMIN)),
+            eq(roles.code, ROLE_CODES.VET),
             eq(users.active, true)
           )
         );
@@ -147,7 +147,7 @@ export const vetRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Get all active vets and admins (admins can be booked as vets)
+      // Get all active vets
       const vets = await ctx.db
         .select({
           id: users.id,
@@ -161,7 +161,7 @@ export const vetRouter = createTRPCRouter({
         .where(
           and(
             eq(users.tenantId, input.tenantId),
-            or(eq(roles.code, ROLE_CODES.VET), eq(roles.code, ROLE_CODES.ADMIN)),
+            eq(roles.code, ROLE_CODES.VET),
             eq(users.active, true)
           )
         );
