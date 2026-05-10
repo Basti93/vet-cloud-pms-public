@@ -162,11 +162,23 @@ async function assertEmbeddingOriginAllowed(
   headers: Headers,
   opts: { tenantId?: string; slug?: string; embeddingOrigin?: string }
 ) {
-  const allowedDomains = opts.tenantId
+  const configuredDomains = opts.tenantId
     ? await getAllowedEmbeddingDomainsForTenant(db, opts.tenantId)
     : opts.slug
       ? await getAllowedEmbeddingDomainsForSlug(db, opts.slug)
       : [];
+
+  // Always allow the booking app's own domain (self-hosted page access).
+  let mainDomainHost: string | null = null;
+  try {
+    mainDomainHost = new URL(getMainDomain()).hostname;
+  } catch {
+    mainDomainHost = null;
+  }
+
+  const allowedDomains = normalizeEmbeddingDomains(
+    mainDomainHost ? [...configuredDomains, mainDomainHost] : configuredDomains
+  );
 
   // No allowlist configured => keep current open behavior
   if (allowedDomains.length === 0) return;
