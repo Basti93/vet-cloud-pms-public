@@ -34,7 +34,6 @@ export async function GET(request: NextRequest) {
       db,
       vetUsers,
       now: new Date(),
-      seedVaccinationTypesFirst: true,
     });
 
     return NextResponse.json({

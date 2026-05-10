@@ -366,7 +366,6 @@ async function main() {
       db,
       vetUsers: createdVets,
       now: new Date(),
-      seedVaccinationTypesFirst: true,
     });
 
     const stats = getTestDataStats();

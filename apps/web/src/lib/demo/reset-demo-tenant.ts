@@ -1,5 +1,4 @@
 import { eq, sql } from "drizzle-orm";
-import { seedVaccinationTypes } from "@/lib/db/seed-vaccination-types";
 import type { Database } from "@/lib/db/client";
 import {
   appointments,
@@ -106,21 +105,15 @@ export async function resetDemoTenantData({
   db,
   vetUsers,
   now = new Date(),
-  seedVaccinationTypesFirst = true,
 }: {
   db: Database;
   vetUsers: DemoVetUser[];
   now?: Date;
-  seedVaccinationTypesFirst?: boolean;
 }): Promise<DemoResetSummary> {
   if (vetUsers.length === 0) {
     throw new Error(
       "No demo vet users found. Run scripts/demo-reset.ts --reset once to bootstrap users/roles."
     );
-  }
-
-  if (seedVaccinationTypesFirst) {
-    await seedVaccinationTypes();
   }
 
   const reminderDefaults = getDemoReminderDefaults();
