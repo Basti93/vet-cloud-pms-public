@@ -58,6 +58,17 @@ async function generateUniqueSlug(
   return finalSlug;
 }
 
+function normalizeEmbeddingDomain(domain: string) {
+  const trimmed = domain.trim().toLowerCase();
+  if (!trimmed) return null;
+
+  try {
+    return new URL(trimmed.includes("://") ? trimmed : `https://${trimmed}`).hostname;
+  } catch {
+    return trimmed.split("/")[0]?.split(":")[0] || null;
+  }
+}
+
 async function scheduleTenantDeletionFor30Days(
   ctx: { db: typeof appDb; userId: string | null },
   {
@@ -475,6 +486,7 @@ export const tenantRouter = createTRPCRouter({
         themePreference: tenants.themePreference,
         typographyPreference: tenants.typographyPreference,
         websiteTemplate: tenants.websiteTemplate,
+        allowedEmbeddingDomains: tenants.allowedEmbeddingDomains,
       })
       .from(tenants)
       .where(eq(tenants.id, user.tenantId))
@@ -543,6 +555,7 @@ export const tenantRouter = createTRPCRouter({
         postalCode: z.string().optional(),
         tagline: z.string().optional(),
         monogram: z.string().max(3).optional(),
+        allowedEmbeddingDomains: z.array(z.string()).optional(),
         themePreference: z.enum(["sage", "warmsand", "klinikblau", "bordeaux", "forest", "schiefer"]).optional(),
         typographyPreference: z.enum(["modern", "klassisch", "klinisch", "freundlich"]).optional(),
         websiteTemplate: z.enum(["klassik", "modern", "kompakt"]).optional(),
@@ -568,6 +581,15 @@ export const tenantRouter = createTRPCRouter({
       if (input.postalCode !== undefined) updateData.postalCode = input.postalCode;
       if (input.tagline !== undefined) updateData.tagline = input.tagline;
       if (input.monogram !== undefined) updateData.monogram = input.monogram;
+      if (input.allowedEmbeddingDomains !== undefined) {
+        updateData.allowedEmbeddingDomains = [
+          ...new Set(
+            input.allowedEmbeddingDomains
+              .map((domain) => normalizeEmbeddingDomain(domain))
+              .filter((domain): domain is string => Boolean(domain))
+          ),
+        ];
+      }
       if (input.themePreference !== undefined) updateData.themePreference = input.themePreference;
       if (input.typographyPreference !== undefined) updateData.typographyPreference = input.typographyPreference;
       if (input.websiteTemplate !== undefined) updateData.websiteTemplate = input.websiteTemplate;
