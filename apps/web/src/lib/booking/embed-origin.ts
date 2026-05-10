@@ -66,3 +66,12 @@ export function isRequestAllowedByEmbeddingDomains(
   if (!requestHost) return false;
   return isHostnameAllowed(requestHost, allowedDomains);
 }
+
+export function isEmbeddingOriginAllowed(
+  embeddingOrigin: string | null | undefined,
+  allowedDomains: string[]
+) {
+  const embeddingHost = extractHostnameFromUrl(embeddingOrigin);
+  if (!embeddingHost) return false;
+  return isHostnameAllowed(embeddingHost, allowedDomains);
+}

@@ -71,6 +71,16 @@ function isWeekend(d: Date) {
   return d.getDay() === 0 || d.getDay() === 6;
 }
 
+function getEmbeddingOrigin() {
+  if (typeof window === "undefined") return undefined;
+  if (!document.referrer) return undefined;
+  try {
+    return new URL(document.referrer).origin;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Build next N weekdays starting from tomorrow */
 function buildWeekdays(count = 14): Date[] {
   const days: Date[] = [];
@@ -270,6 +280,7 @@ function StepDate({
   vets,
   primaryColor,
   browserSessionId,
+  embeddingOrigin,
   onBack,
   onSelect,
 }: {
@@ -278,6 +289,7 @@ function StepDate({
   vets?: VetOption[];
   primaryColor: string;
   browserSessionId: string;
+  embeddingOrigin?: string;
   onBack: () => void;
   onSelect: (slot: Slot, holdToken: string, holdExpiresAt: Date) => void;
 }) {
@@ -296,7 +308,12 @@ function StepDate({
 
   const { data: slots, isLoading: slotsLoading, refetch: refetchSlots } =
     trpc.booking.getAvailableSlots.useQuery(
-      { tenantId, date: selectedDay!, vetId: vetId || undefined },
+      {
+        tenantId,
+        date: selectedDay!,
+        vetId: vetId || undefined,
+        embeddingOrigin,
+      },
       { enabled: !!selectedDay }
     );
 
@@ -309,7 +326,7 @@ function StepDate({
     setHoldError(null);
     // Release hold when switching day
     if (holdToken) {
-      releaseHoldMutation.mutate({ holdToken });
+      releaseHoldMutation.mutate({ holdToken, embeddingOrigin });
       setHoldToken(null);
       setHoldExpiresAt(null);
     }
@@ -319,14 +336,20 @@ function StepDate({
     setHoldError(null);
     // Release previous hold before creating a new one
     if (holdToken) {
-      releaseHoldMutation.mutate({ holdToken });
+      releaseHoldMutation.mutate({ holdToken, embeddingOrigin });
       setHoldToken(null);
       setHoldExpiresAt(null);
     }
     setSelectedSlot(slot);
 
     holdSlotMutation.mutate(
-      { tenantId, slotDatetime: slot.start, vetId: vetId || undefined, browserSessionId },
+      {
+        tenantId,
+        slotDatetime: slot.start,
+        vetId: vetId || undefined,
+        browserSessionId,
+        embeddingOrigin,
+      },
       {
         onSuccess: (data) => {
           setHoldToken(data.holdToken);
@@ -343,7 +366,7 @@ function StepDate({
 
   const handleBack = () => {
     if (holdToken) {
-      releaseHoldMutation.mutate({ holdToken });
+      releaseHoldMutation.mutate({ holdToken, embeddingOrigin });
     }
     onBack();
   };
@@ -715,6 +738,7 @@ function StepConfirm({
   selectedVetId,
   primaryColor,
   browserSessionId,
+  embeddingOrigin,
   holdToken: _holdToken,
   holdExpiresAt,
   onHoldExpired,
@@ -729,6 +753,7 @@ function StepConfirm({
   selectedVetId?: string;
   primaryColor: string;
   browserSessionId: string;
+  embeddingOrigin?: string;
   holdToken?: string | null;
   holdExpiresAt?: Date | null;
   onHoldExpired?: () => void;
@@ -774,6 +799,7 @@ function StepConfirm({
       },
       vetId: selectedVetId || undefined,
       browserSessionId,
+      embeddingOrigin,
     });
   };
 
@@ -911,10 +937,11 @@ export default function BookingPage({
   const { t } = useLocale();
   const systemDomain = getSystemDomain();
   const autoSuggestAttemptedRef = useRef<string | null>(null);
+  const embeddingOrigin = getEmbeddingOrigin();
 
   const { data: clinic, isLoading: clinicLoading, error: clinicError } =
     trpc.booking.getClinic.useQuery(
-      { slug: tenantSlug },
+      { slug: tenantSlug, embeddingOrigin },
       { retry: false }
     );
 
@@ -928,12 +955,12 @@ export default function BookingPage({
     : TYPE_PAIRINGS.modern;
 
   const { data: vets } = trpc.booking.listPublicVets.useQuery(
-    { tenantId: clinic?.id || "" },
+    { tenantId: clinic?.id || "", embeddingOrigin },
     { enabled: !!clinic?.id, retry: false }
   );
 
   const { data: vetAvailability } = trpc.booking.getVetAvailability.useQuery(
-    { tenantId: clinic?.id || "" },
+    { tenantId: clinic?.id || "", embeddingOrigin },
     { enabled: !!clinic?.id }
   );
 
@@ -975,13 +1002,13 @@ export default function BookingPage({
   /** Called when navigating back from StepDetails → StepDate */
   const handleDetailsBack = useCallback(() => {
     if (holdToken) {
-      releaseHoldMutation.mutate({ holdToken });
+      releaseHoldMutation.mutate({ holdToken, embeddingOrigin });
     }
     setHoldToken(null);
     setHoldExpiresAt(null);
     updateField("date", undefined);
     setStep("date");
-  }, [holdToken, releaseHoldMutation, updateField]);
+  }, [holdToken, releaseHoldMutation, updateField, embeddingOrigin]);
 
   // Helper: Get vet display name by ID
   const getVetDisplayName = (vetId: string) => {
@@ -1010,7 +1037,7 @@ export default function BookingPage({
       autoSuggestAttemptedRef.current = clinic.id;
 
       suggestVetMutation.mutate(
-        { tenantId: clinic.id },
+        { tenantId: clinic.id, embeddingOrigin },
         {
           onSuccess: (data) => {
             if (data?.id) {
@@ -1027,7 +1054,7 @@ export default function BookingPage({
         }
       );
     }
-  }, [step, selectedVetId, clinic?.id, vets, updateField, suggestVetMutation]);
+  }, [step, selectedVetId, clinic?.id, vets, updateField, suggestVetMutation, embeddingOrigin]);
 
   // Loading state
   if (clinicLoading) {
@@ -1132,6 +1159,7 @@ export default function BookingPage({
                   vets={vets}
                   primaryColor={primaryColor}
                   browserSessionId={formState.browserSessionId!}
+                  embeddingOrigin={embeddingOrigin}
                   onBack={() => setStep("vet")}
                   onSelect={(s, token, expiresAt) => {
                     updateField("date", JSON.stringify(s));
@@ -1166,6 +1194,7 @@ export default function BookingPage({
                   selectedVetId={selectedVetId}
                   primaryColor={primaryColor}
                   browserSessionId={formState.browserSessionId!}
+                  embeddingOrigin={embeddingOrigin}
                   holdToken={holdToken}
                   holdExpiresAt={holdExpiresAt}
                   onHoldExpired={handleHoldExpired}

@@ -11,6 +11,7 @@ import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import type * as schema from "@/lib/db/schema";
 import { ROLE_CODES } from "@/lib/auth/roles";
 import {
+  isEmbeddingOriginAllowed,
   isRequestAllowedByEmbeddingDomains,
   normalizeEmbeddingDomains,
 } from "@/lib/booking/embed-origin";
@@ -159,7 +160,7 @@ async function getAllowedEmbeddingDomainsForSlug(
 async function assertEmbeddingOriginAllowed(
   db: Db,
   headers: Headers,
-  opts: { tenantId?: string; slug?: string }
+  opts: { tenantId?: string; slug?: string; embeddingOrigin?: string }
 ) {
   const allowedDomains = opts.tenantId
     ? await getAllowedEmbeddingDomainsForTenant(db, opts.tenantId)
@@ -169,6 +170,17 @@ async function assertEmbeddingOriginAllowed(
 
   // No allowlist configured => keep current open behavior
   if (allowedDomains.length === 0) return;
+
+  if (opts.embeddingOrigin !== undefined) {
+    if (isEmbeddingOriginAllowed(opts.embeddingOrigin, allowedDomains)) {
+      return;
+    }
+
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Diese Domain ist nicht autorisiert, das Buchungs-Widget einzubinden",
+    });
+  }
 
   if (!isRequestAllowedByEmbeddingDomains(headers, allowedDomains)) {
     throw new TRPCError({
@@ -362,7 +374,12 @@ export const bookingRouter = createTRPCRouter({
 
   /** Public: Fetch clinic info by slug for the booking widget header */
   getClinic: publicProcedure
-    .input(z.object({ slug: z.string().min(1) }))
+    .input(
+      z.object({
+        slug: z.string().min(1),
+        embeddingOrigin: z.string().optional(),
+      })
+    )
     .query(async ({ ctx, input }) => {
       const [tenant] = await ctx.db
         .select({
@@ -389,17 +406,26 @@ export const bookingRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Praxis nicht gefunden" });
       }
 
-      await assertEmbeddingOriginAllowed(ctx.db, ctx.headers, { slug: input.slug });
+      await assertEmbeddingOriginAllowed(ctx.db, ctx.headers, {
+        slug: input.slug,
+        embeddingOrigin: input.embeddingOrigin,
+      });
 
       return tenant;
     }),
 
   /** Public: List vets for booking widget */
   listPublicVets: publicProcedure
-    .input(z.object({ tenantId: z.string().uuid() }))
+    .input(
+      z.object({
+        tenantId: z.string().uuid(),
+        embeddingOrigin: z.string().optional(),
+      })
+    )
     .query(async ({ ctx, input }) => {
       await assertEmbeddingOriginAllowed(ctx.db, ctx.headers, {
         tenantId: input.tenantId,
+        embeddingOrigin: input.embeddingOrigin,
       });
 
       const vets = await ctx.db
@@ -431,11 +457,13 @@ export const bookingRouter = createTRPCRouter({
         tenantId: z.string().uuid(),
         startTime: z.date().optional(),
         endTime: z.date().optional(),
+        embeddingOrigin: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       await assertEmbeddingOriginAllowed(ctx.db, ctx.headers, {
         tenantId: input.tenantId,
+        embeddingOrigin: input.embeddingOrigin,
       });
 
       const vets = await ctx.db
@@ -510,11 +538,13 @@ export const bookingRouter = createTRPCRouter({
         tenantId: z.string().uuid(),
         date: z.date(),
         vetId: z.string().uuid().optional(),
+        embeddingOrigin: z.string().optional(),
       })
     )
     .query(async ({ ctx, input }) => {
       await assertEmbeddingOriginAllowed(ctx.db, ctx.headers, {
         tenantId: input.tenantId,
+        embeddingOrigin: input.embeddingOrigin,
       });
 
       const dayStart = new Date(input.date);
@@ -616,11 +646,13 @@ export const bookingRouter = createTRPCRouter({
         }),
         vetId: z.string().uuid().optional(),
         browserSessionId: z.string().uuid(),
+        embeddingOrigin: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       await assertEmbeddingOriginAllowed(ctx.db, ctx.headers, {
         tenantId: input.tenantId,
+        embeddingOrigin: input.embeddingOrigin,
       });
 
       // Verify tenant exists + slot is still in the future
@@ -803,11 +835,13 @@ export const bookingRouter = createTRPCRouter({
         slotDatetime: z.date(),
         vetId: z.string().uuid().optional(),
         browserSessionId: z.string().uuid(),
+        embeddingOrigin: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       await assertEmbeddingOriginAllowed(ctx.db, ctx.headers, {
         tenantId: input.tenantId,
+        embeddingOrigin: input.embeddingOrigin,
       });
 
       const now = new Date();
@@ -912,7 +946,12 @@ export const bookingRouter = createTRPCRouter({
 
   /** Public: Release a hold (user went back or navigated away) */
   releaseHold: publicProcedure
-    .input(z.object({ holdToken: z.string().uuid() }))
+    .input(
+      z.object({
+        holdToken: z.string().uuid(),
+        embeddingOrigin: z.string().optional(),
+      })
+    )
     .mutation(async ({ ctx, input }) => {
       const [hold] = await ctx.db
         .select({ tenantId: appointmentHolds.tenantId })
@@ -923,6 +962,7 @@ export const bookingRouter = createTRPCRouter({
       if (hold?.tenantId) {
         await assertEmbeddingOriginAllowed(ctx.db, ctx.headers, {
           tenantId: hold.tenantId,
+          embeddingOrigin: input.embeddingOrigin,
         });
       }
 
@@ -939,11 +979,13 @@ export const bookingRouter = createTRPCRouter({
         tenantId: z.string().uuid(),
         slotDatetime: z.date(),
         vetId: z.string().uuid().optional(),
+        embeddingOrigin: z.string().optional(),
       })
     )
     .query(async ({ ctx, input }) => {
       await assertEmbeddingOriginAllowed(ctx.db, ctx.headers, {
         tenantId: input.tenantId,
+        embeddingOrigin: input.embeddingOrigin,
       });
 
       const now = new Date();
@@ -1001,10 +1043,16 @@ export const bookingRouter = createTRPCRouter({
 
   /** Public: Check which vets have available slots in next 14 days */
   getVetAvailability: publicProcedure
-    .input(z.object({ tenantId: z.string().uuid() }))
+    .input(
+      z.object({
+        tenantId: z.string().uuid(),
+        embeddingOrigin: z.string().optional(),
+      })
+    )
     .query(async ({ ctx, input }) => {
       await assertEmbeddingOriginAllowed(ctx.db, ctx.headers, {
         tenantId: input.tenantId,
+        embeddingOrigin: input.embeddingOrigin,
       });
 
       // Get all active vets
