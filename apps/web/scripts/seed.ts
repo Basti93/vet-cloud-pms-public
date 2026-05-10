@@ -6,7 +6,7 @@
  * - Do NOT create demo tenant/business data
  *
  * Demo data lifecycle (nightly reset / demo reseed) is handled by:
- * - apps/web/scripts/admin-reset.ts --reset
+ * - apps/web/scripts/demo-reset.ts --reset
  */
 
 import fs from "fs";
@@ -41,7 +41,7 @@ async function seed() {
     console.log("  ✓ Vaccination types upserted\n");
 
     console.log("✨ Global seed completed successfully!");
-    console.log("ℹ️  Demo tenant data is managed by: npx tsx scripts/admin-reset.ts --reset");
+    console.log("ℹ️  Demo tenant data is managed by: npx tsx scripts/demo-reset.ts --reset");
   } catch (error) {
     console.error("❌ Global seed failed:", error);
     process.exit(1);

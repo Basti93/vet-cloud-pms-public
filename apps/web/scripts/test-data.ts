@@ -1,6 +1,6 @@
 /**
  * Test Data Definition — Single Source of Truth
- * Used by admin-reset.ts (demo tenant lifecycle)
+ * Used by demo-reset.ts (demo tenant lifecycle)
  *
  * Keep this file as the authoritative source for all test data.
  * Changes here automatically apply to demo reseeding/reset.
