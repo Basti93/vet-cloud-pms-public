@@ -1,9 +1,40 @@
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
 import { createTRPCRouter, protectedProcedure } from "@/server/trpc";
-import { users, vetSchedules, vetAbsences } from "@/lib/db/schema";
+import { users, vetSchedules, vetAbsences, userRoles, roles } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
 import { writeAuditLog } from "@/server/audit";
+import { ROLE_CODES } from "@/lib/auth/roles";
+
+async function getCurrentVetUserOrThrow(ctx: { db: typeof import("@/lib/db/client").db; userId: string }) {
+  const [user] = await ctx.db
+    .select({ id: users.id, tenantId: users.tenantId })
+    .from(users)
+    .where(eq(users.clerkId, ctx.userId));
+
+  if (!user) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "User not found",
+    });
+  }
+
+  const [vetRole] = await ctx.db
+    .select({ code: roles.code })
+    .from(userRoles)
+    .innerJoin(roles, eq(roles.id, userRoles.roleId))
+    .where(and(eq(userRoles.userId, user.id), eq(roles.code, ROLE_CODES.VET)))
+    .limit(1);
+
+  if (!vetRole) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Only users with vet role can manage availability",
+    });
+  }
+
+  return user;
+}
 
 export const userRouter = createTRPCRouter({
   /**
@@ -110,18 +141,7 @@ export const userRouter = createTRPCRouter({
    * Protected: Auth required
    */
   getVetSchedule: protectedProcedure.query(async ({ ctx }) => {
-    // Get user's database ID by clerkId
-    const [user] = await ctx.db
-      .select({ id: users.id, tenantId: users.tenantId })
-      .from(users)
-      .where(eq(users.clerkId, ctx.userId));
-
-    if (!user) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "User not found",
-      });
-    }
+    const user = await getCurrentVetUserOrThrow(ctx);
 
     const schedules = await ctx.db
       .select()
@@ -156,18 +176,7 @@ export const userRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Get user's database ID by clerkId
-      const [user] = await ctx.db
-        .select({ id: users.id, tenantId: users.tenantId })
-        .from(users)
-        .where(eq(users.clerkId, ctx.userId));
-
-      if (!user) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "User not found",
-        });
-      }
+      const user = await getCurrentVetUserOrThrow(ctx);
 
       // Try to update existing schedule, or insert if not exists
       const [existing] = await ctx.db
@@ -226,18 +235,7 @@ export const userRouter = createTRPCRouter({
    * Protected: Auth required
    */
   getVetAbsences: protectedProcedure.query(async ({ ctx }) => {
-    // Get user's database ID by clerkId
-    const [user] = await ctx.db
-      .select({ id: users.id, tenantId: users.tenantId })
-      .from(users)
-      .where(eq(users.clerkId, ctx.userId));
-
-    if (!user) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "User not found",
-      });
-    }
+    const user = await getCurrentVetUserOrThrow(ctx);
 
     const absences = await ctx.db
       .select()
@@ -266,18 +264,7 @@ export const userRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Get user's database ID by clerkId
-      const [user] = await ctx.db
-        .select({ id: users.id, tenantId: users.tenantId })
-        .from(users)
-        .where(eq(users.clerkId, ctx.userId));
-
-      if (!user) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "User not found",
-        });
-      }
+      const user = await getCurrentVetUserOrThrow(ctx);
 
       await ctx.db.insert(vetAbsences).values({
         vetId: user.id,
@@ -315,18 +302,7 @@ export const userRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Get user's database ID by clerkId
-      const [user] = await ctx.db
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.clerkId, ctx.userId));
-
-      if (!user) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "User not found",
-        });
-      }
+      const user = await getCurrentVetUserOrThrow(ctx);
 
       // Verify the absence belongs to the current user
       const [absence] = await ctx.db
@@ -367,6 +343,7 @@ export const userRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       try {
+        await getCurrentVetUserOrThrow(ctx);
         const [updatedUser] = await ctx.db
           .update(users)
           .set({ slotDurationMin: input.slotDurationMin })
