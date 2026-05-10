@@ -1239,7 +1239,14 @@ export default function BookingPage({
             {/* Footer */}
             <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-center gap-1.5">
               <span className="text-xs text-gray-400">Powered by</span>
-              <span className="text-xs font-bold text-gray-500">{poweredByLabel}</span>
+              <a
+                href={poweredByLabel}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-bold text-gray-500 hover:text-gray-700 underline underline-offset-2"
+              >
+                {poweredByLabel}
+              </a>
             </div>
           </div>
         </div>
