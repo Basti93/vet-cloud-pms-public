@@ -40,6 +40,8 @@ import {
   vetAbsences,
   roles,
   rolePermissions,
+  emailSettings,
+  vaccinationSettings,
 } from "../src/lib/db/schema";
 import { TEST_DATA, DEMO_TENANT_ID, getTestDataStats } from "./test-data";
 import { createDefaultRoles } from "../src/lib/auth/permissions";
@@ -67,6 +69,8 @@ const db = drizzle(sql, {
     vitals,
     roles,
     rolePermissions,
+    emailSettings,
+    vaccinationSettings,
   },
 });
 
@@ -116,6 +120,40 @@ async function seed() {
     console.log("👥 Creating default roles...");
     await createDefaultRoles(tenantId);
     console.log("  ✓ Default roles created (Admin, Vet, Receptionist)\n");
+
+    // ────────────────────────────────────────────────────────────────────────
+    // 1c. DEMO EMAIL/VACCINATION REMINDER SETTINGS
+    // ────────────────────────────────────────────────────────────────────────
+    // Keep demo tenant reminder dispatch off by default to avoid accidental spam.
+    await db
+      .insert(emailSettings)
+      .values({
+        tenantId,
+        reminderEmailEnabled: false,
+        reminderHoursBefore: 24,
+      })
+      .onConflictDoUpdate({
+        target: emailSettings.tenantId,
+        set: {
+          reminderEmailEnabled: false,
+          reminderHoursBefore: 24,
+          updatedAt: new Date(),
+        },
+      });
+
+    await db
+      .insert(vaccinationSettings)
+      .values({
+        tenantId,
+        reminderEnabled: false,
+      })
+      .onConflictDoUpdate({
+        target: vaccinationSettings.tenantId,
+        set: {
+          reminderEnabled: false,
+          updatedAt: new Date(),
+        },
+      });
 
     // ────────────────────────────────────────────────────────────────────────
     // CLEANUP (remove old test data to prevent duplicates on re-runs)

@@ -35,6 +35,8 @@ import {
   roles,
   rolePermissions,
   userRoles,
+  emailSettings,
+  vaccinationSettings,
 } from "@/lib/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import {
@@ -320,6 +322,39 @@ async function main() {
       // CREATE DEFAULT ROLES (fresh)
       // ────────────────────────────────────────────────────────────────────
       await createDefaultRoles(DEMO_TENANT_ID);
+
+      // ────────────────────────────────────────────────────────────────────
+      // DEMO SAFETY SETTINGS (avoid nightly reminder spam)
+      // ────────────────────────────────────────────────────────────────────
+      await db
+        .insert(emailSettings)
+        .values({
+          tenantId: DEMO_TENANT_ID,
+          reminderEmailEnabled: false,
+          reminderHoursBefore: 24,
+        })
+        .onConflictDoUpdate({
+          target: emailSettings.tenantId,
+          set: {
+            reminderEmailEnabled: false,
+            reminderHoursBefore: 24,
+            updatedAt: new Date(),
+          },
+        });
+
+      await db
+        .insert(vaccinationSettings)
+        .values({
+          tenantId: DEMO_TENANT_ID,
+          reminderEnabled: false,
+        })
+        .onConflictDoUpdate({
+          target: vaccinationSettings.tenantId,
+          set: {
+            reminderEnabled: false,
+            updatedAt: new Date(),
+          },
+        });
 
       // ────────────────────────────────────────────────────────────────────
       // CREATE USERS (fresh from TEST_DATA)

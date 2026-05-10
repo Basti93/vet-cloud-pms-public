@@ -6,6 +6,8 @@ import {
   roles,
   userRoles,
   featureFlags,
+  emailSettings,
+  vaccinationSettings,
   tenantDeletionSchedules,
   PERMISSIONS,
 } from "@/lib/db/schema";
@@ -289,6 +291,24 @@ export const tenantRouter = createTRPCRouter({
       } catch (_error) {
         // Feature flags already exist, that's fine
       }
+
+      // Ensure default notification settings exist for every newly onboarded tenant.
+      // This avoids missing-row fallbacks and keeps cron behavior predictable.
+      await ctx.db
+        .insert(emailSettings)
+        .values({ tenantId: currentUser.tenantId, reminderHoursBefore: 24 })
+        .onConflictDoUpdate({
+          target: emailSettings.tenantId,
+          set: { updatedAt: new Date() },
+        });
+
+      await ctx.db
+        .insert(vaccinationSettings)
+        .values({ tenantId: currentUser.tenantId })
+        .onConflictDoUpdate({
+          target: vaccinationSettings.tenantId,
+          set: { updatedAt: new Date() },
+        });
 
       console.log(`Practice created: ${updatedTenant.slug} (${updatedTenant.id})`);
 
