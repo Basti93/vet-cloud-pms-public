@@ -199,13 +199,24 @@ async function seed() {
     await Promise.all(
       createdOrExistingUsers.map((u, idx) => {
         if (!u) return Promise.resolve(null);
-        const roleId = rolesByCode[usersToCreate[idx].role.toLowerCase()];
-        if (!roleId) return Promise.resolve(null);
-        return db.insert(userRoles).values({
-          userId: u.id,
-          roleId,
-          assignedBy: u.id,
-        }).onConflictDoNothing();
+        const roleCodes = [
+          usersToCreate[idx].role,
+          ...(usersToCreate[idx].additionalRoles ?? []),
+        ];
+        return Promise.all(
+          roleCodes.map((roleCode) => {
+            const roleId = rolesByCode[roleCode.toLowerCase()];
+            if (!roleId) return Promise.resolve(null);
+            return db
+              .insert(userRoles)
+              .values({
+                userId: u.id,
+                roleId,
+                assignedBy: u.id,
+              })
+              .onConflictDoNothing();
+          })
+        );
       })
     );
     console.log("  ✓ Roles assigned\n");

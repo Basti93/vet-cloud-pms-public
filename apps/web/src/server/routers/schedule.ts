@@ -1,10 +1,11 @@
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
 import { createTRPCRouter, protectedProcedure } from "@/server/trpc";
-import { tenants, vetSchedules, vetAbsences, users } from "@/lib/db/schema";
+import { tenants, vetSchedules, vetAbsences, users, userRoles, roles } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
 import { DEFAULT_OPENING_HOURS, type DaySchedule } from "@/lib/schedule-types";
 import { writeAuditLog } from "@/server/audit";
+import { ROLE_CODES } from "@/lib/auth/roles";
 
 const timeRangeSchema = z.object({
   startHour: z.number().int().min(0).max(23),
@@ -71,7 +72,15 @@ export const scheduleRouter = createTRPCRouter({
           slotDurationMin: users.slotDurationMin,
         })
         .from(users)
-        .where(and(eq(users.tenantId, input.tenantId), eq(users.active, true)));
+        .innerJoin(userRoles, eq(userRoles.userId, users.id))
+        .innerJoin(roles, eq(roles.id, userRoles.roleId))
+        .where(
+          and(
+            eq(users.tenantId, input.tenantId),
+            eq(users.active, true),
+            eq(roles.code, ROLE_CODES.VET)
+          )
+        );
 
       const schedules = await ctx.db
         .select()
