@@ -33,6 +33,7 @@ import {
   owners,
   patients,
   appointments,
+  vaccinations,
   diagnoses,
   medications,
   vitals,
@@ -46,6 +47,10 @@ import {
 import { TEST_DATA, DEMO_TENANT_ID, getTestDataStats } from "./test-data";
 import { createDefaultRoles } from "../src/lib/auth/permissions";
 import { seedVaccinationTypes } from "../src/lib/db/seed-vaccination-types";
+import {
+  buildDemoVaccinationRows,
+  getDemoReminderDefaults,
+} from "./lib/demo-fixtures";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
@@ -64,6 +69,7 @@ const db = drizzle(sql, {
     owners,
     patients,
     appointments,
+    vaccinations,
     diagnoses,
     medications,
     vitals,
@@ -125,18 +131,19 @@ async function seed() {
     // 1c. DEMO EMAIL/VACCINATION REMINDER SETTINGS
     // ────────────────────────────────────────────────────────────────────────
     // Keep demo tenant reminder dispatch off by default to avoid accidental spam.
+    const reminderDefaults = getDemoReminderDefaults();
     await db
       .insert(emailSettings)
       .values({
         tenantId,
-        reminderEmailEnabled: false,
-        reminderHoursBefore: 24,
+        reminderEmailEnabled: reminderDefaults.appointmentRemindersEnabled,
+        reminderHoursBefore: reminderDefaults.appointmentReminderHoursBefore,
       })
       .onConflictDoUpdate({
         target: emailSettings.tenantId,
         set: {
-          reminderEmailEnabled: false,
-          reminderHoursBefore: 24,
+          reminderEmailEnabled: reminderDefaults.appointmentRemindersEnabled,
+          reminderHoursBefore: reminderDefaults.appointmentReminderHoursBefore,
           updatedAt: new Date(),
         },
       });
@@ -145,12 +152,12 @@ async function seed() {
       .insert(vaccinationSettings)
       .values({
         tenantId,
-        reminderEnabled: false,
+        reminderEnabled: reminderDefaults.vaccinationRemindersEnabled,
       })
       .onConflictDoUpdate({
         target: vaccinationSettings.tenantId,
         set: {
-          reminderEnabled: false,
+          reminderEnabled: reminderDefaults.vaccinationRemindersEnabled,
           updatedAt: new Date(),
         },
       });
@@ -159,6 +166,7 @@ async function seed() {
     // CLEANUP (remove old test data to prevent duplicates on re-runs)
     // ────────────────────────────────────────────────────────────────────────
     console.log("🗑️  Cleaning up old test data...");
+    await db.delete(vaccinations).where(eq(vaccinations.tenantId, tenantId));
     await db.delete(appointments).where(eq(appointments.tenantId, tenantId));
     await db.delete(diagnoses).where(eq(diagnoses.tenantId, tenantId));
     await db.delete(medications).where(eq(medications.tenantId, tenantId));
@@ -410,10 +418,25 @@ async function seed() {
     console.log(`  ✓ ${TEST_DATA.vitals.length} vitals\n`);
 
     // ────────────────────────────────────────────────────────────────────────
-    // 8. CREATE INTERNAL APPOINTMENTS
+    // 8. CREATE VACCINATIONS
+    // ────────────────────────────────────────────────────────────────────────
+    console.log("💉 Creating vaccinations...");
+    const now = new Date();
+    const vaccinationRows = buildDemoVaccinationRows({
+      tenantId,
+      patientIds: createdPatients.map((p) => p.id),
+      vetIds: createdVets.map((v) => v.id),
+      now,
+    });
+    if (vaccinationRows.length > 0) {
+      await db.insert(vaccinations).values(vaccinationRows);
+    }
+    console.log(`  ✓ ${vaccinationRows.length} vaccinations\n`);
+
+    // ────────────────────────────────────────────────────────────────────────
+    // 9. CREATE INTERNAL APPOINTMENTS
     // ────────────────────────────────────────────────────────────────────────
     console.log("📅 Creating internal appointments...");
-    const now = new Date();
     await Promise.all(
       TEST_DATA.internalAppointments.map(({ patientIndex, vetIndex, daysFromNow, hour, ...aptData }) => {
         const startTime = new Date(
@@ -438,7 +461,7 @@ async function seed() {
     console.log(`  ✓ ${TEST_DATA.internalAppointments.length} internal appointments\n`);
 
     // ────────────────────────────────────────────────────────────────────────
-    // 9. CREATE ONLINE BOOKINGS
+    // 10. CREATE ONLINE BOOKINGS
     // ────────────────────────────────────────────────────────────────────────
     console.log("📅 Creating online bookings...");
     await Promise.all(
@@ -479,6 +502,7 @@ async function seed() {
     console.log(`  • Diagnoses: ${stats.diagnoses}`);
     console.log(`  • Medications: ${stats.medications}`);
     console.log(`  • Vitals: ${stats.vitals}`);
+    console.log(`  • Vaccinations: ${stats.totalVaccinations}`);
     console.log(
       `  • Appointments: ${stats.internalAppointments} internal + ${stats.onlineBookings} bookings`
     );

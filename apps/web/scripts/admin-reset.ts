@@ -46,6 +46,10 @@ import {
   getTestDataStats,
 } from "./test-data";
 import { createDefaultRoles } from "@/lib/auth/permissions";
+import {
+  buildDemoVaccinationRows,
+  getDemoReminderDefaults,
+} from "./lib/demo-fixtures";
 
 type DemoUser = (typeof TEST_DATA.users)[number];
 type ClerkUpsertResult = {
@@ -326,18 +330,19 @@ async function main() {
       // ────────────────────────────────────────────────────────────────────
       // DEMO SAFETY SETTINGS (avoid nightly reminder spam)
       // ────────────────────────────────────────────────────────────────────
+      const reminderDefaults = getDemoReminderDefaults();
       await db
         .insert(emailSettings)
         .values({
           tenantId: DEMO_TENANT_ID,
-          reminderEmailEnabled: false,
-          reminderHoursBefore: 24,
+          reminderEmailEnabled: reminderDefaults.appointmentRemindersEnabled,
+          reminderHoursBefore: reminderDefaults.appointmentReminderHoursBefore,
         })
         .onConflictDoUpdate({
           target: emailSettings.tenantId,
           set: {
-            reminderEmailEnabled: false,
-            reminderHoursBefore: 24,
+            reminderEmailEnabled: reminderDefaults.appointmentRemindersEnabled,
+            reminderHoursBefore: reminderDefaults.appointmentReminderHoursBefore,
             updatedAt: new Date(),
           },
         });
@@ -346,12 +351,12 @@ async function main() {
         .insert(vaccinationSettings)
         .values({
           tenantId: DEMO_TENANT_ID,
-          reminderEnabled: false,
+          reminderEnabled: reminderDefaults.vaccinationRemindersEnabled,
         })
         .onConflictDoUpdate({
           target: vaccinationSettings.tenantId,
           set: {
-            reminderEnabled: false,
+            reminderEnabled: reminderDefaults.vaccinationRemindersEnabled,
             updatedAt: new Date(),
           },
         });
@@ -567,50 +572,16 @@ async function main() {
       // ────────────────────────────────────────────────────────────────────
       // CREATE VACCINATIONS
       // ────────────────────────────────────────────────────────────────────
-      const vaccinationTypes = [
-        "Tollwut",
-        "Staupe",
-        "Leptospirose",
-        "Parvovirose",
-        "Katzenschnupfen",
-        "Katzenseuche",
-      ];
-      let vaccinationCount = 0;
-      await Promise.all(
-        createdPatients.map((patient, idx) => {
-          const assignedVet = allVets[idx % allVets.length];
-          if (!assignedVet) return null;
-
-          const primaryAdmin = new Date(now.getTime() - (180 + idx * 7) * 24 * 60 * 60 * 1000);
-          const primaryExpiry = new Date(now.getTime() + (idx % 3 === 0 ? -14 : 45 + idx * 2) * 24 * 60 * 60 * 1000);
-          const boosterAdmin = new Date(now.getTime() - (30 + idx * 4) * 24 * 60 * 60 * 1000);
-          const boosterExpiry = new Date(now.getTime() + (15 + idx * 5) * 24 * 60 * 60 * 1000);
-
-          vaccinationCount += 2;
-          return Promise.all([
-            db.insert(vaccinations).values({
-              tenantId: DEMO_TENANT_ID,
-              patientId: patient.id,
-              type: vaccinationTypes[idx % vaccinationTypes.length]!,
-              administeredDate: primaryAdmin,
-              expiryDate: primaryExpiry,
-              vetId: assignedVet.id,
-              batchNumber: `DEMO-${idx + 1}-A`,
-              notes: "Automatisch erzeugter Demo-Impfeintrag",
-            }),
-            db.insert(vaccinations).values({
-              tenantId: DEMO_TENANT_ID,
-              patientId: patient.id,
-              type: `${vaccinationTypes[idx % vaccinationTypes.length]} Booster`,
-              administeredDate: boosterAdmin,
-              expiryDate: boosterExpiry,
-              vetId: assignedVet.id,
-              batchNumber: `DEMO-${idx + 1}-B`,
-              notes: "Automatisch erzeugter Demo-Booster",
-            }),
-          ]);
-        })
-      );
+      const vaccinationRows = buildDemoVaccinationRows({
+        tenantId: DEMO_TENANT_ID,
+        patientIds: createdPatients.map((p) => p.id),
+        vetIds: allVets.map((v) => v.id),
+        now,
+      });
+      if (vaccinationRows.length > 0) {
+        await db.insert(vaccinations).values(vaccinationRows);
+      }
+      const vaccinationCount = vaccinationRows.length;
 
       // ────────────────────────────────────────────────────────────────────
       // CREATE INTERNAL APPOINTMENTS

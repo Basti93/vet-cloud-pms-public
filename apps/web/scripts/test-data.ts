@@ -474,6 +474,42 @@ export const TEST_DATA = {
     { vetIndex: 1, startDate: "2026-04-28", endDate: "2026-04-29", type: "sick" as const, note: null },
     { vetIndex: 2, startDate: "2026-05-19", endDate: "2026-05-29", type: "vacation" as const, note: "Urlaub" },
   ],
+
+  // ────────────────────────────────────────────────────────────────────────
+  // REMINDER DEFAULTS (used by both seed.ts and admin-reset.ts)
+  // ────────────────────────────────────────────────────────────────────────
+  demoReminderDefaults: {
+    appointmentRemindersEnabled: false,
+    vaccinationRemindersEnabled: false,
+    appointmentReminderHoursBefore: 24,
+  },
+
+  // ────────────────────────────────────────────────────────────────────────
+  // VACCINATION DEMO GENERATION RULES (used by both seed.ts and admin-reset.ts)
+  // ────────────────────────────────────────────────────────────────────────
+  vaccinationDemoConfig: {
+    typeCycle: [
+      "Tollwut",
+      "Staupe",
+      "Leptospirose",
+      "Parvovirose",
+      "Katzenschnupfen",
+      "Katzenseuche",
+    ],
+    primaryAdminDaysAgoBase: 180,
+    primaryAdminDaysAgoStep: 7,
+    primaryExpiryOverdueEveryNth: 3,
+    primaryExpiryOverdueDays: -14,
+    primaryExpiryUpcomingDaysBase: 45,
+    primaryExpiryUpcomingDaysStep: 2,
+    boosterAdminDaysAgoBase: 30,
+    boosterAdminDaysAgoStep: 4,
+    boosterExpiryDaysBase: 15,
+    boosterExpiryDaysStep: 5,
+    notesPrimary: "Automatisch erzeugter Demo-Impfeintrag",
+    notesBooster: "Automatisch erzeugter Demo-Booster",
+    batchPrefix: "DEMO",
+  },
 };
 
 // ────────────────────────────────────────────────────────────────────────
@@ -496,5 +532,7 @@ export function getTestDataStats() {
     ).length,
     vetSchedules: TEST_DATA.vetSchedules.length,
     vetAbsences: TEST_DATA.vetAbsences.length,
+    vaccinationsPerPatient: 2,
+    totalVaccinations: TEST_DATA.patients.length * 2,
   };
 }
