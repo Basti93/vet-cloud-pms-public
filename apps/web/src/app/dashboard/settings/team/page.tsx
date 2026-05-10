@@ -86,6 +86,13 @@ export default function TeamPage() {
     if (!tenantId) return;
     removeRoleMutation.mutate({ tenantId, userId, roleId });
   };
+  const assignableRoles = roles?.filter(
+    (role) =>
+      !users
+        ?.find((u: UserWithRoles) => u.id === showAddRoleModal)
+        ?.roles?.some((r) => r.id === role.id)
+  ) ?? [];
+
   const handleCreateInvitation = (e: React.FormEvent) => {
     e.preventDefault();
     if (!tenantId || !inviteEmail.trim()) return;
@@ -276,32 +283,31 @@ export default function TeamPage() {
       {/* Add Role Modal */}
       {showAddRoleModal && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-[2px]"
           onClick={() => setShowAddRoleModal(null)}
         >
           <div
-            className="bg-white rounded-lg p-6 max-w-sm w-full mx-4"
+            className="w-full max-w-md rounded-xl border p-5 shadow-xl mx-4"
             onClick={(e) => e.stopPropagation()}
-            style={{ backgroundColor: "var(--color-surface)" }}
+            style={{
+              backgroundColor: "var(--color-surface)",
+              borderColor: "var(--color-border)",
+            }}
           >
-            <h3 className="font-bold mb-4" style={{ color: "var(--color-fg)" }}>
+            <h3 className="text-base font-semibold mb-1" style={{ color: "var(--color-fg)" }}>
               Rolle hinzufügen
             </h3>
+            <p className="text-sm mb-4" style={{ color: "var(--color-muted)" }}>
+              Wählen Sie eine Rolle für diesen Benutzer aus.
+            </p>
 
             <div className="space-y-2 mb-4 max-h-64 overflow-y-auto">
-              {roles && roles.length > 0 ? (
-                roles
-                  .filter(
-                    (role) =>
-                      !users
-                        ?.find((u: UserWithRoles) => u.id === showAddRoleModal)
-                        ?.roles?.some((r) => r.id === role.id)
-                  )
-                  .map((role) => (
+              {assignableRoles.length > 0 ? (
+                assignableRoles.map((role) => (
                     <button
                       key={role.id}
                       onClick={() => handleAssignRole(showAddRoleModal, role.id)}
-                      className="w-full text-left px-4 py-2 rounded hover:opacity-70"
+                      className="w-full text-left px-3 py-2.5 rounded-lg hover:opacity-80 transition-opacity"
                       style={{
                         backgroundColor: "var(--color-bg)",
                         color: "var(--color-fg)",
@@ -313,13 +319,15 @@ export default function TeamPage() {
                     </button>
                   ))
               ) : (
-                <p style={{ color: "var(--color-muted)" }}>Keine Rollen verfügbar</p>
+                <p className="text-sm" style={{ color: "var(--color-muted)" }}>
+                  Keine weiteren Rollen verfügbar.
+                </p>
               )}
             </div>
 
             <button
               onClick={() => setShowAddRoleModal(null)}
-              className="w-full px-4 py-2 rounded"
+              className="w-full px-4 py-2 rounded-lg"
               style={{
                 backgroundColor: "var(--color-border)",
                 color: "var(--color-fg)",
