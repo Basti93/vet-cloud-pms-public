@@ -335,9 +335,9 @@ export default function AccountPage() {
                 </p>
                 {subscriptionStatus.currentPrice && (
                   <p>
-                    Aktueller Tarif: <span className="font-medium">
-                      {subscriptionStatus.currentPrice.seats} Nutzer (
-                      €{(subscriptionStatus.currentPrice.monthlyPrice / 100).toFixed(2)}/Monat)
+                    {subscriptionStatus.isTrialing ? "Gewählter Tarif:" : "Aktueller Tarif:"}{" "}
+                    <span className="font-medium">
+                      {subscriptionStatus.currentPrice.seats} Nutzer (€{(subscriptionStatus.currentPrice.monthlyPrice / 100).toFixed(2)}/Monat)
                     </span>
                   </p>
                 )}
@@ -349,6 +349,13 @@ export default function AccountPage() {
                   </p>
                 )}
               </div>
+              {subscriptionStatus.isTrialing && subscriptionStatus.currentPrice && subscriptionStatus.trialEndsAt && (
+                <div className="mt-3 p-3 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-800">
+                  ℹ️ Nach der Testphase ({new Date(subscriptionStatus.trialEndsAt).toLocaleDateString("de-DE")}) wird automatisch{" "}
+                  <strong>€{(subscriptionStatus.currentPrice.monthlyPrice / 100).toFixed(2)}/Monat ({subscriptionStatus.currentPrice.seats} Nutzer)</strong> berechnet.
+                  Sie können den Tarif jederzeit vor Ablauf der Testphase ändern.
+                </div>
+              )}
             </div>
 
             <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
@@ -387,13 +394,17 @@ export default function AccountPage() {
               return (
                 <div className="mt-4 p-4 rounded-lg border border-blue-200 bg-blue-50 text-sm">
                   <p className="font-semibold text-blue-900 mb-1">
-                    {isUpgrade ? "Upgrade bestätigen" : "Downgrade bestätigen"}
+                    {subscriptionStatus.isTrialing
+                      ? "Tarif ändern"
+                      : isUpgrade ? "Upgrade bestätigen" : "Downgrade bestätigen"}
                   </p>
                   <p className="text-blue-800 mb-1">
                     {current?.label} ({current?.price}) → {pending?.label} ({pending?.price})
                   </p>
                   <p className="text-blue-700 text-xs mb-3">
-                    {isUpgrade
+                    {subscriptionStatus.isTrialing
+                      ? "Während der Testphase entstehen keine Kosten. Der neue Tarif wird nach Ablauf der Testphase berechnet."
+                      : isUpgrade
                       ? "Die anteilige Differenz für den verbleibenden Abrechnungszeitraum wird Ihrer nächsten Rechnung hinzugefügt."
                       : "Der neue Tarif gilt ab dem nächsten Abrechnungszeitraum. Für den aktuellen Zeitraum erhalten Sie keine Rückerstattung."}
                   </p>
