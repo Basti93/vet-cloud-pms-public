@@ -79,14 +79,21 @@ export default function AccountPage() {
     if (!pendingSeats) return;
     try {
       setErrorMessage("");
-      await changePlanMutation.mutateAsync({ seats: pendingSeats });
+      const result = await changePlanMutation.mutateAsync({ seats: pendingSeats });
       const currentSeats = subscriptionStatus?.currentPrice?.seats ?? 0;
       const isUpgrade = pendingSeats > currentSeats;
-      setSuccessMessage(
-        isUpgrade
-          ? "Tarif erfolgreich aktualisiert. Die anteilige Differenz wird Ihrer nächsten Rechnung hinzugefügt."
-          : "Tarif geändert. Der neue Tarif gilt ab dem nächsten Abrechnungszeitraum."
-      );
+      const deactivated = (result as { deactivatedUserCount?: number }).deactivatedUserCount ?? 0;
+      if (deactivated > 0) {
+        setSuccessMessage(
+          `Tarif geändert. ${deactivated} ${deactivated === 1 ? "Benutzer wurde" : "Benutzer wurden"} deaktiviert, da der neuen Tarif weniger Plätze hat. Sie können Benutzer unter Team & Benutzer verwalten reaktivieren, wenn Plätze frei werden.`
+        );
+      } else {
+        setSuccessMessage(
+          isUpgrade
+            ? "Tarif erfolgreich aktualisiert. Die anteilige Differenz wird Ihrer nächsten Rechnung hinzugefügt."
+            : "Tarif geändert. Der neue Tarif gilt ab dem nächsten Abrechnungszeitraum."
+        );
+      }
       setPendingSeats(null);
       await utils.subscriptions.getSubscriptionStatus.invalidate();
     } catch (error) {
@@ -410,7 +417,11 @@ export default function AccountPage() {
                       ? "Während der Testphase entstehen keine Kosten. Der neue Tarif wird nach Ablauf der Testphase berechnet."
                       : isUpgrade
                       ? "Die anteilige Differenz für den verbleibenden Abrechnungszeitraum wird Ihrer nächsten Rechnung hinzugefügt."
-                      : "Der neue Tarif gilt ab dem nächsten Abrechnungszeitraum. Für den aktuellen Zeitraum erhalten Sie keine Rückerstattung."}
+                      : `Der neue Tarif gilt ab dem nächsten Abrechnungszeitraum. Für den aktuellen Zeitraum erhalten Sie keine Rückerstattung.${
+                          (subscriptionStatus.maxUsers ?? 5) > pendingSeats
+                            ? ` Achtung: ${pendingSeats} Nutzerplätze bedeuten, dass überschüssige nicht-Admin-Benutzer automatisch deaktiviert werden.`
+                            : ""
+                        }`}
                   </p>
                   <div className="flex gap-2">
                     <button

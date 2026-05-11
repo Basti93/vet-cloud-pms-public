@@ -276,24 +276,26 @@ export const adminRouter = createTRPCRouter({
           userId: userRoles.userId,
           id: roles.id,
           name: roles.name,
+          code: roles.code,
         })
         .from(userRoles)
         .innerJoin(roles, eq(userRoles.roleId, roles.id))
         .where(inArray(userRoles.userId, userIds));
 
       // Group roles by user ID
-      const rolesByUserId = new Map<string, Array<{ id: string; name: string }>>();
+      const rolesByUserId = new Map<string, Array<{ id: string; name: string; code: string }>>();
       for (const ur of allUserRoles) {
         if (!rolesByUserId.has(ur.userId)) {
           rolesByUserId.set(ur.userId, []);
         }
-        rolesByUserId.get(ur.userId)!.push({ id: ur.id, name: ur.name });
+        rolesByUserId.get(ur.userId)!.push({ id: ur.id, name: ur.name, code: ur.code });
       }
 
       // Merge roles into users
       const usersWithRoles = allUsers.map((user) => ({
         ...user,
         roles: rolesByUserId.get(user.id) || [],
+        isAdmin: (rolesByUserId.get(user.id) || []).some((r) => r.code === ROLE_CODES.ADMIN),
       }));
 
       return usersWithRoles;
@@ -889,6 +891,133 @@ export const adminRouter = createTRPCRouter({
         event: "user.invitation_revoked",
         summary: "User invitation revoked",
         changes: { email: invitation.email },
+      });
+
+      return { success: true };
+    }),
+
+  getSeatInfo: protectedProcedure
+    .use(requirePermission(PERMISSIONS.USERS_MANAGE))
+    .input(z.object({ tenantId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const [currentUser] = await ctx.db
+        .select({ tenantId: users.tenantId })
+        .from(users)
+        .where(eq(users.clerkId, ctx.userId!))
+        .limit(1);
+      if (currentUser?.tenantId !== input.tenantId) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Cannot access seat info for other tenants" });
+      }
+
+      const [tenant] = await ctx.db
+        .select({ maxUsers: tenants.maxUsers })
+        .from(tenants)
+        .where(eq(tenants.id, input.tenantId))
+        .limit(1);
+
+      const [{ activeUsers }] = await ctx.db
+        .select({ activeUsers: count() })
+        .from(users)
+        .where(and(eq(users.tenantId, input.tenantId), eq(users.active, true)));
+
+      const [{ totalUsers }] = await ctx.db
+        .select({ totalUsers: count() })
+        .from(users)
+        .where(eq(users.tenantId, input.tenantId));
+
+      return {
+        maxUsers: tenant?.maxUsers ?? 5,
+        activeUsers,
+        totalUsers,
+        seatsAvailable: (tenant?.maxUsers ?? 5) - activeUsers,
+      };
+    }),
+
+  toggleUserActive: protectedProcedure
+    .use(requirePermission(PERMISSIONS.USERS_MANAGE))
+    .input(z.object({
+      tenantId: z.string().uuid(),
+      userId: z.string().uuid(),
+      active: z.boolean(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const [currentUser] = await ctx.db
+        .select({ id: users.id, tenantId: users.tenantId })
+        .from(users)
+        .where(eq(users.clerkId, ctx.userId!))
+        .limit(1);
+      if (!currentUser || currentUser.tenantId !== input.tenantId) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Cannot manage users in other tenants" });
+      }
+
+      const [targetUser] = await ctx.db
+        .select({ id: users.id, tenantId: users.tenantId, active: users.active, clerkId: users.clerkId })
+        .from(users)
+        .where(eq(users.id, input.userId))
+        .limit(1);
+      if (!targetUser || targetUser.tenantId !== input.tenantId) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "User not found in this tenant" });
+      }
+
+      if (targetUser.active === input.active) {
+        return { success: true, message: "No change needed" };
+      }
+
+      if (input.active) {
+        const [tenant] = await ctx.db
+          .select({ maxUsers: tenants.maxUsers })
+          .from(tenants)
+          .where(eq(tenants.id, input.tenantId))
+          .limit(1);
+        const [{ activeUsers }] = await ctx.db
+          .select({ activeUsers: count() })
+          .from(users)
+          .where(and(eq(users.tenantId, input.tenantId), eq(users.active, true)));
+        if (activeUsers >= (tenant?.maxUsers ?? 5)) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: `Cannot activate user. Seat limit reached (${tenant?.maxUsers ?? 5} users). Upgrade your plan first.`,
+          });
+        }
+      }
+
+      if (!input.active && targetUser.clerkId === ctx.userId) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot deactivate yourself" });
+      }
+
+      const targetRoles = await ctx.db
+        .select({ code: roles.code })
+        .from(userRoles)
+        .innerJoin(roles, eq(userRoles.roleId, roles.id))
+        .where(eq(userRoles.userId, targetUser.id));
+      const isTargetAdmin = targetRoles.some((r) => r.code === ROLE_CODES.ADMIN);
+
+      if (!input.active && isTargetAdmin) {
+        const [{ adminCount }] = await ctx.db
+          .select({ adminCount: count() })
+          .from(userRoles)
+          .innerJoin(roles, eq(userRoles.roleId, roles.id))
+          .where(and(eq(roles.tenantId, input.tenantId), eq(roles.code, ROLE_CODES.ADMIN)));
+        if (adminCount <= 1) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Cannot deactivate the last admin user. Assign another admin first.",
+          });
+        }
+      }
+
+      await ctx.db
+        .update(users)
+        .set({ active: input.active, updatedAt: new Date() })
+        .where(eq(users.id, input.userId));
+
+      await writeAuditLog(ctx, {
+        tenantId: input.tenantId,
+        action: "update",
+        entity: { type: "user", id: input.userId },
+        event: input.active ? "user.activated" : "user.deactivated",
+        summary: input.active ? "User activated" : "User deactivated",
+        changes: { active: input.active },
       });
 
       return { success: true };

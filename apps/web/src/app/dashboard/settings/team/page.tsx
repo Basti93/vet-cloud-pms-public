@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTenant } from "@/hooks/useTenant";
 import { trpc } from "@/lib/trpc/client";
 import { PERMISSIONS } from "@/lib/db/schema";
+import { Users, Shield, UserCheck, UserX } from "lucide-react";
 
 interface UserWithRoles {
   id: string;
@@ -12,7 +13,8 @@ interface UserWithRoles {
   firstName: string | null;
   lastName: string | null;
   active: boolean;
-  roles: Array<{ id: string; name: string }>;
+  isAdmin: boolean;
+  roles: Array<{ id: string; name: string; code: string }>;
 }
 
 interface InvitationItem {
@@ -31,12 +33,12 @@ export default function TeamPage() {
   const [showAddRoleModal, setShowAddRoleModal] = useState<string | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<"admin" | "vet" | "reception">("reception");
+  const [toggleError, setToggleError] = useState("");
 
   const { data: permissions } = trpc.admin.getUserPermissions.useQuery();
 
   useEffect(() => { setMounted(true); }, []);
 
-  // Check permissions and redirect if user doesn't have access
   useEffect(() => {
     if (mounted && permissions && !permissions.includes(PERMISSIONS.USERS_MANAGE)) {
       router.push("/dashboard/settings/practice");
@@ -45,6 +47,9 @@ export default function TeamPage() {
 
   const { data: users, isLoading: usersLoading, refetch: refetchUsers } =
     trpc.admin.listUsers.useQuery({ tenantId: tenantId! }, { enabled: !!tenantId && mounted });
+
+  const { data: seatInfo, refetch: refetchSeatInfo } =
+    trpc.admin.getSeatInfo.useQuery({ tenantId: tenantId! }, { enabled: !!tenantId && mounted });
 
   const { data: roles, isLoading: rolesLoading } =
     trpc.admin.listRoles.useQuery({ tenantId: tenantId! }, { enabled: !!tenantId && mounted });
@@ -62,6 +67,7 @@ export default function TeamPage() {
     onSuccess: () => {
       setInviteEmail("");
       void refetchInvitations();
+      void refetchSeatInfo();
     },
   });
   const resendInvitationMutation = trpc.admin.resendInvitation.useMutation({
@@ -72,6 +78,17 @@ export default function TeamPage() {
   const revokeInvitationMutation = trpc.admin.revokeInvitation.useMutation({
     onSuccess: () => {
       void refetchInvitations();
+    },
+  });
+
+  const toggleUserActiveMutation = trpc.admin.toggleUserActive.useMutation({
+    onSuccess: () => {
+      setToggleError("");
+      void refetchUsers();
+      void refetchSeatInfo();
+    },
+    onError: (error) => {
+      setToggleError(error.message);
     },
   });
 
@@ -103,96 +120,266 @@ export default function TeamPage() {
     });
   };
 
+  const handleToggleActive = (userId: string, currentActive: boolean) => {
+    if (!tenantId) return;
+    setToggleError("");
+    const action = currentActive ? "deaktivieren" : "aktivieren";
+    const confirmed = window.confirm(
+      currentActive
+        ? "Möchten Sie diesen Benutzer wirklich deaktivieren? Er kann sich danach nicht mehr anmelden."
+        : "Möchten Sie diesen Benutzer aktivieren? Er erhält wieder Zugriff und belegt einen Nutzerplatz."
+    );
+    if (!confirmed) return;
+    toggleUserActiveMutation.mutate({ tenantId, userId, active: !currentActive });
+  };
+
+  const activeUsers = (users as UserWithRoles[] | undefined)?.filter((u) => u.active) ?? [];
+  const inactiveUsers = (users as UserWithRoles[] | undefined)?.filter((u) => !u.active) ?? [];
+  const maxUsers = seatInfo?.maxUsers ?? 5;
+  const seatsUsed = seatInfo?.activeUsers ?? activeUsers.length;
+  const seatsAvailable = seatInfo?.seatsAvailable ?? (maxUsers - seatsUsed);
+  const seatPercentage = Math.min(100, (seatsUsed / maxUsers) * 100);
+
   return (
     <div className="space-y-4">
+      {/* Seat Counter Card */}
+      {seatInfo && (
+        <div
+          className="rounded-xl p-4"
+          style={{
+            backgroundColor: "var(--color-surface)",
+            border: "1px solid var(--color-border)",
+          }}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Users className="w-5 h-5" style={{ color: "var(--color-accent)" }} />
+              <h3 className="text-base font-semibold">Nutzerplätze</h3>
+            </div>
+            <span className="text-sm font-medium">
+              {seatsUsed}/{maxUsers} belegt
+            </span>
+          </div>
+
+          {/* Progress bar */}
+          <div
+            className="h-2.5 rounded-full overflow-hidden mb-3"
+            style={{ backgroundColor: "var(--color-bg)" }}
+          >
+            <div
+              className="h-full rounded-full transition-all duration-300"
+              style={{
+                width: `${seatPercentage}%`,
+                backgroundColor:
+                  seatsAvailable <= 0
+                    ? "#ef4444"
+                    : seatsAvailable <= 1
+                    ? "#f59e0b"
+                    : "var(--color-accent)",
+              }}
+            />
+          </div>
+
+          <div className="flex items-center gap-4 text-xs" style={{ color: "var(--color-muted)" }}>
+            <span className="flex items-center gap-1">
+              <UserCheck className="w-3.5 h-3.5" style={{ color: "#22c55e" }} />
+              {seatsUsed} aktiv
+            </span>
+            <span className="flex items-center gap-1">
+              <UserX className="w-3.5 h-3.5" style={{ color: "#9ca3af" }} />
+              {inactiveUsers.length} inaktiv
+            </span>
+            <span>
+              {seatsAvailable > 0
+                ? `${seatsAvailable} ${seatsAvailable === 1 ? "Platz" : "Plätze"} verfügbar`
+                : "Keine Plätze verfügbar"}
+            </span>
+          </div>
+
+          {seatsAvailable <= 0 && (
+            <p className="mt-2 text-xs" style={{ color: "#ef4444" }}>
+              Alle Plätze sind belegt. Deaktivieren Sie Benutzer oder upgraden Sie den Tarif, um weitere einzuladen.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Active Users */}
       {usersLoading ? (
         <p style={{ color: "var(--color-muted)" }}>Lädt...</p>
-      ) : users && users.length > 0 ? (
-        users.map((user: UserWithRoles) => (
-          <div
-            key={user.id}
-            className="rounded-xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4"
-            style={{
-              backgroundColor: "var(--color-surface)",
-              border: "1px solid var(--color-border)",
-            }}
-          >
-            {/* User Info */}
-            <div className="flex items-center gap-3 min-w-0">
+      ) : activeUsers.length > 0 ? (
+        <div>
+          <h3 className="text-sm font-medium mb-2 flex items-center gap-1.5" style={{ color: "var(--color-muted)" }}>
+            <UserCheck className="w-4 h-4" style={{ color: "#22c55e" }} />
+            Aktiv ({activeUsers.length})
+          </h3>
+          <div className="space-y-2">
+            {activeUsers.map((user: UserWithRoles) => (
               <div
-                className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
-                style={{ backgroundColor: "var(--color-accent)" }}
-              >
-                {(user.firstName?.[0] || user.email[0]).toUpperCase()}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="font-medium text-sm truncate">
-                  {user.firstName} {user.lastName}
-                </p>
-                <p className="text-xs truncate" style={{ color: "var(--color-muted)" }}>
-                  {user.email}
-                </p>
-              </div>
-            </div>
-
-            {/* Status and Roles - Stack on mobile */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
-              <span
-                className="text-xs px-2 py-1 rounded-full font-medium flex-shrink-0"
+                key={user.id}
+                className="rounded-xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4"
                 style={{
-                  backgroundColor: "var(--color-accent-soft)",
-                  color: "var(--color-accent-text)",
+                  backgroundColor: "var(--color-surface)",
+                  border: "1px solid var(--color-border)",
                 }}
               >
-                {user.active ? "Aktiv" : "Inaktiv"}
-              </span>
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
+                    style={{ backgroundColor: user.isAdmin ? "#6366f1" : "var(--color-accent)" }}
+                  >
+                    {(user.firstName?.[0] || user.email[0]).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-sm truncate flex items-center gap-1.5">
+                      {user.firstName} {user.lastName}
+                      {user.isAdmin && (
+                        <Shield className="w-3.5 h-3.5" style={{ color: "#6366f1" }} />
+                      )}
+                    </p>
+                    <p className="text-xs truncate" style={{ color: "var(--color-muted)" }}>
+                      {user.email}
+                    </p>
+                  </div>
+                </div>
 
-              {/* Display assigned roles as badges - wrap on mobile */}
-              <div className="flex flex-wrap gap-2 items-center">
-                {user.roles && user.roles.length > 0 ? (
-                  user.roles.map((role) => (
-                    <div
-                      key={role.id}
-                      className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium"
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
+                  <div className="flex flex-wrap gap-2 items-center">
+                    {user.roles && user.roles.length > 0 ? (
+                      user.roles.map((role) => (
+                        <div
+                          key={role.id}
+                          className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium"
+                          style={{
+                            backgroundColor: role.code === "admin" ? "#eef2ff" : "var(--color-accent-soft)",
+                            color: role.code === "admin" ? "#4338ca" : "var(--color-accent-text)",
+                          }}
+                        >
+                          <span>{role.name}</span>
+                          <button
+                            onClick={() => handleRemoveRole(user.id, role.id)}
+                            className="ml-1 hover:opacity-70 cursor-pointer"
+                            title="Rolle entfernen"
+                            disabled={removeRoleMutation.isPending || user.roles.length === 1}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))
+                    ) : (
+                      <span style={{ color: "var(--color-muted)" }}>Keine Rollen</span>
+                    )}
+
+                    <button
+                      onClick={() => setShowAddRoleModal(user.id)}
+                      className="px-2 py-1 rounded-lg border border-dashed text-xs font-medium hover:bg-opacity-50 flex-shrink-0"
                       style={{
-                        backgroundColor: "var(--color-accent-soft)",
-                        color: "var(--color-accent-text)",
+                        borderColor: "var(--color-border)",
+                        backgroundColor: "var(--color-bg)",
+                        color: "var(--color-fg)",
                       }}
+                      disabled={rolesLoading || assignRoleMutation.isPending}
                     >
-                      <span>{role.name}</span>
-                      <button
-                        onClick={() => handleRemoveRole(user.id, role.id)}
-                        className="ml-1 hover:opacity-70 cursor-pointer"
-                        title="Rolle entfernen"
-                        disabled={removeRoleMutation.isPending || user.roles.length === 1}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))
-                ) : (
-                  <span style={{ color: "var(--color-muted)" }}>Keine Rollen</span>
-                )}
+                      + Rolle
+                    </button>
+                  </div>
 
-                {/* Add Role button */}
-                <button
-                  onClick={() => setShowAddRoleModal(user.id)}
-                  className="px-2 py-1 rounded-lg border border-dashed text-xs font-medium hover:bg-opacity-50 flex-shrink-0"
-                  style={{
-                    borderColor: "var(--color-border)",
-                    backgroundColor: "var(--color-bg)",
-                    color: "var(--color-fg)",
-                  }}
-                  disabled={rolesLoading || assignRoleMutation.isPending}
-                >
-                  + Rolle
-                </button>
+                  {!user.isAdmin && (
+                    <button
+                      onClick={() => handleToggleActive(user.id, true)}
+                      disabled={toggleUserActiveMutation.isPending}
+                      className="px-2.5 py-1 rounded-lg text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      style={{
+                        backgroundColor: "#fef2f2",
+                        color: "#991b1b",
+                        border: "1px solid #fecaca",
+                      }}
+                      title="Benutzer deaktivieren"
+                    >
+                      {toggleUserActiveMutation.isPending ? "..." : "Deaktivieren"}
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
+            ))}
           </div>
-        ))
-      ) : (
+        </div>
+      ) : !usersLoading && inactiveUsers.length === 0 ? (
         <p style={{ color: "var(--color-muted)" }}>Keine Benutzer gefunden</p>
+      ) : null}
+
+      {/* Inactive Users */}
+      {inactiveUsers.length > 0 && (
+        <div>
+          <h3 className="text-sm font-medium mb-2 flex items-center gap-1.5" style={{ color: "var(--color-muted)" }}>
+            <UserX className="w-4 h-4" style={{ color: "#9ca3af" }} />
+            Inaktiv ({inactiveUsers.length})
+          </h3>
+          <div className="space-y-2">
+            {inactiveUsers.map((user: UserWithRoles) => (
+              <div
+                key={user.id}
+                className="rounded-xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 opacity-60"
+                style={{
+                  backgroundColor: "var(--color-surface)",
+                  border: "1px solid var(--color-border)",
+                }}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
+                    style={{ backgroundColor: "#9ca3af" }}
+                  >
+                    {(user.firstName?.[0] || user.email[0]).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-sm truncate flex items-center gap-1.5">
+                      {user.firstName} {user.lastName}
+                      {user.isAdmin && (
+                        <Shield className="w-3.5 h-3.5" style={{ color: "#6366f1" }} />
+                      )}
+                    </p>
+                    <p className="text-xs truncate" style={{ color: "var(--color-muted)" }}>
+                      {user.email}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
+                  <span
+                    className="text-xs px-2 py-1 rounded-full font-medium flex-shrink-0"
+                    style={{
+                      backgroundColor: "#f3f4f6",
+                      color: "#6b7280",
+                    }}
+                  >
+                    Inaktiv
+                  </span>
+
+                  <button
+                    onClick={() => handleToggleActive(user.id, false)}
+                    disabled={toggleUserActiveMutation.isPending || seatsAvailable <= 0}
+                    className="px-2.5 py-1 rounded-lg text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{
+                      backgroundColor: "#f0fdf4",
+                      color: "#166534",
+                      border: "1px solid #bbf7d0",
+                    }}
+                    title={seatsAvailable <= 0 ? "Kein Platz verfügbar — upgraden Sie den Tarif" : "Benutzer aktivieren"}
+                  >
+                    {toggleUserActiveMutation.isPending ? "..." : "Aktivieren"}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {toggleError && (
+        <div className="rounded-lg p-4 text-sm" style={{ backgroundColor: "#fef2f2", color: "#991b1b", border: "1px solid #fecaca" }}>
+          {toggleError}
+        </div>
       )}
 
       <div
@@ -225,13 +412,20 @@ export default function TeamPage() {
           </select>
           <button
             type="submit"
-            disabled={createInvitationMutation.isPending}
+            disabled={createInvitationMutation.isPending || seatsAvailable <= 0}
             className="px-4 py-2 rounded-lg text-white font-medium disabled:opacity-50"
             style={{ backgroundColor: "var(--color-accent)" }}
+            title={seatsAvailable <= 0 ? "Keine Plätze verfügbar" : undefined}
           >
             {createInvitationMutation.isPending ? "Sendet..." : "Einladen"}
           </button>
         </form>
+
+        {seatsAvailable <= 0 && (
+          <p className="text-xs" style={{ color: "#ef4444" }}>
+            Alle Nutzerplätze sind belegt. Upgraden Sie den Tarif, um weitere Benutzer einzuladen.
+          </p>
+        )}
 
         {invitationsLoading ? (
           <p style={{ color: "var(--color-muted)" }}>Einladungen laden...</p>

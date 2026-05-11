@@ -1,8 +1,8 @@
 import { createTRPCRouter, protectedProcedure } from "@/server/trpc";
 import { z } from "zod";
-import { tenants, PERMISSIONS } from "@/lib/db/schema";
+import { tenants, users, userRoles, roles, PERMISSIONS } from "@/lib/db/schema";
 import { db as appDb } from "@/lib/db/client";
-import { eq } from "drizzle-orm";
+import { eq, and, count, inArray, sql } from "drizzle-orm";
 import { getStripeClient } from "@/lib/stripe/client";
 import {
   TRIAL_DAYS,
@@ -12,6 +12,7 @@ import {
 import { TRPCError } from "@trpc/server";
 import { getMainDomain } from "@/lib/env";
 import { logEventAsync, serializeLogError } from "@/server/trpc/logging-middleware";
+import { ROLE_CODES } from "@/lib/auth/roles";
 import { requirePermission } from "@/server/trpc/middleware";
 
 export const subscriptionsRouter = createTRPCRouter({
@@ -195,6 +196,60 @@ export const subscriptionsRouter = createTRPCRouter({
           })
           .where(eq(tenants.id, tenantId));
 
+        let deactivatedUserCount = 0;
+
+        if (!isUpgrade || isOnTrial) {
+          const newMax = newPrice.seats;
+          const [{ activeUsers }] = await appDb
+            .select({ activeUsers: count() })
+            .from(users)
+            .where(and(eq(users.tenantId, tenantId), eq(users.active, true)));
+
+          if (activeUsers > newMax) {
+            const excessCount = activeUsers - newMax;
+
+            const adminRoleRows = await appDb
+              .select({ id: roles.id })
+              .from(roles)
+              .where(and(eq(roles.tenantId, tenantId), eq(roles.code, ROLE_CODES.ADMIN)));
+            const adminRoleIds = adminRoleRows.map((r) => r.id);
+
+            const adminUserRows = adminRoleIds.length
+              ? await appDb
+                  .select({ userId: userRoles.userId })
+                  .from(userRoles)
+                  .where(and(inArray(userRoles.roleId, adminRoleIds), eq(userRoles.userId, users.id)))
+              : [];
+
+            const nonAdminActiveUsers = await appDb
+              .select({ id: users.id })
+              .from(users)
+              .where(and(eq(users.tenantId, tenantId), eq(users.active, true)))
+              .orderBy(users.createdAt);
+
+            const adminUserIds = new Set(adminUserRows.map((r) => r.userId));
+            const toDeactivate = nonAdminActiveUsers
+              .filter((u) => !adminUserIds.has(u.id))
+              .slice(0, excessCount);
+
+            if (toDeactivate.length > 0) {
+              await appDb
+                .update(users)
+                .set({ active: false, updatedAt: new Date() })
+                .where(
+                  and(
+                    eq(users.tenantId, tenantId),
+                    inArray(
+                      users.id,
+                      toDeactivate.map((u) => u.id)
+                    )
+                  )
+                );
+              deactivatedUserCount = toDeactivate.length;
+            }
+          }
+        }
+
         logEventAsync({
           level: "info",
           category: "subscription",
@@ -207,6 +262,7 @@ export const subscriptionsRouter = createTRPCRouter({
             seats,
             isOnTrial,
             isUpgrade,
+            deactivatedUserCount,
           },
         });
 
@@ -216,6 +272,7 @@ export const subscriptionsRouter = createTRPCRouter({
           isOnTrial,
           newPriceId: newPrice.priceId,
           seats: newPrice.seats,
+          deactivatedUserCount,
         };
       } catch (error) {
         logEventAsync({

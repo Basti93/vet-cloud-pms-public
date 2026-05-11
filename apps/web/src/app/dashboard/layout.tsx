@@ -28,10 +28,12 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     | undefined;
 
   const [user] = await db
-    .select({ tenantId: users.tenantId })
+    .select({ tenantId: users.tenantId, active: users.active })
     .from(users)
     .where(eq(users.clerkId, userId))
     .limit(1);
+
+  const isUserInactive = user && !user.active;
 
   if (user?.tenantId) {
     const [found] = await db
@@ -78,6 +80,21 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       <div style={themeStyle}>
         {!hasTenantAssignment ? (
           <NoPraxisAssignedState supportEmail={supportEmail} />
+        ) : isUserInactive ? (
+          <div
+            className="min-h-screen flex items-center justify-center p-6"
+            style={{ backgroundColor: "var(--color-bg)", color: "var(--color-fg)" }}
+          >
+            <div className="max-w-lg rounded-2xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
+              <h1 className="text-2xl font-bold text-amber-800">Zugriff deaktiviert</h1>
+              <p className="mt-3 text-sm text-amber-900">
+                Ihr Benutzerkonto wurde deaktiviert. Sie haben keinen Zugriff mehr auf die Praxisdaten.
+              </p>
+              <p className="mt-2 text-sm text-amber-900">
+                Kontaktieren Sie einen Administrator Ihrer Praxis, um Ihren Zugang wiederherzustellen.
+              </p>
+            </div>
+          </div>
         ) : deactivationInfo ? (
           <div
             className="min-h-screen flex items-center justify-center p-6"

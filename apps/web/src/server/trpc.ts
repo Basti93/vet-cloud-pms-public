@@ -73,6 +73,14 @@ const DEACTIVATION_ALLOWED_PATHS = new Set([
   "subscriptions.undoCancellation",
   "admin.getCurrentUser",
   "admin.getUserPermissions",
+  "admin.getSeatInfo",
+  "admin.listUsers",
+  "admin.toggleUserActive",
+]);
+
+const INACTIVE_USER_ALLOWED_PATHS = new Set([
+  "admin.getCurrentUser",
+  "admin.getUserPermissions",
 ]);
 
 const enforceTenantIsActive = t.middleware(async ({ ctx, path, next }) => {
@@ -81,13 +89,20 @@ const enforceTenantIsActive = t.middleware(async ({ ctx, path, next }) => {
   }
 
   const [user] = await ctx.db
-    .select({ id: users.id, tenantId: users.tenantId })
+    .select({ id: users.id, tenantId: users.tenantId, active: users.active })
     .from(users)
     .where(eq(users.clerkId, ctx.userId))
     .limit(1);
 
   if (!user?.tenantId) {
     throw new TRPCError({ code: "FORBIDDEN" });
+  }
+
+  if (!user.active && !INACTIVE_USER_ALLOWED_PATHS.has(path)) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "USER_INACTIVE",
+    });
   }
 
   const [scheduledDeletion] = await ctx.db
