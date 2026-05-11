@@ -3,7 +3,7 @@ import { getStripeClient } from "@/lib/stripe/client";
 import { db as appDb } from "@/lib/db/client";
 import { tenants } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { sendTrialEndingEmail } from "@/lib/email/service";
+import { sendTrialEndingEmail, sendPaymentFailedAdminEmail } from "@/lib/email/service";
 import Stripe from "stripe";
 
 export async function POST(request: NextRequest) {
@@ -142,12 +142,51 @@ export async function POST(request: NextRequest) {
             .limit(1);
 
           if (tenant.length) {
+            const currentFailureCount = tenant[0].paymentFailureCount || 0;
+            const newFailureCount = currentFailureCount + 1;
+            const now = new Date();
+            const gracePeriodEndsAt = new Date(now.getTime() + 10 * 24 * 60 * 60 * 1000); // 10 days
+
+            const updateData: Record<string, any> = {
+              lastPaymentFailedAt: now,
+              paymentFailureCount: newFailureCount,
+            };
+
+            // First failure: set grace period
+            if (newFailureCount === 1) {
+              updateData.paymentGracePeriodEndsAt = gracePeriodEndsAt;
+            }
+
+            // 3+ failures and grace period expired: deactivate
+            if (newFailureCount >= 3 && tenant[0].paymentGracePeriodEndsAt && tenant[0].paymentGracePeriodEndsAt < now) {
+              updateData.subscriptionStatus = "suspended";
+              updateData.deactivatedAt = now;
+            }
+
             await appDb
               .update(tenants)
-              .set({
-                lastPaymentFailedAt: new Date(),
-              })
+              .set(updateData)
               .where(eq(tenants.id, tenant[0].id));
+
+            // Send admin notification
+            if (tenant[0].email) {
+              const admins = await appDb
+                .select({ email: (await import("@/lib/db/schema")).users.email })
+                .from((await import("@/lib/db/schema")).users)
+                .where(eq((await import("@/lib/db/schema")).users.tenantId, tenant[0].id));
+
+              const adminEmails = admins
+                .map((u) => u.email)
+                .filter((e): e is string => !!e);
+
+              if (adminEmails.length > 0) {
+                await sendPaymentFailedAdminEmail({
+                  clinicName: tenant[0].name,
+                  adminEmails,
+                  gracePeriodEndsAt,
+                });
+              }
+            }
           }
         }
         break;
@@ -165,11 +204,14 @@ export async function POST(request: NextRequest) {
             .limit(1);
 
           if (tenant.length) {
+            // Reset payment failure counters on successful payment
             await appDb
               .update(tenants)
               .set({
                 subscriptionStatus: "active",
                 deactivatedAt: null,
+                paymentFailureCount: 0,
+                paymentGracePeriodEndsAt: null,
               })
               .where(eq(tenants.id, tenant[0].id));
           }

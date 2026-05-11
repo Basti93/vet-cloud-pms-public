@@ -141,6 +141,8 @@ export const subscriptionsRouter = createTRPCRouter({
         deactivatedAt: tenantData.deactivatedAt,
         lastPaymentFailedAt: tenantData.lastPaymentFailedAt,
         cancelledAtPeriodEnd: tenantData.cancelledAtPeriodEnd,
+        paymentFailureCount: tenantData.paymentFailureCount || 0,
+        paymentGracePeriodEndsAt: tenantData.paymentGracePeriodEndsAt,
         isTrialing:
           tenantData.subscriptionStatus === "trial" &&
           tenantData.trialEndsAt &&

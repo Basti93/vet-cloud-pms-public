@@ -191,6 +191,18 @@ export default function AccountPage() {
             </div>
           )}
 
+          {subscriptionStatus.paymentGracePeriodEndsAt &&
+           new Date(subscriptionStatus.paymentGracePeriodEndsAt) > new Date() && (
+            <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-red-900 text-sm">
+              <p className="font-semibold">⚠️ Zahlung fehlgeschlagen</p>
+              <p>
+                Zahlungsmethode konnte nicht eingezogen werden. Bitte aktualisieren Sie Ihre Zahlungsmethode bis{" "}
+                {new Date(subscriptionStatus.paymentGracePeriodEndsAt).toLocaleDateString("de-DE")}.
+                Danach wird die Praxis deaktiviert.
+              </p>
+            </div>
+          )}
+
           {subscriptionStatus.cancelledAtPeriodEnd && (
             <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-red-900 text-sm">
               <p className="font-semibold">Abonnement wird gekündigt</p>

@@ -546,6 +546,58 @@ export async function sendVaccinationReminderEmail(
   }
 }
 
+export async function sendPaymentFailedAdminEmail(input: {
+  clinicName: string;
+  adminEmails: string[];
+  gracePeriodEndsAt: Date;
+  stripePortalUrl?: string;
+}) {
+  const gracePeriodDate = input.gracePeriodEndsAt.toLocaleDateString("de-DE");
+  const subject = `Zahlungsfehlgeschlagen: ${input.clinicName}`;
+  const body = `
+Hallo,
+
+Zahlung für "${input.clinicName}" konnte nicht eingezogen werden.
+
+Zahlungsdetails:
+- Klinik: ${input.clinicName}
+- Grace Period endet: ${gracePeriodDate}
+- Danach wird die Praxis automatisch deaktiviert
+
+Der Klinikbetreiber sollte seine Zahlungsmethode aktualisieren:
+${input.stripePortalUrl || "Im Konto-Bereich unter Einstellungen"}
+
+Bei Fragen kontaktieren Sie uns unter support@example.com
+
+Mit freundlichen Grüßen,
+Ihr Vet Cloud Team
+  `.trim();
+
+  try {
+    const results = await Promise.all(
+      input.adminEmails.map((email) =>
+        getResend().emails.send({
+          from: systemSender(),
+          to: email,
+          subject,
+          text: body,
+        })
+      )
+    );
+
+    const failed = results.filter((r) => r.error);
+    if (failed.length > 0) {
+      console.error("Errors sending payment failed emails:", failed);
+      return { success: false, errors: failed.map((r) => r.error) };
+    }
+
+    return { success: true, messageIds: results.map((r) => r.data?.id) };
+  } catch (error) {
+    console.error("Error sending payment failed admin emails:", error);
+    return { success: false, error };
+  }
+}
+
 export async function sendTrialExpiredAdminEmail(input: {
   clinicName: string;
   adminEmails: string[];
