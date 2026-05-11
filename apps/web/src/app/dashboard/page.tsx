@@ -10,6 +10,7 @@ import { StatusTooltip } from "@/components/ui/status-tooltip";
 import { AppointmentModal } from "@/components/appointments/AppointmentModal";
 import { NewPatientModal } from "@/components/patients/NewPatientModal";
 import { AppointmentTable } from "@/components/appointments/AppointmentTable";
+import { TrialWarningBanner } from "@/components/subscription/TrialWarningBanner";
 import type { AppointmentType } from "@/components/appointments/AppointmentTable";
 import { useState, useMemo } from "react";
 
@@ -103,6 +104,10 @@ export default function DashboardHome() {
     { tenantId: tenantId! },
     { enabled: !!tenantId }
   );
+  const { data: subscriptionStatus } = trpc.subscriptions.getSubscriptionStatus.useQuery(
+    undefined,
+    { enabled: !!tenantId }
+  );
 
   const todayAppts = allAppts?.filter((a) => {
     const d = new Date(a.startTime);
@@ -139,6 +144,8 @@ export default function DashboardHome() {
 
   return (
     <div className="space-y-6">
+      <TrialWarningBanner daysUntilTrialEnds={subscriptionStatus?.daysUntilTrialEnds || null} />
+
       <div>
         <h1 className="text-3xl font-bold text-fg">
           Hallo {currentUser?.firstName || "Willkommen"}!
