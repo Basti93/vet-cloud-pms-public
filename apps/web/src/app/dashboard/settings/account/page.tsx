@@ -33,9 +33,17 @@ export default function AccountPage() {
   const reactivateSubscriptionMutation = trpc.subscriptions.reactivateSubscription.useMutation();
   const undoCancellationMutation = trpc.subscriptions.undoCancellation.useMutation();
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
+  const [pendingSeats, setPendingSeats] = useState<number | null>(null);
   const canManageSettings = Boolean(
     permissions?.includes(PERMISSIONS.SETTINGS_MANAGE)
   );
+
+  const PLAN_PRICES: Record<number, { label: string; price: string }> = {
+    1: { label: "1 Nutzer", price: "€30/Monat" },
+    3: { label: "3 Nutzer", price: "€50/Monat" },
+    5: { label: "5 Nutzer", price: "€100/Monat" },
+    10: { label: "10 Nutzer", price: "€200/Monat" },
+  };
 
   useEffect(() => {
     if (checkoutUrl) {
@@ -43,26 +51,46 @@ export default function AccountPage() {
     }
   }, [checkoutUrl]);
 
-  const handleUpgrade = async (seats: number) => {
+  const handleSelectTier = (seats: number) => {
+    if (!subscriptionStatus?.currentPrice) {
+      // No existing sub → go straight to Stripe Checkout, no confirmation needed
+      handleCheckout(seats);
+      return;
+    }
+    setPendingSeats(seats);
+    setErrorMessage("");
+    setSuccessMessage("");
+  };
+
+  const handleCheckout = async (seats: number) => {
     try {
       setErrorMessage("");
-      if (subscriptionStatus?.currentPrice) {
-        // Existing subscription → change plan inline (no Stripe Checkout redirect)
-        await changePlanMutation.mutateAsync({ seats });
-        setSuccessMessage("Tarif erfolgreich geändert.");
-        await utils.subscriptions.getSubscriptionStatus.invalidate();
-      } else {
-        // No subscription yet → Stripe Checkout flow
-        const result = await createCheckoutMutation.mutateAsync({ seats });
-        if (result.url) {
-          setCheckoutUrl(result.url);
-        }
+      const result = await createCheckoutMutation.mutateAsync({ seats });
+      if (result.url) {
+        setCheckoutUrl(result.url);
       }
     } catch (error) {
-      console.error("Failed to change plan:", error);
-      setErrorMessage(
-        error instanceof Error ? error.message : "Fehler beim Ändern des Tarifs"
+      setErrorMessage(error instanceof Error ? error.message : "Fehler beim Starten des Checkouts");
+    }
+  };
+
+  const handleConfirmPlanChange = async () => {
+    if (!pendingSeats) return;
+    try {
+      setErrorMessage("");
+      await changePlanMutation.mutateAsync({ seats: pendingSeats });
+      const currentSeats = subscriptionStatus?.currentPrice?.seats ?? 0;
+      const isUpgrade = pendingSeats > currentSeats;
+      setSuccessMessage(
+        isUpgrade
+          ? "Tarif erfolgreich aktualisiert. Die anteilige Differenz wird Ihrer nächsten Rechnung hinzugefügt."
+          : "Tarif geändert. Der neue Tarif gilt ab dem nächsten Abrechnungszeitraum."
       );
+      setPendingSeats(null);
+      await utils.subscriptions.getSubscriptionStatus.invalidate();
+    } catch (error) {
+      console.error("Failed to change plan:", error);
+      setErrorMessage(error instanceof Error ? error.message : "Fehler beim Ändern des Tarifs");
     }
   };
 
@@ -332,12 +360,13 @@ export default function AccountPage() {
               ].map((tier) => (
                 <button
                   key={tier.seats}
-                  onClick={() => handleUpgrade(tier.seats)}
+                  onClick={() => handleSelectTier(tier.seats)}
                   disabled={
                     createCheckoutMutation.isPending ||
                     changePlanMutation.isPending ||
                     !!subscriptionStatus.cancelledAtPeriodEnd ||
-                    subscriptionStatus.currentPrice?.seats === tier.seats
+                    subscriptionStatus.currentPrice?.seats === tier.seats ||
+                    pendingSeats === tier.seats
                   }
                   className="p-4 rounded-lg border border-gray-200 transition-all text-sm font-medium hover:border-blue-300 disabled:opacity-50 disabled:cursor-not-allowed data-[current=true]:border-blue-400 data-[current=true]:bg-blue-50"
                   data-current={subscriptionStatus.currentPrice?.seats === tier.seats}
@@ -350,6 +379,43 @@ export default function AccountPage() {
                 </button>
               ))}
             </div>
+
+            {pendingSeats && subscriptionStatus.currentPrice && (() => {
+              const isUpgrade = pendingSeats > subscriptionStatus.currentPrice.seats;
+              const pending = PLAN_PRICES[pendingSeats];
+              const current = PLAN_PRICES[subscriptionStatus.currentPrice.seats];
+              return (
+                <div className="mt-4 p-4 rounded-lg border border-blue-200 bg-blue-50 text-sm">
+                  <p className="font-semibold text-blue-900 mb-1">
+                    {isUpgrade ? "Upgrade bestätigen" : "Downgrade bestätigen"}
+                  </p>
+                  <p className="text-blue-800 mb-1">
+                    {current?.label} ({current?.price}) → {pending?.label} ({pending?.price})
+                  </p>
+                  <p className="text-blue-700 text-xs mb-3">
+                    {isUpgrade
+                      ? "Die anteilige Differenz für den verbleibenden Abrechnungszeitraum wird Ihrer nächsten Rechnung hinzugefügt."
+                      : "Der neue Tarif gilt ab dem nächsten Abrechnungszeitraum. Für den aktuellen Zeitraum erhalten Sie keine Rückerstattung."}
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleConfirmPlanChange}
+                      disabled={changePlanMutation.isPending}
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    >
+                      {changePlanMutation.isPending ? "Wird geändert..." : "Bestätigen"}
+                    </button>
+                    <button
+                      onClick={() => setPendingSeats(null)}
+                      disabled={changePlanMutation.isPending}
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium text-blue-800 border border-blue-300 hover:bg-blue-100 disabled:opacity-50 transition-all"
+                    >
+                      Abbrechen
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
 
             {subscriptionStatus.deactivatedAt && (
               <div className="mt-6 pt-6 border-t border-border">

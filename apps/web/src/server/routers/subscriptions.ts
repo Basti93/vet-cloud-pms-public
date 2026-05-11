@@ -160,6 +160,9 @@ export const subscriptionsRouter = createTRPCRouter({
           });
         }
 
+        const currentPrice = getPriceById(tenantData.currentStripePriceId ?? "");
+        const isUpgrade = currentPrice ? newPrice.monthlyPrice > currentPrice.monthlyPrice : true;
+
         const stripe = getStripeClient();
         const subscription = await stripe.subscriptions.retrieve(tenantData.stripeSubscriptionId);
         const currentItem = subscription.items.data[0];
@@ -171,17 +174,17 @@ export const subscriptionsRouter = createTRPCRouter({
           });
         }
 
-        // For trial subscriptions: swap price, keep trial, no immediate charge
-        // For active paid subscriptions: prorate (credit unused days, charge/credit on next invoice)
         const isOnTrial = subscription.status === "trialing";
+
+        // Trial: no proration needed (no charges yet)
+        // Upgrade: prorate immediately (charge difference on next invoice)
+        // Downgrade: no proration — new lower price starts next billing cycle, no refund
+        const prorationType = isOnTrial ? "none" : isUpgrade ? "create_prorations" : "none";
 
         await stripe.subscriptions.update(tenantData.stripeSubscriptionId, {
           items: [{ id: currentItem.id, price: newPrice.priceId }],
-          proration_behavior: isOnTrial ? "none" : "create_prorations",
-          metadata: {
-            tenantId,
-            seats: seats.toString(),
-          },
+          proration_behavior: prorationType,
+          metadata: { tenantId, seats: seats.toString() },
         });
 
         await appDb
@@ -196,22 +199,23 @@ export const subscriptionsRouter = createTRPCRouter({
           level: "info",
           category: "subscription",
           eventType: "plan_changed",
-          message: "Subscription plan changed",
+          message: `Subscription plan ${isUpgrade ? "upgraded" : "downgraded"}`,
           metadata: {
             tenantId,
             fromPriceId: tenantData.currentStripePriceId,
             toPriceId: newPrice.priceId,
             seats,
             isOnTrial,
+            isUpgrade,
           },
         });
 
         return {
           success: true,
-          message: "Plan changed",
+          isUpgrade,
+          isOnTrial,
           newPriceId: newPrice.priceId,
           seats: newPrice.seats,
-          isOnTrial,
         };
       } catch (error) {
         logEventAsync({
