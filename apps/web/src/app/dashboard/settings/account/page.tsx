@@ -10,6 +10,7 @@ export default function AccountPage() {
   const searchParams = useSearchParams();
   const [exportLoading, setExportLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [cancelLoading, setCancelLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [deactivationMailSent, setDeactivationMailSent] = useState(false);
@@ -24,6 +25,7 @@ export default function AccountPage() {
   const { data: subscriptionStatus } = trpc.subscriptions.getSubscriptionStatus.useQuery();
   const requestDeletionMutation = trpc.tenant.requestDeletion.useMutation();
   const createCheckoutMutation = trpc.subscriptions.createCheckoutSession.useMutation();
+  const cancelSubscriptionMutation = trpc.subscriptions.cancelSubscription.useMutation();
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
   const canManageSettings = Boolean(
     permissions?.includes(PERMISSIONS.SETTINGS_MANAGE)
@@ -43,6 +45,30 @@ export default function AccountPage() {
       }
     } catch (error) {
       console.error("Failed to create checkout session:", error);
+    }
+  };
+
+  const handleCancelSubscription = async () => {
+    const confirmed = window.confirm(
+      "Möchten Sie Ihr Abonnement wirklich kündigen? Die Praxis wird zum Ende des aktuellen Abrechnungszyklus deaktiviert."
+    );
+    if (!confirmed) return;
+
+    try {
+      setCancelLoading(true);
+      setErrorMessage("");
+      await cancelSubscriptionMutation.mutateAsync({});
+      setSuccessMessage("Abonnement erfolgreich gekündigt. Die Praxis wird zum Ende des Abrechnungszyklus deaktiviert.");
+      // Refresh subscription status
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      router.refresh();
+    } catch (error) {
+      console.error("Failed to cancel subscription:", error);
+      setErrorMessage(
+        error instanceof Error ? error.message : "Fehler beim Kündigen des Abos"
+      );
+    } finally {
+      setCancelLoading(false);
     }
   };
 
@@ -165,6 +191,17 @@ export default function AccountPage() {
             </div>
           )}
 
+          {subscriptionStatus.cancelledAtPeriodEnd && (
+            <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-red-900 text-sm">
+              <p className="font-semibold">Abonnement wird gekündigt</p>
+              <p>
+                Das Abonnement endet am{" "}
+                {new Date(subscriptionStatus.cancelledAtPeriodEnd).toLocaleDateString("de-DE")}.
+                Danach wird die Praxis deaktiviert und ist nur noch im Lesemodus verfügbar.
+              </p>
+            </div>
+          )}
+
           <div className="bg-surface rounded-2xl border border-border shadow-sm p-6">
             <div className="mb-6">
               <h2 className="text-lg font-semibold text-fg mb-2">Abonnement</h2>
@@ -202,7 +239,7 @@ export default function AccountPage() {
                 <button
                   key={tier.seats}
                   onClick={() => handleUpgrade(tier.seats)}
-                  disabled={createCheckoutMutation.isPending}
+                  disabled={createCheckoutMutation.isPending || !!subscriptionStatus.cancelledAtPeriodEnd}
                   className="p-4 rounded-lg border border-gray-200 transition-all text-sm font-medium hover:border-blue-300 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <div>{tier.price}</div>
@@ -210,6 +247,18 @@ export default function AccountPage() {
                 </button>
               ))}
             </div>
+
+            {(subscriptionStatus.status === "active" || subscriptionStatus.status === "trial") && !subscriptionStatus.cancelledAtPeriodEnd && (
+              <div className="mt-6 pt-6 border-t border-border">
+                <button
+                  onClick={handleCancelSubscription}
+                  disabled={cancelLoading}
+                  className="px-4 py-2 rounded-lg font-medium text-red-600 border border-red-300 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                >
+                  {cancelLoading ? "Wird gekündigt..." : "Abo kündigen"}
+                </button>
+              </div>
+            )}
           </div>
         </>
       )}

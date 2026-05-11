@@ -140,6 +140,7 @@ export const subscriptionsRouter = createTRPCRouter({
         trialEndsAt: tenantData.trialEndsAt,
         deactivatedAt: tenantData.deactivatedAt,
         lastPaymentFailedAt: tenantData.lastPaymentFailedAt,
+        cancelledAtPeriodEnd: tenantData.cancelledAtPeriodEnd,
         isTrialing:
           tenantData.subscriptionStatus === "trial" &&
           tenantData.trialEndsAt &&
@@ -151,6 +152,77 @@ export const subscriptionsRouter = createTRPCRouter({
             )
           : null,
       };
+    }),
+
+  cancelSubscription: protectedProcedure
+    .input(z.object({}).optional())
+    .mutation(async ({ ctx }) => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const tenantId = (ctx as any).tenantId;
+
+        const tenant = await appDb
+          .select()
+          .from(tenants)
+          .where(eq(tenants.id, tenantId))
+          .limit(1);
+
+        if (!tenant.length) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Tenant not found",
+          });
+        }
+
+        const tenantData = tenant[0];
+
+        if (!tenantData.stripeSubscriptionId) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "No active subscription found",
+          });
+        }
+
+        const stripe = getStripeClient();
+
+        const subscription = await stripe.subscriptions.update(
+          tenantData.stripeSubscriptionId,
+          { cancel_at_period_end: true }
+        );
+
+        // Update DB with cancellation timestamp
+        await appDb
+          .update(tenants)
+          .set({ cancelledAtPeriodEnd: new Date(subscription.cancel_at! * 1000) })
+          .where(eq(tenants.id, tenantId));
+
+        logEventAsync({
+          level: "info",
+          category: "subscription",
+          eventType: "subscription_cancelled",
+          message: "Subscription cancelled by user",
+          metadata: {
+            tenantId,
+            stripeSubscriptionId: tenantData.stripeSubscriptionId,
+            cancelAt: new Date(subscription.cancel_at! * 1000),
+          },
+        });
+
+        return {
+          success: true,
+          message: "Subscription cancelled",
+          cancellationDate: new Date(subscription.cancel_at! * 1000),
+        };
+      } catch (error) {
+        logEventAsync({
+          level: "error",
+          category: "stripe",
+          eventType: "cancel_subscription_failed",
+          message: "Failed to cancel subscription",
+          metadata: { error: serializeLogError(error) },
+        });
+        throw error;
+      }
     }),
 
 });

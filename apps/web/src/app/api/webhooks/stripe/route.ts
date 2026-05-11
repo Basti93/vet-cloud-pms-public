@@ -89,6 +89,13 @@ export async function POST(request: NextRequest) {
 
         if (priceId) updateData.currentStripePriceId = priceId;
 
+        // Handle cancellation status
+        if (subscription.cancel_at_period_end) {
+          updateData.cancelledAtPeriodEnd = new Date(subscription.cancel_at! * 1000);
+        } else {
+          updateData.cancelledAtPeriodEnd = null;
+        }
+
         // Determine subscription status
         if (subscription.trial_end && subscription.trial_end * 1000 > Date.now()) {
           updateData.subscriptionStatus = "trial";
