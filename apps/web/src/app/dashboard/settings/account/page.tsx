@@ -12,6 +12,7 @@ export default function AccountPage() {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
   const [reactivateLoading, setReactivateLoading] = useState(false);
+  const [undoCancelLoading, setUndoCancelLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [deactivationMailSent, setDeactivationMailSent] = useState(false);
@@ -28,6 +29,7 @@ export default function AccountPage() {
   const createCheckoutMutation = trpc.subscriptions.createCheckoutSession.useMutation();
   const cancelSubscriptionMutation = trpc.subscriptions.cancelSubscription.useMutation();
   const reactivateSubscriptionMutation = trpc.subscriptions.reactivateSubscription.useMutation();
+  const undoCancellationMutation = trpc.subscriptions.undoCancellation.useMutation();
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
   const canManageSettings = Boolean(
     permissions?.includes(PERMISSIONS.SETTINGS_MANAGE)
@@ -71,6 +73,29 @@ export default function AccountPage() {
       );
     } finally {
       setCancelLoading(false);
+    }
+  };
+
+  const handleUndoCancellation = async () => {
+    const confirmed = window.confirm(
+      "Möchten Sie die Kündigung zurückziehen? Das Abonnement läuft dann weiter."
+    );
+    if (!confirmed) return;
+
+    try {
+      setUndoCancelLoading(true);
+      setErrorMessage("");
+      await undoCancellationMutation.mutateAsync({});
+      setSuccessMessage("Kündigung erfolgreich zurückgezogen. Das Abonnement läuft weiter.");
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      router.refresh();
+    } catch (error) {
+      console.error("Failed to undo cancellation:", error);
+      setErrorMessage(
+        error instanceof Error ? error.message : "Fehler beim Zurückziehen der Kündigung"
+      );
+    } finally {
+      setUndoCancelLoading(false);
     }
   };
 
@@ -245,13 +270,20 @@ export default function AccountPage() {
           )}
 
           {subscriptionStatus.cancelledAtPeriodEnd && (
-            <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-red-900 text-sm">
-              <p className="font-semibold">Abonnement wird gekündigt</p>
-              <p>
+            <div className="p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-sm">
+              <p className="font-semibold mb-1">Abonnement wird gekündigt</p>
+              <p className="mb-3">
                 Das Abonnement endet am{" "}
                 {new Date(subscriptionStatus.cancelledAtPeriodEnd).toLocaleDateString("de-DE")}.
                 Danach wird die Praxis deaktiviert und ist nur noch im Lesemodus verfügbar.
               </p>
+              <button
+                onClick={handleUndoCancellation}
+                disabled={undoCancelLoading}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium text-amber-900 border border-amber-400 hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                {undoCancelLoading ? "Wird zurückgezogen..." : "Kündigung zurückziehen"}
+              </button>
             </div>
           )}
 

@@ -248,6 +248,71 @@ export const subscriptionsRouter = createTRPCRouter({
       }
     }),
 
+  undoCancellation: protectedProcedure
+    .input(z.object({}).optional())
+    .mutation(async ({ ctx }) => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const tenantId = (ctx as any).tenantId;
+
+        const tenant = await appDb
+          .select()
+          .from(tenants)
+          .where(eq(tenants.id, tenantId))
+          .limit(1);
+
+        if (!tenant.length) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Tenant not found" });
+        }
+
+        const tenantData = tenant[0];
+
+        if (!tenantData.stripeSubscriptionId) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "No active subscription found",
+          });
+        }
+
+        if (!tenantData.cancelledAtPeriodEnd) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Subscription is not scheduled for cancellation",
+          });
+        }
+
+        const stripe = getStripeClient();
+
+        await stripe.subscriptions.update(tenantData.stripeSubscriptionId, {
+          cancel_at_period_end: false,
+        });
+
+        await appDb
+          .update(tenants)
+          .set({ cancelledAtPeriodEnd: null })
+          .where(eq(tenants.id, tenantId));
+
+        logEventAsync({
+          level: "info",
+          category: "subscription",
+          eventType: "cancellation_undone",
+          message: "Subscription cancellation undone by user",
+          metadata: { tenantId, stripeSubscriptionId: tenantData.stripeSubscriptionId },
+        });
+
+        return { success: true, message: "Cancellation undone" };
+      } catch (error) {
+        logEventAsync({
+          level: "error",
+          category: "stripe",
+          eventType: "undo_cancellation_failed",
+          message: "Failed to undo subscription cancellation",
+          metadata: { error: serializeLogError(error) },
+        });
+        throw error;
+      }
+    }),
+
   reactivateSubscription: protectedProcedure
     .input(z.object({}).optional())
     .mutation(async ({ ctx }) => {

@@ -70,6 +70,7 @@ const DEACTIVATION_ALLOWED_PATHS = new Set([
   "subscriptions.getSubscriptionStatus",
   "subscriptions.cancelSubscription",
   "subscriptions.reactivateSubscription",
+  "subscriptions.undoCancellation",
   "admin.getCurrentUser",
   "admin.getUserPermissions",
 ]);
