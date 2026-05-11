@@ -144,6 +144,9 @@ export default function TenantsPage() {
                   Erstellt
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Stripe
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Aktionen
                 </th>
               </tr>
@@ -180,6 +183,21 @@ export default function TenantsPage() {
                       locale: de,
                       addSuffix: true,
                     })}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    {tenant.stripeCustomerId ? (
+                      <a
+                        href={`https://dashboard.stripe.com/${(typeof process !== 'undefined' && process.env?.STRIPE_SECRET_KEY?.startsWith('sk_test_')) ? 'test/' : ''}customers/${tenant.stripeCustomerId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-700 hover:underline"
+                        title={tenant.stripeCustomerId}
+                      >
+                        ↗ Stripe
+                      </a>
+                    ) : (
+                      <span className="text-gray-300">—</span>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <div className="flex flex-col gap-2">

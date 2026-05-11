@@ -154,6 +154,90 @@ export default function TenantDetailPage() {
         </div>
       </div>
 
+      {/* Stripe & Abrechnung */}
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <h3 className="text-sm font-semibold text-gray-900 mb-3">Stripe & Abrechnung</h3>
+        {tenant.stripeCustomerId ? (
+          <div className="space-y-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <p className="text-xs font-medium text-gray-500">Customer</p>
+                <a
+                  href={tenant.stripeDashboardUrls?.customerUrl ?? "#"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-blue-600 hover:text-blue-700 hover:underline break-all"
+                >
+                  {tenant.stripeCustomerId}
+                  <span className="ml-1 text-xs">↗</span>
+                </a>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500">Subscription</p>
+                {tenant.stripeSubscriptionId ? (
+                  <a
+                    href={tenant.stripeDashboardUrls?.subscriptionUrl ?? "#"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-blue-600 hover:text-blue-700 hover:underline break-all"
+                  >
+                    {tenant.stripeSubscriptionId}
+                    <span className="ml-1 text-xs">↗</span>
+                  </a>
+                ) : (
+                  <p className="text-sm text-gray-400">Keine Subscription</p>
+                )}
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500">Tarif</p>
+                <p className="text-sm text-gray-900">
+                  {tenant.currentPriceLabel
+                    ? `${tenant.currentPriceLabel.seats} Nutzer (€${(tenant.currentPriceLabel.monthlyPrice / 100).toFixed(2)}/Monat)`
+                    : tenant.currentStripePriceId ?? "—"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500">Testphase</p>
+                <p className="text-sm text-gray-900">
+                  {tenant.trialEndsAt
+                    ? new Date(tenant.trialEndsAt) > new Date()
+                      ? `Endet am ${new Date(tenant.trialEndsAt).toLocaleDateString("de-DE")}`
+                      : `Abgelaufen am ${new Date(tenant.trialEndsAt).toLocaleDateString("de-DE")}`
+                    : "—"}
+                </p>
+              </div>
+            </div>
+            {/* Warnings row */}
+            {(tenant.cancelledAtPeriodEnd || tenant.paymentFailureCount > 0 || tenant.deactivatedAt) && (
+              <div className="mt-3 pt-3 border-t border-gray-100 space-y-1.5">
+                {tenant.cancelledAtPeriodEnd && (
+                  <p className="text-xs text-amber-700">
+                    Kündigt am {new Date(tenant.cancelledAtPeriodEnd).toLocaleDateString("de-DE")}
+                  </p>
+                )}
+                {tenant.paymentFailureCount > 0 && (
+                  <p className="text-xs text-red-700">
+                    {tenant.paymentFailureCount} Zahlungsfehlversuche
+                    {tenant.paymentGracePeriodEndsAt && new Date(tenant.paymentGracePeriodEndsAt) > new Date()
+                      ? ` — Gnadenfrist bis ${new Date(tenant.paymentGracePeriodEndsAt).toLocaleDateString("de-DE")}`
+                      : tenant.paymentGracePeriodEndsAt
+                      ? " — Gnadenfrist abgelaufen"
+                      : ""}
+                  </p>
+                )}
+                {tenant.deactivatedAt && (
+                  <p className="text-xs text-red-700">
+                    Deaktiviert am {new Date(tenant.deactivatedAt).toLocaleDateString("de-DE")}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-400">Noch kein Stripe-Kunde</p>
+        )}
+      </div>
+
       <div className="bg-white rounded-lg border border-gray-200 p-4">
         <h3 className="text-sm font-semibold text-gray-900">Feature Flags</h3>
         <p className="mt-1 text-xs text-gray-500">

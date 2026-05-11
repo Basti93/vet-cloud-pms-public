@@ -19,6 +19,20 @@ import { sendTenantLifecycleEmail } from "@/lib/email/service";
 import { randomUUID } from "crypto";
 import { createDefaultRoles } from "@/lib/auth/permissions";
 import { invalidateAllRolePermissions } from "@/lib/auth/permission-cache";
+import { getPriceById } from "@/lib/stripe/prices";
+
+function getStripeDashboardUrls(stripeCustomerId: string | null, stripeSubscriptionId: string | null) {
+  const isTestMode = (process.env.STRIPE_SECRET_KEY ?? "").startsWith("sk_test_");
+  const prefix = isTestMode ? "test/" : "";
+  return {
+    customerUrl: stripeCustomerId
+      ? `https://dashboard.stripe.com/${prefix}customers/${stripeCustomerId}`
+      : null,
+    subscriptionUrl: stripeSubscriptionId
+      ? `https://dashboard.stripe.com/${prefix}subscriptions/${stripeSubscriptionId}`
+      : null,
+  };
+}
 
 export const adminCoreRouter = createAdminRouter({
   /**
@@ -43,6 +57,7 @@ export const adminCoreRouter = createAdminRouter({
         status: tenants.subscriptionStatus,
         email: tenants.email,
         createdAt: tenants.createdAt,
+        stripeCustomerId: tenants.stripeCustomerId,
       }).from(tenants);
 
       // Add filters
@@ -153,6 +168,8 @@ export const adminCoreRouter = createAdminRouter({
         systemRolesEditable:
           Number(systemRoleLockState?.editableCount ?? 0) > 0 &&
           Number(systemRoleLockState?.totalSystemCount ?? 0) > 0,
+        stripeDashboardUrls: getStripeDashboardUrls(tenant.stripeCustomerId, tenant.stripeSubscriptionId),
+        currentPriceLabel: tenant.currentStripePriceId ? getPriceById(tenant.currentStripePriceId) : null,
       };
     }),
 
