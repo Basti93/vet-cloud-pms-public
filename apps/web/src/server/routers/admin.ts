@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, count } from "drizzle-orm";
 import { createTRPCRouter, protectedProcedure } from "@/server/trpc";
 import {
   tenants,
@@ -738,11 +738,24 @@ export const adminRouter = createTRPCRouter({
       }
 
       const [tenant] = await ctx.db
-        .select({ name: tenants.name })
+        .select({ name: tenants.name, maxUsers: tenants.maxUsers })
         .from(tenants)
         .where(eq(tenants.id, input.tenantId))
         .limit(1);
       if (!tenant) throw new TRPCError({ code: "NOT_FOUND", message: "Tenant not found" });
+
+      // Enforce seat limit: count active users before allowing invite
+      const [{ activeUsers }] = await ctx.db
+        .select({ activeUsers: count() })
+        .from(users)
+        .where(and(eq(users.tenantId, input.tenantId), eq(users.active, true)));
+
+      if (activeUsers >= (tenant.maxUsers ?? 5)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: `Seat limit reached. Your plan allows ${tenant.maxUsers ?? 5} users. Upgrade your subscription to invite more.`,
+        });
+      }
 
       const invite = await createInvite({
         tenantId: input.tenantId,

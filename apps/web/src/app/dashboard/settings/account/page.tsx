@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PERMISSIONS } from "@/lib/db/schema";
+import { Info } from "lucide-react";
 
 export default function AccountPage() {
   const router = useRouter();
@@ -350,10 +351,13 @@ export default function AccountPage() {
                 )}
               </div>
               {subscriptionStatus.isTrialing && subscriptionStatus.currentPrice && subscriptionStatus.trialEndsAt && (
-                <div className="mt-3 p-3 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-800">
-                  ℹ️ Nach der Testphase ({new Date(subscriptionStatus.trialEndsAt).toLocaleDateString("de-DE")}) wird automatisch{" "}
-                  <strong>€{(subscriptionStatus.currentPrice.monthlyPrice / 100).toFixed(2)}/Monat ({subscriptionStatus.currentPrice.seats} Nutzer)</strong> berechnet.
-                  Sie können den Tarif jederzeit vor Ablauf der Testphase ändern.
+                <div className="mt-3 p-3 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-800 flex gap-2">
+                  <Info className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>
+                    Nach der Testphase ({new Date(subscriptionStatus.trialEndsAt).toLocaleDateString("de-DE")}) wird automatisch{" "}
+                    <strong>€{(subscriptionStatus.currentPrice.monthlyPrice / 100).toFixed(2)}/Monat ({subscriptionStatus.currentPrice.seats} Nutzer)</strong> berechnet.
+                    Sie können den Tarif jederzeit vor Ablauf der Testphase ändern.
+                  </span>
                 </div>
               )}
             </div>

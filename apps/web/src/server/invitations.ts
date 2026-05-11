@@ -1,8 +1,8 @@
 import { randomBytes, createHash } from "crypto";
-import { and, eq, gt, lt } from "drizzle-orm";
+import { and, eq, gt, lt, count } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { db } from "@/lib/db/client";
-import { roles, userInvitations, userRoles, users } from "@/lib/db/schema";
+import { roles, tenants, userInvitations, userRoles, users } from "@/lib/db/schema";
 import { INVITE_ROLE_TO_CODE } from "@/lib/auth/roles";
 import { invalidateRolePermissionCache } from "@/lib/auth/permission-cache";
 
@@ -235,6 +235,25 @@ export async function acceptInvite(params: { token: string; clerkUserId: string 
   }
 
   await db.transaction(async (tx) => {
+    // Seat check inside transaction to prevent race conditions and post-downgrade overflow
+    const [tenantData] = await tx
+      .select({ maxUsers: tenants.maxUsers })
+      .from(tenants)
+      .where(eq(tenants.id, invitation.tenantId))
+      .limit(1);
+
+    const [{ activeUsers }] = await tx
+      .select({ activeUsers: count() })
+      .from(users)
+      .where(and(eq(users.tenantId, invitation.tenantId), eq(users.active, true)));
+
+    if (activeUsers >= (tenantData?.maxUsers ?? 5)) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: `Seat limit reached. The practice has reached its user limit of ${tenantData?.maxUsers ?? 5}. Ask the admin to upgrade the subscription.`,
+      });
+    }
+
     const claimed = await tx
       .update(userInvitations)
       .set({
