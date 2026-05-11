@@ -589,30 +589,7 @@ export default function AccountPage() {
         </div>
       ) : null}
 
-      {/* DSGVO Rights Information */}
-      <div className="bg-surface rounded-2xl border border-border shadow-sm p-6">
-        <h3 className="text-lg font-semibold text-fg mb-4">Ihre DSGVO-Rechte</h3>
-        <ul className="space-y-2 text-sm text-muted">
-          <li>
-            <strong>Recht auf Auskunft (Art. 15):</strong> Sie können eine Kopie aller Ihre Daten betreffenden Informationen anfordern.
-          </li>
-          <li>
-            <strong>Recht auf Berichtigung (Art. 16):</strong> Sie können Ihre Daten korrigieren, indem Sie die Einstellungen ändern.
-          </li>
-          <li>
-            <strong>Recht auf Löschung (Art. 17):</strong> Sie können die Löschung Ihres Kontos anfordern (siehe oben).
-          </li>
-          <li>
-            <strong>Recht auf Datenübertragbarkeit (Art. 20):</strong> Sie können Ihre Daten in einem strukturierten Format herunterladen (siehe oben).
-          </li>
-          <li>
-            <strong>Fragen zum Datenschutz?</strong> Kontaktieren Sie uns unter{" "}
-            <a href="mailto:user@example.com" className="text-blue-600 hover:underline">
-              user@example.com
-            </a>
-          </li>
-        </ul>
-      </div>
+
     </div>
   );
 }
