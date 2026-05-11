@@ -546,6 +546,53 @@ export async function sendVaccinationReminderEmail(
   }
 }
 
+export async function sendTrialExpiredAdminEmail(input: {
+  clinicName: string;
+  adminEmails: string[];
+  adminDashboardUrl: string;
+}) {
+  const subject = `Testphase abgelaufen: ${input.clinicName}`;
+  const body = `
+Hallo,
+
+Die 90-Tage Testphase für "${input.clinicName}" ist abgelaufen. Die Praxis wurde deaktiviert.
+
+Weitere Schritte:
+- Kontaktieren Sie den Klinikbetreiber und bieten Sie ein Abo an
+- Alternativ können Sie die Praxis reaktivieren, falls ein Fehler vorliegen sollte
+- Admin-Dashboard: ${input.adminDashboardUrl}
+
+Bei Fragen kontaktieren Sie uns unter support@example.com
+
+Mit freundlichen Grüßen,
+Ihr Vet Cloud Team
+  `.trim();
+
+  try {
+    const results = await Promise.all(
+      input.adminEmails.map((email) =>
+        getResend().emails.send({
+          from: systemSender(),
+          to: email,
+          subject,
+          text: body,
+        })
+      )
+    );
+
+    const failed = results.filter((r) => r.error);
+    if (failed.length > 0) {
+      console.error("Errors sending trial expired emails:", failed);
+      return { success: false, errors: failed.map((r) => r.error) };
+    }
+
+    return { success: true, messageIds: results.map((r) => r.data?.id) };
+  } catch (error) {
+    console.error("Error sending trial expired admin emails:", error);
+    return { success: false, error };
+  }
+}
+
 export async function sendTrialEndingEmail(input: {
   clinicEmail: string;
   clinicName: string;
