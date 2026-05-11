@@ -1,5 +1,4 @@
--- Create calendar_access_tokens table
-CREATE TABLE "calendar_access_tokens" (
+CREATE TABLE IF NOT EXISTS "calendar_access_tokens" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"tenant_id" uuid NOT NULL,
 	"vet_id" uuid NOT NULL,
@@ -15,8 +14,7 @@ CREATE TABLE "calendar_access_tokens" (
 	CONSTRAINT "calendar_access_tokens_vet_id_fkey" FOREIGN KEY ("vet_id") REFERENCES "users"("id") ON DELETE cascade
 );
 
--- Create calendar_access_audit table
-CREATE TABLE "calendar_access_audit" (
+CREATE TABLE IF NOT EXISTS "calendar_access_audit" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"token_id" uuid,
 	"tenant_id" uuid NOT NULL,
@@ -31,9 +29,8 @@ CREATE TABLE "calendar_access_audit" (
 	CONSTRAINT "calendar_access_audit_veterinarian_id_fkey" FOREIGN KEY ("veterinarian_id") REFERENCES "users"("id") ON DELETE cascade
 );
 
--- Create indexes
-CREATE INDEX "calendar_tokens_tenant_vet_idx" ON "calendar_access_tokens" ("tenant_id","vet_id");
-CREATE INDEX "calendar_tokens_tenant_id_idx" ON "calendar_access_tokens" ("tenant_id");
-CREATE INDEX "calendar_audit_tenant_id_idx" ON "calendar_access_audit" ("tenant_id");
-CREATE INDEX "calendar_audit_token_id_idx" ON "calendar_access_audit" ("token_id");
-CREATE INDEX "calendar_audit_accessed_at_idx" ON "calendar_access_audit" ("accessed_at");
+CREATE INDEX IF NOT EXISTS "calendar_tokens_tenant_vet_idx" ON "calendar_access_tokens" ("tenant_id","vet_id");
+CREATE INDEX IF NOT EXISTS "calendar_tokens_tenant_id_idx" ON "calendar_access_tokens" ("tenant_id");
+CREATE INDEX IF NOT EXISTS "calendar_audit_tenant_id_idx" ON "calendar_access_audit" ("tenant_id");
+CREATE INDEX IF NOT EXISTS "calendar_audit_token_id_idx" ON "calendar_access_audit" ("token_id");
+CREATE INDEX IF NOT EXISTS "calendar_audit_accessed_at_idx" ON "calendar_access_audit" ("accessed_at");

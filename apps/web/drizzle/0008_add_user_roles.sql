@@ -1,5 +1,4 @@
--- Create user_roles join table for many-to-many users <-> roles relationship
-CREATE TABLE "user_roles" (
+CREATE TABLE IF NOT EXISTS "user_roles" (
 	"user_id" uuid NOT NULL,
 	"role_id" uuid NOT NULL,
 	"assigned_at" timestamp with time zone DEFAULT now() NOT NULL,
@@ -10,7 +9,6 @@ CREATE TABLE "user_roles" (
 	CONSTRAINT "user_roles_assigned_by_fkey" FOREIGN KEY ("assigned_by") REFERENCES "users"("id") ON DELETE set null
 );
 
--- Create indexes for efficient lookups
-CREATE INDEX "user_roles_user_id_idx" ON "user_roles" ("user_id");
-CREATE INDEX "user_roles_role_id_idx" ON "user_roles" ("role_id");
-CREATE INDEX "user_roles_assigned_by_idx" ON "user_roles" ("assigned_by");
+CREATE INDEX IF NOT EXISTS "user_roles_user_id_idx" ON "user_roles" ("user_id");
+CREATE INDEX IF NOT EXISTS "user_roles_role_id_idx" ON "user_roles" ("role_id");
+CREATE INDEX IF NOT EXISTS "user_roles_assigned_by_idx" ON "user_roles" ("assigned_by");
