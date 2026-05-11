@@ -28,6 +28,7 @@ export default function AccountPage() {
   const utils = trpc.useUtils();
   const requestDeletionMutation = trpc.tenant.requestDeletion.useMutation();
   const createCheckoutMutation = trpc.subscriptions.createCheckoutSession.useMutation();
+  const changePlanMutation = trpc.subscriptions.changePlan.useMutation();
   const cancelSubscriptionMutation = trpc.subscriptions.cancelSubscription.useMutation();
   const reactivateSubscriptionMutation = trpc.subscriptions.reactivateSubscription.useMutation();
   const undoCancellationMutation = trpc.subscriptions.undoCancellation.useMutation();
@@ -44,12 +45,24 @@ export default function AccountPage() {
 
   const handleUpgrade = async (seats: number) => {
     try {
-      const result = await createCheckoutMutation.mutateAsync({ seats });
-      if (result.url) {
-        setCheckoutUrl(result.url);
+      setErrorMessage("");
+      if (subscriptionStatus?.currentPrice) {
+        // Existing subscription → change plan inline (no Stripe Checkout redirect)
+        await changePlanMutation.mutateAsync({ seats });
+        setSuccessMessage("Tarif erfolgreich geändert.");
+        await utils.subscriptions.getSubscriptionStatus.invalidate();
+      } else {
+        // No subscription yet → Stripe Checkout flow
+        const result = await createCheckoutMutation.mutateAsync({ seats });
+        if (result.url) {
+          setCheckoutUrl(result.url);
+        }
       }
     } catch (error) {
-      console.error("Failed to create checkout session:", error);
+      console.error("Failed to change plan:", error);
+      setErrorMessage(
+        error instanceof Error ? error.message : "Fehler beim Ändern des Tarifs"
+      );
     }
   };
 
@@ -320,11 +333,20 @@ export default function AccountPage() {
                 <button
                   key={tier.seats}
                   onClick={() => handleUpgrade(tier.seats)}
-                  disabled={createCheckoutMutation.isPending || !!subscriptionStatus.cancelledAtPeriodEnd}
-                  className="p-4 rounded-lg border border-gray-200 transition-all text-sm font-medium hover:border-blue-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={
+                    createCheckoutMutation.isPending ||
+                    changePlanMutation.isPending ||
+                    !!subscriptionStatus.cancelledAtPeriodEnd ||
+                    subscriptionStatus.currentPrice?.seats === tier.seats
+                  }
+                  className="p-4 rounded-lg border border-gray-200 transition-all text-sm font-medium hover:border-blue-300 disabled:opacity-50 disabled:cursor-not-allowed data-[current=true]:border-blue-400 data-[current=true]:bg-blue-50"
+                  data-current={subscriptionStatus.currentPrice?.seats === tier.seats}
                 >
                   <div>{tier.price}</div>
                   <div className="text-xs text-gray-600 font-normal">{tier.desc}</div>
+                  {subscriptionStatus.currentPrice?.seats === tier.seats && (
+                    <div className="text-xs text-blue-600 font-medium mt-1">Aktuell</div>
+                  )}
                 </button>
               ))}
             </div>

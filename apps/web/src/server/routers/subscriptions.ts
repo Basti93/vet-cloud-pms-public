@@ -123,6 +123,108 @@ export const subscriptionsRouter = createTRPCRouter({
       }
     }),
 
+  changePlan: protectedProcedure
+    .use(requirePermission(PERMISSIONS.SETTINGS_MANAGE))
+    .input(z.object({ seats: z.number().int().min(1).max(10) }))
+    .mutation(async ({ input, ctx }) => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const tenantId = (ctx as any).tenantId;
+        const { seats } = input;
+
+        const tenant = await appDb
+          .select()
+          .from(tenants)
+          .where(eq(tenants.id, tenantId))
+          .limit(1);
+
+        if (!tenant.length) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Tenant not found" });
+        }
+
+        const tenantData = tenant[0];
+
+        if (!tenantData.stripeSubscriptionId) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "No active subscription to change. Use createCheckoutSession instead.",
+          });
+        }
+
+        const newPrice = getPriceBySeats(seats);
+
+        if (tenantData.currentStripePriceId === newPrice.priceId) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Already on this plan",
+          });
+        }
+
+        const stripe = getStripeClient();
+        const subscription = await stripe.subscriptions.retrieve(tenantData.stripeSubscriptionId);
+        const currentItem = subscription.items.data[0];
+
+        if (!currentItem) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Subscription has no items",
+          });
+        }
+
+        // For trial subscriptions: swap price, keep trial, no immediate charge
+        // For active paid subscriptions: prorate (credit unused days, charge/credit on next invoice)
+        const isOnTrial = subscription.status === "trialing";
+
+        await stripe.subscriptions.update(tenantData.stripeSubscriptionId, {
+          items: [{ id: currentItem.id, price: newPrice.priceId }],
+          proration_behavior: isOnTrial ? "none" : "create_prorations",
+          metadata: {
+            tenantId,
+            seats: seats.toString(),
+          },
+        });
+
+        await appDb
+          .update(tenants)
+          .set({
+            currentStripePriceId: newPrice.priceId,
+            maxUsers: newPrice.seats,
+          })
+          .where(eq(tenants.id, tenantId));
+
+        logEventAsync({
+          level: "info",
+          category: "subscription",
+          eventType: "plan_changed",
+          message: "Subscription plan changed",
+          metadata: {
+            tenantId,
+            fromPriceId: tenantData.currentStripePriceId,
+            toPriceId: newPrice.priceId,
+            seats,
+            isOnTrial,
+          },
+        });
+
+        return {
+          success: true,
+          message: "Plan changed",
+          newPriceId: newPrice.priceId,
+          seats: newPrice.seats,
+          isOnTrial,
+        };
+      } catch (error) {
+        logEventAsync({
+          level: "error",
+          category: "stripe",
+          eventType: "change_plan_failed",
+          message: "Failed to change subscription plan",
+          metadata: { error: serializeLogError(error) },
+        });
+        throw error;
+      }
+    }),
+
   getSubscriptionStatus: protectedProcedure
     .input(z.object({}).optional())
     .query(async ({ ctx }) => {
