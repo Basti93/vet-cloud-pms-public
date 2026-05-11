@@ -4,6 +4,7 @@ import { db as appDb } from "@/lib/db/client";
 import { tenants } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { sendTrialEndingEmail, sendPaymentFailedAdminEmail } from "@/lib/email/service";
+import { TRIAL_DAYS } from "@/lib/stripe/prices";
 import Stripe from "stripe";
 
 export async function POST(request: NextRequest) {
@@ -70,6 +71,8 @@ export async function POST(request: NextRequest) {
         const subscription = event.data.object as Stripe.Subscription;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const tenantId = (subscription.metadata as any)?.tenantId;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const trialDaysRemaining = (subscription.metadata as any)?.trialDaysRemaining;
 
         console.log(`[Stripe Webhook] subscription.updated - tenantId: ${tenantId}, subId: ${subscription.id}`);
 
@@ -94,6 +97,14 @@ export async function POST(request: NextRequest) {
           updateData.cancelledAtPeriodEnd = new Date(subscription.cancel_at! * 1000);
         } else {
           updateData.cancelledAtPeriodEnd = null;
+        }
+
+        // Handle trial day preservation on mid-trial upgrade
+        if (trialDaysRemaining && subscription.trial_end) {
+          const remainingDays = parseInt(trialDaysRemaining, 10);
+          updateData.trialEndsAt = new Date(subscription.trial_end * 1000);
+          updateData.trialDaysUsed = Math.max(0, TRIAL_DAYS - remainingDays);
+          updateData.originalTrialEndsAt = new Date(subscription.trial_end * 1000);
         }
 
         // Determine subscription status

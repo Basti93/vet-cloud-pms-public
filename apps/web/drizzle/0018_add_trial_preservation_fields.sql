@@ -1,0 +1,2 @@
+ALTER TABLE tenants ADD COLUMN trial_days_used SMALLINT DEFAULT 0;
+ALTER TABLE tenants ADD COLUMN original_trial_ends_at TIMESTAMP WITH TIME ZONE;

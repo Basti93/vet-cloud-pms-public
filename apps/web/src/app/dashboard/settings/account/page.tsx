@@ -172,6 +172,16 @@ export default function AccountPage() {
       {/* Subscription Status Section */}
       {subscriptionStatus && (
         <>
+          {subscriptionStatus.trialDaysUsed > 0 && subscriptionStatus.originalTrialEndsAt && (
+            <div className="p-4 rounded-lg bg-blue-50 border border-blue-200 text-blue-900 text-sm">
+              <p className="font-semibold">✓ Testphase erhalten</p>
+              <p>
+                Sie haben Ihr Abo während der Testphase aktualisiert. Die ursprünglichen {subscriptionStatus.trialDaysUsed} Tage wurden berücksichtigt.
+                Testphase endet am {new Date(subscriptionStatus.originalTrialEndsAt).toLocaleDateString("de-DE")}.
+              </p>
+            </div>
+          )}
+
           {subscriptionStatus.isTrialing && subscriptionStatus.daysUntilTrialEnds && subscriptionStatus.daysUntilTrialEnds <= 7 && (
             <div className={`p-4 rounded-lg border text-sm ${
               subscriptionStatus.daysUntilTrialEnds <= 0

@@ -84,6 +84,8 @@ export const tenants = pgTable(
     cancelledAtPeriodEnd: timestamp("cancelled_at_period_end", { withTimezone: true }),
     paymentFailureCount: smallint("payment_failure_count").default(0),
     paymentGracePeriodEndsAt: timestamp("payment_grace_period_ends_at", { withTimezone: true }),
+    trialDaysUsed: smallint("trial_days_used").default(0),
+    originalTrialEndsAt: timestamp("original_trial_ends_at", { withTimezone: true }),
     themePreference: varchar("theme_preference", {
       length: 50,
       enum: ["sage", "warmsand", "klinikblau", "bordeaux", "forest", "schiefer"],

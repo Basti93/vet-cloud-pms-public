@@ -64,8 +64,24 @@ export const subscriptionsRouter = createTRPCRouter({
             .where(eq(tenants.id, tenantId));
         }
 
-        // Create checkout session with trial
+        // Check if tenant has existing trial
         const domain = getMainDomain();
+        let trialPeriodDays = TRIAL_DAYS;
+        let metadataTrialDaysRemaining = undefined;
+
+        if (
+          tenantData.subscriptionStatus === "trial" &&
+          tenantData.trialEndsAt &&
+          new Date(tenantData.trialEndsAt) > new Date()
+        ) {
+          // Existing trial still active — calculate remaining days
+          const remainingMs =
+            new Date(tenantData.trialEndsAt).getTime() - Date.now();
+          const remainingDays = Math.ceil(remainingMs / (1000 * 60 * 60 * 24));
+          trialPeriodDays = Math.max(remainingDays, 0);
+          metadataTrialDaysRemaining = remainingDays.toString();
+        }
+
         const session = await stripe.checkout.sessions.create({
           customer: stripeCustomerId,
           mode: "subscription",
@@ -76,10 +92,13 @@ export const subscriptionsRouter = createTRPCRouter({
             },
           ],
           subscription_data: {
-            trial_period_days: TRIAL_DAYS,
+            trial_period_days: trialPeriodDays > 0 ? trialPeriodDays : undefined,
             metadata: {
               tenantId: tenantData.id,
               seats: seats.toString(),
+              ...(metadataTrialDaysRemaining && {
+                trialDaysRemaining: metadataTrialDaysRemaining,
+              }),
             },
           },
           success_url: `${domain}/dashboard/settings/account?status=success`,
@@ -143,6 +162,8 @@ export const subscriptionsRouter = createTRPCRouter({
         cancelledAtPeriodEnd: tenantData.cancelledAtPeriodEnd,
         paymentFailureCount: tenantData.paymentFailureCount || 0,
         paymentGracePeriodEndsAt: tenantData.paymentGracePeriodEndsAt,
+        trialDaysUsed: tenantData.trialDaysUsed || 0,
+        originalTrialEndsAt: tenantData.originalTrialEndsAt,
         isTrialing:
           tenantData.subscriptionStatus === "trial" &&
           tenantData.trialEndsAt &&
