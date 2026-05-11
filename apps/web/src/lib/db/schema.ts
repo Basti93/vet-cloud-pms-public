@@ -75,6 +75,12 @@ export const tenants = pgTable(
       .default("starter")
       .notNull(),
     maxUsers: smallint("max_users").default(5),
+    stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
+    stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }),
+    currentStripePriceId: varchar("current_stripe_price_id", { length: 255 }),
+    trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
+    deactivatedAt: timestamp("deactivated_at", { withTimezone: true }),
+    lastPaymentFailedAt: timestamp("last_payment_failed_at", { withTimezone: true }),
     themePreference: varchar("theme_preference", {
       length: 50,
       enum: ["sage", "warmsand", "klinikblau", "bordeaux", "forest", "schiefer"],

@@ -57,6 +57,7 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "resend": "^6.12.2",
+    "stripe": "^22.1.1",
     "styled-jsx": "^5.1.6",
     "superjson": "^2",
     "svix": "^1",

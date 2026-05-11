@@ -20,6 +20,7 @@ import { userRouter } from "./user";
 import { vaccinationsRouter } from "./vaccinations";
 import { vaccinationSettingsRouter } from "./vaccinationSettings";
 import { adminVaccinationsRouter } from "./admin-vaccinations";
+import { subscriptionsRouter } from "./subscriptions";
 
 export const appRouter = createTRPCRouter({
   appointments: appointmentsRouter,
@@ -45,6 +46,7 @@ export const appRouter = createTRPCRouter({
   user: userRouter,
   vaccinations: vaccinationsRouter,
   vaccinationSettings: vaccinationSettingsRouter,
+  subscriptions: subscriptionsRouter,
 });
 
 export type AppRouter = typeof appRouter;

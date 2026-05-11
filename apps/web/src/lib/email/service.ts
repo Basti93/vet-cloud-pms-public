@@ -545,3 +545,45 @@ export async function sendVaccinationReminderEmail(
     return { success: false, error };
   }
 }
+
+export async function sendTrialEndingEmail(input: {
+  clinicEmail: string;
+  clinicName: string;
+  billingUrl: string;
+}) {
+  const subject = "Deine Testphase endet bald";
+  const mainDomain = getSystemDomain();
+  const body = `
+Hallo ${input.clinicName},
+
+Deine kostenlosen 3 Monate enden bald. Nach dieser Zeit müssen Sie sich für einen Tarif anmelden, um Zugriff auf Vet Cloud zu behalten.
+
+Verfügbare Tarife:
+- 1 Nutzer: €30/Monat
+- 3 Nutzer: €50/Monat
+- 5 Nutzer: €100/Monat
+- 10 Nutzer: €200/Monat
+
+Jetzt upgraden: ${mainDomain}${input.billingUrl}
+
+Ohne ein aktives Abo wird Ihre Klinik deaktiviert und nach 30 Tagen gelöscht.
+
+Bei Fragen schreiben Sie uns: support@example.com
+
+Mit freundlichen Grüßen,
+Ihr Vet Cloud Team
+  `.trim();
+
+  try {
+    const result = await getResend().emails.send({
+      from: systemSender(),
+      to: input.clinicEmail,
+      subject,
+      text: body,
+    });
+    if (result.error) return { success: false, error: result.error };
+    return { success: true, messageId: result.data?.id };
+  } catch (error) {
+    return { success: false, error };
+  }
+}

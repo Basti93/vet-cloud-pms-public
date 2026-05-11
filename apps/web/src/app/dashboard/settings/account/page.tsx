@@ -1,27 +1,50 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc/client";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { PERMISSIONS } from "@/lib/db/schema";
 
 export default function AccountPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [exportLoading, setExportLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [deactivationMailSent, setDeactivationMailSent] = useState(false);
 
+  const statusMessage = searchParams.get("status");
+
   const { data: currentUser } = trpc.admin.getCurrentUser.useQuery();
   const { data: permissions, isLoading: permissionsLoading } =
     trpc.admin.getUserPermissions.useQuery();
   const { data: tenant } = trpc.tenant.getCurrent.useQuery();
   const { data: deletionStatus } = trpc.tenant.getDeletionStatus.useQuery();
+  const { data: subscriptionStatus } = trpc.subscriptions.getSubscriptionStatus.useQuery();
   const requestDeletionMutation = trpc.tenant.requestDeletion.useMutation();
+  const createCheckoutMutation = trpc.subscriptions.createCheckoutSession.useMutation();
+  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
   const canManageSettings = Boolean(
     permissions?.includes(PERMISSIONS.SETTINGS_MANAGE)
   );
+
+  useEffect(() => {
+    if (checkoutUrl) {
+      window.location.href = checkoutUrl;
+    }
+  }, [checkoutUrl]);
+
+  const handleUpgrade = async (seats: number) => {
+    try {
+      const result = await createCheckoutMutation.mutateAsync({ seats });
+      if (result.url) {
+        setCheckoutUrl(result.url);
+      }
+    } catch (error) {
+      console.error("Failed to create checkout session:", error);
+    }
+  };
 
   const handleExportData = async () => {
     try {
@@ -108,6 +131,89 @@ export default function AccountPage() {
 
   return (
     <div className="space-y-8">
+      {/* Checkout Status Messages */}
+      {statusMessage === "success" && (
+        <div className="p-4 rounded-lg bg-green-50 border border-green-200 text-green-800 text-sm">
+          ✓ Danke! Ihr Abo wurde aktiviert.
+        </div>
+      )}
+      {statusMessage === "cancel" && (
+        <div className="p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+          Checkout abgebrochen. Sie können jederzeit upgraden.
+        </div>
+      )}
+
+      {/* Subscription Status Section */}
+      {subscriptionStatus && (
+        <>
+          {subscriptionStatus.isTrialing && subscriptionStatus.daysUntilTrialEnds && subscriptionStatus.daysUntilTrialEnds <= 7 && (
+            <div className={`p-4 rounded-lg border text-sm ${
+              subscriptionStatus.daysUntilTrialEnds <= 0
+                ? "bg-red-50 border-red-200 text-red-900"
+                : "bg-orange-50 border-orange-200 text-orange-900"
+            }`}>
+              <p className="font-semibold">
+                {subscriptionStatus.daysUntilTrialEnds <= 0
+                  ? "Testphase beendet"
+                  : `Testphase endet in ${subscriptionStatus.daysUntilTrialEnds} Tagen`}
+              </p>
+              {subscriptionStatus.daysUntilTrialEnds > 0 && (
+                <p>
+                  Nach dieser Zeit wird die Klinik deaktiviert. Aktivieren Sie jetzt ein Abo.
+                </p>
+              )}
+            </div>
+          )}
+
+          <div className="bg-surface rounded-2xl border border-border shadow-sm p-6">
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold text-fg mb-2">Abonnement</h2>
+              <div className="text-sm text-muted space-y-1">
+                <p>
+                  Status: <span className="font-medium capitalize">
+                    {subscriptionStatus.status === "trial" ? "Testphase" : subscriptionStatus.status}
+                  </span>
+                </p>
+                {subscriptionStatus.currentPrice && (
+                  <p>
+                    Aktueller Tarif: <span className="font-medium">
+                      {subscriptionStatus.currentPrice.seats} Nutzer (
+                      €{(subscriptionStatus.currentPrice.monthlyPrice / 100).toFixed(2)}/Monat)
+                    </span>
+                  </p>
+                )}
+                {subscriptionStatus.trialEndsAt && (
+                  <p>
+                    Testphase endet: <span className="font-medium">
+                      {new Date(subscriptionStatus.trialEndsAt).toLocaleDateString("de-DE")}
+                    </span>
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+              {[
+                { seats: 1, price: "€30", desc: "1 Nutzer" },
+                { seats: 3, price: "€50", desc: "3 Nutzer" },
+                { seats: 5, price: "€100", desc: "5 Nutzer" },
+                { seats: 10, price: "€200", desc: "10 Nutzer" },
+              ].map((tier) => (
+                <button
+                  key={tier.seats}
+                  onClick={() => handleUpgrade(tier.seats)}
+                  disabled={createCheckoutMutation.isPending}
+                  className="p-4 rounded-lg border border-gray-200 transition-all text-sm font-medium hover:border-blue-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <div>{tier.price}</div>
+                  <div className="text-xs text-gray-600 font-normal">{tier.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
       {deletionStatus?.isDeactivationScheduled && deletionStatus.scheduledFor && (
         <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-red-900 text-sm">
           <p className="font-semibold">Praxis ist deaktiviert</p>

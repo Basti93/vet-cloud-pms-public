@@ -10,6 +10,7 @@ export const PUBLIC_ROUTES = [
   '/impressum(.*)',     // Legal notice
   '/datenschutz(.*)',   // Privacy policy
   '/api/webhooks/clerk',
+  '/api/webhooks/stripe',
   '/api/trpc/booking(.*)',        // publicBookingProcedure
   '/api/trpc/tenant(.*)',         // publicProcedure
   '/api/trpc/adminDashboard(.*)', // adminProcedure + ADMIN_CLERK_IDS
