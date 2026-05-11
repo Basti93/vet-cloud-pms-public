@@ -92,21 +92,36 @@ export default function TenantDetailPage() {
           className={`px-3 py-1 rounded-full text-sm font-semibold ${
             tenant.subscriptionStatus === "active"
               ? "bg-green-100 text-green-800"
+              : tenant.subscriptionStatus === "trial"
+              ? "bg-blue-100 text-blue-800"
               : tenant.subscriptionStatus === "paused"
               ? "bg-yellow-100 text-yellow-800"
               : "bg-red-100 text-red-800"
           }`}
         >
-          {tenant.subscriptionStatus}
+          {tenant.subscriptionStatus === "trial"
+            ? "Testphase"
+            : tenant.subscriptionStatus === "active"
+            ? "Aktiv"
+            : tenant.subscriptionStatus === "paused"
+            ? "Pausiert"
+            : tenant.subscriptionStatus}
         </div>
       </div>
 
       {/* Details Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <p className="text-xs font-medium text-gray-500 uppercase">Plan</p>
+          <p className="text-xs font-medium text-gray-500 uppercase">Tarif</p>
           <p className="mt-2 text-2xl font-bold text-gray-900">
-            {tenant.subscriptionPlan}
+            {tenant.currentPriceLabel
+              ? `${tenant.currentPriceLabel.seats} Nutzer`
+              : tenant.subscriptionPlan}
+          </p>
+          <p className="text-xs text-gray-500">
+            {tenant.currentPriceLabel
+              ? `€${(tenant.currentPriceLabel.monthlyPrice / 100).toFixed(2)}/Monat`
+              : ""}
           </p>
           <button
             onClick={() => {
@@ -126,31 +141,59 @@ export default function TenantDetailPage() {
         </div>
 
         <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <p className="text-xs font-medium text-gray-500 uppercase">Nutzer</p>
+          <p className="text-xs font-medium text-gray-500 uppercase">Nutzerplätze</p>
           <p className="mt-2 text-2xl font-bold text-gray-900">
-            {tenant.userCount}
+            {tenant.userCount} / {tenant.maxUsers ?? "—"}
+          </p>
+          <p className="text-xs text-gray-500">
+            {tenant.maxUsers && tenant.userCount >= tenant.maxUsers
+              ? "Alle Plätze belegt"
+              : tenant.maxUsers
+              ? `${(tenant.maxUsers ?? 0) - tenant.userCount} verfügbar`
+              : ""}
           </p>
         </div>
 
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <p className="text-xs font-medium text-gray-500 uppercase">Status</p>
-          <p className="mt-2 text-lg font-semibold text-gray-900">
+          <p className="mt-2 text-lg font-semibold">
+            <span
+              className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                tenant.subscriptionStatus === "active"
+                  ? "bg-green-100 text-green-800"
+                  : tenant.subscriptionStatus === "trial"
+                  ? "bg-blue-100 text-blue-800"
+                  : tenant.subscriptionStatus === "paused"
+                  ? "bg-yellow-100 text-yellow-800"
+                  : "bg-red-100 text-red-800"
+              }`}
+            >
+              {tenant.subscriptionStatus === "trial"
+                ? "Testphase"
+                : tenant.subscriptionStatus === "active"
+                ? "Aktiv"
+                : tenant.subscriptionStatus === "paused"
+                ? "Pausiert"
+                : tenant.subscriptionStatus}
+            </span>
+          </p>
+          <div className="mt-4">
             {tenant.subscriptionStatus === "active" ? (
               <button
                 onClick={() => setShowSuspendDialog(true)}
-                className="text-red-600 hover:text-red-700"
+                className="text-red-600 hover:text-red-700 text-sm font-medium"
               >
                 Pausieren
               </button>
-            ) : (
+            ) : tenant.subscriptionStatus === "paused" ? (
               <button
                 onClick={() => unsuspendMutation.mutate({ tenantId })}
-                className="text-green-600 hover:text-green-700"
+                className="text-green-600 hover:text-green-700 text-sm font-medium"
               >
                 Fortsetzen
               </button>
-            )}
-          </p>
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -189,11 +232,9 @@ export default function TenantDetailPage() {
                 )}
               </div>
               <div>
-                <p className="text-xs font-medium text-gray-500">Tarif</p>
+                <p className="text-xs font-medium text-gray-500">Stripe Tarif</p>
                 <p className="text-sm text-gray-900">
-                  {tenant.currentPriceLabel
-                    ? `${tenant.currentPriceLabel.seats} Nutzer (€${(tenant.currentPriceLabel.monthlyPrice / 100).toFixed(2)}/Monat)`
-                    : tenant.currentStripePriceId ?? "—"}
+                  {tenant.currentStripePriceId ?? "—"}
                 </p>
               </div>
               <div>
