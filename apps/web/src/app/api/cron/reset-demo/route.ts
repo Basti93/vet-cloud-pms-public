@@ -11,7 +11,7 @@ const CRON_SECRET = process.env.CRON_SECRET;
  * Cron endpoint: reset and reseed demo tenant data.
  * Auth via Authorization: Bearer <CRON_SECRET>
  */
-export async function GET(request: NextRequest) {
+export async function POST(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
   if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -55,5 +55,4 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export const POST = GET;
 export const maxDuration = 120;
