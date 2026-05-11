@@ -25,6 +25,7 @@ export default function AccountPage() {
   const { data: tenant } = trpc.tenant.getCurrent.useQuery();
   const { data: deletionStatus } = trpc.tenant.getDeletionStatus.useQuery();
   const { data: subscriptionStatus } = trpc.subscriptions.getSubscriptionStatus.useQuery();
+  const utils = trpc.useUtils();
   const requestDeletionMutation = trpc.tenant.requestDeletion.useMutation();
   const createCheckoutMutation = trpc.subscriptions.createCheckoutSession.useMutation();
   const cancelSubscriptionMutation = trpc.subscriptions.cancelSubscription.useMutation();
@@ -63,9 +64,7 @@ export default function AccountPage() {
       setErrorMessage("");
       await cancelSubscriptionMutation.mutateAsync({});
       setSuccessMessage("Abonnement erfolgreich gekündigt. Die Praxis wird zum Ende des Abrechnungszyklus deaktiviert.");
-      // Refresh subscription status
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      router.refresh();
+      await utils.subscriptions.getSubscriptionStatus.invalidate();
     } catch (error) {
       console.error("Failed to cancel subscription:", error);
       setErrorMessage(
@@ -87,8 +86,7 @@ export default function AccountPage() {
       setErrorMessage("");
       await undoCancellationMutation.mutateAsync({});
       setSuccessMessage("Kündigung erfolgreich zurückgezogen. Das Abonnement läuft weiter.");
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      router.refresh();
+      await utils.subscriptions.getSubscriptionStatus.invalidate();
     } catch (error) {
       console.error("Failed to undo cancellation:", error);
       setErrorMessage(
@@ -105,9 +103,7 @@ export default function AccountPage() {
       setErrorMessage("");
       await reactivateSubscriptionMutation.mutateAsync({});
       setSuccessMessage("Abonnement erfolgreich reaktiviert. Die Praxis ist wieder aktiv.");
-      // Refresh the page to update UI
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      router.refresh();
+      await utils.subscriptions.getSubscriptionStatus.invalidate();
     } catch (error) {
       console.error("Failed to reactivate subscription:", error);
       setErrorMessage(
