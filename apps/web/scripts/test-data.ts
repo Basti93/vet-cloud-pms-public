@@ -40,6 +40,17 @@ export const TEST_DATA = {
     subscriptionStatus: "trial" as const,
     subscriptionPlan: "starter" as const,
     maxUsers: 5,
+    stripeCustomerId: "cus_UUpHoyFjgB9Fxe",
+    stripeSubscriptionId: "sub_1TVprpFry6Q2J6YWKur8fIbo",
+    currentStripePriceId: "price_1TVoO7Fry6Q2J6YWKYI1bQCS",
+    trialEndsAt: null as Date | null,
+    cancelledAtPeriodEnd: null as Date | null,
+    paymentFailureCount: 0,
+    paymentGracePeriodEndsAt: null as Date | null,
+    lastPaymentFailedAt: null as Date | null,
+    deactivatedAt: null as Date | null,
+    trialDaysUsed: 0,
+    originalTrialEndsAt: null as Date | null,
   },
 
   // ────────────────────────────────────────────────────────────────────────

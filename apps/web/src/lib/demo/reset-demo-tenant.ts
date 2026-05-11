@@ -121,7 +121,10 @@ export async function resetDemoTenantData({
 
   await db
     .insert(tenants)
-    .values(demoTenant)
+    .values({
+      ...demoTenant,
+      trialEndsAt: new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000),
+    })
     .onConflictDoUpdate({
       target: tenants.id,
       set: {
@@ -142,6 +145,17 @@ export async function resetDemoTenantData({
         subscriptionStatus: demoTenant.subscriptionStatus,
         subscriptionPlan: demoTenant.subscriptionPlan,
         maxUsers: demoTenant.maxUsers,
+        stripeCustomerId: demoTenant.stripeCustomerId ?? null,
+        stripeSubscriptionId: demoTenant.stripeSubscriptionId ?? null,
+        currentStripePriceId: demoTenant.currentStripePriceId ?? null,
+        trialEndsAt: new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000),
+        cancelledAtPeriodEnd: null,
+        paymentFailureCount: 0,
+        paymentGracePeriodEndsAt: null,
+        lastPaymentFailedAt: null,
+        deactivatedAt: null,
+        trialDaysUsed: 0,
+        originalTrialEndsAt: null,
         updatedAt: new Date(),
       },
     });
