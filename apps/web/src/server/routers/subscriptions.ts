@@ -1,6 +1,6 @@
 import { createTRPCRouter, protectedProcedure } from "@/server/trpc";
 import { z } from "zod";
-import { tenants } from "@/lib/db/schema";
+import { tenants, PERMISSIONS } from "@/lib/db/schema";
 import { db as appDb } from "@/lib/db/client";
 import { eq } from "drizzle-orm";
 import { getStripeClient } from "@/lib/stripe/client";
@@ -12,9 +12,11 @@ import {
 import { TRPCError } from "@trpc/server";
 import { getMainDomain } from "@/lib/env";
 import { logEventAsync, serializeLogError } from "@/server/trpc/logging-middleware";
+import { requirePermission } from "@/server/trpc/middleware";
 
 export const subscriptionsRouter = createTRPCRouter({
   createCheckoutSession: protectedProcedure
+    .use(requirePermission(PERMISSIONS.SETTINGS_MANAGE))
     .input(
       z.object({
         seats: z.number().int().min(1).max(10),
@@ -178,6 +180,7 @@ export const subscriptionsRouter = createTRPCRouter({
     }),
 
   cancelSubscription: protectedProcedure
+    .use(requirePermission(PERMISSIONS.SETTINGS_MANAGE))
     .input(z.object({}).optional())
     .mutation(async ({ ctx }) => {
       try {
@@ -249,6 +252,7 @@ export const subscriptionsRouter = createTRPCRouter({
     }),
 
   undoCancellation: protectedProcedure
+    .use(requirePermission(PERMISSIONS.SETTINGS_MANAGE))
     .input(z.object({}).optional())
     .mutation(async ({ ctx }) => {
       try {
@@ -314,6 +318,7 @@ export const subscriptionsRouter = createTRPCRouter({
     }),
 
   reactivateSubscription: protectedProcedure
+    .use(requirePermission(PERMISSIONS.SETTINGS_MANAGE))
     .input(z.object({}).optional())
     .mutation(async ({ ctx }) => {
       try {
