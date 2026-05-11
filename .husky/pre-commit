@@ -1,3 +1,16 @@
+#!/bin/sh
+
+# Check: if schema.ts changed, drizzle migrations must also have changes
+STAGED_SCHEMA=$(git diff --cached --name-only -- 'apps/web/src/lib/db/schema.ts')
+STAGED_MIGRATIONS=$(git diff --cached --name-only -- 'apps/web/drizzle/')
+
+if [ -n "$STAGED_SCHEMA" ] && [ -z "$STAGED_MIGRATIONS" ]; then
+  echo "❌ schema.ts was modified but no migration files are staged."
+  echo "   Run: npm run db:generate --workspace=web"
+  echo "   Then: git add apps/web/drizzle/"
+  exit 1
+fi
+
 cd apps/web
 echo "🔍 Running pre-commit checks..."
 npm run typecheck && npm run lint && npm run test
