@@ -248,4 +248,59 @@ export const subscriptionsRouter = createTRPCRouter({
       }
     }),
 
+  reactivateSubscription: protectedProcedure
+    .input(z.object({}).optional())
+    .mutation(async ({ ctx }) => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const tenantId = (ctx as any).tenantId;
+
+        const tenant = await appDb
+          .select()
+          .from(tenants)
+          .where(eq(tenants.id, tenantId))
+          .limit(1);
+
+        if (!tenant.length) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Tenant not found",
+          });
+        }
+
+        // Reactivate tenant by clearing deactivation and payment grace period
+        await appDb
+          .update(tenants)
+          .set({
+            deactivatedAt: null,
+            subscriptionStatus: "active",
+            paymentFailureCount: 0,
+            paymentGracePeriodEndsAt: null,
+          })
+          .where(eq(tenants.id, tenantId));
+
+        logEventAsync({
+          level: "info",
+          category: "subscription",
+          eventType: "subscription_reactivated",
+          message: "Subscription reactivated by user",
+          metadata: { tenantId },
+        });
+
+        return {
+          success: true,
+          message: "Subscription reactivated",
+        };
+      } catch (error) {
+        logEventAsync({
+          level: "error",
+          category: "stripe",
+          eventType: "reactivate_subscription_failed",
+          message: "Failed to reactivate subscription",
+          metadata: { error: serializeLogError(error) },
+        });
+        throw error;
+      }
+    }),
+
 });

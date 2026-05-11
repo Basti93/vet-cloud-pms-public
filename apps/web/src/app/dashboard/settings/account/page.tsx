@@ -11,6 +11,7 @@ export default function AccountPage() {
   const [exportLoading, setExportLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
+  const [reactivateLoading, setReactivateLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [deactivationMailSent, setDeactivationMailSent] = useState(false);
@@ -26,6 +27,7 @@ export default function AccountPage() {
   const requestDeletionMutation = trpc.tenant.requestDeletion.useMutation();
   const createCheckoutMutation = trpc.subscriptions.createCheckoutSession.useMutation();
   const cancelSubscriptionMutation = trpc.subscriptions.cancelSubscription.useMutation();
+  const reactivateSubscriptionMutation = trpc.subscriptions.reactivateSubscription.useMutation();
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
   const canManageSettings = Boolean(
     permissions?.includes(PERMISSIONS.SETTINGS_MANAGE)
@@ -69,6 +71,25 @@ export default function AccountPage() {
       );
     } finally {
       setCancelLoading(false);
+    }
+  };
+
+  const handleReactivateSubscription = async () => {
+    try {
+      setReactivateLoading(true);
+      setErrorMessage("");
+      await reactivateSubscriptionMutation.mutateAsync({});
+      setSuccessMessage("Abonnement erfolgreich reaktiviert. Die Praxis ist wieder aktiv.");
+      // Refresh the page to update UI
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      router.refresh();
+    } catch (error) {
+      console.error("Failed to reactivate subscription:", error);
+      setErrorMessage(
+        error instanceof Error ? error.message : "Fehler beim Reaktivieren des Abos"
+      );
+    } finally {
+      setReactivateLoading(false);
     }
   };
 
@@ -172,6 +193,16 @@ export default function AccountPage() {
       {/* Subscription Status Section */}
       {subscriptionStatus && (
         <>
+          {subscriptionStatus.deactivatedAt && (
+            <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-red-900 text-sm">
+              <p className="font-semibold">⚠️ Praxis deaktiviert</p>
+              <p>
+                Die Praxis wurde am {new Date(subscriptionStatus.deactivatedAt).toLocaleDateString("de-DE")} deaktiviert.
+                Sie können nur noch auf diese Seite und den Datenexport zugreifen. Alle anderen Funktionen sind blockiert.
+              </p>
+            </div>
+          )}
+
           {subscriptionStatus.trialDaysUsed > 0 && subscriptionStatus.originalTrialEndsAt && (
             <div className="p-4 rounded-lg bg-blue-50 border border-blue-200 text-blue-900 text-sm">
               <p className="font-semibold">✓ Testphase erhalten</p>
@@ -270,7 +301,19 @@ export default function AccountPage() {
               ))}
             </div>
 
-            {(subscriptionStatus.status === "active" || subscriptionStatus.status === "trial") && !subscriptionStatus.cancelledAtPeriodEnd && (
+            {subscriptionStatus.deactivatedAt && (
+              <div className="mt-6 pt-6 border-t border-border">
+                <button
+                  onClick={handleReactivateSubscription}
+                  disabled={reactivateLoading}
+                  className="px-4 py-2 rounded-lg font-medium text-green-600 border border-green-300 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                >
+                  {reactivateLoading ? "Wird reaktiviert..." : "Abonnement reaktivieren"}
+                </button>
+              </div>
+            )}
+
+            {(subscriptionStatus.status === "active" || subscriptionStatus.status === "trial") && !subscriptionStatus.cancelledAtPeriodEnd && !subscriptionStatus.deactivatedAt && (
               <div className="mt-6 pt-6 border-t border-border">
                 <button
                   onClick={handleCancelSubscription}
