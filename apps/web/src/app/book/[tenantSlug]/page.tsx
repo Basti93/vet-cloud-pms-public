@@ -137,7 +137,11 @@ function StepIndicator({ current }: { current: Step }) {
   const idx = steps.findIndex((s) => s.key === current);
 
   return (
-    <div className="flex items-center justify-center gap-0 flex-wrap">
+    <div
+      data-testid="booking-step-indicator"
+      data-step={current}
+      className="flex items-center justify-center gap-0 flex-wrap"
+    >
       {steps.map((s, i) => {
         const done = i < idx;
         const active = i === idx;
@@ -250,6 +254,7 @@ function StepVet({
 
       {/* Auto-assign option */}
       <button
+        data-testid="booking-vet-auto"
         onClick={() => handleVetClick("")}
         className="w-full p-4 rounded-xl border-2 border-gray-200 hover:border-[var(--primary)] hover:bg-[var(--primary)]/5 text-left transition-all"
       >
@@ -270,6 +275,7 @@ function StepVet({
             return (
               <button
                 key={vet.id}
+                data-testid="booking-vet-card"
                 onClick={() => handleVetClick(vet.id)}
                 disabled={isDisabled}
                 className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
@@ -1157,7 +1163,7 @@ export default function BookingPage({
 
         {/* Booking card */}
         <div className="flex-1 flex items-start justify-center p-4 sm:p-8">
-          <div className="w-full max-w-xl bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div data-testid="booking-page" className="w-full max-w-xl bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
             {step !== "success" && (
               <div className="px-6 py-5 border-b border-gray-100">
                 <h2 className="text-gray-900 mb-4">{t("booking.title")}</h2>
