@@ -16,6 +16,7 @@ export const PUBLIC_ROUTES = [
   '/api/trpc/adminDashboard(.*)', // adminProcedure + ADMIN_CLERK_IDS
   '/api/cron/send-reminders',                // CRON_SECRET-protected scheduled job
   '/api/cron/reset-demo',                    // CRON_SECRET-protected demo reset job
+  '/api/cron/reset-e2e-tenant',              // CRON_SECRET-protected E2E tenant reset
   '/api/cron/check-trial-expirations',       // CRON_SECRET-protected trial expiration check
   '/api/cron/sync-stripe-subscriptions',     // CRON_SECRET-protected Stripe sync
   '/api/unsubscribe',                        // token-protected unsubscribe link from emails
