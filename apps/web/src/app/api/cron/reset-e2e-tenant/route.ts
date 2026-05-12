@@ -6,9 +6,14 @@ import {
   appointmentEmailLogs,
   appointmentHolds,
   diagnoses,
+  emailSettings,
   medications,
   owners,
   patients,
+  roles,
+  tenants,
+  userRoles,
+  users,
   vaccinations,
   vaccinationEmailLogs,
   vetAbsences,
@@ -20,13 +25,15 @@ import {
 const CRON_SECRET = process.env.CRON_SECRET;
 
 /**
- * Resets transient data for the E2E test tenant to a clean state.
+ * Seeds (if not yet present) then resets transient data for the E2E test tenant.
  *
- * Keeps: tenant row, roles, user row, email settings.
- * Deletes: all patient data, appointments, and derived records.
+ * First run: creates tenant + admin role + user + email settings (idempotent upserts).
+ * Every run: deletes all transient data (patients, appointments, etc.).
  *
- * Auth: Bearer <CRON_SECRET> — same token used by other cron routes.
- * Called by Coolify scheduled task before E2E runs, and by CI pre-test hook.
+ * Auth: Bearer <CRON_SECRET>
+ *
+ * Required env vars (Coolify staging):
+ *   E2E_TENANT_ID, E2E_TENANT_SLUG, E2E_CLERK_USER_ID, E2E_EMAIL
  */
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
@@ -35,21 +42,30 @@ export async function POST(request: NextRequest) {
   }
 
   const tenantId = process.env.E2E_TENANT_ID;
-  if (!tenantId) {
+  const tenantSlug = process.env.E2E_TENANT_SLUG;
+  const clerkUserId = process.env.E2E_CLERK_USER_ID;
+  const email = process.env.E2E_EMAIL;
+
+  if (!tenantId || !tenantSlug || !clerkUserId || !email) {
     return NextResponse.json(
-      { error: "E2E_TENANT_ID env var not set" },
+      {
+        error: "Missing env vars",
+        missing: {
+          tenantId: !tenantId,
+          tenantSlug: !tenantSlug,
+          clerkUserId: !clerkUserId,
+          email: !email,
+        },
+      },
       { status: 500 }
     );
   }
 
   try {
+    const seeded = await seedE2ETenant({ tenantId, tenantSlug, clerkUserId, email });
     const deleted = await deleteE2ETenantData(tenantId);
 
-    return NextResponse.json({
-      success: true,
-      tenantId,
-      deleted,
-    });
+    return NextResponse.json({ success: true, tenantId, seeded, deleted });
   } catch (error) {
     console.error("E2E tenant reset failed:", error);
     return NextResponse.json(
@@ -63,10 +79,97 @@ export async function POST(request: NextRequest) {
   }
 }
 
+async function seedE2ETenant({
+  tenantId,
+  tenantSlug,
+  clerkUserId,
+  email,
+}: {
+  tenantId: string;
+  tenantSlug: string;
+  clerkUserId: string;
+  email: string;
+}) {
+  // 1. Tenant
+  await db
+    .insert(tenants)
+    .values({
+      id: tenantId,
+      name: "E2E Test Praxis",
+      slug: tenantSlug,
+      email,
+      phone: "+49 30 000000",
+      address: "Teststraße 1",
+      city: "Berlin",
+      postalCode: "10115",
+      country: "DE",
+      subscriptionStatus: "active",
+      subscriptionPlan: "starter",
+      maxUsers: 5,
+      trialEndsAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+    })
+    .onConflictDoNothing();
+
+  // 2. Admin role
+  await db
+    .insert(roles)
+    .values({
+      tenantId,
+      code: "admin",
+      name: "Admin",
+      description: "Full access",
+      isSystem: true,
+      baseVersion: 1,
+    })
+    .onConflictDoNothing();
+
+  const adminRole = await db
+    .select({ id: roles.id })
+    .from(roles)
+    .where(eq(roles.tenantId, tenantId))
+    .limit(1);
+
+  if (!adminRole[0]) throw new Error("Admin role not found after upsert");
+
+  // 3. User — clerk_id unique constraint, safe to upsert
+  await db
+    .insert(users)
+    .values({
+      tenantId,
+      clerkId: clerkUserId,
+      email,
+      firstName: "E2E",
+      lastName: "Test",
+      active: true,
+    })
+    .onConflictDoNothing();
+
+  const user = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.clerkId, clerkUserId))
+    .limit(1);
+
+  if (!user[0]) throw new Error("E2E user not found after upsert");
+
+  // 4. Role assignment
+  await db
+    .insert(userRoles)
+    .values({ userId: user[0].id, roleId: adminRole[0].id })
+    .onConflictDoNothing();
+
+  // 5. Email settings (expected by dashboard queries)
+  await db
+    .insert(emailSettings)
+    .values({ tenantId, reminderEmailEnabled: false, reminderHoursBefore: 24 })
+    .onConflictDoNothing();
+
+  return { tenant: tenantSlug, userId: user[0].id, roleId: adminRole[0].id };
+}
+
 const toCount = (value: unknown) => Number(value ?? 0);
 
 async function deleteE2ETenantData(tenantId: string) {
-  // Delete in dependency order (children before parents)
   const vaccinationEmailLogsResult = await db
     .delete(vaccinationEmailLogs)
     .where(eq(vaccinationEmailLogs.tenantId, tenantId));
