@@ -1,4 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
+import dotenv from "dotenv";
+import path from "path";
+
+// Load .env.test when running locally (CI injects secrets via environment).
+// Does nothing if file is absent.
+dotenv.config({ path: path.resolve(__dirname, ".env.test") });
 
 /**
  * E2E tests run against the staging environment.

@@ -1,6 +1,8 @@
 node_modules/
 # Playwright auth state — contains live Clerk session tokens, never commit
 e2e/.auth/
+# Local E2E credentials — copy from .env.test.example
+apps/web/.env.test
 .env.local
 .env.production.local
 .env.production

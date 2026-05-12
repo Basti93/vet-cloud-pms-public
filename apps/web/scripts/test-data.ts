@@ -9,6 +9,13 @@
 export const DEMO_TENANT_ID = "00000000-0000-4000-8000-000000000003";
 export const DEMO_TENANT_SLUG = "demo";
 
+// ── E2E tenant ─────────────────────────────────────────────────────────────
+// Separate from demo — never shared, reset before each CI run.
+// Clerk user: user@example.com (user_placeholder)
+export const E2E_TENANT_ID = "00000000-0000-4000-8000-000000000004";
+export const E2E_TENANT_SLUG = "REDACTED";
+export const E2E_CLERK_USER_ID = "user_placeholder";
+
 export const TEST_DATA = {
   // ────────────────────────────────────────────────────────────────────────
   // TENANT
