@@ -7,7 +7,7 @@ import fs from "fs";
  * Auth state file — committed path, actual file is gitignored.
  * Consumed by the "authenticated" Playwright project via storageState.
  */
-export const AUTH_FILE = path.join(__dirname, ".auth/user.json");
+export const AUTH_FILE = path.join(import.meta.dirname, ".auth/user.json");
 
 setup("authenticate", async ({ page }) => {
   // Enables Clerk's test mode — bypasses bot detection on the sign-in form.
