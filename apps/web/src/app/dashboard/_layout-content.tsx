@@ -3,12 +3,13 @@
 import { ReactNode, useState } from "react";
 import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
-import { LayoutDashboard, Calendar, Users, Phone, ClipboardList, Clock, Menu, X, Settings, TrendingUp, ChevronDown, User, Building2, Syringe } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, Phone, ClipboardList, Clock, Menu, X, Settings, ChevronDown, User, Building2, Syringe, TrendingUp } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { useLocale } from "@/lib/user/preferences-context";
 import { usePraxis } from "@/lib/praxis/context";
 import { getSystemDomain } from "@/lib/system-name";
 import { PERMISSIONS } from "@/lib/db/schema";
+import { useFeatureTracking } from "@/lib/analytics/use-feature-tracking";
 
 function useNavItems() {
   const { t } = useLocale();
@@ -44,6 +45,7 @@ function useAdminNavItems() {
 }
 
 export default function DashboardContent({ children }: { children: ReactNode }) {
+  useFeatureTracking();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsExpanded, setSettingsExpanded] = useState(false);
   const { praxis } = usePraxis(); // Tenant name already loaded server-side

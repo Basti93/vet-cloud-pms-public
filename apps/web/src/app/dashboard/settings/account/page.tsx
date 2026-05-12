@@ -5,6 +5,8 @@ import { trpc } from "@/lib/trpc/client";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PERMISSIONS } from "@/lib/db/schema";
 import { Info } from "lucide-react";
+import { trackEvent } from "@/lib/analytics/tracker";
+import { AnalyticsEvents } from "@/lib/analytics/events";
 
 export default function AccountPage() {
   const router = useRouter();
@@ -19,6 +21,14 @@ export default function AccountPage() {
   const [deactivationMailSent, setDeactivationMailSent] = useState(false);
 
   const statusMessage = searchParams.get("status");
+
+  useEffect(() => {
+    if (statusMessage === "success") {
+      trackEvent(AnalyticsEvents.SUBSCRIPTION_CHECKOUT_RETURNED, { status: "success" });
+    } else if (statusMessage === "cancel") {
+      trackEvent(AnalyticsEvents.SUBSCRIPTION_CHECKOUT_RETURNED, { status: "cancelled" });
+    }
+  }, [statusMessage]);
 
   const { data: currentUser } = trpc.admin.getCurrentUser.useQuery();
   const { data: permissions, isLoading: permissionsLoading } =
@@ -66,6 +76,7 @@ export default function AccountPage() {
   const handleCheckout = async (seats: number) => {
     try {
       setErrorMessage("");
+      trackEvent(AnalyticsEvents.SUBSCRIPTION_CHECKOUT_STARTED, { seats });
       const result = await createCheckoutMutation.mutateAsync({ seats });
       if (result.url) {
         setCheckoutUrl(result.url);
@@ -82,6 +93,7 @@ export default function AccountPage() {
       const result = await changePlanMutation.mutateAsync({ seats: pendingSeats });
       const currentSeats = subscriptionStatus?.currentPrice?.seats ?? 0;
       const isUpgrade = pendingSeats > currentSeats;
+      trackEvent(AnalyticsEvents.SUBSCRIPTION_PLAN_CHANGED, { from_seats: currentSeats, to_seats: pendingSeats, direction: isUpgrade ? "upgrade" : "downgrade" });
       const deactivated = (result as { deactivatedUserCount?: number }).deactivatedUserCount ?? 0;
       if (deactivated > 0) {
         setSuccessMessage(
@@ -113,6 +125,7 @@ export default function AccountPage() {
       setErrorMessage("");
       await cancelSubscriptionMutation.mutateAsync({});
       setSuccessMessage("Abonnement erfolgreich gekündigt. Die Praxis wird zum Ende des Abrechnungszyklus deaktiviert.");
+      trackEvent(AnalyticsEvents.SUBSCRIPTION_CANCELLED);
       await utils.subscriptions.getSubscriptionStatus.invalidate();
     } catch (error) {
       console.error("Failed to cancel subscription:", error);
@@ -135,6 +148,7 @@ export default function AccountPage() {
       setErrorMessage("");
       await undoCancellationMutation.mutateAsync({});
       setSuccessMessage("Kündigung erfolgreich zurückgezogen. Das Abonnement läuft weiter.");
+      trackEvent(AnalyticsEvents.SUBSCRIPTION_CANCEL_UNDONE);
       await utils.subscriptions.getSubscriptionStatus.invalidate();
     } catch (error) {
       console.error("Failed to undo cancellation:", error);
@@ -152,6 +166,7 @@ export default function AccountPage() {
       setErrorMessage("");
       await reactivateSubscriptionMutation.mutateAsync({});
       setSuccessMessage("Abonnement erfolgreich reaktiviert. Die Praxis ist wieder aktiv.");
+      trackEvent(AnalyticsEvents.SUBSCRIPTION_REACTIVATED);
       await utils.subscriptions.getSubscriptionStatus.invalidate();
     } catch (error) {
       console.error("Failed to reactivate subscription:", error);
@@ -184,6 +199,7 @@ export default function AccountPage() {
       document.body.removeChild(a);
 
       setSuccessMessage("Daten erfolgreich exportiert und heruntergeladen");
+      trackEvent(AnalyticsEvents.DATA_EXPORTED);
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Fehler beim Exportieren der Daten"
@@ -213,8 +229,7 @@ export default function AccountPage() {
         setDeleteLoading(false);
         return;
       }
-      console.log("Requesting deletion for tenant:", tenant.id, "user:", currentUser.id);
-
+      trackEvent(AnalyticsEvents.ACCOUNT_DELETION_REQUESTED);
       const result = await requestDeletionMutation.mutateAsync({
         tenantId: tenant.id,
         userId: currentUser.id,
