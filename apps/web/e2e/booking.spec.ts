@@ -9,7 +9,8 @@ import { test, expect } from "@playwright/test";
  * Step order: vet → date → details → confirm → success
  */
 
-const DEMO_SLUG = "demo";
+// E2E tenant has 0 vets → vet step is never auto-skipped (demo has 1 vet → skips).
+const DEMO_SLUG = "REDACTED";
 
 test.describe("Booking page", () => {
   test("loads and shows vet-selection step", async ({ page }) => {
@@ -17,6 +18,8 @@ test.describe("Booking page", () => {
 
     // Main card must be visible — confirms page rendered, not a 404/error
     await page.getByTestId("booking-page").waitFor({ state: "visible" });
+    // Wait for vets query to settle (prevents flaky step auto-skip mid-render)
+    await page.waitForLoadState("networkidle");
 
     // Step indicator must report we are on the 'vet' step
     await expect(page.getByTestId("booking-step-indicator")).toHaveAttribute(
@@ -31,6 +34,7 @@ test.describe("Booking page", () => {
   test("clicking auto-assign advances to date step", async ({ page }) => {
     await page.goto(`/book/${DEMO_SLUG}`);
     await page.getByTestId("booking-page").waitFor({ state: "visible" });
+    await page.waitForLoadState("networkidle");
 
     await page.getByTestId("booking-vet-auto").click();
 

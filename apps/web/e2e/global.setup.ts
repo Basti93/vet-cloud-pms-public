@@ -18,10 +18,11 @@ setup("authenticate", async ({ page }) => {
 
   // Clerk's <SignIn /> renders standard HTML inputs — stable across Clerk versions.
   await page.locator('input[name="identifier"]').fill(process.env.E2E_EMAIL!);
-  await page.getByRole("button", { name: /continue/i }).click();
+  await page.locator('input[name="identifier"]').press("Enter");
 
+  await page.locator('input[name="password"]').waitFor({ state: "visible", timeout: 10_000 });
   await page.locator('input[name="password"]').fill(process.env.E2E_PASSWORD!);
-  await page.getByRole("button", { name: /continue/i }).click();
+  await page.locator('input[name="password"]').press("Enter");
 
   // fallbackRedirectUrl="/dashboard" configured on the SignIn component —
   // wait for that redirect to confirm auth succeeded.
