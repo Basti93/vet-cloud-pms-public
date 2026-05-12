@@ -1,4 +1,6 @@
 node_modules/
+# Playwright auth state — contains live Clerk session tokens, never commit
+e2e/.auth/
 .env.local
 .env.production.local
 .env.production

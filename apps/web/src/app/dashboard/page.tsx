@@ -143,7 +143,7 @@ export default function DashboardHome() {
   };
 
   return (
-    <div className="space-y-6">
+    <div data-testid="dashboard-home" className="space-y-6">
       <TrialWarningBanner daysUntilTrialEnds={subscriptionStatus?.daysUntilTrialEnds || null} />
 
       <div>
