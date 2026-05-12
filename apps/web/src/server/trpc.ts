@@ -3,8 +3,8 @@ import { auth } from "@clerk/nextjs/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
 import { adminDb, db } from "@/lib/db/client";
-import { tenantDeletionSchedules, users } from "@/lib/db/schema";
-import { and, eq } from "drizzle-orm";
+import { tenantDeletionSchedules, users, tenants } from "@/lib/db/schema";
+import { and, eq, isNotNull } from "drizzle-orm";
 import { checkRateLimit, getRateLimitInfo } from "@/lib/rateLimit";
 import { logEvent, logEventAsync } from "./trpc/logging-middleware";
 
@@ -65,6 +65,22 @@ const enforceUserIsAuthenticated = t.middleware(({ ctx, next }) => {
 
 const DEACTIVATION_ALLOWED_PATHS = new Set([
   "tenant.getDeletionStatus",
+  "tenant.getCurrent",
+  "tenant.requestDeletion",
+  "subscriptions.getSubscriptionStatus",
+  "subscriptions.cancelSubscription",
+  "subscriptions.reactivateSubscription",
+  "subscriptions.undoCancellation",
+  "admin.getCurrentUser",
+  "admin.getUserPermissions",
+  "admin.getSeatInfo",
+  "admin.listUsers",
+  "admin.toggleUserActive",
+]);
+
+const INACTIVE_USER_ALLOWED_PATHS = new Set([
+  "admin.getCurrentUser",
+  "admin.getUserPermissions",
 ]);
 
 const enforceTenantIsActive = t.middleware(async ({ ctx, path, next }) => {
@@ -73,13 +89,20 @@ const enforceTenantIsActive = t.middleware(async ({ ctx, path, next }) => {
   }
 
   const [user] = await ctx.db
-    .select({ id: users.id, tenantId: users.tenantId })
+    .select({ id: users.id, tenantId: users.tenantId, active: users.active })
     .from(users)
     .where(eq(users.clerkId, ctx.userId))
     .limit(1);
 
   if (!user?.tenantId) {
     throw new TRPCError({ code: "FORBIDDEN" });
+  }
+
+  if (!user.active && !INACTIVE_USER_ALLOWED_PATHS.has(path)) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "USER_INACTIVE",
+    });
   }
 
   const [scheduledDeletion] = await ctx.db
@@ -93,7 +116,15 @@ const enforceTenantIsActive = t.middleware(async ({ ctx, path, next }) => {
     )
     .limit(1);
 
-  if (scheduledDeletion && !DEACTIVATION_ALLOWED_PATHS.has(path)) {
+  const [tenantData] = await ctx.db
+    .select({ deactivatedAt: tenants.deactivatedAt })
+    .from(tenants)
+    .where(eq(tenants.id, user.tenantId))
+    .limit(1);
+
+  const isDeactivated = scheduledDeletion || tenantData?.deactivatedAt;
+
+  if (isDeactivated && !DEACTIVATION_ALLOWED_PATHS.has(path)) {
     throw new TRPCError({
       code: "FORBIDDEN",
       message: "TENANT_DEACTIVATED",

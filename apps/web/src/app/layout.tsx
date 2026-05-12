@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { auth } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db/client";
@@ -10,6 +11,7 @@ import { UserPreferencesProvider } from "@/lib/user/preferences-context";
 import { ToastProvider } from "@/lib/toast/context";
 import { ToastContainer } from "@/components/ui/toast";
 import { DynamicFavicon } from "@/components/DynamicFavicon";
+import { GlobalQueryActivity } from "@/components/ui/global-query-activity";
 import { EnvironmentBanner } from "@/components/EnvironmentBanner";
 import type { PraxisPreferences, UserPreferences } from "@/lib/user/preferences";
 import { getSystemDomain } from "@/lib/system-name";
@@ -87,12 +89,21 @@ export default async function RootLayout({
               <UserPreferencesProvider preferences={userPreferences}>
                 <ToastProvider>
                   <DynamicFavicon />
+                  <GlobalQueryActivity />
                   {children}
                   <ToastContainer />
                 </ToastProvider>
               </UserPreferencesProvider>
             </PraxisProvider>
           </TRPCProvider>
+          {process.env.NEXT_PUBLIC_UMAMI_SRC && (
+            <Script
+              src={process.env.NEXT_PUBLIC_UMAMI_SRC}
+              data-website-id={process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID}
+              data-do-not-track="true"
+              strategy="afterInteractive"
+            />
+          )}
         </body>
       </html>
     </ClerkProviderWrapper>

@@ -12,9 +12,13 @@ if (!process.env.DATABASE_URL) {
   if (fs.existsSync(envPath)) {
     const envContent = fs.readFileSync(envPath, "utf-8");
     envContent.split("\n").forEach((line) => {
-      const [key, value] = line.split("=");
-      if (key && value && !process.env[key]) {
-        process.env[key] = value.trim();
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) {
+        return;
+      }
+      const [key, ...valueParts] = trimmed.split("=");
+      if (key && valueParts.length > 0 && !process.env[key]) {
+        process.env[key] = valueParts.join("=").trim();
       }
     });
   }

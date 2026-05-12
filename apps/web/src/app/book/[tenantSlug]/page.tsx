@@ -5,6 +5,8 @@ import { trpc } from "@/lib/trpc/client";
 import { useBookingFormState } from "@/hooks/useBookingFormState";
 import { useLocale } from "@/lib/user/preferences-context";
 import { getSystemDomain } from "@/lib/system-name";
+import { trackEvent } from "@/lib/analytics/tracker";
+import { AnalyticsEvents } from "@/lib/analytics/events";
 import { ChevronLeft, ChevronRight, Check, Phone, MapPin, Clock, Calendar, AlertCircle, Loader2, Stethoscope, PawPrint } from "lucide-react";
 import { COLOR_PRESETS, TYPE_PAIRINGS, type ColorPresetKey, type TypographyPairingKey } from "@/lib/theme";
 
@@ -137,7 +139,11 @@ function StepIndicator({ current }: { current: Step }) {
   const idx = steps.findIndex((s) => s.key === current);
 
   return (
-    <div className="flex items-center justify-center gap-0 flex-wrap">
+    <div
+      data-testid="booking-step-indicator"
+      data-step={current}
+      className="flex items-center justify-center gap-0 flex-wrap"
+    >
       {steps.map((s, i) => {
         const done = i < idx;
         const active = i === idx;
@@ -250,6 +256,7 @@ function StepVet({
 
       {/* Auto-assign option */}
       <button
+        data-testid="booking-vet-auto"
         onClick={() => handleVetClick("")}
         className="w-full p-4 rounded-xl border-2 border-gray-200 hover:border-[var(--primary)] hover:bg-[var(--primary)]/5 text-left transition-all"
       >
@@ -270,6 +277,7 @@ function StepVet({
             return (
               <button
                 key={vet.id}
+                data-testid="booking-vet-card"
                 onClick={() => handleVetClick(vet.id)}
                 disabled={isDisabled}
                 className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
@@ -995,6 +1003,15 @@ export default function BookingPage({
   const [step, setStep] = useState<Step>("vet");
   const [successData, setSuccessData] = useState<{ startTime: Date; ownerName: string; patientName: string; vetName?: string } | null>(null);
 
+  // Track booking funnel entry
+  const hasTrackedEntry = useRef(false);
+  useEffect(() => {
+    if (clinic?.id && !hasTrackedEntry.current) {
+      hasTrackedEntry.current = true;
+      trackEvent(AnalyticsEvents.BOOKING_STARTED, { tenant_slug: tenantSlug });
+    }
+  }, [clinic?.id, tenantSlug]);
+
   // 15-min slot hold state
   const [holdToken, setHoldToken] = useState<string | null>(null);
   const [holdExpiresAt, setHoldExpiresAt] = useState<Date | null>(null);
@@ -1157,7 +1174,7 @@ export default function BookingPage({
 
         {/* Booking card */}
         <div className="flex-1 flex items-start justify-center p-4 sm:p-8">
-          <div className="w-full max-w-xl bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div data-testid="booking-page" className="w-full max-w-xl bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
             {step !== "success" && (
               <div className="px-6 py-5 border-b border-gray-100">
                 <h2 className="text-gray-900 mb-4">{t("booking.title")}</h2>
@@ -1171,7 +1188,7 @@ export default function BookingPage({
                   vets={vets}
                   vetAvailability={vetAvailability}
                   primaryColor={primaryColor}
-                  onSelect={(vetId) => { updateField("vetId", vetId); setStep("date"); }}
+                  onSelect={(vetId) => { updateField("vetId", vetId); trackEvent(AnalyticsEvents.BOOKING_VET_SELECTED, { vet_id: vetId || "auto", tenant_slug: tenantSlug }); setStep("date"); }}
                 />
               )}
               {step === "date" && (
@@ -1183,12 +1200,13 @@ export default function BookingPage({
                   browserSessionId={formState.browserSessionId!}
                   embeddingOrigin={embeddingOrigin}
                   onBack={() => setStep("vet")}
-                  onSelect={(s, token, expiresAt) => {
-                    updateField("date", JSON.stringify(s));
-                    setHoldToken(token);
-                    setHoldExpiresAt(expiresAt);
-                    setStep("details");
-                  }}
+onSelect={(s, token, expiresAt) => {
+                     updateField("date", JSON.stringify(s));
+                     setHoldToken(token);
+                     setHoldExpiresAt(expiresAt);
+                     trackEvent(AnalyticsEvents.BOOKING_SLOT_SELECTED, { tenant_slug: tenantSlug });
+                     setStep("details");
+                   }}
                 />
               )}
               {step === "details" && slot && (
@@ -1200,7 +1218,7 @@ export default function BookingPage({
                   holdExpiresAt={holdExpiresAt}
                   onHoldExpired={handleHoldExpired}
                   onBack={handleDetailsBack}
-                  onNext={(p, o) => { updateField("patient", p); updateField("owner", o); setStep("confirm"); }}
+                  onNext={(p, o) => { updateField("patient", p); updateField("owner", o); trackEvent(AnalyticsEvents.BOOKING_DETAILS_ENTERED, { species: p.species, tenant_slug: tenantSlug }); setStep("confirm"); }}
                   initialPatient={patient}
                   initialOwner={owner}
                   t={t}
@@ -1221,7 +1239,7 @@ export default function BookingPage({
                   holdExpiresAt={holdExpiresAt}
                   onHoldExpired={handleHoldExpired}
                   onBack={() => setStep("details")}
-                  onSuccess={(data) => { clearFormState(); setSuccessData(data); setStep("success"); }}
+                  onSuccess={(data) => { clearFormState(); setSuccessData(data); trackEvent(AnalyticsEvents.BOOKING_CONFIRMED, { tenant_slug: tenantSlug, source: "online_booking" }); setStep("success"); }}
                 />
               )}
               {step === "success" && successData && (

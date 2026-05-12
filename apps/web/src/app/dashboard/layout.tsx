@@ -1,16 +1,25 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
 import { ReactNode } from "react";
 import { db } from "@/lib/db/client";
 import { tenantDeletionSchedules, tenants, users } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
 import { generateThemeStyles } from "@/lib/theme-utils";
+import { NoPraxisAssignedState } from "@/components/auth/NoPraxisAssignedState";
 import DashboardContent from "./_layout-content";
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const { userId } = await auth();
 
+  if (!userId) {
+    redirect("/sign-in");
+  }
+
+  const supportEmail = process.env.SUPPORT_EMAIL?.trim() || "support@example.com";
+
   let tenant: { themePreference: string | null; typographyPreference: string | null } | undefined;
+  let hasTenantAssignment = false;
   let deactivationInfo:
     | {
         tenantName: string;
@@ -18,44 +27,46 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       }
     | undefined;
 
-  if (userId) {
-    const [user] = await db
-      .select({ tenantId: users.tenantId })
-      .from(users)
-      .where(eq(users.clerkId, userId))
+  const [user] = await db
+    .select({ tenantId: users.tenantId, active: users.active })
+    .from(users)
+    .where(eq(users.clerkId, userId))
+    .limit(1);
+
+  const isUserInactive = user && !user.active;
+
+  if (user?.tenantId) {
+    const [found] = await db
+      .select({
+        id: tenants.id,
+        name: tenants.name,
+        themePreference: tenants.themePreference,
+        typographyPreference: tenants.typographyPreference,
+      })
+      .from(tenants)
+      .where(eq(tenants.id, user.tenantId))
       .limit(1);
 
-    if (user) {
-      const [found] = await db
-        .select({
-          id: tenants.id,
-          name: tenants.name,
-          themePreference: tenants.themePreference,
-          typographyPreference: tenants.typographyPreference,
-        })
-        .from(tenants)
-        .where(eq(tenants.id, user.tenantId))
-        .limit(1);
+    if (found) {
+      hasTenantAssignment = true;
       tenant = found;
 
-      if (found?.id) {
-        const [schedule] = await db
-          .select({ scheduledFor: tenantDeletionSchedules.scheduledFor })
-          .from(tenantDeletionSchedules)
-          .where(
-            and(
-              eq(tenantDeletionSchedules.tenantId, found.id),
-              eq(tenantDeletionSchedules.status, "scheduled")
-            )
+      const [schedule] = await db
+        .select({ scheduledFor: tenantDeletionSchedules.scheduledFor })
+        .from(tenantDeletionSchedules)
+        .where(
+          and(
+            eq(tenantDeletionSchedules.tenantId, found.id),
+            eq(tenantDeletionSchedules.status, "scheduled")
           )
-          .limit(1);
+        )
+        .limit(1);
 
-        if (schedule) {
-          deactivationInfo = {
-            tenantName: found.name,
-            scheduledFor: schedule.scheduledFor,
-          };
-        }
+      if (schedule) {
+        deactivationInfo = {
+          tenantName: found.name,
+          scheduledFor: schedule.scheduledFor,
+        };
       }
     }
   }
@@ -67,7 +78,24 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   return (
     <ClerkProvider>
       <div style={themeStyle}>
-        {deactivationInfo ? (
+        {!hasTenantAssignment ? (
+          <NoPraxisAssignedState supportEmail={supportEmail} />
+        ) : isUserInactive ? (
+          <div
+            className="min-h-screen flex items-center justify-center p-6"
+            style={{ backgroundColor: "var(--color-bg)", color: "var(--color-fg)" }}
+          >
+            <div className="max-w-lg rounded-2xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
+              <h1 className="text-2xl font-bold text-amber-800">Zugriff deaktiviert</h1>
+              <p className="mt-3 text-sm text-amber-900">
+                Ihr Benutzerkonto wurde deaktiviert. Sie haben keinen Zugriff mehr auf die Praxisdaten.
+              </p>
+              <p className="mt-2 text-sm text-amber-900">
+                Kontaktieren Sie einen Administrator Ihrer Praxis, um Ihren Zugang wiederherzustellen.
+              </p>
+            </div>
+          </div>
+        ) : deactivationInfo ? (
           <div
             className="min-h-screen flex items-center justify-center p-6"
             style={{ backgroundColor: "var(--color-bg)", color: "var(--color-fg)" }}

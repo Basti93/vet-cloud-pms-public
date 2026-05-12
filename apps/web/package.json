@@ -17,7 +17,7 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:seed": "npx tsx scripts/seed.ts",
-    "db:seed:demo": "npx tsx scripts/admin-reset.ts --reset",
+    "db:seed:demo": "npx tsx scripts/demo-reset.ts --reset",
     "db:seed-vax-types": "npx tsx src/lib/db/seed-vaccination-types.ts",
     "rbac:check-sync": "npx tsx scripts/check-system-roles-sync.ts",
     "script": "npx tsx scripts"
@@ -57,12 +57,15 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "resend": "^6.12.2",
+    "stripe": "^22.1.1",
     "styled-jsx": "^5.1.6",
     "superjson": "^2",
     "svix": "^1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@clerk/testing": "^2.0.27",
+    "@playwright/test": "^1.60.0",
     "@swc/helpers": "^0.5.17",
     "@tailwindcss/postcss": "^4",
     "@testing-library/react": "^16",

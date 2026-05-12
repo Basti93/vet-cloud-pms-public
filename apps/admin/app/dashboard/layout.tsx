@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { getSystemDomain } from "@/lib/system-name";
 
 export default function DashboardLayout({
@@ -11,6 +12,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const pathname = usePathname();
   const systemDomain = getSystemDomain();
 
   const closeMobileMenu = () => setMobileMenuOpen(false);
@@ -82,10 +84,25 @@ export default function DashboardLayout({
           </Link>
           <Link
             href="/dashboard/audit"
-            className="block rounded-lg px-4 py-2 text-gray-700 transition hover:bg-gray-100"
+            className={`block rounded-lg px-4 py-2 transition ${
+              pathname === "/dashboard/audit"
+                ? "bg-gray-100 font-semibold text-gray-900"
+                : "text-gray-700 hover:bg-gray-100"
+            }`}
             onClick={closeMobileMenu}
           >
             Audit-Log
+          </Link>
+          <Link
+            href="/dashboard/analytics"
+            className={`block rounded-lg px-4 py-2 transition ${
+              pathname === "/dashboard/analytics"
+                ? "bg-gray-100 font-semibold text-gray-900"
+                : "text-gray-700 hover:bg-gray-100"
+            }`}
+            onClick={closeMobileMenu}
+          >
+            Analytics
           </Link>
           </div>
         </nav>

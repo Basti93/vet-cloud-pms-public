@@ -61,7 +61,7 @@ function stringifyError(error: unknown): string {
  *
  * Security: Requires CRON_SECRET header to match environment variable
  */
-export async function GET(request: NextRequest) {
+export async function POST(request: NextRequest) {
   // Verify the cron secret
   const authHeader = request.headers.get("authorization");
   if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
