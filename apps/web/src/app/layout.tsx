@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { auth } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db/client";
@@ -95,6 +96,14 @@ export default async function RootLayout({
               </UserPreferencesProvider>
             </PraxisProvider>
           </TRPCProvider>
+          {process.env.NEXT_PUBLIC_UMAMI_SRC && (
+            <Script
+              src={process.env.NEXT_PUBLIC_UMAMI_SRC}
+              data-website-id={process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID}
+              data-do-not-track="true"
+              strategy="afterInteractive"
+            />
+          )}
         </body>
       </html>
     </ClerkProviderWrapper>

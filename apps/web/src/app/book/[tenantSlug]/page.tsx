@@ -5,6 +5,8 @@ import { trpc } from "@/lib/trpc/client";
 import { useBookingFormState } from "@/hooks/useBookingFormState";
 import { useLocale } from "@/lib/user/preferences-context";
 import { getSystemDomain } from "@/lib/system-name";
+import { trackEvent } from "@/lib/analytics/tracker";
+import { AnalyticsEvents } from "@/lib/analytics/events";
 import { ChevronLeft, ChevronRight, Check, Phone, MapPin, Clock, Calendar, AlertCircle, Loader2, Stethoscope, PawPrint } from "lucide-react";
 import { COLOR_PRESETS, TYPE_PAIRINGS, type ColorPresetKey, type TypographyPairingKey } from "@/lib/theme";
 
@@ -1001,6 +1003,15 @@ export default function BookingPage({
   const [step, setStep] = useState<Step>("vet");
   const [successData, setSuccessData] = useState<{ startTime: Date; ownerName: string; patientName: string; vetName?: string } | null>(null);
 
+  // Track booking funnel entry
+  const hasTrackedEntry = useRef(false);
+  useEffect(() => {
+    if (clinic?.id && !hasTrackedEntry.current) {
+      hasTrackedEntry.current = true;
+      trackEvent(AnalyticsEvents.BOOKING_STARTED, { tenant_slug: tenantSlug });
+    }
+  }, [clinic?.id, tenantSlug]);
+
   // 15-min slot hold state
   const [holdToken, setHoldToken] = useState<string | null>(null);
   const [holdExpiresAt, setHoldExpiresAt] = useState<Date | null>(null);
@@ -1177,7 +1188,7 @@ export default function BookingPage({
                   vets={vets}
                   vetAvailability={vetAvailability}
                   primaryColor={primaryColor}
-                  onSelect={(vetId) => { updateField("vetId", vetId); setStep("date"); }}
+                  onSelect={(vetId) => { updateField("vetId", vetId); trackEvent(AnalyticsEvents.BOOKING_VET_SELECTED, { vet_id: vetId || "auto", tenant_slug: tenantSlug }); setStep("date"); }}
                 />
               )}
               {step === "date" && (
@@ -1189,12 +1200,13 @@ export default function BookingPage({
                   browserSessionId={formState.browserSessionId!}
                   embeddingOrigin={embeddingOrigin}
                   onBack={() => setStep("vet")}
-                  onSelect={(s, token, expiresAt) => {
-                    updateField("date", JSON.stringify(s));
-                    setHoldToken(token);
-                    setHoldExpiresAt(expiresAt);
-                    setStep("details");
-                  }}
+onSelect={(s, token, expiresAt) => {
+                     updateField("date", JSON.stringify(s));
+                     setHoldToken(token);
+                     setHoldExpiresAt(expiresAt);
+                     trackEvent(AnalyticsEvents.BOOKING_SLOT_SELECTED, { tenant_slug: tenantSlug });
+                     setStep("details");
+                   }}
                 />
               )}
               {step === "details" && slot && (
@@ -1206,7 +1218,7 @@ export default function BookingPage({
                   holdExpiresAt={holdExpiresAt}
                   onHoldExpired={handleHoldExpired}
                   onBack={handleDetailsBack}
-                  onNext={(p, o) => { updateField("patient", p); updateField("owner", o); setStep("confirm"); }}
+                  onNext={(p, o) => { updateField("patient", p); updateField("owner", o); trackEvent(AnalyticsEvents.BOOKING_DETAILS_ENTERED, { species: p.species, tenant_slug: tenantSlug }); setStep("confirm"); }}
                   initialPatient={patient}
                   initialOwner={owner}
                   t={t}
@@ -1227,7 +1239,7 @@ export default function BookingPage({
                   holdExpiresAt={holdExpiresAt}
                   onHoldExpired={handleHoldExpired}
                   onBack={() => setStep("details")}
-                  onSuccess={(data) => { clearFormState(); setSuccessData(data); setStep("success"); }}
+                  onSuccess={(data) => { clearFormState(); setSuccessData(data); trackEvent(AnalyticsEvents.BOOKING_CONFIRMED, { tenant_slug: tenantSlug, source: "online_booking" }); setStep("success"); }}
                 />
               )}
               {step === "success" && successData && (
