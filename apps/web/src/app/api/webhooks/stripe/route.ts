@@ -284,6 +284,9 @@ export async function POST(request: NextRequest) {
       }
 
       case "customer.deleted": {
+        // Stripe prevents deleting customers with active subscriptions,
+        // so customer.subscription.deleted always fires first.
+        // Only clear Stripe IDs — don't touch subscriptionStatus (already cancelled).
         const customer = event.data.object as Stripe.Customer;
 
         await appDb
@@ -292,15 +295,10 @@ export async function POST(request: NextRequest) {
             stripeCustomerId: null,
             stripeSubscriptionId: null,
             currentStripePriceId: null,
-            subscriptionStatus: "trial",
-            cancelledAtPeriodEnd: null,
-            paymentFailureCount: 0,
-            paymentGracePeriodEndsAt: null,
-            deactivatedAt: null,
           })
           .where(eq(tenants.stripeCustomerId, customer.id));
 
-        console.log(`[Stripe Webhook] customer.deleted — cleared Stripe data for customer ${customer.id}`);
+        console.log(`[Stripe Webhook] customer.deleted — cleared Stripe IDs for customer ${customer.id}`);
         break;
       }
     }
