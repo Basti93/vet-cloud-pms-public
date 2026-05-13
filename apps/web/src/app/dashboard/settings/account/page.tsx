@@ -470,7 +470,7 @@ export default function AccountPage() {
               </div>
             )}
 
-            {(subscriptionStatus.status === "active" || subscriptionStatus.status === "trial") && !subscriptionStatus.cancelledAtPeriodEnd && !subscriptionStatus.deactivatedAt && (
+            {(subscriptionStatus.status === "active" || subscriptionStatus.status === "trial") && !subscriptionStatus.cancelledAtPeriodEnd && !subscriptionStatus.deactivatedAt && subscriptionStatus.currentPrice && (
               <div className="mt-6 pt-6 border-t border-border">
                 <button
                   onClick={handleCancelSubscription}

@@ -230,6 +230,43 @@ export async function POST(request: NextRequest) {
         break;
       }
 
+      case "customer.subscription.created": {
+        // New subscription — same sync logic as subscription.updated
+        const subscription = event.data.object as Stripe.Subscription;
+        const tenantId = subscription.metadata?.tenantId;
+
+        if (!tenantId) {
+          console.warn(`[Stripe Webhook] subscription.created missing tenantId in metadata`);
+          break;
+        }
+
+        const priceId =
+          Array.isArray(subscription.items?.data) && subscription.items.data.length > 0
+            ? subscription.items.data[0]?.price?.id
+            : null;
+
+        const createData: Record<string, unknown> = {
+          stripeSubscriptionId: subscription.id,
+        };
+
+        if (priceId) createData.currentStripePriceId = priceId;
+
+        if (subscription.trial_end && subscription.trial_end * 1000 > Date.now()) {
+          createData.subscriptionStatus = "trial";
+          createData.trialEndsAt = new Date(subscription.trial_end * 1000);
+        } else if (subscription.status === "active") {
+          createData.subscriptionStatus = "active";
+        }
+
+        await appDb
+          .update(tenants)
+          .set(createData)
+          .where(eq(tenants.id, tenantId));
+
+        console.log(`[Stripe Webhook] subscription.created — tenant ${tenantId} linked to subscription ${subscription.id}`);
+        break;
+      }
+
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
         const customerId = session.customer;
@@ -243,12 +280,30 @@ export async function POST(request: NextRequest) {
             .limit(1);
 
           if (tenant.length) {
+            // Fetch subscription to get price + trial info
+            const stripe = getStripeClient();
+            const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+            const priceId = subscription.items.data[0]?.price?.id ?? null;
+
+            const updateData: Record<string, unknown> = {
+              stripeSubscriptionId: subscriptionId,
+            };
+
+            if (priceId) updateData.currentStripePriceId = priceId;
+
+            if (subscription.trial_end && subscription.trial_end * 1000 > Date.now()) {
+              updateData.subscriptionStatus = "trial";
+              updateData.trialEndsAt = new Date(subscription.trial_end * 1000);
+            } else if (subscription.status === "active") {
+              updateData.subscriptionStatus = "active";
+            }
+
             await appDb
               .update(tenants)
-              .set({ stripeSubscriptionId: subscriptionId })
+              .set(updateData)
               .where(eq(tenants.id, tenant[0].id));
 
-            console.log(`[Stripe Webhook] checkout.session.completed — tenant ${tenant[0].id} linked to subscription ${subscriptionId}`);
+            console.log(`[Stripe Webhook] checkout.session.completed — tenant ${tenant[0].id} linked to subscription ${subscriptionId}, price ${priceId}`);
           }
         }
         break;
