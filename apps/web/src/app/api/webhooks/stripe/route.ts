@@ -86,6 +86,7 @@ export async function POST(request: NextRequest) {
             ? subscription.items.data[0]?.price?.id
             : null;
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const updateData: Record<string, any> = {
           stripeSubscriptionId: subscription.id,
         };
@@ -158,6 +159,7 @@ export async function POST(request: NextRequest) {
             const now = new Date();
             const gracePeriodEndsAt = new Date(now.getTime() + 10 * 24 * 60 * 60 * 1000); // 10 days
 
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const updateData: Record<string, any> = {
               lastPaymentFailedAt: now,
               paymentFailureCount: newFailureCount,
@@ -227,6 +229,104 @@ export async function POST(request: NextRequest) {
               .where(eq(tenants.id, tenant[0].id));
           }
         }
+        break;
+      }
+
+      case "customer.subscription.created": {
+        // New subscription — same sync logic as subscription.updated
+        const subscription = event.data.object as Stripe.Subscription;
+        const tenantId = subscription.metadata?.tenantId;
+
+        if (!tenantId) {
+          console.warn(`[Stripe Webhook] subscription.created missing tenantId in metadata`);
+          break;
+        }
+
+        const priceId =
+          Array.isArray(subscription.items?.data) && subscription.items.data.length > 0
+            ? subscription.items.data[0]?.price?.id
+            : null;
+
+        const createData: Record<string, unknown> = {
+          stripeSubscriptionId: subscription.id,
+        };
+
+        if (priceId) createData.currentStripePriceId = priceId;
+
+        if (subscription.trial_end && subscription.trial_end * 1000 > Date.now()) {
+          createData.subscriptionStatus = "trial";
+          createData.trialEndsAt = new Date(subscription.trial_end * 1000);
+        } else if (subscription.status === "active") {
+          createData.subscriptionStatus = "active";
+        }
+
+        await appDb
+          .update(tenants)
+          .set(createData)
+          .where(eq(tenants.id, tenantId));
+
+        console.log(`[Stripe Webhook] subscription.created — tenant ${tenantId} linked to subscription ${subscription.id}`);
+        break;
+      }
+
+      case "checkout.session.completed": {
+        const session = event.data.object as Stripe.Checkout.Session;
+        const customerId = session.customer;
+        const subscriptionId = session.subscription;
+
+        if (typeof customerId === "string" && typeof subscriptionId === "string") {
+          const tenant = await appDb
+            .select()
+            .from(tenants)
+            .where(eq(tenants.stripeCustomerId, customerId))
+            .limit(1);
+
+          if (tenant.length) {
+            // Fetch subscription to get price + trial info
+            const stripe = getStripeClient();
+            const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+            const priceId = subscription.items.data[0]?.price?.id ?? null;
+
+            const updateData: Record<string, unknown> = {
+              stripeSubscriptionId: subscriptionId,
+            };
+
+            if (priceId) updateData.currentStripePriceId = priceId;
+
+            if (subscription.trial_end && subscription.trial_end * 1000 > Date.now()) {
+              updateData.subscriptionStatus = "trial";
+              updateData.trialEndsAt = new Date(subscription.trial_end * 1000);
+            } else if (subscription.status === "active") {
+              updateData.subscriptionStatus = "active";
+            }
+
+            await appDb
+              .update(tenants)
+              .set(updateData)
+              .where(eq(tenants.id, tenant[0].id));
+
+            console.log(`[Stripe Webhook] checkout.session.completed — tenant ${tenant[0].id} linked to subscription ${subscriptionId}, price ${priceId}`);
+          }
+        }
+        break;
+      }
+
+      case "customer.deleted": {
+        // Stripe prevents deleting customers with active subscriptions,
+        // so customer.subscription.deleted always fires first.
+        // Only clear Stripe IDs — don't touch subscriptionStatus (already cancelled).
+        const customer = event.data.object as Stripe.Customer;
+
+        await appDb
+          .update(tenants)
+          .set({
+            stripeCustomerId: null,
+            stripeSubscriptionId: null,
+            currentStripePriceId: null,
+          })
+          .where(eq(tenants.stripeCustomerId, customer.id));
+
+        console.log(`[Stripe Webhook] customer.deleted — cleared Stripe IDs for customer ${customer.id}`);
         break;
       }
     }
