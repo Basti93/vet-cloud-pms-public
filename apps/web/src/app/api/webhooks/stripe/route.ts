@@ -229,6 +229,80 @@ export async function POST(request: NextRequest) {
         }
         break;
       }
+
+      case "checkout.session.completed": {
+        const session = event.data.object as Stripe.Checkout.Session;
+        const customerId = session.customer;
+        const subscriptionId = session.subscription;
+
+        if (typeof customerId === "string" && typeof subscriptionId === "string") {
+          const tenant = await appDb
+            .select()
+            .from(tenants)
+            .where(eq(tenants.stripeCustomerId, customerId))
+            .limit(1);
+
+          if (tenant.length) {
+            await appDb
+              .update(tenants)
+              .set({ stripeSubscriptionId: subscriptionId })
+              .where(eq(tenants.id, tenant[0].id));
+
+            console.log(`[Stripe Webhook] checkout.session.completed — tenant ${tenant[0].id} linked to subscription ${subscriptionId}`);
+          }
+        }
+        break;
+      }
+
+      case "customer.subscription.paused": {
+        const subscription = event.data.object as Stripe.Subscription;
+        const tenantId = subscription.metadata?.tenantId;
+
+        if (tenantId) {
+          await appDb
+            .update(tenants)
+            .set({ subscriptionStatus: "paused" })
+            .where(eq(tenants.id, tenantId));
+        }
+        break;
+      }
+
+      case "customer.subscription.resumed": {
+        const subscription = event.data.object as Stripe.Subscription;
+        const tenantId = subscription.metadata?.tenantId;
+
+        if (tenantId) {
+          await appDb
+            .update(tenants)
+            .set({
+              subscriptionStatus: "active",
+              deactivatedAt: null,
+            })
+            .where(eq(tenants.id, tenantId));
+        }
+        break;
+      }
+
+      case "customer.deleted": {
+        const customer = event.data.object as Stripe.Customer;
+
+        await appDb
+          .update(tenants)
+          .set({
+            stripeCustomerId: null,
+            stripeSubscriptionId: null,
+            currentStripePriceId: null,
+            subscriptionStatus: "trial",
+            cancelledAtPeriodEnd: null,
+            paymentFailureCount: 0,
+            paymentGracePeriodEndsAt: null,
+            deactivatedAt: null,
+          })
+          .where(eq(tenants.stripeCustomerId, customer.id));
+
+        console.log(`[Stripe Webhook] customer.deleted — cleared Stripe data for customer ${customer.id}`);
+        break;
+      }
     }
 
     return NextResponse.json({ received: true });
