@@ -76,6 +76,7 @@ export async function POST(request: NextRequest) {
           (s) => s.status !== "canceled" && s.status !== "incomplete_expired"
         );
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const updateData: Record<string, any> = {};
 
         if (!activeSub && tenant.stripeSubscriptionId) {

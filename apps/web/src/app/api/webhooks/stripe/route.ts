@@ -86,6 +86,7 @@ export async function POST(request: NextRequest) {
             ? subscription.items.data[0]?.price?.id
             : null;
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const updateData: Record<string, any> = {
           stripeSubscriptionId: subscription.id,
         };
@@ -158,6 +159,7 @@ export async function POST(request: NextRequest) {
             const now = new Date();
             const gracePeriodEndsAt = new Date(now.getTime() + 10 * 24 * 60 * 60 * 1000); // 10 days
 
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const updateData: Record<string, any> = {
               lastPaymentFailedAt: now,
               paymentFailureCount: newFailureCount,
