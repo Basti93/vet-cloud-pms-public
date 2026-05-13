@@ -169,7 +169,7 @@ export const adminCoreRouter = createAdminRouter({
           Number(systemRoleLockState?.editableCount ?? 0) > 0 &&
           Number(systemRoleLockState?.totalSystemCount ?? 0) > 0,
         stripeDashboardUrls: getStripeDashboardUrls(tenant.stripeCustomerId, tenant.stripeSubscriptionId),
-        currentPriceLabel: tenant.currentStripePriceId ? getPriceById(tenant.currentStripePriceId) : null,
+        currentPriceLabel: tenant.currentStripePriceId ? await getPriceById(tenant.currentStripePriceId) : null,
       };
     }),
 
