@@ -8,7 +8,6 @@ import {
   TRIAL_DAYS,
   getPriceBySeats,
   getPriceById,
-  getStripePrices,
 } from "@/lib/stripe/prices";
 import { TRPCError } from "@trpc/server";
 import { getMainDomain } from "@/lib/env";
