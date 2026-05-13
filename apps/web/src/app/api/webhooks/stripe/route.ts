@@ -254,35 +254,6 @@ export async function POST(request: NextRequest) {
         break;
       }
 
-      case "customer.subscription.paused": {
-        const subscription = event.data.object as Stripe.Subscription;
-        const tenantId = subscription.metadata?.tenantId;
-
-        if (tenantId) {
-          await appDb
-            .update(tenants)
-            .set({ subscriptionStatus: "paused" })
-            .where(eq(tenants.id, tenantId));
-        }
-        break;
-      }
-
-      case "customer.subscription.resumed": {
-        const subscription = event.data.object as Stripe.Subscription;
-        const tenantId = subscription.metadata?.tenantId;
-
-        if (tenantId) {
-          await appDb
-            .update(tenants)
-            .set({
-              subscriptionStatus: "active",
-              deactivatedAt: null,
-            })
-            .where(eq(tenants.id, tenantId));
-        }
-        break;
-      }
-
       case "customer.deleted": {
         // Stripe prevents deleting customers with active subscriptions,
         // so customer.subscription.deleted always fires first.
