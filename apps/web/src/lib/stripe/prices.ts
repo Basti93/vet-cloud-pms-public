@@ -77,12 +77,19 @@ export async function getPriceBySeats(seats: number): Promise<StripePriceTier> {
   return tiers.find((t) => t.seats >= seats) ?? tiers[tiers.length - 1];
 }
 
-/** Returns the tier matching priceId, or null if not found. */
+/**
+ * Returns the tier matching priceId, or null if not found.
+ * Returns null (instead of throwing) if Stripe product is not yet configured.
+ */
 export async function getPriceById(
   priceId: string
 ): Promise<StripePriceTier | null> {
-  const tiers = await getStripePrices();
-  return tiers.find((t) => t.priceId === priceId) ?? null;
+  try {
+    const tiers = await getStripePrices();
+    return tiers.find((t) => t.priceId === priceId) ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /** Invalidates the price cache — useful after Stripe webhook price.updated events. */
