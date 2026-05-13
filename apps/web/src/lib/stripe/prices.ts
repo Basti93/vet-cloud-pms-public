@@ -30,36 +30,44 @@ export async function getStripePrices(): Promise<StripePriceTier[]> {
 
   const stripe = getStripeClient();
 
-  // Find the product tagged app=vet-cloud
-  const products = await stripe.products.list({ active: true, limit: 100 });
-  const product = products.data.find((p) => p.metadata.app === "vet-cloud");
+  // Fetch all active products tagged app=vet-cloud — each product = one seat tier.
+  // Product metadata: app=vet-cloud, seats=<n>
+  // Each product has exactly one active price.
+  const { data: products } = await stripe.products.list({ active: true, limit: 100 });
+  const tierProducts = products.filter(
+    (p) => p.metadata.app === "vet-cloud" && p.metadata.seats
+  );
 
-  if (!product) {
+  if (tierProducts.length === 0) {
     throw new Error(
-      "Stripe product not found. Add metadata app=vet-cloud to your subscription product."
+      "No Stripe products found. Add metadata app=vet-cloud and seats=<n> to each subscription product."
     );
   }
 
-  // Fetch all active prices for this product
-  const { data: prices } = await stripe.prices.list({
-    product: product.id,
-    active: true,
-    limit: 100,
-  });
-
-  const tiers: StripePriceTier[] = prices
-    .filter((p) => p.metadata.seats && p.unit_amount !== null)
-    .map((p) => ({
-      priceId: p.id,
-      seats: parseInt(p.metadata.seats, 10),
-      monthlyPrice: p.unit_amount!,
-    }))
+  // For each product fetch its first active price
+  const tiers: StripePriceTier[] = (
+    await Promise.all(
+      tierProducts.map(async (product) => {
+        const { data: prices } = await stripe.prices.list({
+          product: product.id,
+          active: true,
+          limit: 1,
+        });
+        const price = prices[0];
+        if (!price || price.unit_amount === null) return null;
+        return {
+          priceId: price.id,
+          seats: parseInt(product.metadata.seats, 10),
+          monthlyPrice: price.unit_amount,
+        };
+      })
+    )
+  )
+    .filter((t): t is StripePriceTier => t !== null)
     .sort((a, b) => a.seats - b.seats);
 
   if (tiers.length === 0) {
-    throw new Error(
-      "No Stripe prices found. Add metadata seats=<n> to each active price."
-    );
+    throw new Error("No active Stripe prices found for vet-cloud products.");
   }
 
   _cache = tiers;
