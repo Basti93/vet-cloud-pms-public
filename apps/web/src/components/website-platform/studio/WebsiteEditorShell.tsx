@@ -569,6 +569,7 @@ export function WebsiteEditorShell({ projectId, tenantHoursRows, tenantContactIn
   const [isDirty, setIsDirty] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [rightTab, setRightTab] = useState<'content' | 'design'>('content');
+  const [midTab, setMidTab] = useState<'structure' | 'preview'>('structure');
   const saveDraft = trpc.websitePlatform.saveDraft.useMutation({
     onSuccess: () => {
       setIsDirty(false);
@@ -710,7 +711,7 @@ export function WebsiteEditorShell({ projectId, tenantHoursRows, tenantContactIn
         </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[280px_1fr_360px]">
+      <div className="grid gap-6 xl:grid-cols-[260px_380px_360px]">
         <div className="space-y-4">
           <Card className="p-4">
             <h2 className="font-semibold">Seiten</h2>
@@ -741,17 +742,36 @@ export function WebsiteEditorShell({ projectId, tenantHoursRows, tenantContactIn
         </div>
 
         <div className="space-y-4">
-          <Card className="p-4">
-            <h2 className="font-semibold">Struktur: {currentPage?.title ?? 'Seite'}</h2>
-            <div className="mt-4 space-y-3">
-              {blocks.length === 0 ? <p className="rounded-xl border border-dashed border-[var(--color-border)] p-8 text-center text-muted">Noch keine Blöcke. Starte mit Hero, Leistungen und Kontakt.</p> : blocks.map((block, index) => <div key={block.id} className={`rounded-xl border bg-white p-4 ${selectedBlockId === block.id ? 'border-[var(--color-accent)] ring-2 ring-[var(--color-accent-soft)]' : 'border-[var(--color-border)]'}`}><button onClick={() => setSelectedBlockId(block.id)} className="w-full text-left"><p className="font-medium">{WEBSITE_BLOCK_DEFINITIONS[block.type].label}</p><p className="text-xs text-muted">#{index + 1} · {block.type}</p></button><div className="mt-3 flex flex-wrap gap-2"><Button size="xs" variant="outline" disabled={index === 0} onClick={() => moveBlock(index, -1)}>↑ Hoch</Button><Button size="xs" variant="outline" disabled={index === blocks.length - 1} onClick={() => moveBlock(index, 1)}>↓ Runter</Button><Button size="xs" variant="ghost" onClick={() => removeBlock(block.id)}>Entfernen</Button></div></div>)}
-            </div>
-          </Card>
+          <div className="flex rounded-xl border border-[var(--color-border)] overflow-hidden">
+            <button
+              onClick={() => setMidTab('structure')}
+              className={`flex-1 py-2 text-sm font-medium transition-colors ${midTab === 'structure' ? 'bg-[var(--color-accent)] text-white' : 'bg-white hover:bg-[var(--color-muted-soft)]'}`}
+            >
+              Struktur
+            </button>
+            <button
+              onClick={() => setMidTab('preview')}
+              className={`flex-1 py-2 text-sm font-medium transition-colors ${midTab === 'preview' ? 'bg-[var(--color-accent)] text-white' : 'bg-white hover:bg-[var(--color-muted-soft)]'}`}
+            >
+              {isDirty && midTab !== 'preview' && <span className="mr-1 inline-block h-2 w-2 rounded-full bg-amber-400" />}
+              Vorschau
+            </button>
+          </div>
 
-          <Card className="overflow-hidden p-0">
-            <div className="border-b border-[var(--color-border)] p-4"><h2 className="font-semibold">Live-Entwurf</h2><p className="text-sm text-muted">Vorschau der ungespeicherten Blöcke.</p></div>
-            <div className="max-h-[720px] overflow-auto bg-white">{preview && <PageRenderer resolved={preview} assetMap={assetMap} />}</div>
-          </Card>
+          {midTab === 'structure' && (
+            <Card className="p-4">
+              <h2 className="font-semibold">Struktur: {currentPage?.title ?? 'Seite'}</h2>
+              <div className="mt-4 space-y-3">
+                {blocks.length === 0 ? <p className="rounded-xl border border-dashed border-[var(--color-border)] p-8 text-center text-muted">Noch keine Blöcke. Starte mit Hero, Leistungen und Kontakt.</p> : blocks.map((block, index) => <div key={block.id} className={`rounded-xl border bg-white p-4 ${selectedBlockId === block.id ? 'border-[var(--color-accent)] ring-2 ring-[var(--color-accent-soft)]' : 'border-[var(--color-border)]'}`}><button onClick={() => setSelectedBlockId(block.id)} className="w-full text-left"><p className="font-medium">{WEBSITE_BLOCK_DEFINITIONS[block.type].label}</p><p className="text-xs text-muted">#{index + 1} · {block.type}</p></button><div className="mt-3 flex flex-wrap gap-2"><Button size="xs" variant="outline" disabled={index === 0} onClick={() => moveBlock(index, -1)}>↑ Hoch</Button><Button size="xs" variant="outline" disabled={index === blocks.length - 1} onClick={() => moveBlock(index, 1)}>↓ Runter</Button><Button size="xs" variant="ghost" onClick={() => removeBlock(block.id)}>Entfernen</Button></div></div>)}
+              </div>
+            </Card>
+          )}
+
+          {midTab === 'preview' && (
+            <Card className="overflow-hidden p-0">
+              <div className="max-h-[800px] overflow-auto bg-white">{preview && <PageRenderer resolved={preview} assetMap={assetMap} />}</div>
+            </Card>
+          )}
         </div>
 
         <div className="space-y-4">
