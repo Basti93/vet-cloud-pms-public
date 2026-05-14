@@ -28,11 +28,13 @@ function BookingDialog({ tenantSlug, open, onClose }: { tenantSlug: string; open
         <DialogHeader className="flex-shrink-0 px-4 py-3 border-b border-[var(--color-border)]">
           <DialogTitle>Termin buchen</DialogTitle>
         </DialogHeader>
-        <iframe
-          src={`/book/${tenantSlug}`}
-          className="flex-1 w-full border-0"
-          title="Termin buchen"
-        />
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <iframe
+            src={`/book/${tenantSlug}`}
+            className="w-full h-full border-0"
+            title="Termin buchen"
+          />
+        </div>
       </DialogContent>
     </Dialog>
   );
