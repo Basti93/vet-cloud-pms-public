@@ -29,6 +29,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
+# standalone output unpacks to /app, but Next.js serves public from /app/apps/web/public/
+ENV ASSET_PUBLIC_DIR=/app/apps/web/public
 
 RUN apk add --no-cache curl && \
     addgroup --system --gid 1001 nodejs && \
