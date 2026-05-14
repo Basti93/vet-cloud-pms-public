@@ -131,7 +131,9 @@ export function MapEmbedBlock({ block, tenantContactInfo }: BlockProps<Extract<W
     ? [tenantContactInfo.address, tenantContactInfo.city].filter(Boolean).join(', ') || undefined
     : block.props.address;
 
-  return <section className={section}>{block.props.heading && <h2 className="mb-5 text-3xl font-bold">{block.props.heading}</h2>}{block.props.embedUrl ? <iframe src={block.props.embedUrl} className="h-80 w-full rounded-3xl border-0 shadow-sm" loading="lazy" /> : <div className="rounded-3xl border border-[var(--color-border)] bg-white p-8 text-muted">{address}</div>}</section>;
+  const embedSrc = block.props.embedUrl || (address ? `https://maps.google.com/maps?q=${encodeURIComponent(address)}&output=embed` : null);
+
+  return <section className={section}>{block.props.heading && <h2 className="mb-5 text-3xl font-bold">{block.props.heading}</h2>}{embedSrc ? <iframe src={embedSrc} className="h-80 w-full rounded-3xl border-0 shadow-sm" loading="lazy" /> : null}</section>;
 }
 
 export function LegalTextBlock({ block }: BlockProps<Extract<WebsitePageBlock, { type: 'legalText' }>>) {
