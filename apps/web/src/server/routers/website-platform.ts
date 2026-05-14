@@ -1,8 +1,10 @@
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
+import { rm } from 'fs/promises';
+import path from 'path';
 import { and, desc, eq } from 'drizzle-orm';
 import { createTRPCRouter, protectedProcedure, type TRPCContext } from '@/server/trpc';
-import { tenants, websiteAssets, websiteDomains, websiteLeads, websitePageRevisions, websitePages, websiteProjects } from '@/lib/db/schema';
+import { roles, tenants, userRoles, users, websiteAssets, websiteDomains, websiteLeads, websitePageRevisions, websitePages, websiteProjects } from '@/lib/db/schema';
 import { capabilityConfigSchema, normalizeBlocks, pageBlocksSchema, themeConfigSchema, websiteProjectSeoSchema } from '@/lib/website-platform/schemas';
 import { normalizeWebsiteHost, normalizeWebsitePath } from '@/lib/website-platform/resolve-project';
 import { createDefaultLegalBlocks, createDefaultWebsiteBlocks } from '@/lib/website-platform/default-blocks';
@@ -225,6 +227,31 @@ export const websitePlatformRouter = createTRPCRouter({
     await requireProjectAccess(ctx, input.projectId);
     const [asset] = await ctx.db.insert(websiteAssets).values({ websiteProjectId: input.projectId, storageKey: input.storageKey, url: input.url, mimeType: input.mimeType, sizeBytes: input.sizeBytes, width: input.width, height: input.height, alt: input.alt, createdByUserId: ctxTenant(ctx).dbUserId }).returning();
     return asset;
+  }),
+
+  deleteAsset: protectedProcedure.input(z.object({ projectId: z.string().uuid(), assetId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
+    await requireProjectAccess(ctx, input.projectId);
+    const [asset] = await ctx.db.select().from(websiteAssets).where(and(eq(websiteAssets.id, input.assetId), eq(websiteAssets.websiteProjectId, input.projectId))).limit(1);
+    if (!asset) throw new TRPCError({ code: 'NOT_FOUND' });
+    if (asset.storageKey.startsWith('local:')) {
+      const rel = asset.storageKey.slice('local:'.length);
+      const publicBase = process.env.ASSET_PUBLIC_DIR ?? path.join(process.cwd(), 'public');
+      await rm(path.join(publicBase, 'tenant-assets', 'website-projects', rel), { force: true });
+    }
+    await ctx.db.delete(websiteAssets).where(eq(websiteAssets.id, input.assetId));
+    return { deleted: true };
+  }),
+
+  listTeamMembers: protectedProcedure.input(z.object({ projectId: z.string().uuid() })).query(async ({ ctx, input }) => {
+    const project = await requireProjectAccess(ctx, input.projectId);
+    if (!project.ownerTenantId) return [];
+    const vetRole = await ctx.db.select({ id: roles.id }).from(roles).where(and(eq(roles.tenantId, project.ownerTenantId), eq(roles.code, 'vet'))).limit(1);
+    if (!vetRole[0]) return [];
+    return ctx.db
+      .select({ id: users.id, title: users.title, firstName: users.firstName, lastName: users.lastName })
+      .from(users)
+      .innerJoin(userRoles, eq(userRoles.userId, users.id))
+      .where(and(eq(users.tenantId, project.ownerTenantId), eq(userRoles.roleId, vetRole[0].id), eq(users.active, true)));
   }),
 
   listLeads: protectedProcedure.input(z.object({ projectId: z.string().uuid() })).query(async ({ ctx, input }) => {

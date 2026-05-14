@@ -65,9 +65,17 @@ function JsonField<T>({ label, value, onChange }: { label: string; value: T; onC
   );
 }
 
-function MediaPicker({ projectId, value, onChange }: { projectId: string; value?: WebsiteAssetRef; onChange: (value?: WebsiteAssetRef) => void }) {
+function assetFileName(storageKey: string) {
+  const parts = storageKey.replace(/^local:/, '').split('/');
+  return parts[parts.length - 1] ?? storageKey;
+}
+
+function MediaPicker({ projectId, value, onChange, label = 'Bild' }: { projectId: string; value?: WebsiteAssetRef; onChange: (value?: WebsiteAssetRef) => void; label?: string }) {
   const utils = trpc.useUtils();
   const { data: assets } = trpc.websitePlatform.listAssets.useQuery({ projectId });
+  const deleteAsset = trpc.websitePlatform.deleteAsset.useMutation({
+    onSuccess: () => utils.websitePlatform.listAssets.invalidate({ projectId }),
+  });
   const [uploading, setUploading] = useState(false);
   const selectedAsset = value?.assetId ? assets?.find((asset) => asset.id === value.assetId) : undefined;
 
@@ -89,31 +97,97 @@ function MediaPicker({ projectId, value, onChange }: { projectId: string; value?
   return (
     <div className="space-y-3 rounded-xl border border-[var(--color-border)] p-3">
       <div>
-        <p className="text-sm font-medium">Bild</p>
+        <p className="text-sm font-medium">{label}</p>
         <p className="text-xs text-muted">Upload oder bestehendes Asset auswählen.</p>
       </div>
       {selectedAsset && <img src={selectedAsset.url} alt={selectedAsset.alt ?? ''} className="h-28 w-full rounded-lg object-cover" />}
       {value?.url && !selectedAsset && <img src={value.url} alt={value.altOverride ?? ''} className="h-28 w-full rounded-lg object-cover" />}
-      <input
-        type="file"
-        accept="image/*"
-        disabled={uploading}
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) void upload(file);
-        }}
-        className="text-xs"
-      />
-      <TextField label="Alt-Text" value={value?.altOverride} onChange={(altOverride) => onChange(value ? { ...value, altOverride } : { altOverride })} />
-      <div className="max-h-36 space-y-2 overflow-auto">
-        {assets?.map((asset) => (
-          <button key={asset.id} onClick={() => onChange({ assetId: asset.id, altOverride: asset.alt ?? undefined })} className="flex w-full items-center gap-2 rounded-lg border border-[var(--color-border)] p-2 text-left text-xs hover:bg-[var(--color-muted-soft)]">
-            <img src={asset.url} alt={asset.alt ?? ''} className="h-10 w-10 rounded object-cover" />
-            <span className="truncate">{asset.alt || asset.storageKey}</span>
-          </button>
-        ))}
+      <div className="flex items-center gap-2">
+        <label className={`cursor-pointer rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-xs font-medium hover:bg-[var(--color-muted-soft)] ${uploading ? 'opacity-50' : ''}`}>
+          {uploading ? 'Lädt…' : '+ Hochladen'}
+          <input type="file" accept="image/*" disabled={uploading} className="sr-only"
+            onChange={(e) => { const file = e.target.files?.[0]; if (file) void upload(file); }} />
+        </label>
+        {value && <Button variant="ghost" size="sm" onClick={() => onChange(undefined)}>Entfernen</Button>}
       </div>
-      {value && <Button variant="ghost" size="sm" onClick={() => onChange(undefined)}>Bild entfernen</Button>}
+      <TextField label="Alt-Text" value={value?.altOverride} onChange={(altOverride) => onChange(value ? { ...value, altOverride } : { altOverride })} />
+      {(assets?.length ?? 0) > 0 && (
+        <div className="space-y-1">
+          <p className="text-xs font-medium text-muted">Medienbibliothek</p>
+          <div className="max-h-48 space-y-1.5 overflow-auto">
+            {assets?.map((asset) => (
+              <div key={asset.id} className={`flex items-center gap-2 rounded-lg border p-2 ${value?.assetId === asset.id ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)]' : 'border-[var(--color-border)]'}`}>
+                <button onClick={() => onChange({ assetId: asset.id, altOverride: asset.alt ?? undefined })} className="flex flex-1 items-center gap-2 text-left text-xs min-w-0">
+                  <img src={asset.url} alt={asset.alt ?? ''} className="h-10 w-10 flex-shrink-0 rounded object-cover" />
+                  <span className="truncate">{asset.alt || assetFileName(asset.storageKey)}</span>
+                </button>
+                <button
+                  onClick={() => { if (confirm('Asset löschen?')) deleteAsset.mutate({ projectId, assetId: asset.id }); }}
+                  className="flex-shrink-0 rounded p-1 text-xs text-muted hover:bg-red-50 hover:text-red-600"
+                  title="Löschen"
+                >✕</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+type TeamPerson = { id: string; name: string; title?: string; image?: WebsiteAssetRef; bio?: string; focus: string[] };
+type TeamListBlock = Extract<Block, { type: 'teamList' }>;
+
+function TeamListInspector({ projectId, block, replaceProps }: { projectId: string; block: TeamListBlock; replaceProps: (props: TeamListBlock['props']) => void }) {
+  const { data: teamMembers } = trpc.websitePlatform.listTeamMembers.useQuery({ projectId });
+  const people: TeamPerson[] = block.props.people ?? [];
+
+  function updatePerson(index: number, patch: Partial<TeamPerson>) {
+    const next = people.map((p, i) => i === index ? { ...p, ...patch } : p);
+    replaceProps({ ...block.props, people: next });
+  }
+  function removePerson(index: number) {
+    replaceProps({ ...block.props, people: people.filter((_, i) => i !== index) });
+  }
+  function addPerson() {
+    replaceProps({ ...block.props, people: [...people, { id: crypto.randomUUID(), name: '', focus: [] }] });
+  }
+  function importFromTenant() {
+    if (!teamMembers?.length) return;
+    const imported: TeamPerson[] = teamMembers.map((u) => {
+      const fullName = [u.title, u.firstName, u.lastName].filter(Boolean).join(' ');
+      const existing = people.find((p) => p.name === fullName);
+      return existing ?? { id: u.id, name: fullName, focus: [] };
+    });
+    replaceProps({ ...block.props, people: imported });
+  }
+
+  return (
+    <div className="space-y-3">
+      <TextField label="Überschrift" value={block.props.heading} onChange={(heading) => replaceProps({ ...block.props, heading })} />
+      <TextField label="Intro" value={block.props.intro} multiline onChange={(intro) => replaceProps({ ...block.props, intro })} />
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-medium">Team-Mitglieder ({people.length})</p>
+        <div className="flex gap-2">
+          {(teamMembers?.length ?? 0) > 0 && (
+            <Button size="sm" variant="outline" onClick={importFromTenant}>Von Praxis laden</Button>
+          )}
+          <Button size="sm" variant="outline" onClick={addPerson}>+ Hinzufügen</Button>
+        </div>
+      </div>
+      {people.map((person, index) => (
+        <div key={person.id} className="space-y-2 rounded-xl border border-[var(--color-border)] p-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-muted">Person {index + 1}</p>
+            <button onClick={() => removePerson(index)} className="text-xs text-muted hover:text-red-600">Entfernen</button>
+          </div>
+          <TextField label="Name" value={person.name} onChange={(name) => updatePerson(index, { name })} />
+          <TextField label="Titel / Seit" value={person.title} onChange={(title) => updatePerson(index, { title })} />
+          <TextField label="Bio" value={person.bio} multiline onChange={(bio) => updatePerson(index, { bio })} />
+          <TextField label="Schwerpunkte (kommagetrennt)" value={person.focus.join(', ')} onChange={(v) => updatePerson(index, { focus: v.split(',').map((s) => s.trim()).filter(Boolean) })} />
+          <MediaPicker projectId={projectId} label="Foto" value={person.image} onChange={(image) => updatePerson(index, { image })} />
+        </div>
+      ))}
     </div>
   );
 }
@@ -144,13 +218,7 @@ function BlockInspector({ projectId, block, onChange }: { projectId: string; blo
         </div>
       );
     case 'teamList':
-      return (
-        <div className="space-y-3">
-          <TextField label="Überschrift" value={block.props.heading} onChange={(heading) => replaceProps({ ...block.props, heading })} />
-          <TextField label="Intro" value={block.props.intro} multiline onChange={(intro) => replaceProps({ ...block.props, intro })} />
-          <JsonField label="Team-Mitglieder" value={block.props.people} onChange={(people) => replaceProps({ ...block.props, people })} />
-        </div>
-      );
+      return <TeamListInspector projectId={projectId} block={block} replaceProps={replaceProps} />;
     case 'hoursTable':
       return (
         <div className="space-y-3">
