@@ -5,6 +5,42 @@ import { normalizeBlocks, normalizeCapabilities, normalizeThemeConfig, websitePr
 import type { ResolvedWebsitePage } from "./types";
 import { openingHoursToDisplayRows, normalizeWeekSchedule, type DaySchedule } from "@/lib/schedule-types";
 
+type TenantSpecialHours = NonNullable<ResolvedWebsitePage["project"]["tenantSpecialHours"]>;
+
+function normalizeSpecialHours(value: unknown): TenantSpecialHours | null {
+  if (!Array.isArray(value)) return null;
+  const entries = value.flatMap((entry, index): TenantSpecialHours => {
+    if (!entry || typeof entry !== "object") return [];
+    const raw = entry as {
+      id?: unknown;
+      title?: unknown;
+      startsOn?: unknown;
+      endsOn?: unknown;
+      note?: unknown;
+      rows?: unknown;
+    };
+    const rows = Array.isArray(raw.rows)
+      ? raw.rows.flatMap((row): { days: string; time: string }[] => {
+          if (!row || typeof row !== "object") return [];
+          const candidate = row as { days?: unknown; time?: unknown };
+          return typeof candidate.days === "string" && typeof candidate.time === "string"
+            ? [{ days: candidate.days, time: candidate.time }]
+            : [];
+        })
+      : [];
+    if (rows.length === 0) return [];
+    return [{
+      id: typeof raw.id === "string" ? raw.id : `special-hours-${index}`,
+      title: typeof raw.title === "string" ? raw.title : "Abweichende Öffnungszeiten",
+      startsOn: typeof raw.startsOn === "string" ? raw.startsOn : undefined,
+      endsOn: typeof raw.endsOn === "string" ? raw.endsOn : undefined,
+      note: typeof raw.note === "string" ? raw.note : undefined,
+      rows,
+    }];
+  });
+  return entries.length > 0 ? entries : null;
+}
+
 export function normalizeWebsiteHost(host?: string | null) {
   return (host ?? "").toLowerCase().trim().replace(/^www\./, "").split(":")[0] ?? "";
 }
@@ -52,6 +88,7 @@ export async function resolvePublishedWebsitePage(input: { projectId: string; pa
       projectSeo: websiteProjects.seoConfig,
       ownerTenantId: websiteProjects.ownerTenantId,
       tenantOpeningHours: tenants.openingHours,
+      tenantSpecialOpeningHours: tenants.specialOpeningHours,
       tenantAddress: tenants.address,
       tenantCity: tenants.city,
       tenantPhone: tenants.phone,
@@ -94,6 +131,7 @@ export async function resolvePublishedWebsitePage(input: { projectId: string; pa
   const tenantHoursRows = row.tenantOpeningHours
     ? openingHoursToDisplayRows(normalizeWeekSchedule(row.tenantOpeningHours as DaySchedule[])).map((r) => ({ days: r.day, time: r.time }))
     : null;
+  const tenantSpecialHours = normalizeSpecialHours(row.tenantSpecialOpeningHours);
 
   const tenantContactInfo = row.tenantAddress || row.tenantPhone || row.tenantEmail
     ? { address: row.tenantAddress, city: row.tenantCity, phone: row.tenantPhone, email: row.tenantEmail }
@@ -112,6 +150,7 @@ export async function resolvePublishedWebsitePage(input: { projectId: string; pa
       seoConfig: websiteProjectSeoSchema.partial().catch({}).parse(row.projectSeo ?? {}),
       ownerTenantId: row.ownerTenantId,
       tenantHoursRows,
+      tenantSpecialHours,
       tenantContactInfo,
       logoAsset: row.logoAsset as import('./types').WebsiteAssetRef | null,
       customCss: row.customCss,

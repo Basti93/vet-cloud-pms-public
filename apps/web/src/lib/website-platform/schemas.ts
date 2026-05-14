@@ -68,6 +68,12 @@ export const hoursTableBlockSchema = z.object({
   sections: z.array(z.object({ id: z.string(), title: z.string(), chipLabel: z.string().optional(), chipColor: z.string().optional(), note: z.string().optional(), rows: z.array(z.object({ days: z.string(), time: z.string() })).default([]) })).default([]),
 });
 
+export const specialHoursBlockSchema = z.object({
+  heading: z.string().default("Urlaubszeiten"),
+  note: z.string().optional(),
+  emptyText: z.string().default("Aktuell sind keine abweichenden Öffnungszeiten hinterlegt."),
+});
+
 export const contactCardBlockSchema = z.object({
   heading: z.string().default("Kontakt"),
   description: z.string().optional(),
@@ -108,6 +114,7 @@ export const blockPropsByType = {
   servicesGrid: servicesGridBlockSchema,
   teamList: teamListBlockSchema,
   hoursTable: hoursTableBlockSchema,
+  specialHours: specialHoursBlockSchema,
   contactCard: contactCardBlockSchema,
   contactForm: contactFormBlockSchema,
   bookingCta: bookingCtaBlockSchema,
@@ -121,6 +128,7 @@ export const pageBlockSchema = z.discriminatedUnion("type", [
   z.object({ id: z.string(), type: z.literal("servicesGrid"), variant: z.string().optional(), props: servicesGridBlockSchema, visibility: z.any().optional() }),
   z.object({ id: z.string(), type: z.literal("teamList"), variant: z.string().optional(), props: teamListBlockSchema, visibility: z.any().optional() }),
   z.object({ id: z.string(), type: z.literal("hoursTable"), variant: z.string().optional(), props: hoursTableBlockSchema, visibility: z.any().optional() }),
+  z.object({ id: z.string(), type: z.literal("specialHours"), variant: z.string().optional(), props: specialHoursBlockSchema, visibility: z.any().optional() }),
   z.object({ id: z.string(), type: z.literal("contactCard"), variant: z.string().optional(), props: contactCardBlockSchema, visibility: z.any().optional() }),
   z.object({ id: z.string(), type: z.literal("contactForm"), variant: z.string().optional(), props: contactFormBlockSchema, visibility: z.any().optional() }),
   z.object({ id: z.string(), type: z.literal("bookingCta"), variant: z.string().optional(), props: bookingCtaBlockSchema, visibility: z.any().optional() }),

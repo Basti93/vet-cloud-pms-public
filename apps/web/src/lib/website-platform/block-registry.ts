@@ -9,6 +9,7 @@ export const WEBSITE_BLOCK_DEFINITIONS: Record<WebsiteBlockType, { label: string
   servicesGrid: { label: "Leistungen", description: "Service cards" },
   teamList: { label: "Team", description: "Team profiles", capability: "teamProfiles" },
   hoursTable: { label: "Öffnungszeiten", description: "Opening hour sections" },
+  specialHours: { label: "Urlaubszeiten", description: "Special opening hours from tenant settings" },
   contactCard: { label: "Kontaktkarte", description: "Address, phone, email" },
   contactForm: { label: "Kontaktformular", description: "Lead capture form", capability: "contactForm" },
   bookingCta: { label: "Termin-CTA", description: "Booking call-to-action", capability: "booking" },

@@ -395,6 +395,17 @@ function BlockInspector({ projectId, block, onChange }: { projectId: string; blo
           )}
         </div>
       );
+    case 'specialHours':
+      return (
+        <div className="space-y-3">
+          <TextField label="Überschrift" value={block.props.heading} onChange={(heading) => replaceProps({ ...block.props, heading })} />
+          <TextField label="Hinweistext" value={block.props.note} multiline onChange={(note) => replaceProps({ ...block.props, note })} />
+          <TextField label="Leerzustand" value={block.props.emptyText} multiline onChange={(emptyText) => replaceProps({ ...block.props, emptyText })} />
+          <p className="rounded-xl border border-[var(--color-border)] bg-[var(--color-muted-soft)] px-3 py-2 text-xs text-muted">
+            Die Zeiträume und abweichenden Zeiten kommen aus den Praxisdaten. Der Hinweistext hier eignet sich z.B. für Medikamentenabholung oder Erreichbarkeit.
+          </p>
+        </div>
+      );
     case 'contactCard':
       return (
         <div className="space-y-3">
@@ -586,9 +597,10 @@ function CustomCssEditor({ projectId, initialCss }: { projectId: string; initial
   );
 }
 
-export function WebsiteEditorShell({ projectId, tenantHoursRows, tenantContactInfo }: {
+export function WebsiteEditorShell({ projectId, tenantHoursRows, tenantSpecialHours, tenantContactInfo }: {
   projectId: string;
   tenantHoursRows?: { days: string; time: string }[] | null;
+  tenantSpecialHours?: Array<{ id: string; title: string; startsOn?: string; endsOn?: string; rows: { days: string; time: string }[]; note?: string }> | null;
   tenantContactInfo?: { address?: string | null; phone?: string | null; email?: string | null; city?: string | null } | null;
 }) {
   const router = useRouter();
@@ -698,6 +710,7 @@ export function WebsiteEditorShell({ projectId, tenantHoursRows, tenantContactIn
       logoAsset: project.logoAsset as WebsiteAssetRef | null | undefined,
       teamMembers: null,
       tenantHoursRows,
+      tenantSpecialHours,
       tenantContactInfo,
     },
     page: {

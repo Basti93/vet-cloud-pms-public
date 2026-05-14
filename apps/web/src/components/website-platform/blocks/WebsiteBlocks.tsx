@@ -20,6 +20,7 @@ interface BlockProps<T extends WebsitePageBlock = WebsitePageBlock> {
   pagePath: string;
   templateVars?: TemplateVars;
   tenantHoursRows?: { days: string; time: string }[] | null;
+  tenantSpecialHours?: Array<{ id: string; title: string; startsOn?: string; endsOn?: string; rows: { days: string; time: string }[]; note?: string }> | null;
   tenantContactInfo?: { address?: string | null; phone?: string | null; email?: string | null; city?: string | null } | null;
 }
 
@@ -405,6 +406,74 @@ export function HoursTableBlock({ block, tenantHoursRows }: BlockProps<Extract<W
             </article>
           ))}
         </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── Special Hours ────────────────────────────────────────────────────────────
+
+function formatDateRange(startsOn?: string, endsOn?: string) {
+  if (!startsOn && !endsOn) return null;
+  const format = (value: string) => {
+    const [year, month, day] = value.split('-');
+    return day && month && year ? `${day}.${month}.${year}` : value;
+  };
+  if (startsOn && endsOn) return `${format(startsOn)} – ${format(endsOn)}`;
+  return startsOn ? `ab ${format(startsOn)}` : `bis ${format(endsOn!)}`;
+}
+
+export function SpecialHoursBlock({ block, tenantSpecialHours }: BlockProps<Extract<WebsitePageBlock, { type: 'specialHours' }>>) {
+  const entries = tenantSpecialHours ?? [];
+
+  return (
+    <section id="urlaubszeiten" className="py-[var(--spacing-section,4rem)]" style={{ background: 'white' }}>
+      <div className={sectionInner}>
+        <SectionHeading
+          icon={<Calendar className="h-10 w-10" />}
+          title={block.props.heading}
+          subtitle={block.props.note}
+        />
+
+        {entries.length === 0 ? (
+          <p className="mx-auto max-w-xl rounded-[var(--radius-base,1rem)] border px-5 py-4 text-center text-sm" style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)', background: 'var(--color-bg)' }}>
+            {block.props.emptyText}
+          </p>
+        ) : (
+          <div className="mx-auto grid max-w-3xl gap-5">
+            {entries.map((entry) => {
+              const dateRange = formatDateRange(entry.startsOn, entry.endsOn);
+              return (
+                <article
+                  key={entry.id}
+                  className="rounded-[var(--radius-base,1rem)] p-6 shadow-sm"
+                  style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-lg font-bold" style={{ color: 'var(--color-fg)' }}>{entry.title}</h3>
+                      {dateRange && (
+                        <span className="mt-2 inline-block rounded-full px-2.5 py-0.5 text-xs font-medium text-white" style={{ background: 'var(--color-accent)' }}>
+                          {dateRange}
+                        </span>
+                      )}
+                    </div>
+                    <Clock className="h-7 w-7" style={{ color: 'var(--color-accent)' }} />
+                  </div>
+                  <div className="mt-4 space-y-2">
+                    {entry.rows.map((row) => (
+                      <div key={`${entry.id}-${row.days}-${row.time}`} className="flex justify-between border-t py-2 text-sm" style={{ borderColor: 'var(--color-border)' }}>
+                        <span className="font-semibold" style={{ color: 'var(--color-fg)' }}>{row.days}</span>
+                        <span style={{ color: 'var(--color-muted)' }}>{row.time}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {entry.note && <p className="mt-3 text-xs" style={{ color: 'var(--color-muted)' }}>{entry.note}</p>}
+                </article>
+              );
+            })}
+          </div>
+        )}
       </div>
     </section>
   );

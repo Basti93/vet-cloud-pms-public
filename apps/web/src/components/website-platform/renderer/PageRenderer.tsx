@@ -15,7 +15,7 @@ export function PageRenderer({ resolved, assetMap }: { resolved: ResolvedWebsite
   return (
     <PraxisLayout resolved={resolved} assetMap={assetMap}>
       {resolved.blocks.map((block) => (
-        <BlockRenderer key={block.id} block={block} capabilities={resolved.project.capabilities} assetMap={assetMap} projectId={resolved.project.id} pagePath={resolved.page.path} templateVars={templateVars} tenantHoursRows={resolved.project.tenantHoursRows} tenantContactInfo={resolved.project.tenantContactInfo} />
+        <BlockRenderer key={block.id} block={block} capabilities={resolved.project.capabilities} assetMap={assetMap} projectId={resolved.project.id} pagePath={resolved.page.path} templateVars={templateVars} tenantHoursRows={resolved.project.tenantHoursRows} tenantSpecialHours={resolved.project.tenantSpecialHours} tenantContactInfo={resolved.project.tenantContactInfo} />
       ))}
     </PraxisLayout>
   );

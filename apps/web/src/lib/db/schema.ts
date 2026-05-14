@@ -111,8 +111,11 @@ export const tenants = pgTable(
     customWebsiteCode: text("custom_website_code"),
     timezone: varchar("timezone", { length: 64 }).default("Europe/Berlin").notNull(),
     // Opening hours: array of 7 entries (index 0=Sun … 6=Sat)
-    // Each: { isOpen: boolean, startHour: number, endHour: number }
+    // Each: { dayOfWeek: number, slots: [{ startHour, startMin, endHour, endMin }] }
     openingHours: jsonb("opening_hours"),
+    // Special opening hours / vacation periods shown on generated websites.
+    // Example: [{ id, title, startsOn, endsOn, rows: [{ days, time }], note }]
+    specialOpeningHours: jsonb("special_opening_hours"),
     // Allowed domains for embedding the booking widget (array of domain strings)
     allowedEmbeddingDomains: jsonb("allowed_embedding_domains"),
     createdAt: timestamp("created_at", { withTimezone: true })

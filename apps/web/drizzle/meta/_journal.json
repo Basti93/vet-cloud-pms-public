@@ -197,6 +197,13 @@
       "when": 1778775308793,
       "tag": "0027_schema-quality-fixes",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1778776593445,
+      "tag": "0028_add-special-opening-hours",
+      "breakpoints": true
     }
   ]
 }

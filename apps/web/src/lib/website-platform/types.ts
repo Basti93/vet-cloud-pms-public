@@ -41,6 +41,7 @@ export interface ResolvedWebsitePage {
     seoConfig?: WebsiteProjectSeo | null;
     ownerTenantId?: string | null;
     tenantHoursRows?: { days: string; time: string }[] | null;
+    tenantSpecialHours?: Array<{ id: string; title: string; startsOn?: string; endsOn?: string; rows: { days: string; time: string }[]; note?: string }> | null;
     tenantContactInfo?: { address?: string | null; phone?: string | null; email?: string | null; city?: string | null } | null;
     logoAsset?: WebsiteAssetRef | null;
     customCss?: string | null;
