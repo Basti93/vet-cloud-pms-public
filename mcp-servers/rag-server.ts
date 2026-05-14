@@ -8,9 +8,9 @@
  * without relying on Explore agents or manual grep commands.
  *
  * Tools:
- * - rag.search: Semantic + lexical search with vector + keyword reranking
- * - rag.open: Get full file context (up to N lines around match)
- * - rag.reindex: Refresh the index after git operations
+ * - rag_search: Semantic + lexical search with vector + keyword reranking
+ * - rag_open: Get full file context (up to N lines around match)
+ * - rag_reindex: Refresh the index after git operations
  */
 
 import fs from "node:fs/promises";
@@ -101,7 +101,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
       {
-        name: "rag.search",
+        name: "rag_search",
         description:
           "Search the local codebase using semantic (vector) and lexical (keyword) search. Returns the most relevant code chunks.",
         inputSchema: {
@@ -122,7 +122,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: "rag.open",
+        name: "rag_open",
         description:
           "Get the full file context around a search result. Useful for understanding complete functions or implementations.",
         inputSchema: {
@@ -146,7 +146,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: "rag.reindex",
+        name: "rag_reindex",
         description:
           "Manually refresh the RAG index. Useful after git operations or when the index is stale. Runs: npm run rag:refresh",
         inputSchema: {
@@ -162,7 +162,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request;
 
-  if (name === "rag.search") {
+  if (name === "rag_search") {
     const query = (args as any).query as string;
     const limit = Math.min((args as any).limit ?? 8, 50);
 
@@ -242,7 +242,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
   }
 
-  if (name === "rag.open") {
+  if (name === "rag_open") {
     const filePath = (args as any).path as string;
     const lineStart = (args as any).lineStart as number;
     const contextLines = (args as any).contextLines ?? 20;
@@ -281,7 +281,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
   }
 
-  if (name === "rag.reindex") {
+  if (name === "rag_reindex") {
     try {
       const { execSync } = await import("node:child_process");
       execSync("npm run rag:refresh", { cwd: REPO_ROOT, stdio: "inherit" });
