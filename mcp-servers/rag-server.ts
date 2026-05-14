@@ -15,14 +15,15 @@
 
 import fs from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import * as lancedb from "@lancedb/lancedb";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import {
   ListToolsRequestSchema,
   CallToolRequestSchema,
-  TextContent,
-  ToolResponseContent,
 } from "@modelcontextprotocol/sdk/types.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
@@ -91,10 +92,10 @@ function lexicalScore(query: string, candidate: Pick<RagChunk, "path" | "text">)
 }
 
 // MCP Server
-const server = new Server({
-  name: "local-rag-server",
-  version: "1.0.0",
-});
+const server = new Server(
+  { name: "local-rag-server", version: "1.0.0" },
+  { capabilities: { tools: {} } },
+);
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {

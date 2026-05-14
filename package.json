@@ -10,6 +10,7 @@
   ],
   "devDependencies": {
     "@lancedb/lancedb": "^0.27.2",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@types/aria-query": "^5.0.4",
     "@types/babel__core": "^7.20.5",
     "@types/babel__generator": "^7.27.0",
