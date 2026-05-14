@@ -146,7 +146,26 @@ export const websitePlatformRouter = createTRPCRouter({
       return project;
     }),
 
-  getProject: protectedProcedure.input(z.object({ projectId: z.string().uuid() })).query(async ({ ctx, input }) => requireProjectAccess(ctx, input.projectId)),
+  getProject: protectedProcedure.input(z.object({ projectId: z.string().uuid() })).query(async ({ ctx, input }) => {
+    const project = await requireProjectAccess(ctx, input.projectId);
+    const tenantId = project.ownerTenantId;
+    if (!tenantId) return project;
+    const [tenant] = await ctx.db
+      .select({ themePreference: tenants.themePreference, typographyPreference: tenants.typographyPreference })
+      .from(tenants)
+      .where(eq(tenants.id, tenantId))
+      .limit(1);
+    if (!tenant) return project;
+    const base = themeConfigSchema.parse(project.themeConfig ?? {});
+    return {
+      ...project,
+      themeConfig: {
+        ...base,
+        palette: tenant.themePreference ?? base.palette,
+        typography: tenant.typographyPreference ?? base.typography,
+      },
+    };
+  }),
 
   updateProjectSettings: protectedProcedure.input(z.object({
     projectId: z.string().uuid(),

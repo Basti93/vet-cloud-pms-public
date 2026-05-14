@@ -940,6 +940,14 @@ export function WebsiteEditorShell({ projectId, tenantHoursRows, tenantConsultat
               <Card className="p-4">
                 <LogoEditor projectId={projectId} initialLogo={project?.logoAsset as WebsiteAssetRef | null | undefined} />
               </Card>
+              <Card className="p-4 space-y-2">
+                <p className="text-sm font-medium">Farbe & Typografie</p>
+                <p className="text-xs text-muted">
+                  Farbe und Schriftstil werden automatisch aus den{' '}
+                  <a href="/dashboard/settings/appearance" className="underline hover:text-fg">Praxiseinstellungen → Erscheinungsbild</a>
+                  {' '}übernommen — genau wie im Buchungswidget.
+                </p>
+              </Card>
               <Card className="p-4">
                 <CustomCssEditor projectId={projectId} initialCss={project?.customCss} />
               </Card>
