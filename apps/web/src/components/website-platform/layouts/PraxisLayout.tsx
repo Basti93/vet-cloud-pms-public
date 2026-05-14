@@ -1,15 +1,18 @@
 'use client';
 
+/* eslint-disable @next/next/no-img-element */
+
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import type { ResolvedWebsitePage } from '@/lib/website-platform/types';
 import { getBookingUrl } from '@/lib/website-platform/capabilities';
-import { generateThemeStyles } from '@/lib/theme-utils';
+import { generateThemeStyles, getPrimaryHex } from '@/lib/theme-utils';
+import { resolveAssetUrl } from '@/lib/website-platform/assets';
 
 const FONTS_HREF =
   'https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Public+Sans:wght@400;500;600;700&display=swap';
 
-export function PraxisLayout({ resolved, children }: { resolved: ResolvedWebsitePage; children: ReactNode }) {
+export function PraxisLayout({ resolved, assetMap, children }: { resolved: ResolvedWebsitePage; assetMap?: Record<string, string>; children?: ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const bookingUrl = getBookingUrl(resolved.project.capabilities);
   const basePath = `/site/${resolved.project.slug}`;
@@ -19,6 +22,11 @@ export function PraxisLayout({ resolved, children }: { resolved: ResolvedWebsite
     resolved.project.themeConfig.typography,
     { radius: resolved.project.themeConfig.radius, density: resolved.project.themeConfig.density },
   );
+  const logoUrl = resolveAssetUrl(resolved.project.logoAsset ?? null, assetMap);
+  const monogramLetter = resolved.project.name.charAt(0).toUpperCase();
+  const accentHex = getPrimaryHex(resolved.project.themeConfig.palette);
+  const faviconSvg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='${accentHex}'/><text x='50' y='54' font-size='58' font-family='Georgia,serif' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='central'>${monogramLetter}</text></svg>`;
+  const faviconHref = logoUrl ?? `data:image/svg+xml,${encodeURIComponent(faviconSvg)}`;
 
   const navItems = [
     { label: 'Start', href: `${basePath}#start` },
@@ -32,6 +40,7 @@ export function PraxisLayout({ resolved, children }: { resolved: ResolvedWebsite
     <div style={{ ...themeStyles, fontFamily: 'var(--font-body)', color: 'var(--color-fg)', background: 'var(--color-bg)' }} className="min-h-screen">
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="stylesheet" href={FONTS_HREF} />
+      <link rel="icon" href={faviconHref} />
 
       {/* Custom CSS override */}
       {resolved.project.customCss && (
@@ -44,13 +53,21 @@ export function PraxisLayout({ resolved, children }: { resolved: ResolvedWebsite
         style={{ background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(10px)', borderColor: 'var(--color-border)' }}
       >
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-          {/* Logo / name */}
-          <a
-            href={`${basePath}#start`}
-            className="text-lg font-bold"
-            style={{ fontFamily: 'var(--font-heading)', color: 'var(--color-fg)' }}
-          >
-            {resolved.project.name}
+          {/* Logo / monogram */}
+          <a href={`${basePath}#start`} className="flex items-center gap-2.5">
+            {logoUrl ? (
+              <img src={logoUrl} alt={resolved.project.name} className="h-9 w-auto object-contain" />
+            ) : (
+              <span
+                className="flex h-9 w-9 items-center justify-center rounded-xl text-sm font-bold text-white"
+                style={{ background: 'var(--color-accent)', fontFamily: 'Georgia,serif' }}
+              >
+                {monogramLetter}
+              </span>
+            )}
+            <span className="text-lg font-bold" style={{ fontFamily: 'var(--font-heading)', color: 'var(--color-fg)' }}>
+              {resolved.project.name}
+            </span>
           </a>
 
           {/* Desktop nav */}

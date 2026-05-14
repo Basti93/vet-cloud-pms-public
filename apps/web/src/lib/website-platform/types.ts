@@ -42,6 +42,7 @@ export interface ResolvedWebsitePage {
     ownerTenantId?: string | null;
     tenantHoursRows?: { days: string; time: string }[] | null;
     tenantContactInfo?: { address?: string | null; phone?: string | null; email?: string | null; city?: string | null } | null;
+    logoAsset?: WebsiteAssetRef | null;
     customCss?: string | null;
   };
   page: {

@@ -58,6 +58,11 @@ export function getPrimaryColor(themePreference: string | null | undefined): str
   return COLOR_PRESETS[colorKey]?.accent || COLOR_PRESETS.sage.accent;
 }
 
+export function getPrimaryHex(themePreference: string | null | undefined): string {
+  const colorKey = (themePreference as ColorPresetKey) || "sage";
+  return COLOR_PRESETS[colorKey]?.accentHex || COLOR_PRESETS.sage.accentHex;
+}
+
 /**
  * Get typography config for component-level styling.
  */

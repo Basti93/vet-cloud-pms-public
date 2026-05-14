@@ -209,6 +209,72 @@ function TeamListInspector({ projectId, block, replaceProps }: { projectId: stri
   );
 }
 
+const SERVICE_ICON_KEYS = [
+  { key: 'heart', label: 'Herz / Allgemein' },
+  { key: 'syringe', label: 'Spritze / Injektion' },
+  { key: 'vaccination', label: 'Impfung' },
+  { key: 'microscope', label: 'Labor / Diagnostik' },
+  { key: 'scissors', label: 'Chirurgie' },
+  { key: 'tooth', label: 'Zahnheilkunde' },
+  { key: 'emergency', label: 'Notfall' },
+  { key: 'xray', label: 'Röntgen' },
+  { key: 'paw', label: 'Pfote / Wellness' },
+  { key: 'bone', label: 'Orthopädie' },
+  { key: 'eye', label: 'Augenheilkunde' },
+  { key: 'surgery', label: 'OP' },
+  { key: 'wellness', label: 'Vorsorge' },
+];
+
+type ServiceItem = { id: string; title: string; description: string; iconKey?: string };
+type ServicesGridBlock = Extract<Block, { type: 'servicesGrid' }>;
+
+function ServicesGridInspector({ block, replaceProps }: { block: ServicesGridBlock; replaceProps: (props: ServicesGridBlock['props']) => void }) {
+  const services: ServiceItem[] = block.props.services ?? [];
+
+  function updateService(index: number, patch: Partial<ServiceItem>) {
+    replaceProps({ ...block.props, services: services.map((s, i) => i === index ? { ...s, ...patch } : s) });
+  }
+  function removeService(index: number) {
+    replaceProps({ ...block.props, services: services.filter((_, i) => i !== index) });
+  }
+  function addService() {
+    replaceProps({ ...block.props, services: [...services, { id: crypto.randomUUID(), title: '', description: '', iconKey: 'heart' }] });
+  }
+
+  return (
+    <div className="space-y-3">
+      <TextField label="Überschrift" value={block.props.heading} onChange={(heading) => replaceProps({ ...block.props, heading })} />
+      <TextField label="Intro" value={block.props.intro} multiline onChange={(intro) => replaceProps({ ...block.props, intro })} />
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-medium">Leistungen ({services.length})</p>
+        <Button size="sm" variant="outline" onClick={addService}>+ Hinzufügen</Button>
+      </div>
+      {services.map((service, index) => (
+        <div key={service.id} className="space-y-2 rounded-xl border border-[var(--color-border)] p-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-muted">Leistung {index + 1}</p>
+            <button onClick={() => removeService(index)} className="text-xs text-muted hover:text-red-600">Entfernen</button>
+          </div>
+          <TextField label="Titel" value={service.title} onChange={(title) => updateService(index, { title })} />
+          <TextField label="Beschreibung" value={service.description} multiline onChange={(description) => updateService(index, { description })} />
+          <label className="block space-y-1.5 text-sm">
+            <span className="font-medium text-fg">Icon</span>
+            <select
+              value={service.iconKey ?? 'heart'}
+              onChange={(e) => updateService(index, { iconKey: e.target.value })}
+              className="w-full rounded-lg border border-[var(--color-border)] bg-white px-3 py-2 text-sm"
+            >
+              {SERVICE_ICON_KEYS.map(({ key, label }) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function BlockInspector({ projectId, block, onChange }: { projectId: string; block?: Block; onChange: (block: Block) => void }) {
   if (!block) return <p className="text-sm text-muted">Wählen Sie einen Block aus, um Inhalte zu bearbeiten.</p>;
 
@@ -227,13 +293,7 @@ function BlockInspector({ projectId, block, onChange }: { projectId: string; blo
         </div>
       );
     case 'servicesGrid':
-      return (
-        <div className="space-y-3">
-          <TextField label="Überschrift" value={block.props.heading} onChange={(heading) => replaceProps({ ...block.props, heading })} />
-          <TextField label="Intro" value={block.props.intro} multiline onChange={(intro) => replaceProps({ ...block.props, intro })} />
-          <JsonField label="Leistungen" value={block.props.services} onChange={(services) => replaceProps({ ...block.props, services })} />
-        </div>
-      );
+      return <ServicesGridInspector block={block} replaceProps={replaceProps} />;
     case 'teamList':
       return <TeamListInspector projectId={projectId} block={block} replaceProps={replaceProps} />;
     case 'hoursTable':
@@ -333,6 +393,50 @@ function BlockInspector({ projectId, block, onChange }: { projectId: string; blo
     default:
       return null;
   }
+}
+
+function LogoEditor({ projectId, initialLogo }: { projectId: string; initialLogo?: WebsiteAssetRef | null }) {
+  const utils = trpc.useUtils();
+  const { data: assets } = trpc.websitePlatform.listAssets.useQuery({ projectId });
+  const save = trpc.websitePlatform.updateProjectSettings.useMutation({
+    onSuccess: () => void utils.websitePlatform.getProject.invalidate({ projectId }),
+  });
+  const current = initialLogo?.assetId
+    ? assets?.find((a) => a.id === initialLogo.assetId)
+    : null;
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm font-medium">Logo / Favicon</p>
+      <p className="text-xs" style={{ color: 'var(--color-muted)' }}>
+        Wird im Navigationsmenü der Website und als Favicon verwendet. Ohne Logo: Monogramm aus erstem Buchstaben.
+      </p>
+      {current ? (
+        <div className="flex items-center gap-3">
+          <img src={current.url} alt="Logo" className="h-12 w-12 rounded-lg object-contain border border-[var(--color-border)]" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs truncate text-muted">{current.storageKey.split('/').pop()}</p>
+          </div>
+          <Button size="sm" variant="ghost" onClick={() => save.mutate({ projectId, logoAsset: null })}>Entfernen</Button>
+        </div>
+      ) : (
+        <p className="rounded-xl border border-dashed border-[var(--color-border)] p-3 text-center text-xs text-muted">
+          Kein Logo gesetzt — Monogramm wird verwendet
+        </p>
+      )}
+      <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
+        {assets?.filter((a) => /\.(png|jpg|jpeg|svg|webp)$/i.test(a.storageKey)).map((asset) => (
+          <button
+            key={asset.id}
+            onClick={() => save.mutate({ projectId, logoAsset: { assetId: asset.id } })}
+            className={`relative rounded-lg border p-1 transition-colors hover:border-[var(--color-accent)] ${initialLogo?.assetId === asset.id ? 'border-[var(--color-accent)] ring-2 ring-[var(--color-accent-soft)]' : 'border-[var(--color-border)]'}`}
+          >
+            <img src={asset.url} alt={asset.alt ?? ''} className="h-12 w-full object-contain" />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function CustomCssEditor({ projectId, initialCss }: { projectId: string; initialCss?: string | null }) {
@@ -584,6 +688,9 @@ export function WebsiteEditorShell({ projectId, tenantHoursRows, tenantContactIn
           <Card className="p-4">
             <h2 className="font-semibold">Inhalt bearbeiten</h2>
             <div className="mt-4"><BlockInspector projectId={projectId} block={selectedBlock} onChange={updateBlock} /></div>
+          </Card>
+          <Card className="p-4">
+            <LogoEditor projectId={projectId} initialLogo={project?.logoAsset as WebsiteAssetRef | null | undefined} />
           </Card>
           <Card className="p-4">
             <CustomCssEditor projectId={projectId} initialCss={project?.customCss} />

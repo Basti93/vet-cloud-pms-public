@@ -310,6 +310,7 @@ export const websiteProjects = pgTable(
     themeConfig: jsonb("theme_config"),
     capabilities: jsonb("capabilities").default(sql`'{}'::jsonb`).notNull(),
     seoConfig: jsonb("seo_config"),
+    logoAsset: jsonb("logo_asset"),
     customCss: text("custom_css"),
     publishedAt: timestamp("published_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })

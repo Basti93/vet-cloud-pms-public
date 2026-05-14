@@ -6,7 +6,7 @@ import { and, desc, eq } from 'drizzle-orm';
 import { createTRPCRouter, protectedProcedure, type TRPCContext } from '@/server/trpc';
 import { roles, tenants, userRoles, users, websiteAssets, websiteDomains, websiteLeads, websitePageRevisions, websitePages, websiteProjects } from '@/lib/db/schema';
 import { writeAuditLog } from '@/server/audit';
-import { capabilityConfigSchema, normalizeBlocks, pageBlocksSchema, themeConfigSchema, websiteProjectSeoSchema } from '@/lib/website-platform/schemas';
+import { assetRefSchema, capabilityConfigSchema, normalizeBlocks, pageBlocksSchema, themeConfigSchema, websiteProjectSeoSchema } from '@/lib/website-platform/schemas';
 import { normalizeWebsiteHost, normalizeWebsitePath } from '@/lib/website-platform/resolve-project';
 import { createDefaultLegalBlocks, createDefaultWebsiteBlocks } from '@/lib/website-platform/default-blocks';
 import type { DaySchedule } from '@/lib/schedule-types';
@@ -155,6 +155,7 @@ export const websitePlatformRouter = createTRPCRouter({
     capabilities: capabilityConfigSchema.optional(),
     seoConfig: websiteProjectSeoSchema.partial().optional(),
     status: z.enum(['draft', 'published', 'archived']).optional(),
+    logoAsset: assetRefSchema.nullable().optional(),
     customCss: z.string().max(50000).nullable().optional(),
   })).mutation(async ({ ctx, input }) => {
     await requireProjectAccess(ctx, input.projectId);
