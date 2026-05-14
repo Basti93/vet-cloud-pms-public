@@ -674,10 +674,9 @@ function CustomCssEditor({ projectId, initialCss }: { projectId: string; initial
   );
 }
 
-function ThemeInheritanceToggle({ projectId, initialInherit, initialThemeConfig }: {
+function ThemeInheritanceToggle({ projectId, initialInherit }: {
   projectId: string;
   initialInherit: boolean;
-  initialThemeConfig: { palette?: string; typography?: string; radius?: string; density?: string };
 }) {
   const utils = trpc.useUtils();
   const [inherit, setInherit] = useState(initialInherit);
@@ -687,15 +686,11 @@ function ThemeInheritanceToggle({ projectId, initialInherit, initialThemeConfig 
 
   const handleChange = (checked: boolean) => {
     setInherit(checked);
+    // Always store default base values — when checked, tenant palette/typography
+    // are overlaid at read time; when unchecked, these defaults are used as-is.
     save.mutate({
       projectId,
-      themeConfig: {
-        palette: (initialThemeConfig.palette as 'sage' | 'warmsand' | 'klinikblau' | 'bordeaux' | 'forest' | 'schiefer') ?? 'sage',
-        typography: (initialThemeConfig.typography as 'modern' | 'klassisch' | 'klinisch' | 'freundlich') ?? 'modern',
-        radius: (initialThemeConfig.radius as 'sm' | 'md' | 'lg' | 'xl') ?? 'lg',
-        density: (initialThemeConfig.density as 'compact' | 'comfortable' | 'spacious') ?? 'comfortable',
-        inheritTenantTheme: checked,
-      },
+      themeConfig: { palette: 'sage', typography: 'modern', radius: 'lg', density: 'comfortable', inheritTenantTheme: checked },
     });
   };
 
@@ -999,7 +994,6 @@ export function WebsiteEditorShell({ projectId, tenantHoursRows, tenantConsultat
                 <ThemeInheritanceToggle
                   projectId={projectId}
                   initialInherit={(project?.themeConfig as { inheritTenantTheme?: boolean } | null)?.inheritTenantTheme ?? true}
-                  initialThemeConfig={project?.themeConfig as { palette?: string; typography?: string; radius?: string; density?: string } ?? {}}
                 />
               </Card>
               <Card className="p-4">
