@@ -102,12 +102,6 @@ export const tenants = pgTable(
     })
       .default("modern")
       .notNull(),
-    websiteTemplate: varchar("website_template", {
-      length: 50,
-      enum: ["klassik", "modern", "kompakt"],
-    })
-      .default("modern")
-      .notNull(),
     customWebsiteCode: text("custom_website_code"),
     timezone: varchar("timezone", { length: 64 }).default("Europe/Berlin").notNull(),
     // Opening hours: array of 7 entries (index 0=Sun … 6=Sat)

@@ -674,6 +674,61 @@ function CustomCssEditor({ projectId, initialCss }: { projectId: string; initial
   );
 }
 
+function ThemeInheritanceToggle({ projectId, initialInherit, initialThemeConfig }: {
+  projectId: string;
+  initialInherit: boolean;
+  initialThemeConfig: { palette?: string; typography?: string; radius?: string; density?: string };
+}) {
+  const utils = trpc.useUtils();
+  const [inherit, setInherit] = useState(initialInherit);
+  const save = trpc.websitePlatform.updateProjectSettings.useMutation({
+    onSuccess: () => void utils.websitePlatform.getProject.invalidate({ projectId }),
+  });
+
+  const handleChange = (checked: boolean) => {
+    setInherit(checked);
+    save.mutate({
+      projectId,
+      themeConfig: {
+        palette: (initialThemeConfig.palette as 'sage' | 'warmsand' | 'klinikblau' | 'bordeaux' | 'forest' | 'schiefer') ?? 'sage',
+        typography: (initialThemeConfig.typography as 'modern' | 'klassisch' | 'klinisch' | 'freundlich') ?? 'modern',
+        radius: (initialThemeConfig.radius as 'sm' | 'md' | 'lg' | 'xl') ?? 'lg',
+        density: (initialThemeConfig.density as 'compact' | 'comfortable' | 'spacious') ?? 'comfortable',
+        inheritTenantTheme: checked,
+      },
+    });
+  };
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm font-medium">Farbe & Typografie</p>
+      <label className="flex items-start gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={inherit}
+          onChange={(e) => handleChange(e.target.checked)}
+          className="mt-0.5 cursor-pointer"
+          disabled={save.isPending}
+        />
+        <span className="text-xs" style={{ color: 'var(--color-fg)' }}>
+          Farbe & Schrift aus Praxiseinstellungen übernehmen
+        </span>
+      </label>
+      {inherit ? (
+        <p className="text-xs" style={{ color: 'var(--color-muted)' }}>
+          Wird automatisch aus{' '}
+          <a href="/dashboard/settings/appearance" className="underline hover:text-fg">Praxiseinstellungen → Erscheinungsbild</a>
+          {' '}übernommen — wie im Buchungswidget.
+        </p>
+      ) : (
+        <p className="text-xs" style={{ color: 'var(--color-muted)' }}>
+          Standard-Design (Sage / Modern) wird verwendet.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function WebsiteEditorShell({ projectId, tenantHoursRows, tenantConsultationHoursRows, tenantOpeningHoursRows, tenantSpecialHours, tenantContactInfo }: {
   projectId: string;
   tenantHoursRows?: { days: string; time: string }[] | null;
@@ -782,7 +837,7 @@ export function WebsiteEditorShell({ projectId, tenantHoursRows, tenantConsultat
       status: project.status,
       primaryDomain: project.primaryDomain,
       layoutKey: project.layoutKey,
-      themeConfig: { palette: 'sage', typography: 'modern', radius: 'lg', density: 'comfortable', ...(project.themeConfig as object | null ?? {}) },
+      themeConfig: { palette: 'sage', typography: 'modern', radius: 'lg', density: 'comfortable', inheritTenantTheme: true, ...(project.themeConfig as object | null ?? {}) },
       capabilities: project.capabilities as ResolvedWebsitePage['project']['capabilities'],
       seoConfig: null,
       ownerTenantId: project.ownerTenantId,
@@ -940,13 +995,12 @@ export function WebsiteEditorShell({ projectId, tenantHoursRows, tenantConsultat
               <Card className="p-4">
                 <LogoEditor projectId={projectId} initialLogo={project?.logoAsset as WebsiteAssetRef | null | undefined} />
               </Card>
-              <Card className="p-4 space-y-2">
-                <p className="text-sm font-medium">Farbe & Typografie</p>
-                <p className="text-xs text-muted">
-                  Farbe und Schriftstil werden automatisch aus den{' '}
-                  <a href="/dashboard/settings/appearance" className="underline hover:text-fg">Praxiseinstellungen → Erscheinungsbild</a>
-                  {' '}übernommen — genau wie im Buchungswidget.
-                </p>
+              <Card className="p-4">
+                <ThemeInheritanceToggle
+                  projectId={projectId}
+                  initialInherit={(project?.themeConfig as { inheritTenantTheme?: boolean } | null)?.inheritTenantTheme ?? true}
+                  initialThemeConfig={project?.themeConfig as { palette?: string; typography?: string; radius?: string; density?: string } ?? {}}
+                />
               </Card>
               <Card className="p-4">
                 <CustomCssEditor projectId={projectId} initialCss={project?.customCss} />

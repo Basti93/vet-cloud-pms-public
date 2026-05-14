@@ -157,14 +157,12 @@ export const websitePlatformRouter = createTRPCRouter({
       .limit(1);
     if (!tenant) return project;
     const base = themeConfigSchema.parse(project.themeConfig ?? {});
-    return {
-      ...project,
-      themeConfig: {
-        ...base,
-        palette: tenant.themePreference ?? base.palette,
-        typography: tenant.typographyPreference ?? base.typography,
-      },
-    };
+    const merged = base.inheritTenantTheme !== false ? {
+      ...base,
+      ...(tenant.themePreference ? { palette: tenant.themePreference } : {}),
+      ...(tenant.typographyPreference ? { typography: tenant.typographyPreference } : {}),
+    } : base;
+    return { ...project, themeConfig: merged };
   }),
 
   updateProjectSettings: protectedProcedure.input(z.object({

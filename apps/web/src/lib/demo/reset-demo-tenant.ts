@@ -266,7 +266,6 @@ export async function resetDemoTenantData({
         monogram: demoTenant.monogram,
         themePreference: demoTenant.themePreference,
         typographyPreference: demoTenant.typographyPreference,
-        websiteTemplate: demoTenant.websiteTemplate,
         consultationHours: demoTenant.consultationHours,
         openingHours: demoTenant.openingHours,
         subscriptionStatus: demoTenant.subscriptionStatus,

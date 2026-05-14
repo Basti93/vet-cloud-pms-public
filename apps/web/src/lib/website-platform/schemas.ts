@@ -11,6 +11,7 @@ export const themeConfigSchema = z.object({
   typography: z.enum(["modern", "klassisch", "klinisch", "freundlich"]).default("modern"),
   radius: z.enum(["sm", "md", "lg", "xl"]).default("lg"),
   density: z.enum(["compact", "comfortable", "spacious"]).default("comfortable"),
+  inheritTenantTheme: z.boolean().default(true),
 });
 
 export const bookingCapabilitySchema = z.object({
@@ -147,7 +148,7 @@ export const pageBlockSchema = z.discriminatedUnion("type", [
 export const pageBlocksSchema = z.array(pageBlockSchema).max(80);
 
 export function normalizeThemeConfig(value: unknown) {
-  return themeConfigSchema.catch({ palette: "sage", typography: "modern", radius: "lg", density: "comfortable" }).parse(value ?? {});
+  return themeConfigSchema.catch({ palette: "sage", typography: "modern", radius: "lg", density: "comfortable", inheritTenantTheme: true }).parse(value ?? {});
 }
 
 export function normalizeCapabilities(value: unknown) {

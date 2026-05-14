@@ -409,7 +409,6 @@ export const bookingRouter = createTRPCRouter({
           tagline: tenants.tagline,
           themePreference: tenants.themePreference,
           typographyPreference: tenants.typographyPreference,
-          websiteTemplate: tenants.websiteTemplate,
           monogram: tenants.monogram,
           allowedEmbeddingDomains: tenants.allowedEmbeddingDomains,
         })

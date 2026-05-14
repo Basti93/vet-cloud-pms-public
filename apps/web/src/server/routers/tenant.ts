@@ -227,7 +227,6 @@ export const tenantRouter = createTRPCRouter({
           maxUsers: 5,
           themePreference: "sage",
           typographyPreference: "modern",
-          websiteTemplate: "modern",
           updatedAt: new Date(),
         })
         .where(eq(tenants.id, currentUser.tenantId))
@@ -440,7 +439,6 @@ export const tenantRouter = createTRPCRouter({
           monogram: tenants.monogram,
           themePreference: tenants.themePreference,
           typographyPreference: tenants.typographyPreference,
-          websiteTemplate: tenants.websiteTemplate,
         })
         .from(tenants)
         .where(eq(tenants.slug, input.slug))
@@ -462,7 +460,6 @@ export const tenantRouter = createTRPCRouter({
         monogram: z.string().optional(),
         themePreference: z.string().optional(),
         typographyPreference: z.string().optional(),
-        websiteTemplate: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -476,8 +473,6 @@ export const tenantRouter = createTRPCRouter({
         updateData.themePreference = updates.themePreference;
       if (updates.typographyPreference !== undefined)
         updateData.typographyPreference = updates.typographyPreference;
-      if (updates.websiteTemplate !== undefined)
-        updateData.websiteTemplate = updates.websiteTemplate;
 
       await ctx.db.update(tenants).set(updateData).where(eq(tenants.id, tenantId));
 
@@ -518,7 +513,6 @@ export const tenantRouter = createTRPCRouter({
         monogram: tenants.monogram,
         themePreference: tenants.themePreference,
         typographyPreference: tenants.typographyPreference,
-        websiteTemplate: tenants.websiteTemplate,
         allowedEmbeddingDomains: tenants.allowedEmbeddingDomains,
       })
       .from(tenants)
@@ -591,7 +585,6 @@ export const tenantRouter = createTRPCRouter({
         allowedEmbeddingDomains: z.array(z.string()).optional(),
         themePreference: z.enum(["sage", "warmsand", "klinikblau", "bordeaux", "forest", "schiefer"]).optional(),
         typographyPreference: z.enum(["modern", "klassisch", "klinisch", "freundlich"]).optional(),
-        websiteTemplate: z.enum(["klassik", "modern", "kompakt"]).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -625,7 +618,6 @@ export const tenantRouter = createTRPCRouter({
       }
       if (input.themePreference !== undefined) updateData.themePreference = input.themePreference;
       if (input.typographyPreference !== undefined) updateData.typographyPreference = input.typographyPreference;
-      if (input.websiteTemplate !== undefined) updateData.websiteTemplate = input.websiteTemplate;
 
       await ctx.db.update(tenants).set(updateData).where(eq(tenants.id, user.tenantId));
 

@@ -5,13 +5,12 @@ import { trpc } from "@/lib/trpc/client";
 import { useTheme } from "@/lib/theme-context";
 import { BrandSettingsForm } from "@/components/brand/BrandSettingsForm";
 import { BrandPreview } from "@/components/brand/BrandPreview";
-import { ColorPresetKey, TypographyPairingKey, WebsiteTemplateKey } from "@/lib/theme";
+import { ColorPresetKey, TypographyPairingKey } from "@/lib/theme";
 
 export default function AppearancePage() {
   const { colorPreset, setColorPreset, typographyPairing, setTypographyPairing } = useTheme();
   const [localColorPreset, setLocalColorPreset] = useState<ColorPresetKey>(colorPreset);
   const [localTypographyPairing, setLocalTypographyPairing] = useState<TypographyPairingKey>(typographyPairing);
-  const [template, setTemplate] = useState<WebsiteTemplateKey>("modern");
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   const { data: tenant } = trpc.tenant.getCurrent.useQuery();
@@ -48,7 +47,6 @@ export default function AppearancePage() {
     updateTheme.mutate({
       themePreference: localColorPreset,
       typographyPreference: localTypographyPairing,
-      websiteTemplate: template,
     });
   };
 
@@ -59,8 +57,6 @@ export default function AppearancePage() {
         onColorPresetChange={handleColorPresetChange}
         typographyPairing={localTypographyPairing}
         onTypographyPairingChange={handleTypographyChange}
-        template={template}
-        onTemplateChange={setTemplate}
         showBrandingFields={false}
         onSave={handleSave}
         isSaving={updateTheme.isPending}
@@ -70,7 +66,6 @@ export default function AppearancePage() {
       <BrandPreview
         colorPreset={localColorPreset}
         typographyPairing={localTypographyPairing}
-        template={template}
         brandName={tenant?.name || "Tierarztpraxis"}
         tagline={tenant?.tagline || ""}
         monogram={tenant?.monogram || ""}

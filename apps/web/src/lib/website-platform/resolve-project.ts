@@ -152,11 +152,17 @@ export async function resolvePublishedWebsitePage(input: { projectId: string; pa
       status: row.projectStatus,
       primaryDomain: row.primaryDomain,
       layoutKey: row.layoutKey,
-      themeConfig: {
-        ...normalizeThemeConfig(row.themeConfig),
-        ...(row.tenantThemePreference ? { palette: row.tenantThemePreference as import('./types').WebsiteThemeConfig['palette'] } : {}),
-        ...(row.tenantTypographyPreference ? { typography: row.tenantTypographyPreference as import('./types').WebsiteThemeConfig['typography'] } : {}),
-      },
+      themeConfig: (() => {
+        const base = normalizeThemeConfig(row.themeConfig);
+        if (base.inheritTenantTheme !== false) {
+          return {
+            ...base,
+            ...(row.tenantThemePreference ? { palette: row.tenantThemePreference as import('./types').WebsiteThemeConfig['palette'] } : {}),
+            ...(row.tenantTypographyPreference ? { typography: row.tenantTypographyPreference as import('./types').WebsiteThemeConfig['typography'] } : {}),
+          };
+        }
+        return base;
+      })(),
       capabilities: normalizeCapabilities(row.capabilities),
       seoConfig: websiteProjectSeoSchema.partial().catch({}).parse(row.projectSeo ?? {}),
       ownerTenantId: row.ownerTenantId,
