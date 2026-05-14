@@ -17,6 +17,11 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm --filter @vet-cloud/web build
 
+# Dereference pnpm symlinks so runner-stage COPY works without the .pnpm store.
+# drizzle-orm is a root dep (hoisted); postgres lives in apps/web/node_modules.
+RUN cp -rL node_modules/drizzle-orm /tmp/drizzle-orm && \
+    cp -rL apps/web/node_modules/postgres /tmp/postgres
+
 # ── Stage 2: Production image ─────────────────────────────────────────────────
 FROM node:24-alpine AS runner
 WORKDIR /app
@@ -41,8 +46,8 @@ RUN mkdir -p ./apps/web/public/tenant-assets && \
 
 # Migration runner + its dependencies.
 # pnpm hoists drizzle-orm/postgres to workspace root node_modules.
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/drizzle-orm  ./node_modules/drizzle-orm
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/postgres      ./node_modules/postgres
+COPY --from=builder --chown=nextjs:nodejs /tmp/drizzle-orm  ./node_modules/drizzle-orm
+COPY --from=builder --chown=nextjs:nodejs /tmp/postgres     ./node_modules/postgres
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/drizzle           ./drizzle
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/migrate.mjs       ./migrate.mjs
 COPY --from=builder                       /app/apps/web/entrypoint.sh     ./entrypoint.sh
