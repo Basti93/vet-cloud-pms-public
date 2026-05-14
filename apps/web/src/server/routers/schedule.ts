@@ -19,6 +19,28 @@ const dayScheduleSchema = z.object({
   slots: z.array(timeRangeSchema),
 });
 
+const specialOpeningHoursSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1).max(120),
+  startsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  endsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  rows: z.array(z.object({
+    days: z.string().min(1).max(80),
+    time: z.string().min(1).max(80),
+  })).min(1).max(14),
+  note: z.string().max(500).optional(),
+});
+
+type SpecialOpeningHours = z.infer<typeof specialOpeningHoursSchema>;
+
+function normalizeSpecialOpeningHours(value: unknown): SpecialOpeningHours[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry): SpecialOpeningHours[] => {
+    const parsed = specialOpeningHoursSchema.safeParse(entry);
+    return parsed.success ? [parsed.data] : [];
+  });
+}
+
 export const scheduleRouter = createTRPCRouter({
   // ── Practice Opening Hours ──────────────────────────────────────────────────
 
@@ -58,6 +80,50 @@ export const scheduleRouter = createTRPCRouter({
         event: "schedule.practice_hours_updated",
         summary: "Practice opening hours updated",
         changes: { daysConfigured: normalizedHours.length },
+      });
+      return { success: true };
+    }),
+
+  // ── Practice Special Opening Hours ─────────────────────────────────────────
+
+  getSpecialOpeningHours: protectedProcedure
+    .input(z.object({ tenantId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const [tenant] = await ctx.db
+        .select({ specialOpeningHours: tenants.specialOpeningHours })
+        .from(tenants)
+        .where(eq(tenants.id, input.tenantId))
+        .limit(1);
+
+      if (!tenant) throw new TRPCError({ code: "NOT_FOUND" });
+
+      return normalizeSpecialOpeningHours(tenant.specialOpeningHours);
+    }),
+
+  updateSpecialOpeningHours: protectedProcedure
+    .input(z.object({
+      tenantId: z.string().uuid(),
+      entries: z.array(specialOpeningHoursSchema).max(20),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      for (const entry of input.entries) {
+        if (entry.startsOn && entry.endsOn && entry.endsOn < entry.startsOn) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Enddatum darf nicht vor Startdatum liegen" });
+        }
+      }
+
+      await ctx.db
+        .update(tenants)
+        .set({ specialOpeningHours: input.entries, updatedAt: new Date() })
+        .where(eq(tenants.id, input.tenantId));
+
+      await writeAuditLog(ctx, {
+        tenantId: input.tenantId,
+        action: "config_change",
+        entity: { type: "tenant_special_hours", id: input.tenantId },
+        event: "schedule.special_hours_updated",
+        summary: "Practice special opening hours updated",
+        changes: { entriesConfigured: input.entries.length },
       });
       return { success: true };
     }),

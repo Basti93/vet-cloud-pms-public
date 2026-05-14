@@ -15,6 +15,15 @@ const ABSENCE_TYPES = [
   { value: 'other', label: 'Sonstiges' },
 ] as const;
 
+type SpecialOpeningHours = {
+  id: string;
+  title: string;
+  startsOn?: string;
+  endsOn?: string;
+  rows: { days: string; time: string }[];
+  note?: string;
+};
+
 // Time options at 30-min increments
 const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
   const h = Math.floor(i / 2);
@@ -51,6 +60,12 @@ function defaultDay(dayOfWeek: number): DaySchedule {
     return { dayOfWeek, slots: [{ startHour: 8, startMin: 0, endHour: 18, endMin: 0 }] };
   }
   return emptyDay(dayOfWeek);
+}
+
+function formatDateRange(start?: string, end?: string) {
+  if (!start && !end) return 'Ohne Zeitraum';
+  if (start && end) return start === end ? start : `${start} – ${end}`;
+  return start ? `ab ${start}` : `bis ${end}`;
 }
 
 // ── Day schedule editor (reusable for both practice hours and vet schedules) ──
@@ -171,6 +186,40 @@ export default function AvailabilityPage() {
   const [practiceEdits, setPracticeEdits] = useState<DaySchedule[] | null>(null);
   const serverPracticeHours = normalizeWeekSchedule(practiceHoursQuery.data, { fallback: DEFAULT_OPENING_HOURS });
   const practiceHours = normalizeWeekSchedule(practiceEdits ?? serverPracticeHours, { fallback: DEFAULT_OPENING_HOURS });
+
+  // ── Practice special hours / vacation periods ──────────────────────────────
+  const specialHoursQuery = trpc.schedule.getSpecialOpeningHours.useQuery(
+    { tenantId },
+    { enabled: !!tenantId }
+  );
+  const updateSpecialHours = trpc.schedule.updateSpecialOpeningHours.useMutation({
+    onSuccess: () => {
+      utils.schedule.getSpecialOpeningHours.invalidate({ tenantId });
+      setNewSpecialHours(null);
+      setSpecialSaved(true);
+      setTimeout(() => setSpecialSaved(false), 2000);
+    },
+  });
+  const [specialSaved, setSpecialSaved] = useState(false);
+  const [newSpecialHours, setNewSpecialHours] = useState<SpecialOpeningHours | null>(null);
+
+  const specialHours = specialHoursQuery.data ?? [];
+
+  function saveSpecialHours(entries: SpecialOpeningHours[]) {
+    updateSpecialHours.mutate({ tenantId, entries });
+  }
+
+  function deleteSpecialHours(id: string) {
+    saveSpecialHours(specialHours.filter((entry) => entry.id !== id));
+  }
+
+  function updateSpecialRow(index: number, patch: Partial<{ days: string; time: string }>) {
+    if (!newSpecialHours) return;
+    setNewSpecialHours({
+      ...newSpecialHours,
+      rows: newSpecialHours.rows.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row),
+    });
+  }
 
   // ── Vet schedules ───────────────────────────────────────────────────────────
   const vetSchedulesQuery = trpc.schedule.getVetSchedules.useQuery(
@@ -295,6 +344,192 @@ export default function AvailabilityPage() {
             </span>
           )}
         </div>
+      </section>
+
+      {/* ── Practice Special Hours ───────────────────────────────────────── */}
+      <section className="rounded-xl border p-6 space-y-4"
+        style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg" style={{ backgroundColor: 'var(--color-accent-soft)' }}>
+              <CalendarOff size={18} style={{ color: 'var(--color-accent)' }} />
+            </div>
+            <div>
+              <h2 className="font-semibold text-base">Abweichende Öffnungszeiten</h2>
+              <p className="text-sm" style={{ color: 'var(--color-muted)' }}>
+                Urlaubszeiten und Sonderzeiten für die Praxis-Website
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setNewSpecialHours({
+              id: crypto.randomUUID(),
+              title: 'Urlaubszeiten',
+              startsOn: '',
+              endsOn: '',
+              rows: [{ days: '', time: '' }],
+            })}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-white"
+            style={{ backgroundColor: 'var(--color-accent)' }}
+          >
+            <Plus size={15} /> Hinzufügen
+          </button>
+        </div>
+
+        {newSpecialHours && (
+          <div className="border rounded-lg p-4 space-y-3"
+            style={{ borderColor: 'var(--color-accent)', backgroundColor: 'var(--color-accent-soft)' }}>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <label className="text-xs font-medium block mb-1" style={{ color: 'var(--color-muted)' }}>Titel</label>
+                <input
+                  type="text"
+                  value={newSpecialHours.title}
+                  onChange={(e) => setNewSpecialHours({ ...newSpecialHours, title: e.target.value })}
+                  className="w-full text-sm border rounded px-2 py-1.5"
+                  style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)', color: 'var(--color-fg)' }}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium block mb-1" style={{ color: 'var(--color-muted)' }}>Von</label>
+                <input
+                  type="date"
+                  value={newSpecialHours.startsOn ?? ''}
+                  onChange={(e) => setNewSpecialHours({ ...newSpecialHours, startsOn: e.target.value })}
+                  className="w-full text-sm border rounded px-2 py-1.5"
+                  style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)', color: 'var(--color-fg)' }}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium block mb-1" style={{ color: 'var(--color-muted)' }}>Bis</label>
+                <input
+                  type="date"
+                  value={newSpecialHours.endsOn ?? ''}
+                  min={newSpecialHours.startsOn}
+                  onChange={(e) => setNewSpecialHours({ ...newSpecialHours, endsOn: e.target.value })}
+                  className="w-full text-sm border rounded px-2 py-1.5"
+                  style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)', color: 'var(--color-fg)' }}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-medium block" style={{ color: 'var(--color-muted)' }}>Zeiten</label>
+              {newSpecialHours.rows.map((row, index) => (
+                <div key={index} className="grid grid-cols-[1fr_1fr_auto] gap-2">
+                  <input
+                    type="text"
+                    placeholder="z.B. Mo, Di, Fr"
+                    value={row.days}
+                    onChange={(e) => updateSpecialRow(index, { days: e.target.value })}
+                    className="text-sm border rounded px-2 py-1.5"
+                    style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)', color: 'var(--color-fg)' }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="z.B. 14:00 – 19:00"
+                    value={row.time}
+                    onChange={(e) => updateSpecialRow(index, { time: e.target.value })}
+                    className="text-sm border rounded px-2 py-1.5"
+                    style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)', color: 'var(--color-fg)' }}
+                  />
+                  <button
+                    onClick={() => setNewSpecialHours({
+                      ...newSpecialHours,
+                      rows: newSpecialHours.rows.filter((_, rowIndex) => rowIndex !== index),
+                    })}
+                    disabled={newSpecialHours.rows.length === 1}
+                    className="p-1.5 rounded-lg disabled:opacity-30"
+                    style={{ color: 'var(--color-muted)' }}
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              ))}
+              <button
+                onClick={() => setNewSpecialHours({ ...newSpecialHours, rows: [...newSpecialHours.rows, { days: '', time: '' }] })}
+                className="flex items-center gap-1 text-xs hover:opacity-70"
+                style={{ color: 'var(--color-accent)' }}
+              >
+                <Plus size={12} /> Zeitraum hinzufügen
+              </button>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  const cleaned: SpecialOpeningHours = {
+                    ...newSpecialHours,
+                    title: newSpecialHours.title.trim(),
+                    startsOn: newSpecialHours.startsOn || undefined,
+                    endsOn: newSpecialHours.endsOn || undefined,
+                    rows: newSpecialHours.rows
+                      .map((row) => ({ days: row.days.trim(), time: row.time.trim() }))
+                      .filter((row) => row.days && row.time),
+                  };
+                  if (!cleaned.title || cleaned.rows.length === 0) return;
+                  saveSpecialHours([...specialHours.filter((entry) => entry.id !== cleaned.id), cleaned]);
+                }}
+                disabled={updateSpecialHours.isPending || !newSpecialHours.title || newSpecialHours.rows.every((row) => !row.days || !row.time)}
+                className="px-3 py-1.5 rounded-lg text-sm font-medium text-white disabled:opacity-50"
+                style={{ backgroundColor: 'var(--color-accent)' }}
+              >
+                {updateSpecialHours.isPending ? 'Wird gespeichert…' : 'Speichern'}
+              </button>
+              <button onClick={() => setNewSpecialHours(null)}
+                className="px-3 py-1.5 rounded-lg text-sm font-medium"
+                style={{ color: 'var(--color-muted)' }}>
+                Abbrechen
+              </button>
+            </div>
+          </div>
+        )}
+
+        {specialHoursQuery.isLoading ? (
+          <div className="text-sm" style={{ color: 'var(--color-muted)' }}>Wird geladen…</div>
+        ) : specialHours.length === 0 ? (
+          <p className="text-sm" style={{ color: 'var(--color-muted)' }}>Keine abweichenden Öffnungszeiten hinterlegt.</p>
+        ) : (
+          <div className="space-y-2">
+            {specialHours.map((entry) => (
+              <div key={entry.id} className="flex items-start justify-between px-4 py-3 rounded-lg border"
+                style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-bg)' }}>
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-medium">{entry.title}</span>
+                    <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: '#dbeafe', color: '#2563eb' }}>
+                      {formatDateRange(entry.startsOn, entry.endsOn)}
+                    </span>
+                  </div>
+                  <div className="space-y-0.5 text-xs" style={{ color: 'var(--color-muted)' }}>
+                    {entry.rows.map((row) => (
+                      <div key={`${entry.id}-${row.days}-${row.time}`}>{row.days}: {row.time}</div>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setNewSpecialHours(entry)}
+                    className="px-2 py-1 rounded-lg text-xs font-medium hover:opacity-70"
+                    style={{ color: 'var(--color-accent)' }}
+                  >
+                    Bearbeiten
+                  </button>
+                  <button onClick={() => deleteSpecialHours(entry.id)}
+                    className="p-1.5 rounded-lg hover:opacity-70 transition-opacity"
+                    style={{ color: 'var(--color-muted)' }}>
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {specialSaved && (
+          <span className="flex items-center gap-1.5 text-sm text-green-600">
+            <CheckCircle size={15} /> Gespeichert
+          </span>
+        )}
       </section>
 
       {/* ── Vet Schedules ──────────────────────────────────────────────────── */}
