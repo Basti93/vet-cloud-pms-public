@@ -65,7 +65,7 @@ export const teamListBlockSchema = z.object({
 export const hoursTableBlockSchema = z.object({
   heading: z.string().default("Öffnungszeiten"),
   useManualOverride: z.boolean().default(false),
-  sections: z.array(z.object({ id: z.string(), title: z.string(), note: z.string().optional(), rows: z.array(z.object({ days: z.string(), time: z.string() })).default([]) })).default([]),
+  sections: z.array(z.object({ id: z.string(), title: z.string(), chipLabel: z.string().optional(), chipColor: z.string().optional(), note: z.string().optional(), rows: z.array(z.object({ days: z.string(), time: z.string() })).default([]) })).default([]),
 });
 
 export const contactCardBlockSchema = z.object({
@@ -75,6 +75,7 @@ export const contactCardBlockSchema = z.object({
   address: z.string().optional(),
   phone: z.string().optional(),
   email: z.string().optional(),
+  embedUrl: z.string().optional(),
 });
 
 export const contactFormBlockSchema = z.object({

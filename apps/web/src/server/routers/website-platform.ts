@@ -155,6 +155,7 @@ export const websitePlatformRouter = createTRPCRouter({
     capabilities: capabilityConfigSchema.optional(),
     seoConfig: websiteProjectSeoSchema.partial().optional(),
     status: z.enum(['draft', 'published', 'archived']).optional(),
+    customCss: z.string().max(50000).nullable().optional(),
   })).mutation(async ({ ctx, input }) => {
     await requireProjectAccess(ctx, input.projectId);
     const { projectId, ...updates } = input;

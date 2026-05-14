@@ -4,9 +4,23 @@ import { COLOR_PRESETS, TYPE_PAIRINGS, type ColorPresetKey, type TypographyPairi
  * Generate CSS variable styles from theme preferences.
  * Returns a React.CSSProperties object ready to apply as inline styles.
  */
+const RADIUS_MAP: Record<string, string> = {
+  sm: "0.5rem",
+  md: "0.75rem",
+  lg: "1rem",
+  xl: "1.5rem",
+};
+
+const DENSITY_MAP: Record<string, string> = {
+  compact: "3rem",
+  comfortable: "4rem",
+  spacious: "5rem",
+};
+
 export function generateThemeStyles(
   themePreference: string | null | undefined,
-  typographyPreference: string | null | undefined
+  typographyPreference: string | null | undefined,
+  options?: { radius?: string | null; density?: string | null }
 ): React.CSSProperties {
   const colorKey = (themePreference as ColorPresetKey) || "sage";
   const typographyKey = (typographyPreference as TypographyPairingKey) || "modern";
@@ -30,6 +44,8 @@ export function generateThemeStyles(
     "--font-body": type.body,
     "--font-heading-weight": String(type.headingWeight),
     "--font-heading-tracking": type.headingTracking,
+    "--radius-base": RADIUS_MAP[options?.radius ?? "lg"] ?? RADIUS_MAP.lg,
+    "--spacing-section": DENSITY_MAP[options?.density ?? "comfortable"] ?? DENSITY_MAP.comfortable,
   } as React.CSSProperties;
 }
 

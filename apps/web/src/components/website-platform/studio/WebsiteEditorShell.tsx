@@ -2,7 +2,6 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { trpc } from '@/lib/trpc/client';
@@ -336,6 +335,47 @@ function BlockInspector({ projectId, block, onChange }: { projectId: string; blo
   }
 }
 
+function CustomCssEditor({ projectId, initialCss }: { projectId: string; initialCss?: string | null }) {
+  const utils = trpc.useUtils();
+  const [css, setCss] = useState(initialCss ?? '');
+  const [saved, setSaved] = useState(true);
+  const save = trpc.websitePlatform.updateProjectSettings.useMutation({
+    onSuccess: () => {
+      setSaved(true);
+      void utils.websitePlatform.getProject.invalidate({ projectId });
+    },
+  });
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-medium">Custom CSS</p>
+        {!saved && (
+          <Button
+            size="sm"
+            disabled={save.isPending}
+            onClick={() => save.mutate({ projectId, customCss: css || null })}
+          >
+            Speichern
+          </Button>
+        )}
+      </div>
+      <p className="text-xs" style={{ color: 'var(--color-muted)' }}>
+        CSS-Variablen überschreiben: z.B. <code>:root {'{'} --color-secondary: #F5A623; {'}'}</code>
+      </p>
+      <textarea
+        value={css}
+        onChange={(e) => { setCss(e.target.value); setSaved(false); }}
+        rows={10}
+        placeholder=":root {\n  --color-secondary: #F5A623;\n  --color-secondary-hover: #e09100;\n}"
+        className="w-full rounded-lg border px-3 py-2 font-mono text-xs"
+        style={{ borderColor: 'var(--color-border)', background: 'white', resize: 'vertical' }}
+      />
+      {saved && css && <p className="text-xs text-green-600">✓ Gespeichert</p>}
+    </div>
+  );
+}
+
 export function WebsiteEditorShell({ projectId, tenantHoursRows, tenantContactInfo }: {
   projectId: string;
   tenantHoursRows?: { days: string; time: string }[] | null;
@@ -540,10 +580,15 @@ export function WebsiteEditorShell({ projectId, tenantHoursRows, tenantContactIn
           </Card>
         </div>
 
-        <Card className="p-4">
-          <h2 className="font-semibold">Inhalt bearbeiten</h2>
-          <div className="mt-4"><BlockInspector projectId={projectId} block={selectedBlock} onChange={updateBlock} /></div>
-        </Card>
+        <div className="space-y-4">
+          <Card className="p-4">
+            <h2 className="font-semibold">Inhalt bearbeiten</h2>
+            <div className="mt-4"><BlockInspector projectId={projectId} block={selectedBlock} onChange={updateBlock} /></div>
+          </Card>
+          <Card className="p-4">
+            <CustomCssEditor projectId={projectId} initialCss={project?.customCss} />
+          </Card>
+        </div>
       </div>
     </div>
   );

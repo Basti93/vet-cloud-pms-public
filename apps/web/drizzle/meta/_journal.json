@@ -176,6 +176,13 @@
       "when": 1779800000000,
       "tag": "0024_complex_loa",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1778772482632,
+      "tag": "0025_opposite_expediter",
+      "breakpoints": true
     }
   ]
 }

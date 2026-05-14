@@ -46,6 +46,7 @@ export async function resolvePublishedWebsitePage(input: { projectId: string; pa
       primaryDomain: websiteProjects.primaryDomain,
       layoutKey: websiteProjects.layoutKey,
       themeConfig: websiteProjects.themeConfig,
+      customCss: websiteProjects.customCss,
       capabilities: websiteProjects.capabilities,
       projectSeo: websiteProjects.seoConfig,
       ownerTenantId: websiteProjects.ownerTenantId,
@@ -100,6 +101,7 @@ export async function resolvePublishedWebsitePage(input: { projectId: string; pa
       ownerTenantId: row.ownerTenantId,
       tenantHoursRows,
       tenantContactInfo,
+      customCss: row.customCss,
     },
     page: {
       id: row.pageId,
