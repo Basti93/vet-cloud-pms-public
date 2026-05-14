@@ -3,10 +3,8 @@ import { Card } from '@/components/ui/card';
 import {
   COLOR_PRESETS,
   TYPE_PAIRINGS,
-  WEBSITE_TEMPLATES,
   ColorPresetKey,
   TypographyPairingKey,
-  WebsiteTemplateKey,
 } from '@/lib/theme';
 import { CheckCircle } from 'lucide-react';
 
@@ -15,8 +13,6 @@ interface BrandSettingsFormProps {
   onColorPresetChange: (preset: ColorPresetKey) => void;
   typographyPairing: TypographyPairingKey;
   onTypographyPairingChange: (pairing: TypographyPairingKey) => void;
-  template: WebsiteTemplateKey;
-  onTemplateChange: (template: WebsiteTemplateKey) => void;
   brandName?: string;
   onBrandNameChange?: (name: string) => void;
   tagline?: string;
@@ -35,8 +31,6 @@ export function BrandSettingsForm({
   onColorPresetChange,
   typographyPairing,
   onTypographyPairingChange,
-  template,
-  onTemplateChange,
   brandName = "",
   onBrandNameChange = () => {},
   tagline = "",
@@ -144,27 +138,6 @@ export function BrandSettingsForm({
                 {typography.label}
               </p>
               <p className="text-xs text-muted">{typography.sub}</p>
-            </button>
-          ))}
-        </div>
-      </Card>
-
-      {/* Website Template */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold text-fg mb-4">Website-Vorlage</h3>
-        <div className="grid grid-cols-2 gap-3">
-          {Object.entries(WEBSITE_TEMPLATES).map(([key, tmpl]) => (
-            <button
-              key={key}
-              onClick={() => onTemplateChange(key as WebsiteTemplateKey)}
-              className={`p-3 rounded-lg border-2 transition-all text-left ${
-                template === key
-                  ? 'border-primary ring-2 ring-primary ring-offset-2'
-                  : 'border-[var(--color-border)] hover:border-primary'
-              }`}
-            >
-              <p className="font-medium text-sm text-fg">{tmpl.label}</p>
-              <p className="text-xs text-muted">{tmpl.sub}</p>
             </button>
           ))}
         </div>

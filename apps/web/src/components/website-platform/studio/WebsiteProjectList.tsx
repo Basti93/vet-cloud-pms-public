@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { trpc } from '@/lib/trpc/client';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -11,16 +12,23 @@ function slugify(value: string) {
 }
 
 export function WebsiteProjectList() {
+  const router = useRouter();
   const utils = trpc.useUtils();
   const { data: projects, isLoading } = trpc.websitePlatform.listProjects.useQuery();
   const [name, setName] = useState('');
+
+  useEffect(() => {
+    if (projects && projects.length > 0) {
+      router.replace(`/dashboard/websites/${projects[0].id}/editor`);
+    }
+  }, [projects, router]);
   const createProject = trpc.websitePlatform.createProject.useMutation({ onSuccess: () => { setName(''); utils.websitePlatform.listProjects.invalidate(); } });
   const hasWebsite = Boolean(projects?.length);
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Websites</h1>
+        <h1 className="text-2xl font-bold">Website</h1>
         <p className="text-muted">Praxis-Websites, Landingpages, Domains, Inhalte und Medien zentral verwalten.</p>
       </div>
       <Card className="p-5">

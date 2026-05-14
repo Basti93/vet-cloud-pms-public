@@ -120,6 +120,7 @@ export async function ensureDemoWebsiteProject(db: Database) {
     phone: demoTenant.phone,
     address: [demoTenant.address, demoTenant.postalCode].filter(Boolean).join(" "),
     city: demoTenant.city,
+    consultationHours: demoTenant.consultationHours,
     openingHours: demoTenant.openingHours,
   });
 
@@ -265,7 +266,7 @@ export async function resetDemoTenantData({
         monogram: demoTenant.monogram,
         themePreference: demoTenant.themePreference,
         typographyPreference: demoTenant.typographyPreference,
-        websiteTemplate: demoTenant.websiteTemplate,
+        consultationHours: demoTenant.consultationHours,
         openingHours: demoTenant.openingHours,
         subscriptionStatus: demoTenant.subscriptionStatus,
         subscriptionPlan: demoTenant.subscriptionPlan,

@@ -4,12 +4,12 @@ export const WEBSITE_LAYOUTS: Record<WebsiteLayoutKey, { label: string; descript
   "praxis-classic": {
     label: "Praxis Classic",
     description: "Warm, local practice website with clear booking and contact flow.",
-    supportedBlocks: ["hero", "servicesGrid", "teamList", "hoursTable", "contactCard", "contactForm", "bookingCta", "mapEmbed", "legalText", "richText"],
+    supportedBlocks: ["hero", "servicesGrid", "teamList", "hoursTable", "specialHours", "contactCard", "contactForm", "bookingCta", "mapEmbed", "legalText", "richText"],
   },
   "praxis-editorial": {
     label: "Praxis Editorial",
     description: "Premium editorial storytelling for established practices.",
-    supportedBlocks: ["hero", "richText", "servicesGrid", "teamList", "bookingCta", "contactCard", "mapEmbed", "legalText"],
+    supportedBlocks: ["hero", "richText", "servicesGrid", "teamList", "hoursTable", "specialHours", "bookingCta", "contactCard", "mapEmbed", "legalText"],
   },
   "landing-simple": {
     label: "Simple Landing",

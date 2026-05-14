@@ -13,6 +13,7 @@ export function createDefaultWebsiteBlocks(input: {
   phone?: string | null;
   address?: string | null;
   city?: string | null;
+  consultationHours?: DaySchedule[] | null;
   openingHours?: DaySchedule[] | null;
 }): WebsitePageBlock[] {
   const address = [input.address, input.city].filter(Boolean).join("\n") || undefined;
@@ -25,6 +26,8 @@ export function createDefaultWebsiteBlocks(input: {
         eyebrow: "Ihre Praxiswebsite",
         title: input.practiceName || "Ihre Tierarztpraxis",
         subtitle: "Stellen Sie Ihre Praxis, Ihr Team und Ihre Leistungen vor — mit direkter Online-Terminbuchung.",
+        images: [],
+        slideshowInterval: 5,
         primaryCtaLabel: "Termin buchen",
         secondaryCtaLabel: "Kontakt",
       },
@@ -36,9 +39,9 @@ export function createDefaultWebsiteBlocks(input: {
         heading: "Unsere Leistungen",
         intro: "Passen Sie diese Leistungen im Website-Studio an Ihre Praxis an.",
         services: [
-          { id: "vorsorge", title: "Vorsorge", description: "Regelmäßige Untersuchungen und Beratung für Ihr Tier." },
-          { id: "sprechstunde", title: "Sprechstunde", description: "Kompetente Hilfe bei akuten und chronischen Beschwerden." },
-          { id: "diagnostik", title: "Diagnostik", description: "Moderne Untersuchung, Labor und weiterführende Abklärung." },
+          { id: "vorsorge", title: "Vorsorge", description: "Regelmäßige Untersuchungen und Beratung für Ihr Tier.", iconKey: "Heart" },
+          { id: "sprechstunde", title: "Sprechstunde", description: "Kompetente Hilfe bei akuten und chronischen Beschwerden.", iconKey: "Stethoscope" },
+          { id: "diagnostik", title: "Diagnostik", description: "Moderne Untersuchung, Labor und weiterführende Abklärung.", iconKey: "Microscope" },
         ],
       },
     },
@@ -46,9 +49,13 @@ export function createDefaultWebsiteBlocks(input: {
       id: "hours-default",
       type: "hoursTable",
       props: {
-        heading: "Öffnungszeiten",
+        heading: "Sprechzeiten & Öffnungszeiten",
         useManualOverride: false,
-        sections: buildHoursSections(input.openingHours),
+        consultationTitle: "Sprechzeiten",
+        consultationChipLabel: "Terminsprechstunde",
+        openingTitle: "Öffnungszeiten",
+        openingChipLabel: "Telefonisch erreichbar",
+        sections: buildHoursSections(input.consultationHours ?? input.openingHours),
       },
     },
     {

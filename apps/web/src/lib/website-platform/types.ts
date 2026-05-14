@@ -41,7 +41,14 @@ export interface ResolvedWebsitePage {
     seoConfig?: WebsiteProjectSeo | null;
     ownerTenantId?: string | null;
     tenantHoursRows?: { days: string; time: string }[] | null;
+    tenantConsultationHoursRows?: { days: string; time: string }[] | null;
+    tenantOpeningHoursRows?: { days: string; time: string }[] | null;
+    tenantSpecialHours?: Array<{ id: string; title: string; startsOn?: string; endsOn?: string; rows: { days: string; time: string }[]; note?: string }> | null;
     tenantContactInfo?: { address?: string | null; phone?: string | null; email?: string | null; city?: string | null } | null;
+    logoAsset?: WebsiteAssetRef | null;
+    customCss?: string | null;
+    tenantMonogram?: string | null;
+    teamMembers?: { id: string; fullName: string; title?: string | null }[] | null;
   };
   page: {
     id: string;

@@ -6,7 +6,7 @@ import { and, desc, eq } from 'drizzle-orm';
 import { createTRPCRouter, protectedProcedure, type TRPCContext } from '@/server/trpc';
 import { roles, tenants, userRoles, users, websiteAssets, websiteDomains, websiteLeads, websitePageRevisions, websitePages, websiteProjects } from '@/lib/db/schema';
 import { writeAuditLog } from '@/server/audit';
-import { capabilityConfigSchema, normalizeBlocks, pageBlocksSchema, themeConfigSchema, websiteProjectSeoSchema } from '@/lib/website-platform/schemas';
+import { assetRefSchema, capabilityConfigSchema, normalizeBlocks, pageBlocksSchema, themeConfigSchema, websiteProjectSeoSchema } from '@/lib/website-platform/schemas';
 import { normalizeWebsiteHost, normalizeWebsitePath } from '@/lib/website-platform/resolve-project';
 import { createDefaultLegalBlocks, createDefaultWebsiteBlocks } from '@/lib/website-platform/default-blocks';
 import type { DaySchedule } from '@/lib/schedule-types';
@@ -113,7 +113,7 @@ export const websitePlatformRouter = createTRPCRouter({
       }
 
       const [tenant] = await ctx.db
-        .select({ slug: tenants.slug, email: tenants.email, phone: tenants.phone, address: tenants.address, city: tenants.city, openingHours: tenants.openingHours })
+        .select({ slug: tenants.slug, email: tenants.email, phone: tenants.phone, address: tenants.address, city: tenants.city, consultationHours: tenants.consultationHours, openingHours: tenants.openingHours })
         .from(tenants)
         .where(eq(tenants.id, tenantId))
         .limit(1);
@@ -124,6 +124,7 @@ export const websitePlatformRouter = createTRPCRouter({
         phone: tenant?.phone,
         address: tenant?.address,
         city: tenant?.city,
+        consultationHours: tenant?.consultationHours as DaySchedule[] | null,
         openingHours: tenant?.openingHours as DaySchedule[] | null,
       });
       const [project] = await ctx.db.insert(websiteProjects).values({
@@ -145,7 +146,24 @@ export const websitePlatformRouter = createTRPCRouter({
       return project;
     }),
 
-  getProject: protectedProcedure.input(z.object({ projectId: z.string().uuid() })).query(async ({ ctx, input }) => requireProjectAccess(ctx, input.projectId)),
+  getProject: protectedProcedure.input(z.object({ projectId: z.string().uuid() })).query(async ({ ctx, input }) => {
+    const project = await requireProjectAccess(ctx, input.projectId);
+    const tenantId = project.ownerTenantId;
+    if (!tenantId) return project;
+    const [tenant] = await ctx.db
+      .select({ themePreference: tenants.themePreference, typographyPreference: tenants.typographyPreference })
+      .from(tenants)
+      .where(eq(tenants.id, tenantId))
+      .limit(1);
+    if (!tenant) return project;
+    const base = themeConfigSchema.parse(project.themeConfig ?? {});
+    const merged = base.inheritTenantTheme !== false ? {
+      ...base,
+      ...(tenant.themePreference ? { palette: tenant.themePreference } : {}),
+      ...(tenant.typographyPreference ? { typography: tenant.typographyPreference } : {}),
+    } : base;
+    return { ...project, themeConfig: merged };
+  }),
 
   updateProjectSettings: protectedProcedure.input(z.object({
     projectId: z.string().uuid(),
@@ -155,6 +173,8 @@ export const websitePlatformRouter = createTRPCRouter({
     capabilities: capabilityConfigSchema.optional(),
     seoConfig: websiteProjectSeoSchema.partial().optional(),
     status: z.enum(['draft', 'published', 'archived']).optional(),
+    logoAsset: assetRefSchema.nullable().optional(),
+    customCss: z.string().max(50000).nullable().optional(),
   })).mutation(async ({ ctx, input }) => {
     await requireProjectAccess(ctx, input.projectId);
     const { projectId, ...updates } = input;

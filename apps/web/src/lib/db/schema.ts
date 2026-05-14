@@ -102,17 +102,16 @@ export const tenants = pgTable(
     })
       .default("modern")
       .notNull(),
-    websiteTemplate: varchar("website_template", {
-      length: 50,
-      enum: ["klassik", "modern", "kompakt"],
-    })
-      .default("modern")
-      .notNull(),
     customWebsiteCode: text("custom_website_code"),
     timezone: varchar("timezone", { length: 64 }).default("Europe/Berlin").notNull(),
     // Opening hours: array of 7 entries (index 0=Sun … 6=Sat)
-    // Each: { isOpen: boolean, startHour: number, endHour: number }
+    // Each: { dayOfWeek: number, slots: [{ startHour, startMin, endHour, endMin }] }
     openingHours: jsonb("opening_hours"),
+    // Consultation hours: bookable appointment windows used by the booking widget.
+    consultationHours: jsonb("consultation_hours"),
+    // Special opening hours / vacation periods shown on generated websites.
+    // Example: [{ id, title, startsOn, endsOn, rows: [{ days, time }], note }]
+    specialOpeningHours: jsonb("special_opening_hours"),
     // Allowed domains for embedding the booking widget (array of domain strings)
     allowedEmbeddingDomains: jsonb("allowed_embedding_domains"),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -310,6 +309,8 @@ export const websiteProjects = pgTable(
     themeConfig: jsonb("theme_config"),
     capabilities: jsonb("capabilities").default(sql`'{}'::jsonb`).notNull(),
     seoConfig: jsonb("seo_config"),
+    logoAsset: jsonb("logo_asset"),
+    customCss: text("custom_css"),
     publishedAt: timestamp("published_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .default(sql`now()`)
@@ -748,6 +749,7 @@ export const medications = pgTable(
     tenantIdIdx: index("medications_tenant_id_idx").on(table.tenantId),
     patientIdIdx: index("medications_patient_id_idx").on(table.patientId),
     diagnosisIdIdx: index("medications_diagnosis_id_idx").on(table.diagnosisId),
+    prescribedByIdx: index("medications_prescribed_by_idx").on(table.prescribedBy),
   })
 );
 
@@ -957,7 +959,7 @@ export const emailSettings = pgTable(
       .notNull(),
   },
   (table) => ({
-    tenantIdIdx: index("email_settings_tenant_id_idx").on(table.tenantId),
+    // tenantId has column-level .unique() which already creates an index
   })
 );
 
@@ -1168,7 +1170,7 @@ export const vaccinationSettings = pgTable(
       .notNull(),
   },
   (table) => ({
-    tenantIdIdx: index("vaccination_settings_tenant_id_idx").on(table.tenantId),
+    // tenantId is the primaryKey — already indexed
   })
 );
 
@@ -1223,7 +1225,7 @@ export const featureFlags = pgTable(
       .notNull(),
   },
   (table) => ({
-    tenantIdIdx: index("feature_flags_tenant_id_idx").on(table.tenantId),
+    // tenantId has column-level .unique() which already creates an index
   })
 );
 
@@ -1254,7 +1256,7 @@ export const calendarAccessTokens = pgTable(
   (table) => ({
     tenantVetIdx: index("calendar_tokens_tenant_vet_idx").on(table.tenantId, table.vetId),
     tenantIdIdx: index("calendar_tokens_tenant_id_idx").on(table.tenantId),
-    tokenUniqueIdx: unique("calendar_tokens_token_unique").on(table.token),
+    // token has column-level .unique() — tokenUniqueIdx was a duplicate
   })
 );
 
@@ -1454,7 +1456,7 @@ export const systemLogs = pgTable(
 // ============================================================================
 
 /*
-  Nach Deployment: Diese SQL-Queries in Neon ausführen:
+  Nach Deployment: Diese SQL-Queries direkt in PostgreSQL ausführen (Hetzner/Coolify):
 
   -- Enable RLS on all tables
   ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
