@@ -65,6 +65,12 @@ export const teamListBlockSchema = z.object({
 export const hoursTableBlockSchema = z.object({
   heading: z.string().default("Öffnungszeiten"),
   useManualOverride: z.boolean().default(false),
+  consultationTitle: z.string().default("Sprechzeiten"),
+  consultationChipLabel: z.string().optional(),
+  consultationNote: z.string().optional(),
+  openingTitle: z.string().default("Öffnungszeiten"),
+  openingChipLabel: z.string().optional(),
+  openingNote: z.string().optional(),
   sections: z.array(z.object({ id: z.string(), title: z.string(), chipLabel: z.string().optional(), chipColor: z.string().optional(), note: z.string().optional(), rows: z.array(z.object({ days: z.string(), time: z.string() })).default([]) })).default([]),
 });
 

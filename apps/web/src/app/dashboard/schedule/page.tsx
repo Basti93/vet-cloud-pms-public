@@ -129,11 +129,11 @@ export default function SchedulePage() {
   const { tenantId, isReady } = useTenant();
   const { userId } = useAuth();
   const vetId = useCurrentVet();
-  const practiceHoursQuery = trpc.schedule.getPracticeHours.useQuery(
+  const consultationHoursQuery = trpc.schedule.getConsultationHours.useQuery(
     { tenantId: tenantId! },
     { enabled: !!tenantId }
   );
-  const businessHours = toFullCalendarBusinessHours(practiceHoursQuery.data ?? DEFAULT_OPENING_HOURS);
+  const businessHours = toFullCalendarBusinessHours(consultationHoursQuery.data ?? DEFAULT_OPENING_HOURS);
   const calRef = useRef<FullCalendarType>(null);
   const [view, setView] = useState<CalView>("timeGridWeek");
   const [currentTitle, setCurrentTitle] = useState("");

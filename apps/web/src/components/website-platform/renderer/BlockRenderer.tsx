@@ -26,6 +26,8 @@ interface Props {
   pagePath: string;
   templateVars?: TemplateVars;
   tenantHoursRows?: { days: string; time: string }[] | null;
+  tenantConsultationHoursRows?: { days: string; time: string }[] | null;
+  tenantOpeningHoursRows?: { days: string; time: string }[] | null;
   tenantSpecialHours?: Array<{ id: string; title: string; startsOn?: string; endsOn?: string; rows: { days: string; time: string }[]; note?: string }> | null;
   tenantContactInfo?: { address?: string | null; phone?: string | null; email?: string | null; city?: string | null } | null;
 }
@@ -39,7 +41,7 @@ export function BlockRenderer(props: Props) {
     case 'richText': return <RichTextBlock {...props} block={props.block} />;
     case 'servicesGrid': return <ServicesGridBlock {...props} block={props.block} />;
     case 'teamList': return <TeamListBlock {...props} block={props.block} />;
-    case 'hoursTable': return <HoursTableBlock {...props} block={props.block} tenantHoursRows={props.tenantHoursRows} />;
+    case 'hoursTable': return <HoursTableBlock {...props} block={props.block} tenantHoursRows={props.tenantHoursRows} tenantConsultationHoursRows={props.tenantConsultationHoursRows} tenantOpeningHoursRows={props.tenantOpeningHoursRows} />;
     case 'specialHours': return <SpecialHoursBlock {...props} block={props.block} tenantSpecialHours={props.tenantSpecialHours} />;
     case 'contactCard': return <ContactCardBlock {...props} block={props.block} tenantContactInfo={props.tenantContactInfo} />;
     case 'contactForm': return <ContactFormBlock {...props} block={props.block} />;

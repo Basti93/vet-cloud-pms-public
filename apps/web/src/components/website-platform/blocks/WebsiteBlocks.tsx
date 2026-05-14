@@ -20,6 +20,8 @@ interface BlockProps<T extends WebsitePageBlock = WebsitePageBlock> {
   pagePath: string;
   templateVars?: TemplateVars;
   tenantHoursRows?: { days: string; time: string }[] | null;
+  tenantConsultationHoursRows?: { days: string; time: string }[] | null;
+  tenantOpeningHoursRows?: { days: string; time: string }[] | null;
   tenantSpecialHours?: Array<{ id: string; title: string; startsOn?: string; endsOn?: string; rows: { days: string; time: string }[]; note?: string }> | null;
   tenantContactInfo?: { address?: string | null; phone?: string | null; email?: string | null; city?: string | null } | null;
 }
@@ -343,9 +345,34 @@ export function TeamListBlock({ block, assetMap, templateVars = {} }: BlockProps
 
 // ─── Hours Table ───────────────────────────────────────────────────────────────
 
-export function HoursTableBlock({ block, tenantHoursRows }: BlockProps<Extract<WebsitePageBlock, { type: 'hoursTable' }>>) {
-  const effectiveSections = !block.props.useManualOverride && tenantHoursRows
-    ? [{ id: 'tenant', title: 'Sprechzeiten', chipLabel: undefined, chipColor: undefined, rows: tenantHoursRows, note: undefined }]
+export function HoursTableBlock({ block, tenantHoursRows, tenantConsultationHoursRows, tenantOpeningHoursRows }: BlockProps<Extract<WebsitePageBlock, { type: 'hoursTable' }>>) {
+  const tenantSections = [
+    ...(tenantConsultationHoursRows?.length
+      ? [{
+          id: 'consultation',
+          title: block.props.consultationTitle,
+          chipLabel: block.props.consultationChipLabel,
+          chipColor: undefined,
+          rows: tenantConsultationHoursRows,
+          note: block.props.consultationNote,
+        }]
+      : []),
+    ...(tenantOpeningHoursRows?.length
+      ? [{
+          id: 'opening',
+          title: block.props.openingTitle,
+          chipLabel: block.props.openingChipLabel,
+          chipColor: undefined,
+          rows: tenantOpeningHoursRows,
+          note: block.props.openingNote,
+        }]
+      : []),
+  ];
+  const fallbackTenantSections = tenantHoursRows
+    ? [{ id: 'tenant', title: block.props.consultationTitle, chipLabel: block.props.consultationChipLabel, chipColor: undefined, rows: tenantHoursRows, note: block.props.consultationNote }]
+    : [];
+  const effectiveSections = !block.props.useManualOverride
+    ? (tenantSections.length > 0 ? tenantSections : fallbackTenantSections)
     : block.props.sections;
 
   return (

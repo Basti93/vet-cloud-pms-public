@@ -170,7 +170,24 @@ export default function AvailabilityPage() {
   const tenant = trpc.tenant.getCurrent.useQuery();
   const tenantId = tenant.data?.id ?? '';
 
-  // ── Practice hours ──────────────────────────────────────────────────────────
+  // ── Consultation hours ──────────────────────────────────────────────────────
+  const consultationHoursQuery = trpc.schedule.getConsultationHours.useQuery(
+    { tenantId },
+    { enabled: !!tenantId }
+  );
+  const updateConsultationHours = trpc.schedule.updateConsultationHours.useMutation({
+    onSuccess: () => {
+      utils.schedule.getConsultationHours.invalidate({ tenantId });
+      setConsultationSaved(true);
+      setTimeout(() => setConsultationSaved(false), 2000);
+    },
+  });
+  const [consultationSaved, setConsultationSaved] = useState(false);
+  const [consultationEdits, setConsultationEdits] = useState<DaySchedule[] | null>(null);
+  const serverConsultationHours = normalizeWeekSchedule(consultationHoursQuery.data, { fallback: DEFAULT_OPENING_HOURS });
+  const consultationHours = normalizeWeekSchedule(consultationEdits ?? serverConsultationHours, { fallback: DEFAULT_OPENING_HOURS });
+
+  // ── Practice opening/contact hours ──────────────────────────────────────────
   const practiceHoursQuery = trpc.schedule.getPracticeHours.useQuery(
     { tenantId },
     { enabled: !!tenantId }
@@ -294,6 +311,58 @@ export default function AvailabilityPage() {
   return (
     <div className="space-y-8 max-w-3xl">
 
+      {/* ── Consultation Hours ─────────────────────────────────────────────── */}
+      <section className="rounded-xl border p-6 space-y-4"
+        style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg" style={{ backgroundColor: 'var(--color-accent-soft)' }}>
+            <Clock size={18} style={{ color: 'var(--color-accent)' }} />
+          </div>
+          <div>
+            <h2 className="font-semibold text-base">Sprechzeiten / Terminzeiten</h2>
+            <p className="text-sm" style={{ color: 'var(--color-muted)' }}>
+              Diese Zeiten werden für Online-Buchungen verwendet
+            </p>
+          </div>
+        </div>
+
+        {consultationHoursQuery.isLoading ? (
+          <div className="text-sm" style={{ color: 'var(--color-muted)' }}>Wird geladen…</div>
+        ) : (
+          <div className="divide-y" style={{ borderColor: 'var(--color-border)' }}>
+            {DAY_ORDER.map((dayOfWeek) => {
+              const day = consultationHours.find((d) => d.dayOfWeek === dayOfWeek) ?? defaultDay(dayOfWeek);
+              return (
+                <DayRow
+                  key={dayOfWeek}
+                  day={day}
+                  onChange={(updated) => {
+                    const base = normalizeWeekSchedule(consultationEdits ?? serverConsultationHours, { fallback: DEFAULT_OPENING_HOURS });
+                    setConsultationEdits(base.map((d) => d.dayOfWeek === dayOfWeek ? updated : d));
+                  }}
+                />
+              );
+            })}
+          </div>
+        )}
+
+        <div className="flex items-center gap-3 pt-1">
+          <button
+            onClick={() => updateConsultationHours.mutate({ tenantId, hours: consultationHours })}
+            disabled={updateConsultationHours.isPending}
+            className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+            style={{ backgroundColor: 'var(--color-accent)' }}
+          >
+            {updateConsultationHours.isPending ? 'Wird gespeichert…' : 'Speichern'}
+          </button>
+          {consultationSaved && (
+            <span className="flex items-center gap-1.5 text-sm text-green-600">
+              <CheckCircle size={15} /> Gespeichert
+            </span>
+          )}
+        </div>
+      </section>
+
       {/* ── Practice Opening Hours ─────────────────────────────────────────── */}
       <section className="rounded-xl border p-6 space-y-4"
         style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
@@ -302,9 +371,9 @@ export default function AvailabilityPage() {
             <Clock size={18} style={{ color: 'var(--color-accent)' }} />
           </div>
           <div>
-            <h2 className="font-semibold text-base">Öffnungszeiten der Praxis</h2>
+            <h2 className="font-semibold text-base">Öffnungszeiten / Erreichbarkeit</h2>
             <p className="text-sm" style={{ color: 'var(--color-muted)' }}>
-              Rahmen für Online-Buchungen — mehrere Zeiträume pro Tag möglich
+              Telefonisch erreichbar, Medikamentenabholung und öffentliche Website-Information
             </p>
           </div>
         </div>

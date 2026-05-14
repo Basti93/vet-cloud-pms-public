@@ -45,24 +45,31 @@ export default async function WebsiteEditorPage({ params }: Props) {
     .limit(1);
 
   let tenantHoursRows: { days: string; time: string }[] | null = null;
+  let tenantConsultationHoursRows: { days: string; time: string }[] | null = null;
+  let tenantOpeningHoursRows: { days: string; time: string }[] | null = null;
   let tenantSpecialHours: TenantSpecialHours | null = null;
   let tenantContactInfo: { address?: string | null; phone?: string | null; email?: string | null; city?: string | null } | null = null;
 
   if (project?.tenantId) {
     const [tenant] = await db
-      .select({ openingHours: tenants.openingHours, specialOpeningHours: tenants.specialOpeningHours, address: tenants.address, city: tenants.city, phone: tenants.phone, email: tenants.email })
+      .select({ consultationHours: tenants.consultationHours, openingHours: tenants.openingHours, specialOpeningHours: tenants.specialOpeningHours, address: tenants.address, city: tenants.city, phone: tenants.phone, email: tenants.email })
       .from(tenants)
       .where(eq(tenants.id, project.tenantId))
       .limit(1);
-    if (tenant?.openingHours) {
-      tenantHoursRows = openingHoursToDisplayRows(normalizeWeekSchedule(tenant.openingHours as DaySchedule[]))
+    if (tenant?.consultationHours) {
+      tenantConsultationHoursRows = openingHoursToDisplayRows(normalizeWeekSchedule(tenant.consultationHours as DaySchedule[]))
         .map((r) => ({ days: r.day, time: r.time }));
     }
+    if (tenant?.openingHours) {
+      tenantOpeningHoursRows = openingHoursToDisplayRows(normalizeWeekSchedule(tenant.openingHours as DaySchedule[]))
+        .map((r) => ({ days: r.day, time: r.time }));
+    }
+    tenantHoursRows = tenantConsultationHoursRows ?? tenantOpeningHoursRows;
     tenantSpecialHours = normalizeSpecialHours(tenant?.specialOpeningHours);
     if (tenant) {
       tenantContactInfo = { address: tenant.address, city: tenant.city, phone: tenant.phone, email: tenant.email };
     }
   }
 
-  return <WebsiteEditorShell projectId={projectId} tenantHoursRows={tenantHoursRows} tenantSpecialHours={tenantSpecialHours} tenantContactInfo={tenantContactInfo} />;
+  return <WebsiteEditorShell projectId={projectId} tenantHoursRows={tenantHoursRows} tenantConsultationHoursRows={tenantConsultationHoursRows} tenantOpeningHoursRows={tenantOpeningHoursRows} tenantSpecialHours={tenantSpecialHours} tenantContactInfo={tenantContactInfo} />;
 }

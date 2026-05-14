@@ -13,6 +13,7 @@ export function createDefaultWebsiteBlocks(input: {
   phone?: string | null;
   address?: string | null;
   city?: string | null;
+  consultationHours?: DaySchedule[] | null;
   openingHours?: DaySchedule[] | null;
 }): WebsitePageBlock[] {
   const address = [input.address, input.city].filter(Boolean).join("\n") || undefined;
@@ -46,9 +47,13 @@ export function createDefaultWebsiteBlocks(input: {
       id: "hours-default",
       type: "hoursTable",
       props: {
-        heading: "Öffnungszeiten",
+        heading: "Sprechzeiten & Öffnungszeiten",
         useManualOverride: false,
-        sections: buildHoursSections(input.openingHours),
+        consultationTitle: "Sprechzeiten",
+        consultationChipLabel: "Terminsprechstunde",
+        openingTitle: "Öffnungszeiten",
+        openingChipLabel: "Telefonisch erreichbar",
+        sections: buildHoursSections(input.consultationHours ?? input.openingHours),
       },
     },
     {

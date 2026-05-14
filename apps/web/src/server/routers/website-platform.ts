@@ -113,7 +113,7 @@ export const websitePlatformRouter = createTRPCRouter({
       }
 
       const [tenant] = await ctx.db
-        .select({ slug: tenants.slug, email: tenants.email, phone: tenants.phone, address: tenants.address, city: tenants.city, openingHours: tenants.openingHours })
+        .select({ slug: tenants.slug, email: tenants.email, phone: tenants.phone, address: tenants.address, city: tenants.city, consultationHours: tenants.consultationHours, openingHours: tenants.openingHours })
         .from(tenants)
         .where(eq(tenants.id, tenantId))
         .limit(1);
@@ -124,6 +124,7 @@ export const websitePlatformRouter = createTRPCRouter({
         phone: tenant?.phone,
         address: tenant?.address,
         city: tenant?.city,
+        consultationHours: tenant?.consultationHours as DaySchedule[] | null,
         openingHours: tenant?.openingHours as DaySchedule[] | null,
       });
       const [project] = await ctx.db.insert(websiteProjects).values({

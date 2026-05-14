@@ -377,6 +377,7 @@ function BlockInspector({ projectId, block, onChange }: { projectId: string; blo
     case 'hoursTable':
       return (
         <div className="space-y-3">
+          <TextField label="Überschrift" value={block.props.heading} onChange={(heading) => replaceProps({ ...block.props, heading })} />
           <label className="flex items-center gap-2 text-sm cursor-pointer">
             <input
               type="checkbox"
@@ -389,9 +390,23 @@ function BlockInspector({ projectId, block, onChange }: { projectId: string; blo
           {block.props.useManualOverride ? (
             <JsonField label="Öffnungszeiten-Sektionen" value={block.props.sections} onChange={(sections) => replaceProps({ ...block.props, sections })} />
           ) : (
-            <p className="rounded-xl border border-[var(--color-border)] bg-[var(--color-muted-soft)] px-3 py-2 text-xs text-muted">
-              Zeigt automatisch die Öffnungszeiten aus den Praxisdaten. Checkbox aktivieren zum manuellen Bearbeiten.
-            </p>
+            <>
+              <div className="rounded-xl border border-[var(--color-border)] p-3 space-y-2">
+                <p className="text-sm font-medium">Sprechzeiten</p>
+                <TextField label="Titel" value={block.props.consultationTitle} onChange={(consultationTitle) => replaceProps({ ...block.props, consultationTitle })} />
+                <TextField label="Chip" value={block.props.consultationChipLabel} onChange={(consultationChipLabel) => replaceProps({ ...block.props, consultationChipLabel })} />
+                <TextField label="Hinweistext" value={block.props.consultationNote} multiline onChange={(consultationNote) => replaceProps({ ...block.props, consultationNote })} />
+              </div>
+              <div className="rounded-xl border border-[var(--color-border)] p-3 space-y-2">
+                <p className="text-sm font-medium">Öffnungszeiten</p>
+                <TextField label="Titel" value={block.props.openingTitle} onChange={(openingTitle) => replaceProps({ ...block.props, openingTitle })} />
+                <TextField label="Chip" value={block.props.openingChipLabel} onChange={(openingChipLabel) => replaceProps({ ...block.props, openingChipLabel })} />
+                <TextField label="Hinweistext" value={block.props.openingNote} multiline onChange={(openingNote) => replaceProps({ ...block.props, openingNote })} />
+              </div>
+              <p className="rounded-xl border border-[var(--color-border)] bg-[var(--color-muted-soft)] px-3 py-2 text-xs text-muted">
+                Die Zeiten kommen aus den Praxisdaten. Hier bearbeitest du nur Website-Texte, Chips und Hinweise.
+              </p>
+            </>
           )}
         </div>
       );
@@ -597,9 +612,11 @@ function CustomCssEditor({ projectId, initialCss }: { projectId: string; initial
   );
 }
 
-export function WebsiteEditorShell({ projectId, tenantHoursRows, tenantSpecialHours, tenantContactInfo }: {
+export function WebsiteEditorShell({ projectId, tenantHoursRows, tenantConsultationHoursRows, tenantOpeningHoursRows, tenantSpecialHours, tenantContactInfo }: {
   projectId: string;
   tenantHoursRows?: { days: string; time: string }[] | null;
+  tenantConsultationHoursRows?: { days: string; time: string }[] | null;
+  tenantOpeningHoursRows?: { days: string; time: string }[] | null;
   tenantSpecialHours?: Array<{ id: string; title: string; startsOn?: string; endsOn?: string; rows: { days: string; time: string }[]; note?: string }> | null;
   tenantContactInfo?: { address?: string | null; phone?: string | null; email?: string | null; city?: string | null } | null;
 }) {
@@ -710,6 +727,8 @@ export function WebsiteEditorShell({ projectId, tenantHoursRows, tenantSpecialHo
       logoAsset: project.logoAsset as WebsiteAssetRef | null | undefined,
       teamMembers: null,
       tenantHoursRows,
+      tenantConsultationHoursRows,
+      tenantOpeningHoursRows,
       tenantSpecialHours,
       tenantContactInfo,
     },

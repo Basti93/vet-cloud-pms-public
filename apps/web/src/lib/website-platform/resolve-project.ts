@@ -88,6 +88,7 @@ export async function resolvePublishedWebsitePage(input: { projectId: string; pa
       projectSeo: websiteProjects.seoConfig,
       ownerTenantId: websiteProjects.ownerTenantId,
       tenantOpeningHours: tenants.openingHours,
+      tenantConsultationHours: tenants.consultationHours,
       tenantSpecialOpeningHours: tenants.specialOpeningHours,
       tenantAddress: tenants.address,
       tenantCity: tenants.city,
@@ -128,9 +129,13 @@ export async function resolvePublishedWebsitePage(input: { projectId: string; pa
         .orderBy(asc(users.lastName), asc(users.firstName))
     : [];
 
-  const tenantHoursRows = row.tenantOpeningHours
+  const tenantConsultationHoursRows = row.tenantConsultationHours
+    ? openingHoursToDisplayRows(normalizeWeekSchedule(row.tenantConsultationHours as DaySchedule[])).map((r) => ({ days: r.day, time: r.time }))
+    : null;
+  const tenantOpeningHoursRows = row.tenantOpeningHours
     ? openingHoursToDisplayRows(normalizeWeekSchedule(row.tenantOpeningHours as DaySchedule[])).map((r) => ({ days: r.day, time: r.time }))
     : null;
+  const tenantHoursRows = tenantConsultationHoursRows ?? tenantOpeningHoursRows;
   const tenantSpecialHours = normalizeSpecialHours(row.tenantSpecialOpeningHours);
 
   const tenantContactInfo = row.tenantAddress || row.tenantPhone || row.tenantEmail
@@ -150,6 +155,8 @@ export async function resolvePublishedWebsitePage(input: { projectId: string; pa
       seoConfig: websiteProjectSeoSchema.partial().catch({}).parse(row.projectSeo ?? {}),
       ownerTenantId: row.ownerTenantId,
       tenantHoursRows,
+      tenantConsultationHoursRows,
+      tenantOpeningHoursRows,
       tenantSpecialHours,
       tenantContactInfo,
       logoAsset: row.logoAsset as import('./types').WebsiteAssetRef | null,

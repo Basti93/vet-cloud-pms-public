@@ -42,6 +42,48 @@ function normalizeSpecialOpeningHours(value: unknown): SpecialOpeningHours[] {
 }
 
 export const scheduleRouter = createTRPCRouter({
+  // ── Practice Consultation Hours ─────────────────────────────────────────────
+
+  getConsultationHours: protectedProcedure
+    .input(z.object({ tenantId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const [tenant] = await ctx.db
+        .select({ consultationHours: tenants.consultationHours })
+        .from(tenants)
+        .where(eq(tenants.id, input.tenantId))
+        .limit(1);
+
+      if (!tenant) throw new TRPCError({ code: "NOT_FOUND" });
+
+      return normalizeWeekSchedule(tenant.consultationHours as DaySchedule[] | null, {
+        fallback: DEFAULT_OPENING_HOURS,
+      });
+    }),
+
+  updateConsultationHours: protectedProcedure
+    .input(z.object({
+      tenantId: z.string().uuid(),
+      hours: z.array(dayScheduleSchema).min(0).max(7),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const normalizedHours = normalizeWeekSchedule(input.hours);
+
+      await ctx.db
+        .update(tenants)
+        .set({ consultationHours: normalizedHours, updatedAt: new Date() })
+        .where(eq(tenants.id, input.tenantId));
+
+      await writeAuditLog(ctx, {
+        tenantId: input.tenantId,
+        action: "config_change",
+        entity: { type: "tenant_consultation_schedule", id: input.tenantId },
+        event: "schedule.consultation_hours_updated",
+        summary: "Practice consultation hours updated",
+        changes: { daysConfigured: normalizedHours.length },
+      });
+      return { success: true };
+    }),
+
   // ── Practice Opening Hours ──────────────────────────────────────────────────
 
   getPracticeHours: protectedProcedure

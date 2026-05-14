@@ -113,6 +113,8 @@ export const tenants = pgTable(
     // Opening hours: array of 7 entries (index 0=Sun … 6=Sat)
     // Each: { dayOfWeek: number, slots: [{ startHour, startMin, endHour, endMin }] }
     openingHours: jsonb("opening_hours"),
+    // Consultation hours: bookable appointment windows used by the booking widget.
+    consultationHours: jsonb("consultation_hours"),
     // Special opening hours / vacation periods shown on generated websites.
     // Example: [{ id, title, startsOn, endsOn, rows: [{ days, time }], note }]
     specialOpeningHours: jsonb("special_opening_hours"),
