@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Globe, ExternalLink, CheckCircle, Save } from "lucide-react";
+import { Globe, ExternalLink, CheckCircle, Save, Pencil, PlusCircle } from "lucide-react";
 import { EmbedHelpSection } from "@/components/settings/EmbedHelpSection";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -51,6 +51,7 @@ export default function PracticePage() {
     { enabled: !!tenant?.slug }
   );
   const update = trpc.tenant.update.useMutation();
+  const { data: websiteProjects, isLoading: websitesLoading } = trpc.websitePlatform.listProjects.useQuery();
 
   const [form, setForm] = useState({
     name: "",
@@ -95,9 +96,16 @@ export default function PracticePage() {
     });
   };
 
-  const websiteUrl = tenant?.slug
-    ? `${typeof window !== "undefined" ? window.location.origin : ""}/${tenant.slug}`
+  const websiteProject = websiteProjects?.[0];
+  const websiteUrl = websiteProject?.slug
+    ? `${typeof window !== "undefined" ? window.location.origin : ""}/site/${websiteProject.slug}`
     : null;
+  const websiteStatusLabel = websiteProject?.status === "published" ? "Aktiv" : websiteProject ? "Entwurf" : "Nicht eingerichtet";
+  const websiteStatusClass = websiteProject?.status === "published"
+    ? "bg-green-100 text-green-800"
+    : websiteProject
+      ? "bg-amber-100 text-amber-800"
+      : "bg-muted text-muted-foreground";
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -125,47 +133,55 @@ export default function PracticePage() {
               <div className="flex items-center gap-2">
                 <span className="font-semibold text-sm">Öffentliche Website</span>
                 <span
-                  className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium"
-                  style={{ backgroundColor: "#dcfce7", color: "#166534" }}
+                  className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${websiteStatusClass}`}
                 >
-                  <CheckCircle size={11} />
-                  Aktiv
+                  {websiteProject?.status === "published" && <CheckCircle size={11} />}
+                  {websitesLoading ? "Lädt…" : websiteStatusLabel}
                 </span>
               </div>
               <p className="text-xs mt-0.5" style={{ color: "var(--color-muted)" }}>
-                Ihre Praxis ist öffentlich unter folgender URL erreichbar
+                Inhalte, Layout, Medien, Veröffentlichung und Domains werden im Website-Studio verwaltet.
               </p>
-              {websiteUrl && (
+              {websiteUrl ? (
                 <code
                   className="text-xs mt-1.5 block px-2 py-1 rounded"
                   style={{ backgroundColor: "var(--color-bg)", color: "var(--color-accent)" }}
                 >
                   {websiteUrl}
                 </code>
+              ) : (
+                <p className="text-xs mt-1.5" style={{ color: "var(--color-muted)" }}>
+                  Für diese Praxis wurde noch keine Website angelegt.
+                </p>
               )}
             </div>
           </div>
-          {websiteUrl && (
-            <a
-              href={websiteUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex-shrink-0"
-            >
-              <Button variant="outline" size="sm" className="gap-1.5 text-xs">
-                <ExternalLink size={13} />
-                Öffnen
-              </Button>
-            </a>
-          )}
+          <div className="flex flex-shrink-0 flex-wrap justify-end gap-2">
+            {websiteUrl && (
+              <a href={websiteUrl} target="_blank" rel="noopener noreferrer">
+                <Button variant="outline" size="sm" className="gap-1.5 text-xs">
+                  <ExternalLink size={13} />
+                  Öffnen
+                </Button>
+              </a>
+            )}
+            {websiteProject ? (
+              <a href={`/dashboard/websites/${websiteProject.id}/editor`}>
+                <Button variant="default" size="sm" className="gap-1.5 text-xs">
+                  <Pencil size={13} />
+                  Im Studio bearbeiten
+                </Button>
+              </a>
+            ) : (
+              <a href="/dashboard/websites">
+                <Button variant="default" size="sm" className="gap-1.5 text-xs">
+                  <PlusCircle size={13} />
+                  Website erstellen
+                </Button>
+              </a>
+            )}
+          </div>
         </div>
-        <p className="text-xs mt-3 pt-3" style={{ borderTop: "1px solid var(--color-border)", color: "var(--color-muted)" }}>
-          Die Website nutzt die Daten aus diesem Formular sowie das Erscheinungsbild aus dem{" "}
-          <a href="/dashboard/settings/appearance" style={{ color: "var(--color-accent)" }}>
-            Erscheinungsbild-Tab
-          </a>
-          .
-        </p>
       </Card>
 
       {/* Praxisinformationen */}
