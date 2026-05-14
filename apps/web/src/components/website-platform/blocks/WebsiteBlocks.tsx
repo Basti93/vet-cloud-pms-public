@@ -24,17 +24,18 @@ const section = 'mx-auto max-w-6xl px-4 py-14 sm:px-6 lg:px-8';
 function BookingDialog({ tenantSlug, open, onClose }: { tenantSlug: string; open: boolean; onClose: () => void }) {
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
-      <DialogContent className="max-w-2xl h-[90vh] p-0 overflow-hidden flex flex-col gap-0">
+      <DialogContent
+        className="max-w-2xl"
+        style={{ height: '90vh', padding: 0, display: 'flex', flexDirection: 'column', gap: 0, overflow: 'hidden' }}
+      >
         <DialogHeader className="flex-shrink-0 px-4 py-3 border-b border-[var(--color-border)]">
           <DialogTitle>Termin buchen</DialogTitle>
         </DialogHeader>
-        <div className="flex-1 min-h-0 overflow-hidden">
-          <iframe
-            src={`/book/${tenantSlug}`}
-            className="w-full h-full border-0"
-            title="Termin buchen"
-          />
-        </div>
+        <iframe
+          src={`/book/${tenantSlug}`}
+          style={{ flex: 1, width: '100%', border: 0, minHeight: 0 }}
+          title="Termin buchen"
+        />
       </DialogContent>
     </Dialog>
   );

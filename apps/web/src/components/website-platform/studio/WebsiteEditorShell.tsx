@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { trpc } from '@/lib/trpc/client';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { getDefaultBlock, WEBSITE_BLOCK_DEFINITIONS, type WebsiteBlockType } from '@/lib/website-platform/block-registry';
 import { pageBlocksSchema, pageBlockSchema } from '@/lib/website-platform/schemas';
 import { PageRenderer } from '@/components/website-platform/renderer/PageRenderer';
@@ -77,6 +78,7 @@ function MediaPicker({ projectId, value, onChange, label = 'Bild' }: { projectId
     onSuccess: () => utils.websitePlatform.listAssets.invalidate({ projectId }),
   });
   const [uploading, setUploading] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
   const selectedAsset = value?.assetId ? assets?.find((asset) => asset.id === value.assetId) : undefined;
 
   async function upload(file: File) {
@@ -94,43 +96,58 @@ function MediaPicker({ projectId, value, onChange, label = 'Bild' }: { projectId
     }
   }
 
+  const previewUrl = selectedAsset?.url ?? value?.url;
+
   return (
-    <div className="space-y-3 rounded-xl border border-[var(--color-border)] p-3">
-      <div>
-        <p className="text-sm font-medium">{label}</p>
-        <p className="text-xs text-muted">Upload oder bestehendes Asset auswählen.</p>
-      </div>
-      {selectedAsset && <img src={selectedAsset.url} alt={selectedAsset.alt ?? ''} className="h-28 w-full rounded-lg object-cover" />}
-      {value?.url && !selectedAsset && <img src={value.url} alt={value.altOverride ?? ''} className="h-28 w-full rounded-lg object-cover" />}
-      <div className="flex items-center gap-2">
+    <div className="space-y-2 rounded-xl border border-[var(--color-border)] p-3">
+      <p className="text-sm font-medium">{label}</p>
+      {previewUrl && <img src={previewUrl} alt={value?.altOverride ?? ''} className="h-28 w-full rounded-lg object-cover" />}
+      <div className="flex flex-wrap items-center gap-2">
         <label className={`cursor-pointer rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-xs font-medium hover:bg-[var(--color-muted-soft)] ${uploading ? 'opacity-50' : ''}`}>
           {uploading ? 'Lädt…' : '+ Hochladen'}
           <input type="file" accept="image/*" disabled={uploading} className="sr-only"
             onChange={(e) => { const file = e.target.files?.[0]; if (file) void upload(file); }} />
         </label>
+        <Button variant="outline" size="sm" onClick={() => setLibraryOpen(true)}>
+          Bibliothek {(assets?.length ?? 0) > 0 ? `(${assets!.length})` : ''}
+        </Button>
         {value && <Button variant="ghost" size="sm" onClick={() => onChange(undefined)}>Entfernen</Button>}
       </div>
       <TextField label="Alt-Text" value={value?.altOverride} onChange={(altOverride) => onChange(value ? { ...value, altOverride } : { altOverride })} />
-      {(assets?.length ?? 0) > 0 && (
-        <div className="space-y-1">
-          <p className="text-xs font-medium text-muted">Medienbibliothek</p>
-          <div className="max-h-48 space-y-1.5 overflow-auto">
-            {assets?.map((asset) => (
-              <div key={asset.id} className={`flex items-center gap-2 rounded-lg border p-2 ${value?.assetId === asset.id ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)]' : 'border-[var(--color-border)]'}`}>
-                <button onClick={() => onChange({ assetId: asset.id, altOverride: asset.alt ?? undefined })} className="flex flex-1 items-center gap-2 text-left text-xs min-w-0">
-                  <img src={asset.url} alt={asset.alt ?? ''} className="h-10 w-10 flex-shrink-0 rounded object-cover" />
-                  <span className="truncate">{asset.alt || assetFileName(asset.storageKey)}</span>
-                </button>
-                <button
-                  onClick={() => { if (confirm('Asset löschen?')) deleteAsset.mutate({ projectId, assetId: asset.id }); }}
-                  className="flex-shrink-0 rounded p-1 text-xs text-muted hover:bg-red-50 hover:text-red-600"
-                  title="Löschen"
-                >✕</button>
-              </div>
-            ))}
+
+      <Dialog open={libraryOpen} onOpenChange={setLibraryOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Medienbibliothek</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <label className={`inline-flex cursor-pointer items-center gap-2 rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm font-medium hover:bg-[var(--color-muted-soft)] ${uploading ? 'opacity-50' : ''}`}>
+              {uploading ? 'Lädt…' : '+ Bild hochladen'}
+              <input type="file" accept="image/*" disabled={uploading} className="sr-only"
+                onChange={(e) => { const file = e.target.files?.[0]; if (file) void upload(file); }} />
+            </label>
+            {(assets?.length ?? 0) === 0 && <p className="text-sm text-muted">Noch keine Bilder hochgeladen.</p>}
+            <div className="grid grid-cols-3 gap-3 max-h-[480px] overflow-auto">
+              {assets?.map((asset) => (
+                <div key={asset.id} className={`group relative rounded-xl border-2 overflow-hidden ${value?.assetId === asset.id ? 'border-[var(--color-accent)]' : 'border-[var(--color-border)]'}`}>
+                  <button onClick={() => { onChange({ assetId: asset.id, altOverride: asset.alt ?? undefined }); setLibraryOpen(false); }} className="block w-full">
+                    <img src={asset.url} alt={asset.alt ?? ''} className="aspect-square w-full object-cover" />
+                    <p className="truncate px-2 py-1.5 text-xs text-muted">{asset.alt || assetFileName(asset.storageKey)}</p>
+                  </button>
+                  <button
+                    onClick={() => { if (confirm('Asset löschen?')) deleteAsset.mutate({ projectId, assetId: asset.id }); }}
+                    className="absolute right-1 top-1 rounded-full bg-white/80 p-1 text-xs text-muted opacity-0 transition-opacity group-hover:opacity-100 hover:bg-red-50 hover:text-red-600"
+                    title="Löschen"
+                  >✕</button>
+                  {value?.assetId === asset.id && (
+                    <div className="absolute bottom-0 left-0 right-0 bg-[var(--color-accent)] py-0.5 text-center text-xs text-white">Ausgewählt</div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -336,8 +353,23 @@ export function WebsiteEditorShell({ projectId, tenantHoursRows, tenantContactIn
   const [selectedBlockId, setSelectedBlockId] = useState<string>('');
   const [newPageTitle, setNewPageTitle] = useState('');
   const [newPagePath, setNewPagePath] = useState('');
-  const saveDraft = trpc.websitePlatform.saveDraft.useMutation({ onSuccess: () => currentPage && utils.websitePlatform.getDraft.invalidate({ pageId: currentPage.id }) });
-  const publish = trpc.websitePlatform.publishPage.useMutation({ onSuccess: () => currentPage && utils.websitePlatform.getDraft.invalidate({ pageId: currentPage.id }) });
+  const [isDirty, setIsDirty] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const saveDraft = trpc.websitePlatform.saveDraft.useMutation({
+    onSuccess: () => {
+      setIsDirty(false);
+      setLastSavedAt(new Date());
+      if (currentPage) void utils.websitePlatform.getDraft.invalidate({ pageId: currentPage.id });
+    },
+  });
+  const publish = trpc.websitePlatform.publishPage.useMutation({
+    onSuccess: () => {
+      setIsDirty(false);
+      setLastSavedAt(new Date());
+      void utils.websitePlatform.getProject.invalidate({ projectId });
+      if (currentPage) void utils.websitePlatform.getDraft.invalidate({ pageId: currentPage.id });
+    },
+  });
   const { data: assets } = trpc.websitePlatform.listAssets.useQuery({ projectId });
   const assetMap = useMemo(() => Object.fromEntries((assets ?? []).map((asset) => [asset.id, asset.url])), [assets]);
 
@@ -356,6 +388,8 @@ export function WebsiteEditorShell({ projectId, tenantHoursRows, tenantContactIn
   useEffect(() => {
     setBlocks(initialBlocks);
     setSelectedBlockId(initialBlocks[0]?.id ?? '');
+    setIsDirty(false);
+    setLastSavedAt(null);
   }, [currentPage?.id, draft?.id, initialBlocks]);
 
   const selectedBlock = blocks.find((block) => block.id === selectedBlockId);
@@ -363,12 +397,14 @@ export function WebsiteEditorShell({ projectId, tenantHoursRows, tenantContactIn
     const block = getDefaultBlock(type) as Block;
     setBlocks([...blocks, block]);
     setSelectedBlockId(block.id);
+    setIsDirty(true);
   };
-  const updateBlock = (next: Block) => setBlocks(blocks.map((block) => (block.id === next.id ? next : block)));
+  const updateBlock = (next: Block) => { setBlocks(blocks.map((block) => (block.id === next.id ? next : block))); setIsDirty(true); };
   const removeBlock = (id: string) => {
     const next = blocks.filter((block) => block.id !== id);
     setBlocks(next);
     setSelectedBlockId(next[0]?.id ?? '');
+    setIsDirty(true);
   };
   const moveBlock = (index: number, direction: -1 | 1) => {
     const target = index + direction;
@@ -378,6 +414,7 @@ export function WebsiteEditorShell({ projectId, tenantHoursRows, tenantContactIn
     if (!item) return;
     next.splice(target, 0, item);
     setBlocks(next);
+    setIsDirty(true);
   };
 
   const preview: ResolvedWebsitePage | null = project && currentPage ? {
@@ -413,10 +450,29 @@ export function WebsiteEditorShell({ projectId, tenantHoursRows, tenantContactIn
           <h1 className="text-2xl font-bold">{project?.name ?? 'Website'}</h1>
           <p className="text-muted">Seiten, Blöcke, Inhalte, Medien und Veröffentlichung verwalten.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <a href={project ? `/site/${project.slug}${currentPage?.path === '/' ? '' : currentPage?.path ?? ''}` : '#'} target="_blank" className="inline-flex items-center rounded-xl border border-[var(--color-border)] bg-surface px-4 py-2.5 text-sm font-medium text-[var(--color-accent-text)] shadow-sm hover:bg-[var(--color-accent-soft)]">Öffnen</a>
-          <Button disabled={!currentPage || saveDraft.isPending} onClick={() => currentPage && saveDraft.mutate({ pageId: currentPage.id, blocks })}>Entwurf speichern</Button>
-          <Button disabled={!currentPage || publish.isPending} onClick={() => currentPage && publish.mutate({ pageId: currentPage.id })}>Seite veröffentlichen</Button>
+        <div className="space-y-1.5">
+          <div className="flex flex-wrap gap-2">
+            <a href={project ? `/site/${project.slug}${currentPage?.path === '/' ? '' : currentPage?.path ?? ''}` : '#'} target="_blank" className="inline-flex items-center rounded-xl border border-[var(--color-border)] bg-surface px-4 py-2.5 text-sm font-medium text-[var(--color-accent-text)] shadow-sm hover:bg-[var(--color-accent-soft)]">Öffnen</a>
+            <Button disabled={!currentPage || saveDraft.isPending} onClick={() => currentPage && saveDraft.mutate({ pageId: currentPage.id, blocks })}>
+              {isDirty && <span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-amber-400" />}
+              Entwurf speichern
+            </Button>
+            <Button disabled={!currentPage || publish.isPending} onClick={() => currentPage && publish.mutate({ pageId: currentPage.id })}>Seite veröffentlichen</Button>
+          </div>
+          <div className="flex flex-wrap gap-4 text-xs text-muted">
+            {isDirty ? (
+              <span className="text-amber-600">● Ungespeicherte Änderungen</span>
+            ) : lastSavedAt ? (
+              <span>Gespeichert {lastSavedAt.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</span>
+            ) : draft?.createdAt ? (
+              <span>Entwurf vom {new Date(draft.createdAt).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+            ) : null}
+            {project?.publishedAt ? (
+              <span>Veröffentlicht {new Date(project.publishedAt).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+            ) : (
+              <span>Noch nicht veröffentlicht</span>
+            )}
+          </div>
         </div>
       </div>
 
