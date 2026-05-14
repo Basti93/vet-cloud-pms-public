@@ -5,6 +5,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { trpc } from '@/lib/trpc/client';
+import { TEMPLATE_VAR_DOCS } from '@/lib/website-platform/template';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -281,6 +282,34 @@ function ServicesGridInspector({ block, replaceProps }: { block: ServicesGridBlo
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function TemplateVarsHelper() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="space-y-2">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between text-sm font-medium"
+      >
+        <span>Verfügbare Variablen</span>
+        <span className="text-muted">{open ? '▲' : '▼'}</span>
+      </button>
+      <p className="text-xs" style={{ color: 'var(--color-muted)' }}>
+        In Textfeldern einfügen: z.B. <code className="rounded bg-[var(--color-muted-soft)] px-1">{'{{praxis.name}}'}</code>
+      </p>
+      {open && (
+        <div className="space-y-1 rounded-xl border border-[var(--color-border)] p-2">
+          {TEMPLATE_VAR_DOCS.map(({ key, desc }) => (
+            <div key={key} className="flex items-center justify-between gap-2 rounded px-2 py-1 hover:bg-[var(--color-muted-soft)]">
+              <code className="text-xs" style={{ color: 'var(--color-accent-text)' }}>{key}</code>
+              <span className="text-xs text-muted">{desc}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -627,6 +656,7 @@ export function WebsiteEditorShell({ projectId, tenantHoursRows, tenantContactIn
       seoConfig: null,
       ownerTenantId: project.ownerTenantId,
       logoAsset: project.logoAsset as WebsiteAssetRef | null | undefined,
+      teamMembers: null,
       tenantHoursRows,
       tenantContactInfo,
     },
@@ -741,10 +771,15 @@ export function WebsiteEditorShell({ projectId, tenantHoursRows, tenantContactIn
           </div>
 
           {rightTab === 'content' && (
-            <Card className="p-4">
-              <h2 className="font-semibold">Inhalt bearbeiten</h2>
-              <div className="mt-4"><BlockInspector projectId={projectId} block={selectedBlock} onChange={updateBlock} /></div>
-            </Card>
+            <>
+              <Card className="p-4">
+                <h2 className="font-semibold">Inhalt bearbeiten</h2>
+                <div className="mt-4"><BlockInspector projectId={projectId} block={selectedBlock} onChange={updateBlock} /></div>
+              </Card>
+              <Card className="p-4">
+                <TemplateVarsHelper />
+              </Card>
+            </>
           )}
 
           {rightTab === 'design' && (

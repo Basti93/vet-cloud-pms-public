@@ -1,6 +1,7 @@
 'use client';
 
 import type { WebsiteCapabilityConfig, WebsitePageBlock } from '@/lib/website-platform/types';
+import type { TemplateVars } from '@/lib/website-platform/template';
 import { isCapabilityEnabled } from '@/lib/website-platform/capabilities';
 import { WEBSITE_BLOCK_DEFINITIONS } from '@/lib/website-platform/block-registry';
 import {
@@ -22,6 +23,7 @@ interface Props {
   assetMap?: Record<string, string>;
   projectId: string;
   pagePath: string;
+  templateVars?: TemplateVars;
   tenantHoursRows?: { days: string; time: string }[] | null;
   tenantContactInfo?: { address?: string | null; phone?: string | null; email?: string | null; city?: string | null } | null;
 }

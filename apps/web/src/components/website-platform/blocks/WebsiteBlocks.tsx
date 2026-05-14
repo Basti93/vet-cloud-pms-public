@@ -8,6 +8,7 @@ import type { WebsiteCapabilityConfig, WebsitePageBlock } from '@/lib/website-pl
 import { getBookingUrl } from '@/lib/website-platform/capabilities';
 import { resolveAssetUrl } from '@/lib/website-platform/assets';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { interpolate, type TemplateVars } from '@/lib/website-platform/template';
 
 interface BlockProps<T extends WebsitePageBlock = WebsitePageBlock> {
   block: T;
@@ -15,6 +16,7 @@ interface BlockProps<T extends WebsitePageBlock = WebsitePageBlock> {
   assetMap?: Record<string, string>;
   projectId: string;
   pagePath: string;
+  templateVars?: TemplateVars;
   tenantHoursRows?: { days: string; time: string }[] | null;
   tenantContactInfo?: { address?: string | null; phone?: string | null; email?: string | null; city?: string | null } | null;
 }
@@ -58,12 +60,13 @@ function BookingDialog({ tenantSlug, open, onClose }: { tenantSlug: string; open
 
 // ─── Hero ──────────────────────────────────────────────────────────────────────
 
-export function HeroBlock({ block, capabilities, assetMap }: BlockProps<Extract<WebsitePageBlock, { type: 'hero' }>>) {
+export function HeroBlock({ block, capabilities, assetMap, templateVars = {} }: BlockProps<Extract<WebsitePageBlock, { type: 'hero' }>>) {
   const [bookingOpen, setBookingOpen] = useState(false);
   const imageUrl = resolveAssetUrl(block.props.image, assetMap);
   const bookingUrl = getBookingUrl(capabilities);
   const pmsSlug = capabilities.booking.enabled && capabilities.booking.mode === 'pms' ? capabilities.booking.tenantSlug : null;
   const hasImage = Boolean(imageUrl);
+  const t = (s?: string | null) => interpolate(s, templateVars);
 
   return (
     <section
@@ -101,7 +104,7 @@ export function HeroBlock({ block, capabilities, assetMap }: BlockProps<Extract<
                 className="text-sm font-bold uppercase tracking-widest"
                 style={{ color: hasImage ? '#ffd180' : 'var(--color-accent-text)' }}
               >
-                {block.props.eyebrow}
+                {t(block.props.eyebrow)}
               </span>
             </div>
           )}
@@ -115,7 +118,7 @@ export function HeroBlock({ block, capabilities, assetMap }: BlockProps<Extract<
               textShadow: hasImage ? '0 2px 20px rgba(0,0,0,0.3)' : 'none',
             }}
           >
-            {block.props.title}
+            {t(block.props.title)}
           </h1>
 
           {block.props.subtitle && (
@@ -123,7 +126,7 @@ export function HeroBlock({ block, capabilities, assetMap }: BlockProps<Extract<
               className="mt-5 max-w-xl text-lg leading-relaxed"
               style={{ color: hasImage ? 'rgba(255,255,255,0.9)' : 'var(--color-muted)' }}
             >
-              {block.props.subtitle}
+              {t(block.props.subtitle)}
             </p>
           )}
 
@@ -136,7 +139,7 @@ export function HeroBlock({ block, capabilities, assetMap }: BlockProps<Extract<
                     className="rounded-full px-6 py-3 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90"
                     style={{ background: 'var(--color-secondary, var(--color-accent))' }}
                   >
-                    {block.props.primaryCtaLabel}
+                    {t(block.props.primaryCtaLabel)}
                   </button>
                 )
                 : (
@@ -145,7 +148,7 @@ export function HeroBlock({ block, capabilities, assetMap }: BlockProps<Extract<
                     className="rounded-full px-6 py-3 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90"
                     style={{ background: 'var(--color-secondary, var(--color-accent))' }}
                   >
-                    {block.props.primaryCtaLabel}
+                    {t(block.props.primaryCtaLabel)}
                   </a>
                 )
             )}
@@ -156,7 +159,7 @@ export function HeroBlock({ block, capabilities, assetMap }: BlockProps<Extract<
                 ? { border: '1px solid rgba(255,255,255,0.5)', color: 'white', background: 'rgba(255,255,255,0.08)' }
                 : { border: '1px solid var(--color-border-strong)', color: 'var(--color-fg)', background: 'white' }}
             >
-              {block.props.secondaryCtaLabel}
+              {t(block.props.secondaryCtaLabel)}
             </a>
           </div>
         </div>
@@ -169,7 +172,8 @@ export function HeroBlock({ block, capabilities, assetMap }: BlockProps<Extract<
 
 // ─── Rich Text ─────────────────────────────────────────────────────────────────
 
-export function RichTextBlock({ block }: BlockProps<Extract<WebsitePageBlock, { type: 'richText' }>>) {
+export function RichTextBlock({ block, templateVars = {} }: BlockProps<Extract<WebsitePageBlock, { type: 'richText' }>>) {
+  const t = (s?: string | null) => interpolate(s, templateVars);
   return (
     <section className="py-[var(--spacing-section,4rem)]">
       <div className={sectionInner}>
@@ -178,7 +182,7 @@ export function RichTextBlock({ block }: BlockProps<Extract<WebsitePageBlock, { 
             className="mb-5 text-3xl font-bold"
             style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}
           >
-            {block.props.heading}
+            {t(block.props.heading)}
           </h2>
         )}
         <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: block.props.html }} />
@@ -267,11 +271,12 @@ export function getServiceIcon(iconKey?: string): React.ReactNode {
   return SERVICE_ICONS[iconKey ?? ''] ?? SERVICE_ICONS.default;
 }
 
-export function ServicesGridBlock({ block }: BlockProps<Extract<WebsitePageBlock, { type: 'servicesGrid' }>>) {
+export function ServicesGridBlock({ block, templateVars = {} }: BlockProps<Extract<WebsitePageBlock, { type: 'servicesGrid' }>>) {
+  const t = (s?: string | null) => interpolate(s, templateVars);
   return (
     <section id="leistungen" className="py-[var(--spacing-section,4rem)]" style={{ background: 'white' }}>
       <div className={sectionInner}>
-        <SectionHeading title={block.props.heading} subtitle={block.props.intro} />
+        <SectionHeading title={t(block.props.heading)} subtitle={t(block.props.intro)} />
         {/* Single shared style for hover effects using CSS vars */}
         <style>{`
           .service-card:hover { border-color: var(--color-accent) !important; }
@@ -290,8 +295,8 @@ export function ServicesGridBlock({ block }: BlockProps<Extract<WebsitePageBlock
               >
                 {getServiceIcon(service.iconKey)}
               </div>
-              <h3 className="font-semibold" style={{ color: 'var(--color-fg)' }}>{service.title}</h3>
-              <p className="mt-2 text-sm" style={{ color: 'var(--color-muted)' }}>{service.description}</p>
+              <h3 className="font-semibold" style={{ color: 'var(--color-fg)' }}>{t(service.title)}</h3>
+              <p className="mt-2 text-sm" style={{ color: 'var(--color-muted)' }}>{t(service.description)}</p>
             </article>
           ))}
         </div>
@@ -302,11 +307,12 @@ export function ServicesGridBlock({ block }: BlockProps<Extract<WebsitePageBlock
 
 // ─── Team List ─────────────────────────────────────────────────────────────────
 
-export function TeamListBlock({ block, assetMap }: BlockProps<Extract<WebsitePageBlock, { type: 'teamList' }>>) {
+export function TeamListBlock({ block, assetMap, templateVars = {} }: BlockProps<Extract<WebsitePageBlock, { type: 'teamList' }>>) {
+  const t = (s?: string | null) => interpolate(s, templateVars);
   return (
     <section id="team" className="py-[var(--spacing-section,4rem)]" style={{ background: 'var(--color-bg)' }}>
       <div className={sectionInner}>
-        <SectionHeading title={block.props.heading} subtitle={block.props.intro} />
+        <SectionHeading title={t(block.props.heading)} subtitle={t(block.props.intro)} />
         <div className="mx-auto grid max-w-3xl gap-8 md:grid-cols-2">
           {block.props.people.map((person) => {
             const image = resolveAssetUrl(person.image, assetMap);
@@ -336,7 +342,7 @@ export function TeamListBlock({ block, assetMap }: BlockProps<Extract<WebsitePag
                   className="text-xl font-bold"
                   style={{ fontFamily: 'var(--font-heading)', color: 'var(--color-fg)' }}
                 >
-                  {person.name}
+                  {t(person.name)}
                 </h3>
 
                 {person.title && (
@@ -344,13 +350,13 @@ export function TeamListBlock({ block, assetMap }: BlockProps<Extract<WebsitePag
                     className="mt-2 rounded-full border px-3 py-0.5 text-xs font-medium"
                     style={{ borderColor: 'var(--color-accent)', color: 'var(--color-accent-text)' }}
                   >
-                    {person.title}
+                    {t(person.title)}
                   </span>
                 )}
 
                 {person.bio && (
                   <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--color-muted)' }}>
-                    {person.bio}
+                    {t(person.bio)}
                   </p>
                 )}
 
@@ -643,10 +649,11 @@ export function ContactFormBlock({ block, projectId, pagePath }: BlockProps<Extr
 
 // ─── Booking CTA ───────────────────────────────────────────────────────────────
 
-export function BookingCtaBlock({ block, capabilities }: BlockProps<Extract<WebsitePageBlock, { type: 'bookingCta' }>>) {
+export function BookingCtaBlock({ block, capabilities, templateVars = {} }: BlockProps<Extract<WebsitePageBlock, { type: 'bookingCta' }>>) {
   const [bookingOpen, setBookingOpen] = useState(false);
   const bookingUrl = getBookingUrl(capabilities);
   const pmsSlug = capabilities.booking.enabled && capabilities.booking.mode === 'pms' ? capabilities.booking.tenantSlug : null;
+  const t = (s?: string | null) => interpolate(s, templateVars);
   if (!bookingUrl) return null;
 
   return (
@@ -661,10 +668,10 @@ export function BookingCtaBlock({ block, capabilities }: BlockProps<Extract<Webs
             className="text-3xl font-bold"
             style={{ fontFamily: 'var(--font-heading)', fontWeight: 'var(--font-heading-weight)' }}
           >
-            {block.props.heading}
+            {t(block.props.heading)}
           </h2>
           {block.props.text && (
-            <p className="mt-3 max-w-xl text-base opacity-90">{block.props.text}</p>
+            <p className="mt-3 max-w-xl text-base opacity-90">{t(block.props.text)}</p>
           )}
           {pmsSlug ? (
             <button
@@ -672,7 +679,7 @@ export function BookingCtaBlock({ block, capabilities }: BlockProps<Extract<Webs
               className="mt-6 inline-flex rounded-full bg-white px-7 py-3 font-semibold transition-opacity hover:opacity-90"
               style={{ color: 'var(--color-accent-text)' }}
             >
-              {block.props.buttonLabel}
+              {t(block.props.buttonLabel)}
             </button>
           ) : (
             <a
@@ -680,7 +687,7 @@ export function BookingCtaBlock({ block, capabilities }: BlockProps<Extract<Webs
               className="mt-6 inline-flex rounded-full bg-white px-7 py-3 font-semibold transition-opacity hover:opacity-90"
               style={{ color: 'var(--color-accent-text)' }}
             >
-              {block.props.buttonLabel}
+              {t(block.props.buttonLabel)}
             </a>
           )}
         </div>

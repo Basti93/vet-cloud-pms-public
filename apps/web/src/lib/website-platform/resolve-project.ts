@@ -1,5 +1,5 @@
 import { db } from "@/lib/db/client";
-import { tenants, websiteDomains, websitePageRevisions, websitePages, websiteProjects } from "@/lib/db/schema";
+import { roles, tenants, userRoles, users, websiteDomains, websitePageRevisions, websitePages, websiteProjects } from "@/lib/db/schema";
 import { and, desc, eq } from "drizzle-orm";
 import { normalizeBlocks, normalizeCapabilities, normalizeThemeConfig, websiteProjectSeoSchema } from "./schemas";
 import type { ResolvedWebsitePage } from "./types";
@@ -80,6 +80,15 @@ export async function resolvePublishedWebsitePage(input: { projectId: string; pa
 
   if (!row) return null;
 
+  const teamMembers = row.ownerTenantId
+    ? await db
+        .select({ id: users.id, title: users.title, firstName: users.firstName, lastName: users.lastName })
+        .from(users)
+        .innerJoin(userRoles, eq(userRoles.userId, users.id))
+        .innerJoin(roles, and(eq(roles.id, userRoles.roleId), eq(roles.tenantId, row.ownerTenantId), eq(roles.code, 'vet')))
+        .where(and(eq(users.tenantId, row.ownerTenantId), eq(users.active, true)))
+    : [];
+
   const tenantHoursRows = row.tenantOpeningHours
     ? openingHoursToDisplayRows(normalizeWeekSchedule(row.tenantOpeningHours as DaySchedule[])).map((r) => ({ days: r.day, time: r.time }))
     : null;
@@ -104,6 +113,11 @@ export async function resolvePublishedWebsitePage(input: { projectId: string; pa
       tenantContactInfo,
       logoAsset: row.logoAsset as import('./types').WebsiteAssetRef | null,
       customCss: row.customCss,
+      teamMembers: teamMembers.map((m) => ({
+        id: m.id,
+        fullName: [m.title, m.firstName, m.lastName].filter(Boolean).join(' '),
+        title: m.title,
+      })),
     },
     page: {
       id: row.pageId,
