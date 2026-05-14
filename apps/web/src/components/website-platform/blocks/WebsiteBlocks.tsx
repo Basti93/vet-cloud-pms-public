@@ -43,7 +43,7 @@ function SectionHeading({ icon, title, subtitle }: { icon?: React.ReactNode; tit
   );
 }
 
-function BookingDialog({ tenantSlug, open, onClose }: { tenantSlug: string; open: boolean; onClose: () => void }) {
+export function BookingDialog({ tenantSlug, open, onClose }: { tenantSlug: string; open: boolean; onClose: () => void }) {
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
       <DialogContent
@@ -97,8 +97,8 @@ export function HeroBlock({ block, capabilities, assetMap, templateVars = {} }: 
       {slideUrls.map((url, i) => (
         <div
           key={url}
-          className="absolute inset-0 bg-cover bg-center transition-opacity duration-1000"
-          style={{ backgroundImage: `url(${url})`, opacity: i === slideIndex ? 1 : 0 }}
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: `url(${url})`, opacity: i === slideIndex ? 1 : 0, transition: 'opacity 1.8s cubic-bezier(0.4, 0, 0.2, 1)', willChange: 'opacity' }}
         />
       ))}
       {!hasImage && <div className="absolute inset-0" style={{ background: 'var(--color-accent-soft)' }} />}

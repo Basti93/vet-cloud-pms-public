@@ -8,13 +8,18 @@ import type { ResolvedWebsitePage } from '@/lib/website-platform/types';
 import { getBookingUrl } from '@/lib/website-platform/capabilities';
 import { generateThemeStyles, getPrimaryHex } from '@/lib/theme-utils';
 import { resolveAssetUrl } from '@/lib/website-platform/assets';
+import { BookingDialog } from '@/components/website-platform/blocks/WebsiteBlocks';
 
 const FONTS_HREF =
   'https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Public+Sans:wght@400;500;600;700&display=swap';
 
 export function PraxisLayout({ resolved, assetMap, children }: { resolved: ResolvedWebsitePage; assetMap?: Record<string, string>; children?: ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [bookingOpen, setBookingOpen] = useState(false);
   const bookingUrl = getBookingUrl(resolved.project.capabilities);
+  const pmsSlug = resolved.project.capabilities.booking.enabled && resolved.project.capabilities.booking.mode === 'pms'
+    ? resolved.project.capabilities.booking.tenantSlug
+    : null;
   const basePath = `/site/${resolved.project.slug}`;
   const phone = resolved.project.tenantContactInfo?.phone;
   const themeStyles = generateThemeStyles(
@@ -99,13 +104,23 @@ export function PraxisLayout({ resolved, assetMap, children }: { resolved: Resol
               </a>
             )}
             {bookingUrl && (
-              <a
-                href={bookingUrl}
-                className="rounded-full px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
-                style={{ background: 'var(--color-secondary, var(--color-accent))' }}
-              >
-                Termin buchen
-              </a>
+              pmsSlug ? (
+                <button
+                  onClick={() => setBookingOpen(true)}
+                  className="rounded-full px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                  style={{ background: 'var(--color-secondary, var(--color-accent))' }}
+                >
+                  Termin buchen
+                </button>
+              ) : (
+                <a
+                  href={bookingUrl}
+                  className="rounded-full px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                  style={{ background: 'var(--color-secondary, var(--color-accent))' }}
+                >
+                  Termin buchen
+                </a>
+              )
             )}
           </div>
 
@@ -146,14 +161,24 @@ export function PraxisLayout({ resolved, assetMap, children }: { resolved: Resol
             </nav>
             <div className="mt-4 flex flex-col gap-2">
               {bookingUrl && (
-                <a
-                  href={bookingUrl}
-                  onClick={() => setMenuOpen(false)}
-                  className="rounded-full py-3 text-center text-sm font-semibold text-white"
-                  style={{ background: 'var(--color-secondary, var(--color-accent))' }}
-                >
-                  Termin buchen
-                </a>
+                pmsSlug ? (
+                  <button
+                    onClick={() => { setMenuOpen(false); setBookingOpen(true); }}
+                    className="rounded-full py-3 text-center text-sm font-semibold text-white"
+                    style={{ background: 'var(--color-secondary, var(--color-accent))' }}
+                  >
+                    Termin buchen
+                  </button>
+                ) : (
+                  <a
+                    href={bookingUrl}
+                    onClick={() => setMenuOpen(false)}
+                    className="rounded-full py-3 text-center text-sm font-semibold text-white"
+                    style={{ background: 'var(--color-secondary, var(--color-accent))' }}
+                  >
+                    Termin buchen
+                  </a>
+                )
               )}
               {phone && (
                 <a
@@ -243,6 +268,7 @@ export function PraxisLayout({ resolved, assetMap, children }: { resolved: Resol
           </div>
         </div>
       </footer>
+      {pmsSlug && <BookingDialog tenantSlug={pmsSlug} open={bookingOpen} onClose={() => setBookingOpen(false)} />}
     </div>
   );
 }
