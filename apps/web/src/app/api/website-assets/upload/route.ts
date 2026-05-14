@@ -5,8 +5,9 @@ import { mkdir, writeFile } from 'fs/promises';
 import path from 'path';
 import { z } from 'zod';
 import { db } from '@/lib/db/client';
-import { users, websiteAssets, websiteProjects } from '@/lib/db/schema';
+import { auditLogs, users, websiteAssets, websiteProjects } from '@/lib/db/schema';
 import { and, eq } from 'drizzle-orm';
+import { AUDIT_SCHEMA_VERSION } from '@/server/audit';
 
 export const runtime = 'nodejs';
 
@@ -51,6 +52,17 @@ export async function POST(request: NextRequest) {
     alt: typeof formData.get('alt') === 'string' ? String(formData.get('alt')) : undefined,
     createdByUserId: user.id,
   }).returning();
+
+  await db.insert(auditLogs).values({
+    tenantId: user.tenantId,
+    userId: user.id,
+    action: 'create',
+    entityType: 'website_asset',
+    entityId: asset.id,
+    changes: { schemaVersion: AUDIT_SCHEMA_VERSION, event: 'website_asset.upload', summary: `Asset hochgeladen: ${file.name}`, actor: { userId: user.id }, target: { entityType: 'website_asset', entityId: asset.id }, diff: { fileName: file.name, mimeType: file.type, sizeBytes: file.size }, metadata: {}, occurredAt: new Date().toISOString() },
+    ipAddress: request.headers.get('x-forwarded-for'),
+    userAgent: request.headers.get('user-agent'),
+  });
 
   return NextResponse.json({ asset });
 }

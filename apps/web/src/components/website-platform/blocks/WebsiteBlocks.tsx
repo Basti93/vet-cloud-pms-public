@@ -24,17 +24,18 @@ const section = 'mx-auto max-w-6xl px-4 py-14 sm:px-6 lg:px-8';
 function BookingDialog({ tenantSlug, open, onClose }: { tenantSlug: string; open: boolean; onClose: () => void }) {
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
-      <DialogContent className="max-w-2xl h-[90vh] p-0 overflow-hidden flex flex-col gap-0">
+      <DialogContent
+        className="max-w-2xl"
+        style={{ height: '90vh', padding: 0, display: 'flex', flexDirection: 'column', gap: 0, overflow: 'hidden' }}
+      >
         <DialogHeader className="flex-shrink-0 px-4 py-3 border-b border-[var(--color-border)]">
           <DialogTitle>Termin buchen</DialogTitle>
         </DialogHeader>
-        <div className="flex-1 min-h-0 overflow-hidden">
-          <iframe
-            src={`/book/${tenantSlug}`}
-            className="w-full h-full border-0"
-            title="Termin buchen"
-          />
-        </div>
+        <iframe
+          src={`/book/${tenantSlug}`}
+          style={{ flex: 1, width: '100%', border: 0, minHeight: 0 }}
+          title="Termin buchen"
+        />
       </DialogContent>
     </Dialog>
   );
@@ -130,7 +131,9 @@ export function MapEmbedBlock({ block, tenantContactInfo }: BlockProps<Extract<W
     ? [tenantContactInfo.address, tenantContactInfo.city].filter(Boolean).join(', ') || undefined
     : block.props.address;
 
-  return <section className={section}>{block.props.heading && <h2 className="mb-5 text-3xl font-bold">{block.props.heading}</h2>}{block.props.embedUrl ? <iframe src={block.props.embedUrl} className="h-80 w-full rounded-3xl border-0 shadow-sm" loading="lazy" /> : <div className="rounded-3xl border border-[var(--color-border)] bg-white p-8 text-muted">{address}</div>}</section>;
+  const embedSrc = block.props.embedUrl || (address ? `https://www.google.com/maps?q=${encodeURIComponent(address)}&output=embed` : null);
+
+  return <section className={section}>{block.props.heading && <h2 className="mb-5 text-3xl font-bold">{block.props.heading}</h2>}{embedSrc ? <iframe src={embedSrc} className="h-80 w-full rounded-3xl border-0 shadow-sm" loading="lazy" /> : null}</section>;
 }
 
 export function LegalTextBlock({ block }: BlockProps<Extract<WebsitePageBlock, { type: 'legalText' }>>) {
