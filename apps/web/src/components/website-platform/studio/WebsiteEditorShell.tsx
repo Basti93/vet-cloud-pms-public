@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { getDefaultBlock, WEBSITE_BLOCK_DEFINITIONS, type WebsiteBlockType } from '@/lib/website-platform/block-registry';
 import { pageBlocksSchema, pageBlockSchema } from '@/lib/website-platform/schemas';
 import { PageRenderer } from '@/components/website-platform/renderer/PageRenderer';
+import { getServiceIcon } from '@/components/website-platform/blocks/WebsiteBlocks';
 import type { ResolvedWebsitePage, WebsiteAssetRef } from '@/lib/website-platform/types';
 import type { z } from 'zod';
 
@@ -257,18 +258,27 @@ function ServicesGridInspector({ block, replaceProps }: { block: ServicesGridBlo
           </div>
           <TextField label="Titel" value={service.title} onChange={(title) => updateService(index, { title })} />
           <TextField label="Beschreibung" value={service.description} multiline onChange={(description) => updateService(index, { description })} />
-          <label className="block space-y-1.5 text-sm">
-            <span className="font-medium text-fg">Icon</span>
-            <select
-              value={service.iconKey ?? 'heart'}
-              onChange={(e) => updateService(index, { iconKey: e.target.value })}
-              className="w-full rounded-lg border border-[var(--color-border)] bg-white px-3 py-2 text-sm"
-            >
+          <div className="space-y-1.5">
+            <span className="text-sm font-medium">Icon</span>
+            <div className="grid grid-cols-4 gap-1">
               {SERVICE_ICON_KEYS.map(({ key, label }) => (
-                <option key={key} value={key}>{label}</option>
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => updateService(index, { iconKey: key })}
+                  title={label}
+                  className={`flex flex-col items-center gap-1 rounded-lg p-2 transition-colors ${
+                    (service.iconKey ?? 'heart') === key
+                      ? 'bg-[var(--color-accent)] text-white'
+                      : 'border border-[var(--color-border)] hover:bg-[var(--color-muted-soft)]'
+                  }`}
+                >
+                  <span className="[&_svg]:h-5 [&_svg]:w-5">{getServiceIcon(key)}</span>
+                  <span className="text-[10px] leading-tight text-center truncate w-full">{label.split(' ')[0]}</span>
+                </button>
               ))}
-            </select>
-          </label>
+            </div>
+          </div>
         </div>
       ))}
     </div>
@@ -398,43 +408,71 @@ function BlockInspector({ projectId, block, onChange }: { projectId: string; blo
 function LogoEditor({ projectId, initialLogo }: { projectId: string; initialLogo?: WebsiteAssetRef | null }) {
   const utils = trpc.useUtils();
   const { data: assets } = trpc.websitePlatform.listAssets.useQuery({ projectId });
+  const [uploading, setUploading] = useState(false);
   const save = trpc.websitePlatform.updateProjectSettings.useMutation({
     onSuccess: () => void utils.websitePlatform.getProject.invalidate({ projectId }),
   });
-  const current = initialLogo?.assetId
+  const currentAsset = initialLogo?.assetId
     ? assets?.find((a) => a.id === initialLogo.assetId)
     : null;
+
+  async function upload(file: File) {
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const response = await fetch(`/api/website-assets/upload?projectId=${projectId}`, { method: 'POST', body: form });
+      if (!response.ok) throw new Error(await response.text());
+      const payload = (await response.json()) as { asset: Asset };
+      save.mutate({ projectId, logoAsset: { assetId: payload.asset.id } });
+      await utils.websitePlatform.listAssets.invalidate({ projectId });
+    } finally {
+      setUploading(false);
+    }
+  }
 
   return (
     <div className="space-y-3">
       <p className="text-sm font-medium">Logo / Favicon</p>
       <p className="text-xs" style={{ color: 'var(--color-muted)' }}>
-        Wird im Navigationsmenü der Website und als Favicon verwendet. Ohne Logo: Monogramm aus erstem Buchstaben.
+        Wird im Navigationsmenü und als Favicon verwendet. Ohne Logo: Monogramm aus erstem Buchstaben.
       </p>
-      {current ? (
+      {currentAsset ? (
         <div className="flex items-center gap-3">
-          <img src={current.url} alt="Logo" className="h-12 w-12 rounded-lg object-contain border border-[var(--color-border)]" />
+          <img src={currentAsset.url} alt="Logo" className="h-12 w-12 rounded-lg object-contain border border-[var(--color-border)]" />
           <div className="flex-1 min-w-0">
-            <p className="text-xs truncate text-muted">{current.storageKey.split('/').pop()}</p>
+            <p className="text-xs truncate text-muted">{assetFileName(currentAsset.storageKey)}</p>
           </div>
           <Button size="sm" variant="ghost" onClick={() => save.mutate({ projectId, logoAsset: null })}>Entfernen</Button>
         </div>
       ) : (
         <p className="rounded-xl border border-dashed border-[var(--color-border)] p-3 text-center text-xs text-muted">
-          Kein Logo gesetzt — Monogramm wird verwendet
+          Kein Logo — Monogramm wird verwendet
         </p>
       )}
-      <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
-        {assets?.filter((a) => /\.(png|jpg|jpeg|svg|webp)$/i.test(a.storageKey)).map((asset) => (
-          <button
-            key={asset.id}
-            onClick={() => save.mutate({ projectId, logoAsset: { assetId: asset.id } })}
-            className={`relative rounded-lg border p-1 transition-colors hover:border-[var(--color-accent)] ${initialLogo?.assetId === asset.id ? 'border-[var(--color-accent)] ring-2 ring-[var(--color-accent-soft)]' : 'border-[var(--color-border)]'}`}
-          >
-            <img src={asset.url} alt={asset.alt ?? ''} className="h-12 w-full object-contain" />
-          </button>
-        ))}
+      <div className="flex flex-wrap gap-2">
+        <label className={`cursor-pointer rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-xs font-medium hover:bg-[var(--color-muted-soft)] ${uploading ? 'opacity-50' : ''}`}>
+          {uploading ? 'Lädt…' : '+ Logo hochladen'}
+          <input type="file" accept="image/*" disabled={uploading} className="sr-only"
+            onChange={(e) => { const file = e.target.files?.[0]; if (file) void upload(file); }} />
+        </label>
       </div>
+      {(assets?.filter((a) => /\.(png|jpg|jpeg|svg|webp)$/i.test(a.storageKey))?.length ?? 0) > 0 && (
+        <div className="space-y-1.5">
+          <p className="text-xs font-medium text-muted">Aus Bibliothek wählen</p>
+          <div className="grid grid-cols-4 gap-2 max-h-40 overflow-y-auto">
+            {assets?.filter((a) => /\.(png|jpg|jpeg|svg|webp)$/i.test(a.storageKey)).map((asset) => (
+              <button
+                key={asset.id}
+                onClick={() => save.mutate({ projectId, logoAsset: { assetId: asset.id } })}
+                className={`relative rounded-lg border p-1 transition-colors hover:border-[var(--color-accent)] ${initialLogo?.assetId === asset.id ? 'border-[var(--color-accent)] ring-2 ring-[var(--color-accent-soft)]' : 'border-[var(--color-border)]'}`}
+              >
+                <img src={asset.url} alt={asset.alt ?? ''} className="h-10 w-full object-contain" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -501,6 +539,7 @@ export function WebsiteEditorShell({ projectId, tenantHoursRows, tenantContactIn
   const [newPagePath, setNewPagePath] = useState('');
   const [isDirty, setIsDirty] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [rightTab, setRightTab] = useState<'content' | 'design'>('content');
   const saveDraft = trpc.websitePlatform.saveDraft.useMutation({
     onSuccess: () => {
       setIsDirty(false);
@@ -685,16 +724,38 @@ export function WebsiteEditorShell({ projectId, tenantHoursRows, tenantContactIn
         </div>
 
         <div className="space-y-4">
-          <Card className="p-4">
-            <h2 className="font-semibold">Inhalt bearbeiten</h2>
-            <div className="mt-4"><BlockInspector projectId={projectId} block={selectedBlock} onChange={updateBlock} /></div>
-          </Card>
-          <Card className="p-4">
-            <LogoEditor projectId={projectId} initialLogo={project?.logoAsset as WebsiteAssetRef | null | undefined} />
-          </Card>
-          <Card className="p-4">
-            <CustomCssEditor projectId={projectId} initialCss={project?.customCss} />
-          </Card>
+          <div className="flex rounded-xl border border-[var(--color-border)] overflow-hidden">
+            <button
+              onClick={() => setRightTab('content')}
+              className={`flex-1 py-2 text-sm font-medium transition-colors ${rightTab === 'content' ? 'bg-[var(--color-accent)] text-white' : 'bg-white hover:bg-[var(--color-muted-soft)]'}`}
+            >
+              Inhalt
+            </button>
+            <button
+              onClick={() => setRightTab('design')}
+              className={`flex-1 py-2 text-sm font-medium transition-colors ${rightTab === 'design' ? 'bg-[var(--color-accent)] text-white' : 'bg-white hover:bg-[var(--color-muted-soft)]'}`}
+            >
+              Design
+            </button>
+          </div>
+
+          {rightTab === 'content' && (
+            <Card className="p-4">
+              <h2 className="font-semibold">Inhalt bearbeiten</h2>
+              <div className="mt-4"><BlockInspector projectId={projectId} block={selectedBlock} onChange={updateBlock} /></div>
+            </Card>
+          )}
+
+          {rightTab === 'design' && (
+            <>
+              <Card className="p-4">
+                <LogoEditor projectId={projectId} initialLogo={project?.logoAsset as WebsiteAssetRef | null | undefined} />
+              </Card>
+              <Card className="p-4">
+                <CustomCssEditor projectId={projectId} initialCss={project?.customCss} />
+              </Card>
+            </>
+          )}
         </div>
       </div>
     </div>
