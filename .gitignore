@@ -26,3 +26,9 @@ coverage/
 .claude/mcp.json
 # Tenant-uploaded assets (binary content, not git)
 apps/web/public/tenant-assets/
+# Claude Code / tool artifacts
+.ai/
+.agents/
+.rtk/
+# Playwright test results
+apps/web/test-results/
