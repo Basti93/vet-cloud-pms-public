@@ -286,8 +286,19 @@ function ServicesGridInspector({ block, replaceProps }: { block: ServicesGridBlo
   );
 }
 
-function TemplateVarsHelper() {
+function TemplateVarsHelper({ projectId }: { projectId: string }) {
   const [open, setOpen] = useState(false);
+  const { data: teamMembers } = trpc.websitePlatform.listTeamMembers.useQuery({ projectId });
+
+  const staticVars = TEMPLATE_VAR_DOCS.filter((v) => !v.key.startsWith('{{team.'));
+  const teamVars = (teamMembers ?? []).flatMap((m, i) => {
+    const fullName = [m.title, m.firstName, m.lastName].filter(Boolean).join(' ');
+    return [
+      { key: `{{team.${i + 1}.name}}`, desc: fullName },
+      ...(m.title ? [{ key: `{{team.${i + 1}.titel}}`, desc: `Titel: ${m.title}` }] : []),
+    ];
+  });
+
   return (
     <div className="space-y-2">
       <button
@@ -302,12 +313,26 @@ function TemplateVarsHelper() {
       </p>
       {open && (
         <div className="space-y-1 rounded-xl border border-[var(--color-border)] p-2">
-          {TEMPLATE_VAR_DOCS.map(({ key, desc }) => (
+          {staticVars.map(({ key, desc }) => (
             <div key={key} className="flex items-center justify-between gap-2 rounded px-2 py-1 hover:bg-[var(--color-muted-soft)]">
               <code className="text-xs" style={{ color: 'var(--color-accent-text)' }}>{key}</code>
               <span className="text-xs text-muted">{desc}</span>
             </div>
           ))}
+          {teamVars.length > 0 && (
+            <>
+              <p className="px-2 pt-2 text-xs font-medium text-muted">Tierärzte (alphabetisch sortiert)</p>
+              {teamVars.map(({ key, desc }) => (
+                <div key={key} className="flex items-center justify-between gap-2 rounded px-2 py-1 hover:bg-[var(--color-muted-soft)]">
+                  <code className="text-xs" style={{ color: 'var(--color-accent-text)' }}>{key}</code>
+                  <span className="text-xs text-muted truncate">{desc}</span>
+                </div>
+              ))}
+            </>
+          )}
+          {teamMembers?.length === 0 && (
+            <p className="px-2 py-1 text-xs text-muted">Keine aktiven Tierärzte gefunden.</p>
+          )}
         </div>
       )}
     </div>
@@ -797,7 +822,7 @@ export function WebsiteEditorShell({ projectId, tenantHoursRows, tenantContactIn
                 <div className="mt-4"><BlockInspector projectId={projectId} block={selectedBlock} onChange={updateBlock} /></div>
               </Card>
               <Card className="p-4">
-                <TemplateVarsHelper />
+                <TemplateVarsHelper projectId={projectId} />
               </Card>
             </>
           )}

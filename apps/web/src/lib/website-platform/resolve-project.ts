@@ -1,6 +1,6 @@
 import { db } from "@/lib/db/client";
 import { roles, tenants, userRoles, users, websiteDomains, websitePageRevisions, websitePages, websiteProjects } from "@/lib/db/schema";
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { normalizeBlocks, normalizeCapabilities, normalizeThemeConfig, websiteProjectSeoSchema } from "./schemas";
 import type { ResolvedWebsitePage } from "./types";
 import { openingHoursToDisplayRows, normalizeWeekSchedule, type DaySchedule } from "@/lib/schedule-types";
@@ -87,6 +87,7 @@ export async function resolvePublishedWebsitePage(input: { projectId: string; pa
         .innerJoin(userRoles, eq(userRoles.userId, users.id))
         .innerJoin(roles, and(eq(roles.id, userRoles.roleId), eq(roles.tenantId, row.ownerTenantId), eq(roles.code, 'vet')))
         .where(and(eq(users.tenantId, row.ownerTenantId), eq(users.active, true)))
+        .orderBy(asc(users.lastName), asc(users.firstName))
     : [];
 
   const tenantHoursRows = row.tenantOpeningHours
