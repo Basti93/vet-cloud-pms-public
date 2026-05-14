@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import * as LucideIcons from 'lucide-react';
-import { Calendar, Clock, Mail, MapPin, Phone } from 'lucide-react';
+import { Calendar, Clock, Mail, MapPin, PawPrint, Phone } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { WebsiteCapabilityConfig, WebsitePageBlock } from '@/lib/website-platform/types';
 import { getBookingUrl } from '@/lib/website-platform/capabilities';
@@ -304,7 +304,7 @@ export function TeamListBlock({ block, assetMap, templateVars = {} }: BlockProps
   return (
     <section id="team" className="py-[var(--spacing-section,4rem)]" style={{ background: 'var(--color-bg)' }}>
       <div className={sectionInner}>
-        <SectionHeading title={t(block.props.heading)} subtitle={t(block.props.intro)} />
+        <SectionHeading icon={<PawPrint className="h-10 w-10" />} title={t(block.props.heading)} subtitle={t(block.props.intro)} />
         <div className="mx-auto grid max-w-3xl gap-8 md:grid-cols-2">
           {block.props.people.map((person) => {
             const image = resolveAssetUrl(person.image, assetMap);
