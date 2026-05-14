@@ -3,7 +3,8 @@
 /* eslint-disable @next/next/no-img-element */
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { trpc } from '@/lib/trpc/client';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -340,6 +341,7 @@ export function WebsiteEditorShell({ projectId, tenantHoursRows, tenantContactIn
   tenantHoursRows?: { days: string; time: string }[] | null;
   tenantContactInfo?: { address?: string | null; phone?: string | null; email?: string | null; city?: string | null } | null;
 }) {
+  const router = useRouter();
   const utils = trpc.useUtils();
   const { data: project } = trpc.websitePlatform.getProject.useQuery({ projectId });
   const { data: pages } = trpc.websitePlatform.listPages.useQuery({ projectId });
@@ -391,6 +393,18 @@ export function WebsiteEditorShell({ projectId, tenantHoursRows, tenantContactIn
     setIsDirty(false);
     setLastSavedAt(null);
   }, [currentPage?.id, draft?.id, initialBlocks]);
+
+  const isDirtyRef = useRef(isDirty);
+  useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
+
+  useEffect(() => {
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      if (!isDirtyRef.current) return;
+      e.preventDefault();
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
 
   const selectedBlock = blocks.find((block) => block.id === selectedBlockId);
   const addBlock = (type: WebsiteBlockType) => {
@@ -446,7 +460,13 @@ export function WebsiteEditorShell({ projectId, tenantHoursRows, tenantContactIn
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <Link href="/dashboard/websites" className="text-sm text-muted">← Websites</Link>
+          <button
+              onClick={() => {
+                if (isDirty && !confirm('Ungespeicherte Änderungen gehen verloren. Trotzdem verlassen?')) return;
+                router.push('/dashboard/websites');
+              }}
+              className="text-sm text-muted hover:text-fg"
+            >← Websites</button>
           <h1 className="text-2xl font-bold">{project?.name ?? 'Website'}</h1>
           <p className="text-muted">Seiten, Blöcke, Inhalte, Medien und Veröffentlichung verwalten.</p>
         </div>
