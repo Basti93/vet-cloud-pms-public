@@ -359,7 +359,10 @@ function BlockInspector({ projectId, block, onChange }: { projectId: string; blo
   const replaceProps = (props: Block['props']) => onChange({ ...block, props } as Block);
 
   switch (block.type) {
-    case 'hero':
+    case 'hero': {
+      const heroImages = block.props.images?.length
+        ? block.props.images
+        : block.props.image ? [block.props.image] : [];
       return (
         <div className="space-y-3">
           <TextField label="Eyebrow" value={block.props.eyebrow} onChange={(eyebrow) => replaceProps({ ...block.props, eyebrow })} />
@@ -367,9 +370,53 @@ function BlockInspector({ projectId, block, onChange }: { projectId: string; blo
           <TextField label="Untertitel" value={block.props.subtitle} multiline onChange={(subtitle) => replaceProps({ ...block.props, subtitle })} />
           <TextField label="Primärer Button" value={block.props.primaryCtaLabel} onChange={(primaryCtaLabel) => replaceProps({ ...block.props, primaryCtaLabel })} />
           <TextField label="Sekundärer Button" value={block.props.secondaryCtaLabel} onChange={(secondaryCtaLabel) => replaceProps({ ...block.props, secondaryCtaLabel })} />
-          <MediaPicker projectId={projectId} value={block.props.image} onChange={(image) => replaceProps({ ...block.props, image })} />
+          <div className="space-y-2 rounded-xl border border-[var(--color-border)] p-3">
+            <p className="text-sm font-medium">Slideshow-Bilder</p>
+            {heroImages.map((img, idx) => (
+              <div key={idx} className="flex items-start gap-2">
+                <div className="flex-1">
+                  <MediaPicker
+                    projectId={projectId}
+                    label={heroImages.length > 1 ? `Bild ${idx + 1}` : 'Bild'}
+                    value={img}
+                    onChange={(updated) => {
+                      const next = heroImages.map((x, i) => (i === idx ? updated : x)).filter(Boolean) as typeof heroImages;
+                      replaceProps({ ...block.props, images: updated ? next : heroImages.filter((_, i) => i !== idx), image: undefined });
+                    }}
+                  />
+                </div>
+                {heroImages.length > 1 && (
+                  <button
+                    className="mt-6 rounded-lg border border-[var(--color-border)] px-2 py-1.5 text-xs text-muted hover:bg-[var(--color-muted-soft)]"
+                    onClick={() => replaceProps({ ...block.props, images: heroImages.filter((_, i) => i !== idx), image: undefined })}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              className="w-full rounded-lg border border-dashed border-[var(--color-border)] py-2 text-xs text-muted hover:bg-[var(--color-muted-soft)]"
+              onClick={() => replaceProps({ ...block.props, images: [...heroImages, { assetId: '', altOverride: '' }], image: undefined })}
+            >
+              + Bild hinzufügen
+            </button>
+            {heroImages.length > 1 && (
+              <div className="flex items-center gap-2 pt-1">
+                <label className="text-xs text-muted whitespace-nowrap">Wechsel alle</label>
+                <input
+                  type="range" min={2} max={30} step={1}
+                  value={block.props.slideshowInterval ?? 5}
+                  onChange={(e) => replaceProps({ ...block.props, slideshowInterval: Number(e.target.value) })}
+                  className="flex-1"
+                />
+                <span className="text-xs text-muted w-10 text-right">{block.props.slideshowInterval ?? 5}s</span>
+              </div>
+            )}
+          </div>
         </div>
       );
+    }
     case 'servicesGrid':
       return <ServicesGridInspector block={block} replaceProps={replaceProps} />;
     case 'teamList':

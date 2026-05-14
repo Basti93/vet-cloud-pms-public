@@ -26,6 +26,8 @@ export function createDefaultWebsiteBlocks(input: {
         eyebrow: "Ihre Praxiswebsite",
         title: input.practiceName || "Ihre Tierarztpraxis",
         subtitle: "Stellen Sie Ihre Praxis, Ihr Team und Ihre Leistungen vor — mit direkter Online-Terminbuchung.",
+        images: [],
+        slideshowInterval: 5,
         primaryCtaLabel: "Termin buchen",
         secondaryCtaLabel: "Kontakt",
       },

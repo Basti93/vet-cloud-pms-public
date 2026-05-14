@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import * as LucideIcons from 'lucide-react';
 import { Calendar, Clock, Mail, MapPin, Phone } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -67,10 +67,24 @@ function BookingDialog({ tenantSlug, open, onClose }: { tenantSlug: string; open
 
 export function HeroBlock({ block, capabilities, assetMap, templateVars = {} }: BlockProps<Extract<WebsitePageBlock, { type: 'hero' }>>) {
   const [bookingOpen, setBookingOpen] = useState(false);
-  const imageUrl = resolveAssetUrl(block.props.image, assetMap);
+  const [slideIndex, setSlideIndex] = useState(0);
+
+  // Build ordered image list: new `images` array first, fall back to legacy `image`
+  const slideAssets = block.props.images?.length
+    ? block.props.images
+    : block.props.image ? [block.props.image] : [];
+  const slideUrls = slideAssets.map((ref) => resolveAssetUrl(ref, assetMap)).filter(Boolean) as string[];
+
+  const intervalMs = (block.props.slideshowInterval ?? 5) * 1000;
+  useEffect(() => {
+    if (slideUrls.length <= 1) return;
+    const id = setInterval(() => setSlideIndex((i) => (i + 1) % slideUrls.length), intervalMs);
+    return () => clearInterval(id);
+  }, [slideUrls.length, intervalMs]);
+
   const bookingUrl = getBookingUrl(capabilities);
   const pmsSlug = capabilities.booking.enabled && capabilities.booking.mode === 'pms' ? capabilities.booking.tenantSlug : null;
-  const hasImage = Boolean(imageUrl);
+  const hasImage = slideUrls.length > 0;
   const t = (s?: string | null) => interpolate(s, templateVars);
 
   return (
@@ -79,21 +93,38 @@ export function HeroBlock({ block, capabilities, assetMap, templateVars = {} }: 
       className="relative flex items-center overflow-hidden"
       style={{ minHeight: '82vh' }}
     >
-      {/* Background image */}
-      {hasImage && (
+      {/* Slideshow background images — cross-fade via opacity */}
+      {slideUrls.map((url, i) => (
         <div
-          className="absolute inset-0 bg-cover bg-center"
-          style={{ backgroundImage: `url(${imageUrl})` }}
+          key={url}
+          className="absolute inset-0 bg-cover bg-center transition-opacity duration-1000"
+          style={{ backgroundImage: `url(${url})`, opacity: i === slideIndex ? 1 : 0 }}
         />
-      )}
-      {/* Gradient overlay — accent color when image present, soft bg when not */}
-      {hasImage ? (
+      ))}
+      {!hasImage && <div className="absolute inset-0" style={{ background: 'var(--color-accent-soft)' }} />}
+      {/* Gradient overlay */}
+      {hasImage && (
         <div
           className="absolute inset-0"
           style={{ background: 'linear-gradient(135deg, color-mix(in srgb, var(--color-accent) 88%, black) 0%, rgba(0,0,0,0.52) 100%)' }}
         />
-      ) : (
-        <div className="absolute inset-0" style={{ background: 'var(--color-accent-soft)' }} />
+      )}
+      {/* Slide indicator dots */}
+      {slideUrls.length > 1 && (
+        <div className="absolute bottom-6 left-1/2 z-20 flex -translate-x-1/2 gap-2">
+          {slideUrls.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setSlideIndex(i)}
+              className="h-2 rounded-full transition-all duration-300"
+              style={{
+                width: i === slideIndex ? '1.5rem' : '0.5rem',
+                background: i === slideIndex ? 'white' : 'rgba(255,255,255,0.45)',
+              }}
+              aria-label={`Slide ${i + 1}`}
+            />
+          ))}
+        </div>
       )}
 
       <div className={`${sectionInner} relative z-10 py-20 w-full`}>

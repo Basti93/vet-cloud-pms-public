@@ -41,6 +41,8 @@ export const heroBlockSchema = z.object({
   title: z.string().min(1).default("Willkommen"),
   subtitle: z.string().optional(),
   image: assetRefSchema.optional(),
+  images: z.array(assetRefSchema).default([]),
+  slideshowInterval: z.number().int().min(2).max(30).default(5),
   primaryCtaLabel: z.string().default("Termin buchen"),
   secondaryCtaLabel: z.string().default("Kontakt"),
 });
