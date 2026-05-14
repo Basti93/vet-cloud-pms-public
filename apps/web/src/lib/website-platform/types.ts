@@ -44,6 +44,7 @@ export interface ResolvedWebsitePage {
     tenantContactInfo?: { address?: string | null; phone?: string | null; email?: string | null; city?: string | null } | null;
     logoAsset?: WebsiteAssetRef | null;
     customCss?: string | null;
+    tenantMonogram?: string | null;
     teamMembers?: { id: string; fullName: string; title?: string | null }[] | null;
   };
   page: {

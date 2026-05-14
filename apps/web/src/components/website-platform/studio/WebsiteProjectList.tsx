@@ -20,7 +20,7 @@ export function WebsiteProjectList() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Websites</h1>
+        <h1 className="text-2xl font-bold">Website</h1>
         <p className="text-muted">Praxis-Websites, Landingpages, Domains, Inhalte und Medien zentral verwalten.</p>
       </div>
       <Card className="p-5">

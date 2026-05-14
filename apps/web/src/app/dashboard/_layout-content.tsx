@@ -40,7 +40,7 @@ function useUserNavItems() {
 function useAdminNavItems() {
   const { t } = useLocale();
   return [
-    { href: "/dashboard/websites", icon: Globe2, label: "Websites", adminOnly: true },
+    { href: "/dashboard/websites", icon: Globe2, label: "Website", adminOnly: true },
     { href: "/dashboard/settings", icon: Building2, labelKey: "navigation.settings", label: t("navigation.settings"), adminOnly: true },
   ];
 }

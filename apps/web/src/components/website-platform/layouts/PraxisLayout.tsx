@@ -23,9 +23,9 @@ export function PraxisLayout({ resolved, assetMap, children }: { resolved: Resol
     { radius: resolved.project.themeConfig.radius, density: resolved.project.themeConfig.density },
   );
   const logoUrl = resolveAssetUrl(resolved.project.logoAsset ?? null, assetMap);
-  const monogramLetter = resolved.project.name.charAt(0).toUpperCase();
+  const monogram = resolved.project.tenantMonogram || resolved.project.name.charAt(0).toUpperCase();
   const accentHex = getPrimaryHex(resolved.project.themeConfig.palette);
-  const faviconSvg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='${accentHex}'/><text x='50' y='54' font-size='58' font-family='Georgia,serif' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='central'>${monogramLetter}</text></svg>`;
+  const faviconSvg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='${accentHex}'/><text x='50' y='54' font-size='${monogram.length > 1 ? 38 : 58}' font-family='Georgia,serif' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='central'>${monogram}</text></svg>`;
   const faviconHref = logoUrl ?? `data:image/svg+xml,${encodeURIComponent(faviconSvg)}`;
 
   const navItems = [
@@ -62,7 +62,7 @@ export function PraxisLayout({ resolved, assetMap, children }: { resolved: Resol
                 className="flex h-9 w-9 items-center justify-center rounded-xl text-sm font-bold text-white"
                 style={{ background: 'var(--color-accent)', fontFamily: 'Georgia,serif' }}
               >
-                {monogramLetter}
+                {monogram}
               </span>
             )}
             <span className="text-lg font-bold" style={{ fontFamily: 'var(--font-heading)', color: 'var(--color-fg)' }}>

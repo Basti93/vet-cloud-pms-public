@@ -56,6 +56,7 @@ export async function resolvePublishedWebsitePage(input: { projectId: string; pa
       tenantCity: tenants.city,
       tenantPhone: tenants.phone,
       tenantEmail: tenants.email,
+      tenantMonogram: tenants.monogram,
       pageId: websitePages.id,
       pagePath: websitePages.path,
       pageTitle: websitePages.title,
@@ -114,6 +115,7 @@ export async function resolvePublishedWebsitePage(input: { projectId: string; pa
       tenantContactInfo,
       logoAsset: row.logoAsset as import('./types').WebsiteAssetRef | null,
       customCss: row.customCss,
+      tenantMonogram: row.tenantMonogram ?? null,
       teamMembers: teamMembers.map((m) => ({
         id: m.id,
         fullName: [m.title, m.firstName, m.lastName].filter(Boolean).join(' '),
