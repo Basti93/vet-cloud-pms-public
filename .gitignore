@@ -22,3 +22,5 @@ coverage/
 # Generated RAG index (auto-refreshed via git hooks)
 .rag/
 *.tsbuildinfo
+.mcp.json
+.claude/mcp.json
