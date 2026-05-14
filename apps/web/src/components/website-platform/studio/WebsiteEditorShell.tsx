@@ -711,7 +711,7 @@ export function WebsiteEditorShell({ projectId, tenantHoursRows, tenantContactIn
         </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[260px_380px_360px]">
+      <div className="grid gap-6 xl:grid-cols-[260px_1fr_360px]">
         <div className="space-y-4">
           <Card className="p-4">
             <h2 className="font-semibold">Seiten</h2>
