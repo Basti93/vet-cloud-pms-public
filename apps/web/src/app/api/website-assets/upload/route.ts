@@ -11,7 +11,7 @@ import { AUDIT_SCHEMA_VERSION } from '@/server/audit';
 
 export const runtime = 'nodejs';
 
-const ALLOWED = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/svg+xml']);
+const ALLOWED = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/svg+xml', 'image/gif', 'application/pdf']);
 const MAX_BYTES = 12 * 1024 * 1024;
 const querySchema = z.object({ projectId: z.string().uuid() });
 
