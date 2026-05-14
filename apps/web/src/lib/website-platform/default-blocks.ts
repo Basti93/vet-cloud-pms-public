@@ -36,9 +36,9 @@ export function createDefaultWebsiteBlocks(input: {
         heading: "Unsere Leistungen",
         intro: "Passen Sie diese Leistungen im Website-Studio an Ihre Praxis an.",
         services: [
-          { id: "vorsorge", title: "Vorsorge", description: "Regelmäßige Untersuchungen und Beratung für Ihr Tier." },
-          { id: "sprechstunde", title: "Sprechstunde", description: "Kompetente Hilfe bei akuten und chronischen Beschwerden." },
-          { id: "diagnostik", title: "Diagnostik", description: "Moderne Untersuchung, Labor und weiterführende Abklärung." },
+          { id: "vorsorge", title: "Vorsorge", description: "Regelmäßige Untersuchungen und Beratung für Ihr Tier.", iconKey: "Heart" },
+          { id: "sprechstunde", title: "Sprechstunde", description: "Kompetente Hilfe bei akuten und chronischen Beschwerden.", iconKey: "Stethoscope" },
+          { id: "diagnostik", title: "Diagnostik", description: "Moderne Untersuchung, Labor und weiterführende Abklärung.", iconKey: "Microscope" },
         ],
       },
     },

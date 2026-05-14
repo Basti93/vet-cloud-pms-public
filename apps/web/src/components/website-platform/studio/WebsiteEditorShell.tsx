@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { getDefaultBlock, WEBSITE_BLOCK_DEFINITIONS, type WebsiteBlockType } from '@/lib/website-platform/block-registry';
 import { pageBlocksSchema, pageBlockSchema } from '@/lib/website-platform/schemas';
 import { PageRenderer } from '@/components/website-platform/renderer/PageRenderer';
-import { getServiceIcon } from '@/components/website-platform/blocks/WebsiteBlocks';
+import { getServiceIcon, SERVICE_ICON_KEYS } from '@/components/website-platform/blocks/WebsiteBlocks';
 import type { ResolvedWebsitePage, WebsiteAssetRef } from '@/lib/website-platform/types';
 import type { z } from 'zod';
 
@@ -211,24 +211,54 @@ function TeamListInspector({ projectId, block, replaceProps }: { projectId: stri
   );
 }
 
-const SERVICE_ICON_KEYS = [
-  { key: 'heart', label: 'Herz / Allgemein' },
-  { key: 'syringe', label: 'Spritze / Injektion' },
-  { key: 'vaccination', label: 'Impfung' },
-  { key: 'microscope', label: 'Labor / Diagnostik' },
-  { key: 'scissors', label: 'Chirurgie' },
-  { key: 'tooth', label: 'Zahnheilkunde' },
-  { key: 'emergency', label: 'Notfall' },
-  { key: 'xray', label: 'Röntgen' },
-  { key: 'paw', label: 'Pfote / Wellness' },
-  { key: 'bone', label: 'Orthopädie' },
-  { key: 'eye', label: 'Augenheilkunde' },
-  { key: 'surgery', label: 'OP' },
-  { key: 'wellness', label: 'Vorsorge' },
-];
-
 type ServiceItem = { id: string; title: string; description: string; iconKey?: string };
 type ServicesGridBlock = Extract<Block, { type: 'servicesGrid' }>;
+
+function ServiceIconDropdown({ value, onChange }: { value?: string; onChange: (iconKey: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const selectedIcon = value ?? 'Heart';
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((next) => !next)}
+        className="flex h-11 w-11 items-center justify-center rounded-lg border border-[var(--color-border)] bg-white transition-colors hover:bg-[var(--color-muted-soft)] [&_svg]:h-5 [&_svg]:w-5"
+        aria-label="Icon auswählen"
+        aria-expanded={open}
+      >
+        {getServiceIcon(selectedIcon)}
+      </button>
+      {open && (
+        <div className="absolute left-0 z-20 mt-2 w-72 rounded-xl border border-[var(--color-border)] bg-white p-2 shadow-xl">
+          <div className="grid max-h-72 grid-cols-6 gap-1 overflow-y-auto pr-1">
+            {SERVICE_ICON_KEYS.map((key) => {
+              const selected = selectedIcon === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => {
+                    onChange(key);
+                    setOpen(false);
+                  }}
+                  className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors [&_svg]:h-4 [&_svg]:w-4 ${
+                    selected
+                      ? 'bg-[var(--color-accent)] text-white'
+                      : 'border border-[var(--color-border)] hover:bg-[var(--color-muted-soft)]'
+                  }`}
+                  aria-label="Icon"
+                >
+                  {getServiceIcon(key)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function ServicesGridInspector({ block, replaceProps }: { block: ServicesGridBlock; replaceProps: (props: ServicesGridBlock['props']) => void }) {
   const services: ServiceItem[] = block.props.services ?? [];
@@ -240,7 +270,7 @@ function ServicesGridInspector({ block, replaceProps }: { block: ServicesGridBlo
     replaceProps({ ...block.props, services: services.filter((_, i) => i !== index) });
   }
   function addService() {
-    replaceProps({ ...block.props, services: [...services, { id: crypto.randomUUID(), title: '', description: '', iconKey: 'heart' }] });
+    replaceProps({ ...block.props, services: [...services, { id: crypto.randomUUID(), title: '', description: '', iconKey: 'Heart' }] });
   }
 
   return (
@@ -261,24 +291,7 @@ function ServicesGridInspector({ block, replaceProps }: { block: ServicesGridBlo
           <TextField label="Beschreibung" value={service.description} multiline onChange={(description) => updateService(index, { description })} />
           <div className="space-y-1.5">
             <span className="text-sm font-medium">Icon</span>
-            <div className="grid grid-cols-4 gap-1">
-              {SERVICE_ICON_KEYS.map(({ key, label }) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => updateService(index, { iconKey: key })}
-                  title={label}
-                  className={`flex flex-col items-center gap-1 rounded-lg p-2 transition-colors ${
-                    (service.iconKey ?? 'heart') === key
-                      ? 'bg-[var(--color-accent)] text-white'
-                      : 'border border-[var(--color-border)] hover:bg-[var(--color-muted-soft)]'
-                  }`}
-                >
-                  <span className="[&_svg]:h-5 [&_svg]:w-5">{getServiceIcon(key)}</span>
-                  <span className="text-[10px] leading-tight text-center truncate w-full">{label.split(' ')[0]}</span>
-                </button>
-              ))}
-            </div>
+            <ServiceIconDropdown value={service.iconKey} onChange={(iconKey) => updateService(index, { iconKey })} />
           </div>
         </div>
       ))}
