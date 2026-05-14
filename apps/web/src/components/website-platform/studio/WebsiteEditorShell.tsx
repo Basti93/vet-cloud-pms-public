@@ -23,7 +23,7 @@ function fieldClass() {
   return 'w-full rounded-lg border border-[var(--color-border)] bg-white px-3 py-2 text-sm';
 }
 
-function TextField({ label, value, onChange, multiline = false }: { label: string; value?: string; onChange: (value: string) => void; multiline?: boolean }) {
+function TextField({ label, value, onChange, multiline = false, hint }: { label: string; value?: string; onChange: (value: string) => void; multiline?: boolean; hint?: string }) {
   return (
     <label className="block space-y-1.5 text-sm">
       <span className="font-medium text-fg">{label}</span>
@@ -32,6 +32,7 @@ function TextField({ label, value, onChange, multiline = false }: { label: strin
       ) : (
         <input value={value ?? ''} onChange={(e) => onChange(e.target.value)} className={fieldClass()} />
       )}
+      {hint && <span className="block text-xs text-muted">{hint}</span>}
     </label>
   );
 }
@@ -363,17 +364,31 @@ function BlockInspector({ projectId, block, onChange }: { projectId: string; blo
       const heroImages = block.props.images?.length
         ? block.props.images
         : block.props.image ? [block.props.image] : [];
+      const reorderImages = (from: number, to: number) => {
+        const next = [...heroImages];
+        const [moved] = next.splice(from, 1);
+        next.splice(to, 0, moved);
+        replaceProps({ ...block.props, images: next, image: undefined });
+      };
       return (
         <div className="space-y-3">
           <TextField label="Eyebrow" value={block.props.eyebrow} onChange={(eyebrow) => replaceProps({ ...block.props, eyebrow })} />
           <TextField label="Titel" value={block.props.title} onChange={(title) => replaceProps({ ...block.props, title })} />
           <TextField label="Untertitel" value={block.props.subtitle} multiline onChange={(subtitle) => replaceProps({ ...block.props, subtitle })} />
-          <TextField label="Primärer Button" value={block.props.primaryCtaLabel} onChange={(primaryCtaLabel) => replaceProps({ ...block.props, primaryCtaLabel })} />
-          <TextField label="Sekundärer Button" value={block.props.secondaryCtaLabel} onChange={(secondaryCtaLabel) => replaceProps({ ...block.props, secondaryCtaLabel })} />
+          <TextField label="Primärer Button" value={block.props.primaryCtaLabel} hint="→ Öffnet den Buchungsdialog (oder Online-Buchungs-URL)" onChange={(primaryCtaLabel) => replaceProps({ ...block.props, primaryCtaLabel })} />
+          <TextField label="Sekundärer Button" value={block.props.secondaryCtaLabel} hint="→ Scrollt zum Kontaktbereich (#kontakt)" onChange={(secondaryCtaLabel) => replaceProps({ ...block.props, secondaryCtaLabel })} />
           <div className="space-y-2 rounded-xl border border-[var(--color-border)] p-3">
             <p className="text-sm font-medium">Slideshow-Bilder</p>
             {heroImages.map((img, idx) => (
-              <div key={idx} className="flex items-start gap-2">
+              <div
+                key={idx}
+                draggable
+                onDragStart={(e) => e.dataTransfer.setData('text/plain', String(idx))}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => { e.preventDefault(); const from = Number(e.dataTransfer.getData('text/plain')); if (from !== idx) reorderImages(from, idx); }}
+                className="flex items-start gap-2 cursor-grab active:cursor-grabbing"
+              >
+                <div className="flex-shrink-0 mt-7 text-muted cursor-grab select-none" title="Ziehen zum Sortieren">⠿</div>
                 <div className="flex-1">
                   <MediaPicker
                     projectId={projectId}
@@ -387,7 +402,7 @@ function BlockInspector({ projectId, block, onChange }: { projectId: string; blo
                 </div>
                 {heroImages.length > 1 && (
                   <button
-                    className="mt-6 rounded-lg border border-[var(--color-border)] px-2 py-1.5 text-xs text-muted hover:bg-[var(--color-muted-soft)]"
+                    className="mt-7 rounded-lg border border-[var(--color-border)] px-2 py-1.5 text-xs text-muted hover:bg-[var(--color-muted-soft)]"
                     onClick={() => replaceProps({ ...block.props, images: heroImages.filter((_, i) => i !== idx), image: undefined })}
                   >
                     ✕
@@ -512,7 +527,7 @@ function BlockInspector({ projectId, block, onChange }: { projectId: string; blo
         <div className="space-y-3">
           <TextField label="Überschrift" value={block.props.heading} onChange={(heading) => replaceProps({ ...block.props, heading })} />
           <TextField label="Text" value={block.props.text} multiline onChange={(text) => replaceProps({ ...block.props, text })} />
-          <TextField label="Button" value={block.props.buttonLabel} onChange={(buttonLabel) => replaceProps({ ...block.props, buttonLabel })} />
+          <TextField label="Button" hint="→ Öffnet den Buchungsdialog" value={block.props.buttonLabel} onChange={(buttonLabel) => replaceProps({ ...block.props, buttonLabel })} />
         </div>
       );
     case 'mapEmbed':
