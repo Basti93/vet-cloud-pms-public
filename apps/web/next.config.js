@@ -68,7 +68,7 @@ const appContentSecurityPolicy =
   "font-src 'self' https://fonts.gstatic.com; " +
   "img-src 'self' data: https: blob:; " +
   `connect-src 'self' ${clerkConnectSrc}; ` +
-  `frame-src 'self' ${clerkFrameSrc}; ` +
+  `frame-src 'self' https://www.google.com https://maps.google.com https://www.openstreetmap.org ${clerkFrameSrc}; ` +
   "worker-src 'self' blob:; " +
   "object-src 'none'; " +
   "base-uri 'self'; " +
