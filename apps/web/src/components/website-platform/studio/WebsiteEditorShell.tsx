@@ -626,6 +626,7 @@ export function WebsiteEditorShell({ projectId, tenantHoursRows, tenantContactIn
       capabilities: project.capabilities as ResolvedWebsitePage['project']['capabilities'],
       seoConfig: null,
       ownerTenantId: project.ownerTenantId,
+      logoAsset: project.logoAsset as WebsiteAssetRef | null | undefined,
       tenantHoursRows,
       tenantContactInfo,
     },

@@ -17,6 +17,6 @@ export default async function WebsiteProjectPublicPage({ params }: Props) {
   const path = sitePath?.length ? `/${sitePath.join('/')}` : '/';
   const resolved = await resolvePublishedWebsitePage({ projectId, path });
   if (!resolved) notFound();
-  const assetMap = await loadAssetUrlMap(collectAssetIds(resolved.blocks));
+  const assetMap = await loadAssetUrlMap(collectAssetIds([resolved.blocks, resolved.project.logoAsset]));
   return <PageRenderer resolved={resolved} assetMap={assetMap} />;
 }
