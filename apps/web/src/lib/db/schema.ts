@@ -41,6 +41,10 @@ export const PERMISSIONS = {
   USERS_MANAGE: "users:manage",
   ROLES_MANAGE: "roles:manage",
   SETTINGS_MANAGE: "settings:manage",
+  WEBSITE_MANAGE: "website:manage",
+  WEBSITE_PUBLISH: "website:publish",
+  WEBSITE_DOMAINS: "website:domains",
+  WEBSITE_MEDIA: "website:media",
 } as const;
 
 // ============================================================================
@@ -120,6 +124,41 @@ export const tenants = pgTable(
   },
   (table) => ({
     slugIdx: index("tenants_slug_idx").on(table.slug),
+  })
+);
+
+export const tenantWebsiteContactRequests = pgTable(
+  "tenant_website_contact_requests",
+  {
+    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 120 }).notNull(),
+    email: varchar("email", { length: 180 }).notNull(),
+    phone: varchar("phone", { length: 80 }),
+    message: text("message").notNull(),
+    emailStatus: varchar("email_status", {
+      length: 20,
+      enum: ["pending", "sent", "failed"],
+    })
+      .default("pending")
+      .notNull(),
+    emailSentAt: timestamp("email_sent_at", { withTimezone: true }),
+    emailError: text("email_error"),
+    ipAddress: varchar("ip_address", { length: 45 }),
+    userAgent: text("user_agent"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (table) => ({
+    tenantIdIdx: index("tenant_website_contact_requests_tenant_id_idx").on(table.tenantId),
+    createdAtIdx: index("tenant_website_contact_requests_created_at_idx").on(table.createdAt),
+    emailStatusIdx: index("tenant_website_contact_requests_email_status_idx").on(table.emailStatus),
   })
 );
 
@@ -225,6 +264,243 @@ export const userRoles = pgTable(
     userIdIdx: index("user_roles_user_id_idx").on(table.userId),
     roleIdIdx: index("user_roles_role_id_idx").on(table.roleId),
     assignedByIdx: index("user_roles_assigned_by_idx").on(table.assignedBy),
+  })
+);
+
+// ============================================================================
+// WEBSITE PLATFORM V2 (Thin PMS-aware website platform)
+// ============================================================================
+
+export const standaloneAccounts = pgTable(
+  "standalone_accounts",
+  {
+    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+    name: varchar("name", { length: 255 }).notNull(),
+    email: varchar("email", { length: 255 }).notNull(),
+    billingRef: varchar("billing_ref", { length: 255 }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (table) => ({
+    emailIdx: index("standalone_accounts_email_idx").on(table.email),
+  })
+);
+
+export const websiteProjects = pgTable(
+  "website_projects",
+  {
+    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+    ownerType: varchar("owner_type", { length: 20, enum: ["tenant", "standalone"] }).notNull(),
+    ownerTenantId: uuid("owner_tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+    ownerStandaloneId: uuid("owner_standalone_id").references(() => standaloneAccounts.id, {
+      onDelete: "cascade",
+    }),
+    name: varchar("name", { length: 255 }).notNull(),
+    slug: varchar("slug", { length: 120 }).notNull(),
+    status: varchar("status", { length: 20, enum: ["draft", "published", "archived"] })
+      .default("draft")
+      .notNull(),
+    primaryDomain: varchar("primary_domain", { length: 255 }),
+    layoutKey: varchar("layout_key", { length: 80 }).default("praxis-classic").notNull(),
+    layoutVersion: integer("layout_version").default(1).notNull(),
+    themeConfig: jsonb("theme_config"),
+    capabilities: jsonb("capabilities").default(sql`'{}'::jsonb`).notNull(),
+    seoConfig: jsonb("seo_config"),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (table) => ({
+    slugIdx: unique("website_projects_slug_idx").on(table.slug),
+    ownerTenantUniqueIdx: unique("website_projects_owner_tenant_unique_idx").on(table.ownerTenantId),
+    ownerStandaloneIdx: index("website_projects_owner_standalone_idx").on(table.ownerStandaloneId),
+    statusIdx: index("website_projects_status_idx").on(table.status),
+  })
+);
+
+export const websitePages = pgTable(
+  "website_pages",
+  {
+    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+    websiteProjectId: uuid("website_project_id")
+      .notNull()
+      .references(() => websiteProjects.id, { onDelete: "cascade" }),
+    path: varchar("path", { length: 255 }).notNull(),
+    pageType: varchar("page_type", {
+      length: 30,
+      enum: ["default", "legal_impressum", "legal_privacy", "landing", "booking"],
+    })
+      .default("default")
+      .notNull(),
+    title: varchar("title", { length: 255 }).notNull(),
+    isHomepage: boolean("is_homepage").default(false).notNull(),
+    seoConfig: jsonb("seo_config"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (table) => ({
+    projectPathIdx: unique("website_pages_project_path_idx").on(table.websiteProjectId, table.path),
+    projectIdx: index("website_pages_project_idx").on(table.websiteProjectId),
+    homepageIdx: index("website_pages_homepage_idx").on(table.websiteProjectId, table.isHomepage),
+  })
+);
+
+export const websitePageRevisions = pgTable(
+  "website_page_revisions",
+  {
+    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+    websitePageId: uuid("website_page_id")
+      .notNull()
+      .references(() => websitePages.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    state: varchar("state", { length: 20, enum: ["draft", "published"] }).default("draft").notNull(),
+    blocks: jsonb("blocks").default(sql`'[]'::jsonb`).notNull(),
+    createdByUserId: uuid("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (table) => ({
+    pageVersionIdx: unique("website_page_revisions_page_version_idx").on(
+      table.websitePageId,
+      table.version
+    ),
+    pageStateIdx: index("website_page_revisions_page_state_idx").on(
+      table.websitePageId,
+      table.state,
+      table.createdAt
+    ),
+  })
+);
+
+export const websiteDomains = pgTable(
+  "website_domains",
+  {
+    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+    websiteProjectId: uuid("website_project_id")
+      .notNull()
+      .references(() => websiteProjects.id, { onDelete: "cascade" }),
+    domain: varchar("domain", { length: 255 }).notNull(),
+    type: varchar("type", { length: 20, enum: ["primary", "alias"] }).default("alias").notNull(),
+    status: varchar("status", {
+      length: 30,
+      enum: ["pending", "verification_required", "verified", "active", "failed"],
+    })
+      .default("pending")
+      .notNull(),
+    verificationMethod: varchar("verification_method", {
+      length: 20,
+      enum: ["txt", "cname", "http"],
+    }).default("txt"),
+    verificationToken: varchar("verification_token", { length: 255 }),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
+    errorMessage: text("error_message"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (table) => ({
+    domainIdx: unique("website_domains_domain_idx").on(table.domain),
+    projectIdx: index("website_domains_project_idx").on(table.websiteProjectId),
+    statusIdx: index("website_domains_status_idx").on(table.status),
+  })
+);
+
+export const websiteAssets = pgTable(
+  "website_assets",
+  {
+    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+    websiteProjectId: uuid("website_project_id")
+      .notNull()
+      .references(() => websiteProjects.id, { onDelete: "cascade" }),
+    storageKey: varchar("storage_key", { length: 500 }).notNull(),
+    url: text("url").notNull(),
+    mimeType: varchar("mime_type", { length: 120 }).notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    width: integer("width"),
+    height: integer("height"),
+    alt: text("alt"),
+    focalPoint: jsonb("focal_point"),
+    createdByUserId: uuid("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (table) => ({
+    projectIdx: index("website_assets_project_idx").on(table.websiteProjectId),
+    storageKeyIdx: unique("website_assets_storage_key_idx").on(table.storageKey),
+  })
+);
+
+export const websiteAssetUsages = pgTable(
+  "website_asset_usages",
+  {
+    assetId: uuid("asset_id")
+      .notNull()
+      .references(() => websiteAssets.id, { onDelete: "cascade" }),
+    pageId: uuid("page_id")
+      .notNull()
+      .references(() => websitePages.id, { onDelete: "cascade" }),
+    blockId: varchar("block_id", { length: 120 }).notNull(),
+    fieldPath: varchar("field_path", { length: 255 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (table) => ({
+    pk: primaryKey(table.assetId, table.pageId, table.blockId, table.fieldPath),
+    assetIdx: index("website_asset_usages_asset_idx").on(table.assetId),
+    pageIdx: index("website_asset_usages_page_idx").on(table.pageId),
+  })
+);
+
+export const websiteLeads = pgTable(
+  "website_leads",
+  {
+    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+    websiteProjectId: uuid("website_project_id")
+      .notNull()
+      .references(() => websiteProjects.id, { onDelete: "cascade" }),
+    sourcePagePath: varchar("source_page_path", { length: 255 }),
+    name: varchar("name", { length: 120 }).notNull(),
+    email: varchar("email", { length: 180 }).notNull(),
+    phone: varchar("phone", { length: 80 }),
+    message: text("message").notNull(),
+    consent: boolean("consent").default(false).notNull(),
+    status: varchar("status", { length: 20, enum: ["new", "contacted", "archived"] })
+      .default("new")
+      .notNull(),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (table) => ({
+    projectIdx: index("website_leads_project_idx").on(table.websiteProjectId),
+    statusIdx: index("website_leads_status_idx").on(table.status),
+    createdAtIdx: index("website_leads_created_at_idx").on(table.createdAt),
   })
 );
 

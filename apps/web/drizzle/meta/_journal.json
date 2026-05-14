@@ -148,6 +148,34 @@
       "when": 1779400000000,
       "tag": "0019_reconcile_missing_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1779500000000,
+      "tag": "0021_sour_stardust",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1779600000000,
+      "tag": "0022_dry_prowler",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1779700000000,
+      "tag": "0023_charming_molecule_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1779800000000,
+      "tag": "0024_complex_loa",
+      "breakpoints": true
     }
   ]
 }
