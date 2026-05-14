@@ -1,0 +1,16 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+# Allowlist packages permitted to run install scripts (postinstall/preinstall).
+# All entries here are native binary packages with legitimate compilation needs.
+# New packages with install scripts will fail until explicitly added here.
+allowedDeprecatedVersions: {}
+allowBuilds:
+  '@clerk/shared': true
+  '@parcel/watcher': true
+  '@swc/core': true
+  esbuild: true
+  sharp: true
+  tree-sitter: true
+  unrs-resolver: true
