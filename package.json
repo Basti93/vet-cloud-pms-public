@@ -2,12 +2,8 @@
   "name": "vet-cloud-pms",
   "private": true,
   "version": "0.0.1",
-  "packageManager": "npm@10.9.4",
+  "packageManager": "pnpm@11.1.2",
   "type": "module",
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
   "devDependencies": {
     "@lancedb/lancedb": "^0.27.2",
     "@modelcontextprotocol/sdk": "^1.29.0",
@@ -31,9 +27,9 @@
     "turbo": "^1.13.0"
   },
   "scripts": {
-    "dev": "npm run dev:web",
-    "dev:web": "npm run dev --workspace @vet-cloud/web",
-    "dev:admin": "npm run dev --workspace admin",
+    "dev": "pnpm run dev:web",
+    "dev:web": "pnpm --filter @vet-cloud/web dev",
+    "dev:admin": "pnpm --filter admin dev",
     "dev:all": "turbo run dev --parallel --filter=@vet-cloud/web --filter=admin",
     "build": "turbo run build",
     "lint": "turbo run lint",

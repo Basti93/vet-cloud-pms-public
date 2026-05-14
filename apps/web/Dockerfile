@@ -2,26 +2,30 @@
 FROM node:24-alpine AS deps
 WORKDIR /app
 
+RUN corepack enable && corepack prepare pnpm@11.1.2 --activate
+
 # Copy workspace manifests only (no source yet)
-COPY package.json package-lock.json .npmrc ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY apps/web/package.json ./apps/web/
 COPY apps/admin/package.json ./apps/admin/
 
-# Install all workspace deps so npm correctly resolves cross-workspace
-# version conflicts (e.g. @clerk/nextjs ^6 vs ^7)
-RUN npm ci
+RUN pnpm install --frozen-lockfile
 
 # ── Stage 2: Build ────────────────────────────────────────────────────────────
 FROM node:24-alpine AS builder
 WORKDIR /app
 
+RUN corepack enable && corepack prepare pnpm@11.1.2 --activate
+
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
+COPY --from=deps /app/apps/admin/node_modules ./apps/admin/node_modules
 
 # Copy source (node_modules excluded via .dockerignore)
 COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build --workspace=@vet-cloud/web
+RUN pnpm --filter @vet-cloud/web build
 
 # ── Stage 3: Production image ─────────────────────────────────────────────────
 FROM node:24-alpine AS runner
@@ -46,8 +50,7 @@ RUN mkdir -p ./apps/web/public/tenant-assets && \
     chown nextjs:nodejs ./apps/web/public/tenant-assets
 
 # Migration runner + its dependencies.
-# Turbopack bundles drizzle-orm/postgres into server chunks so they are not
-# automatically included in the standalone node_modules — copy them explicitly.
+# pnpm hoists drizzle-orm/postgres to workspace root node_modules.
 COPY --from=deps    --chown=nextjs:nodejs /app/node_modules/drizzle-orm  ./node_modules/drizzle-orm
 COPY --from=deps    --chown=nextjs:nodejs /app/node_modules/postgres      ./node_modules/postgres
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/drizzle           ./drizzle
