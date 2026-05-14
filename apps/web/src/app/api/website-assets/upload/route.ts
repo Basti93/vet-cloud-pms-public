@@ -35,7 +35,8 @@ export async function POST(request: NextRequest) {
   const ext = file.name.split('.').pop()?.toLowerCase() || 'bin';
   const safeName = `${randomUUID()}.${ext}`;
   const relDir = `/tenant-assets/website-projects/${project.id}`;
-  const publicDir = path.join(process.cwd(), 'public', relDir);
+  const publicBase = process.env.ASSET_PUBLIC_DIR ?? path.join(process.cwd(), 'public');
+  const publicDir = path.join(publicBase, relDir);
   await mkdir(publicDir, { recursive: true });
   const bytes = Buffer.from(await file.arrayBuffer());
   await writeFile(path.join(publicDir, safeName), bytes);
