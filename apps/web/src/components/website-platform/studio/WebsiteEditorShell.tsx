@@ -290,12 +290,13 @@ function TemplateVarsHelper({ projectId }: { projectId: string }) {
   const [open, setOpen] = useState(false);
   const { data: teamMembers } = trpc.websitePlatform.listTeamMembers.useQuery({ projectId });
 
-  const staticVars = TEMPLATE_VAR_DOCS.filter((v) => !v.key.startsWith('{{team.'));
-  const teamVars = (teamMembers ?? []).flatMap((m, i) => {
+  const staticVars = TEMPLATE_VAR_DOCS;
+  const teamVars = (teamMembers ?? []).flatMap((m) => {
+    const id8 = m.id.replace(/-/g, '').slice(0, 8);
     const fullName = [m.title, m.firstName, m.lastName].filter(Boolean).join(' ');
     return [
-      { key: `{{team.${i + 1}.name}}`, desc: fullName },
-      ...(m.title ? [{ key: `{{team.${i + 1}.titel}}`, desc: `Titel: ${m.title}` }] : []),
+      { key: `{{team.${id8}.name}}`, desc: fullName },
+      ...(m.title ? [{ key: `{{team.${id8}.titel}}`, desc: `Titel: ${m.title}` }] : []),
     ];
   });
 
@@ -321,7 +322,7 @@ function TemplateVarsHelper({ projectId }: { projectId: string }) {
           ))}
           {teamVars.length > 0 && (
             <>
-              <p className="px-2 pt-2 text-xs font-medium text-muted">Tierärzte (alphabetisch sortiert)</p>
+              <p className="px-2 pt-2 text-xs font-medium text-muted">Tierärzte</p>
               {teamVars.map(({ key, desc }) => (
                 <div key={key} className="flex items-center justify-between gap-2 rounded px-2 py-1 hover:bg-[var(--color-muted-soft)]">
                   <code className="text-xs" style={{ color: 'var(--color-accent-text)' }}>{key}</code>
