@@ -107,7 +107,7 @@ export function PraxisLayout({ resolved, assetMap, children }: { resolved: Resol
               pmsSlug ? (
                 <button
                   onClick={() => setBookingOpen(true)}
-                  className="rounded-full px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                  className="cursor-pointer rounded-full px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
                   style={{ background: 'var(--color-secondary, var(--color-accent))' }}
                 >
                   Termin buchen
@@ -164,7 +164,7 @@ export function PraxisLayout({ resolved, assetMap, children }: { resolved: Resol
                 pmsSlug ? (
                   <button
                     onClick={() => { setMenuOpen(false); setBookingOpen(true); }}
-                    className="rounded-full py-3 text-center text-sm font-semibold text-white"
+                    className="cursor-pointer rounded-full py-3 text-center text-sm font-semibold text-white"
                     style={{ background: 'var(--color-secondary, var(--color-accent))' }}
                   >
                     Termin buchen
@@ -173,7 +173,7 @@ export function PraxisLayout({ resolved, assetMap, children }: { resolved: Resol
                   <a
                     href={bookingUrl}
                     onClick={() => setMenuOpen(false)}
-                    className="rounded-full py-3 text-center text-sm font-semibold text-white"
+                    className="cursor-pointer rounded-full py-3 text-center text-sm font-semibold text-white"
                     style={{ background: 'var(--color-secondary, var(--color-accent))' }}
                   >
                     Termin buchen

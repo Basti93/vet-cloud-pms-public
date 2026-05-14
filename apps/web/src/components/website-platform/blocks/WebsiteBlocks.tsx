@@ -116,7 +116,7 @@ export function HeroBlock({ block, capabilities, assetMap, templateVars = {} }: 
             <button
               key={i}
               onClick={() => setSlideIndex(i)}
-              className="h-2 rounded-full transition-all duration-300"
+              className="h-2 cursor-pointer rounded-full transition-all duration-300"
               style={{
                 width: i === slideIndex ? '1.5rem' : '0.5rem',
                 background: i === slideIndex ? 'white' : 'rgba(255,255,255,0.45)',
@@ -172,7 +172,7 @@ export function HeroBlock({ block, capabilities, assetMap, templateVars = {} }: 
                 ? (
                   <button
                     onClick={() => setBookingOpen(true)}
-                    className="rounded-full px-6 py-3 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90"
+                    className="cursor-pointer rounded-full px-6 py-3 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90"
                     style={{ background: 'var(--color-secondary, var(--color-accent))' }}
                   >
                     {t(block.props.primaryCtaLabel)}
@@ -181,7 +181,7 @@ export function HeroBlock({ block, capabilities, assetMap, templateVars = {} }: 
                 : (
                   <a
                     href={bookingUrl}
-                    className="rounded-full px-6 py-3 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90"
+                    className="cursor-pointer rounded-full px-6 py-3 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90"
                     style={{ background: 'var(--color-secondary, var(--color-accent))' }}
                   >
                     {t(block.props.primaryCtaLabel)}
@@ -642,7 +642,7 @@ export function ContactCardBlock({ block, capabilities, tenantContactInfo }: Blo
                 {pmsSlug ? (
                   <button
                     onClick={() => setBookingOpen(true)}
-                    className="w-full rounded-full py-4 text-center font-semibold text-white transition-opacity hover:opacity-90"
+                    className="w-full cursor-pointer rounded-full py-4 text-center font-semibold text-white transition-opacity hover:opacity-90"
                     style={{ background: 'var(--color-accent)' }}
                   >
                     Termin buchen
@@ -761,7 +761,7 @@ export function BookingCtaBlock({ block, capabilities, templateVars = {} }: Bloc
           {pmsSlug ? (
             <button
               onClick={() => setBookingOpen(true)}
-              className="mt-6 inline-flex rounded-full bg-white px-7 py-3 font-semibold transition-opacity hover:opacity-90"
+              className="mt-6 inline-flex cursor-pointer rounded-full bg-white px-7 py-3 font-semibold transition-opacity hover:opacity-90"
               style={{ color: 'var(--color-accent-text)' }}
             >
               {t(block.props.buttonLabel)}
