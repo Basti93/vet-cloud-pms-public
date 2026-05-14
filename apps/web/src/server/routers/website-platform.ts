@@ -5,6 +5,7 @@ import path from 'path';
 import { and, desc, eq } from 'drizzle-orm';
 import { createTRPCRouter, protectedProcedure, type TRPCContext } from '@/server/trpc';
 import { roles, tenants, userRoles, users, websiteAssets, websiteDomains, websiteLeads, websitePageRevisions, websitePages, websiteProjects } from '@/lib/db/schema';
+import { writeAuditLog } from '@/server/audit';
 import { capabilityConfigSchema, normalizeBlocks, pageBlocksSchema, themeConfigSchema, websiteProjectSeoSchema } from '@/lib/website-platform/schemas';
 import { normalizeWebsiteHost, normalizeWebsitePath } from '@/lib/website-platform/resolve-project';
 import { createDefaultLegalBlocks, createDefaultWebsiteBlocks } from '@/lib/website-platform/default-blocks';
@@ -140,6 +141,7 @@ export const websitePlatformRouter = createTRPCRouter({
         blocks: defaultBlocks,
       });
       await ensureSystemPagesForProject(ctx, project.id);
+      await writeAuditLog(ctx, { tenantId: project.ownerTenantId!, action: 'create', entity: { type: 'website_project', id: project.id }, event: 'website_project.create', summary: `Website-Projekt "${input.name}" erstellt`, changes: { name: input.name, slug: input.slug } });
       return project;
     }),
 
@@ -157,6 +159,7 @@ export const websitePlatformRouter = createTRPCRouter({
     await requireProjectAccess(ctx, input.projectId);
     const { projectId, ...updates } = input;
     const [project] = await ctx.db.update(websiteProjects).set({ ...updates, updatedAt: new Date() }).where(eq(websiteProjects.id, projectId)).returning();
+    await writeAuditLog(ctx, { tenantId: project.ownerTenantId!, action: 'update', entity: { type: 'website_project', id: projectId }, event: 'website_project.update', summary: 'Website-Projekteinstellungen geändert', changes: updates as Record<string, unknown> });
     return project;
   }),
 
@@ -171,9 +174,10 @@ export const websitePlatformRouter = createTRPCRouter({
   }),
 
   createPage: protectedProcedure.input(z.object({ projectId: z.string().uuid(), path: z.string().min(1).max(255), title: z.string().min(1).max(255), pageType: z.enum(['default', 'legal_impressum', 'legal_privacy', 'landing', 'booking']).default('default') })).mutation(async ({ ctx, input }) => {
-    await requireProjectAccess(ctx, input.projectId);
+    const project = await requireProjectAccess(ctx, input.projectId);
     const [page] = await ctx.db.insert(websitePages).values({ websiteProjectId: input.projectId, path: normalizeWebsitePath(input.path), title: input.title, pageType: input.pageType }).returning();
     await ctx.db.insert(websitePageRevisions).values({ websitePageId: page.id, version: 1, state: 'draft', blocks: [{ id: 'richtext-default', type: 'richText', props: { heading: input.title, html: '<p>Neuer Seiteninhalt</p>' } }], createdByUserId: ctxTenant(ctx).dbUserId });
+    await writeAuditLog(ctx, { tenantId: project.ownerTenantId!, action: 'create', entity: { type: 'website_page', id: page.id }, event: 'website_page.create', summary: `Seite "${input.title}" (${input.path}) erstellt`, changes: { title: input.title, path: input.path, pageType: input.pageType } });
     return page;
   }),
 
@@ -197,12 +201,13 @@ export const websitePlatformRouter = createTRPCRouter({
   publishPage: protectedProcedure.input(z.object({ pageId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
     const [page] = await ctx.db.select({ projectId: websitePages.websiteProjectId }).from(websitePages).where(eq(websitePages.id, input.pageId)).limit(1);
     if (!page) throw new TRPCError({ code: 'NOT_FOUND' });
-    await requireProjectAccess(ctx, page.projectId);
+    const project = await requireProjectAccess(ctx, page.projectId);
     const [draft] = await ctx.db.select().from(websitePageRevisions).where(and(eq(websitePageRevisions.websitePageId, input.pageId), eq(websitePageRevisions.state, 'draft'))).orderBy(desc(websitePageRevisions.createdAt)).limit(1);
     if (!draft) throw new TRPCError({ code: 'BAD_REQUEST', message: 'No draft to publish' });
     await ctx.db.update(websitePageRevisions).set({ state: 'draft' }).where(and(eq(websitePageRevisions.websitePageId, input.pageId), eq(websitePageRevisions.state, 'published')));
     const [published] = await ctx.db.update(websitePageRevisions).set({ state: 'published' }).where(eq(websitePageRevisions.id, draft.id)).returning();
     await ctx.db.update(websiteProjects).set({ status: 'published', publishedAt: new Date(), updatedAt: new Date() }).where(eq(websiteProjects.id, page.projectId));
+    await writeAuditLog(ctx, { tenantId: project.ownerTenantId!, action: 'update', entity: { type: 'website_page', id: input.pageId }, event: 'website_page.publish', summary: 'Seite veröffentlicht', changes: { revisionId: draft.id, version: draft.version } });
     return published;
   }),
 
@@ -212,9 +217,10 @@ export const websitePlatformRouter = createTRPCRouter({
   }),
 
   addDomain: protectedProcedure.input(z.object({ projectId: z.string().uuid(), domain: z.string().min(3).max(255) })).mutation(async ({ ctx, input }) => {
-    await requireProjectAccess(ctx, input.projectId);
+    const project = await requireProjectAccess(ctx, input.projectId);
     const domain = normalizeWebsiteHost(input.domain);
     const [row] = await ctx.db.insert(websiteDomains).values({ websiteProjectId: input.projectId, domain, verificationToken: crypto.randomUUID(), status: 'verification_required' }).returning();
+    await writeAuditLog(ctx, { tenantId: project.ownerTenantId!, action: 'create', entity: { type: 'website_domain', id: row.id }, event: 'website_domain.create', summary: `Domain "${domain}" hinzugefügt`, changes: { domain } });
     return row;
   }),
 
@@ -230,7 +236,7 @@ export const websitePlatformRouter = createTRPCRouter({
   }),
 
   deleteAsset: protectedProcedure.input(z.object({ projectId: z.string().uuid(), assetId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
-    await requireProjectAccess(ctx, input.projectId);
+    const project = await requireProjectAccess(ctx, input.projectId);
     const [asset] = await ctx.db.select().from(websiteAssets).where(and(eq(websiteAssets.id, input.assetId), eq(websiteAssets.websiteProjectId, input.projectId))).limit(1);
     if (!asset) throw new TRPCError({ code: 'NOT_FOUND' });
     if (asset.storageKey.startsWith('local:')) {
@@ -239,6 +245,7 @@ export const websitePlatformRouter = createTRPCRouter({
       await rm(path.join(publicBase, 'tenant-assets', 'website-projects', rel), { force: true });
     }
     await ctx.db.delete(websiteAssets).where(eq(websiteAssets.id, input.assetId));
+    await writeAuditLog(ctx, { tenantId: project.ownerTenantId!, action: 'delete', entity: { type: 'website_asset', id: input.assetId }, event: 'website_asset.delete', summary: 'Asset gelöscht', changes: { storageKey: asset.storageKey } });
     return { deleted: true };
   }),
 

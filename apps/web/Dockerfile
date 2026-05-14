@@ -38,6 +38,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static     ./apps/web/.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public           ./apps/web/public
 
+# Pre-create upload dir so Docker initialises the named volume with nextjs ownership.
+# Without this Docker creates the volume mount point as root, causing EACCES on upload.
+RUN mkdir -p ./apps/web/public/tenant-assets && \
+    chown nextjs:nodejs ./apps/web/public/tenant-assets
+
 # Migration runner + its dependencies.
 # Turbopack bundles drizzle-orm/postgres into server chunks so they are not
 # automatically included in the standalone node_modules — copy them explicitly.
