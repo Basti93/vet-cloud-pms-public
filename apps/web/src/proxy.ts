@@ -133,7 +133,10 @@ export default clerkMiddleware(async (auth, req) => {
     );
   }
 
-  if (!isPublicRoute(req)) {
+  // Single-segment paths like /[practiceSlug] handle their own auth server-side
+  const isSingleSegmentPath = /^\/[^/]+\/?$/.test(pathname);
+
+  if (!isPublicRoute(req) && !isSingleSegmentPath) {
     const authObj = await auth();
     if (!authObj.userId) {
       authObj.redirectToSignIn();

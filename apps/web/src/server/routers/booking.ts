@@ -393,6 +393,7 @@ export const bookingRouter = createTRPCRouter({
       z.object({
         slug: z.string().min(1),
         embeddingOrigin: z.string().optional(),
+        previewToken: z.string().optional(),
       })
     )
     .query(async ({ ctx, input }) => {
@@ -411,13 +412,31 @@ export const bookingRouter = createTRPCRouter({
           typographyPreference: tenants.typographyPreference,
           monogram: tenants.monogram,
           allowedEmbeddingDomains: tenants.allowedEmbeddingDomains,
+          websiteEnabled: tenants.websiteEnabled,
+          previewToken: tenants.previewToken,
         })
         .from(tenants)
         .where(eq(tenants.slug, input.slug))
         .limit(1);
 
-      if (!tenant) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Praxis nicht gefunden" });
+      if (!tenant) return null;
+
+      if (!tenant.websiteEnabled) {
+        const isPreviewValid = input.previewToken && tenant.previewToken &&
+          input.previewToken === tenant.previewToken;
+
+        const isAuthenticatedMember = ctx.userId
+          ? await (async () => {
+              const [member] = await ctx.db
+                .select({ id: users.id })
+                .from(users)
+                .where(and(eq(users.clerkId, ctx.userId!), eq(users.tenantId, tenant.id)))
+                .limit(1);
+              return Boolean(member);
+            })()
+          : false;
+
+        if (!isPreviewValid && !isAuthenticatedMember) return null;
       }
 
       await assertEmbeddingOriginAllowed(ctx.db, ctx.headers, {
@@ -425,7 +444,9 @@ export const bookingRouter = createTRPCRouter({
         embeddingOrigin: input.embeddingOrigin,
       });
 
-      return tenant;
+      // Strip internal fields before returning
+      const { previewToken: _pt, websiteEnabled: _we, ...publicTenant } = tenant;
+      return publicTenant;
     }),
 
   /** Public: List vets for booking widget */

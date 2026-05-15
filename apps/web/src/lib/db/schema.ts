@@ -114,6 +114,8 @@ export const tenants = pgTable(
     specialOpeningHours: jsonb("special_opening_hours"),
     // Allowed domains for embedding the booking widget (array of domain strings)
     allowedEmbeddingDomains: jsonb("allowed_embedding_domains"),
+    websiteEnabled: boolean("website_enabled").default(false).notNull(),
+    previewToken: varchar("preview_token", { length: 64 }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .default(sql`now()`)
       .notNull(),

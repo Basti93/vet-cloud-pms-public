@@ -1,8 +1,9 @@
-import { redirect } from 'next/navigation';
+import { redirect, notFound } from 'next/navigation';
 import type { Metadata } from 'next';
+import { auth } from '@clerk/nextjs/server';
 import { db } from '@/lib/db/client';
-import { tenants, websiteProjects } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { tenants, websiteProjects, users } from '@/lib/db/schema';
+import { eq, and } from 'drizzle-orm';
 import { resolvePublishedWebsitePage } from '@/lib/website-platform/resolve-project';
 import { collectAssetIds } from '@/lib/website-platform/assets';
 import { loadAssetUrlMap } from '@/lib/website-platform/assets-server';
@@ -10,32 +11,61 @@ import { PageRenderer } from '@/components/website-platform/renderer/PageRendere
 
 interface Props {
   params: Promise<{ practiceSlug: string }>;
+  searchParams: Promise<{ preview?: string }>;
 }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { practiceSlug } = await params;
-  const [row] = await db
-    .select({ name: tenants.name })
-    .from(tenants)
-    .where(eq(tenants.slug, practiceSlug))
-    .limit(1);
-  if (!row) return {};
-  return { title: row.name };
-}
-
-export default async function PracticeWebsitePage({ params }: Props) {
-  const { practiceSlug } = await params;
-
+async function getTenantData(practiceSlug: string) {
   const [row] = await db
     .select({
       tenantId: tenants.id,
+      tenantName: tenants.name,
       projectId: websiteProjects.id,
       primaryDomain: websiteProjects.primaryDomain,
+      websiteEnabled: tenants.websiteEnabled,
+      previewToken: tenants.previewToken,
     })
     .from(tenants)
     .leftJoin(websiteProjects, eq(websiteProjects.ownerTenantId, tenants.id))
     .where(eq(tenants.slug, practiceSlug))
     .limit(1);
+  return row ?? null;
+}
+
+async function isAuthenticatedMember(tenantId: string): Promise<boolean> {
+  const { userId } = await auth();
+  if (!userId) return false;
+  const [member] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.clerkId, userId), eq(users.tenantId, tenantId)))
+    .limit(1);
+  return Boolean(member);
+}
+
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
+  const { practiceSlug } = await params;
+  const { preview } = await searchParams;
+  const row = await getTenantData(practiceSlug);
+  if (!row) return {};
+
+  const isPublic = row.websiteEnabled;
+  const isPreview = preview && row.previewToken && preview === row.previewToken;
+
+  if (!isPublic && !isPreview) {
+    return {
+      title: row.tenantName,
+      robots: { index: false, follow: false },
+    };
+  }
+
+  return { title: row.tenantName };
+}
+
+export default async function PracticeWebsitePage({ params, searchParams }: Props) {
+  const { practiceSlug } = await params;
+  const { preview } = await searchParams;
+
+  const row = await getTenantData(practiceSlug);
 
   if (!row) {
     return (
@@ -46,6 +76,15 @@ export default async function PracticeWebsitePage({ params }: Props) {
         </div>
       </div>
     );
+  }
+
+  if (!row.websiteEnabled) {
+    const isPreviewValid = preview && row.previewToken && preview === row.previewToken;
+    const isMember = isPreviewValid ? false : await isAuthenticatedMember(row.tenantId);
+
+    if (!isPreviewValid && !isMember) {
+      notFound();
+    }
   }
 
   const project = row.projectId ? { id: row.projectId, primaryDomain: row.primaryDomain } : null;

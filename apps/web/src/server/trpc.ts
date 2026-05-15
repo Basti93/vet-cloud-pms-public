@@ -269,7 +269,7 @@ const systemLoggingMiddleware = t.middleware(async ({ ctx, path, type, next }) =
       const actor = await resolveUserContext();
 
       await logEvent({
-        level: code === "UNAUTHORIZED" || code === "FORBIDDEN" ? "warn" : "error",
+        level: code === "UNAUTHORIZED" || code === "FORBIDDEN" ? "warn" : code === "NOT_FOUND" ? "info" : "error",
         category: "api",
         eventType: `request_failed_${code}`,
         message: `${type} request failed: ${path}`,
