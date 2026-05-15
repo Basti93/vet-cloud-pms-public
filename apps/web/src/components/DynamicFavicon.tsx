@@ -1,13 +1,16 @@
 'use client';
 
 import { useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { useTheme } from '@/lib/theme-context';
 import { COLOR_PRESETS } from '@/lib/theme';
 
 export function DynamicFavicon() {
   const { colorPreset } = useTheme();
+  const pathname = usePathname();
 
   useEffect(() => {
+    if (pathname.startsWith('/site/')) return;
     const hexColor = COLOR_PRESETS[colorPreset].accentHex;
 
     // Generate SVG favicon with dynamic color
@@ -56,7 +59,7 @@ export function DynamicFavicon() {
     return () => {
       if (url.startsWith('blob:')) URL.revokeObjectURL(url);
     };
-  }, [colorPreset]);
+  }, [colorPreset, pathname]);
 
   return null;
 }

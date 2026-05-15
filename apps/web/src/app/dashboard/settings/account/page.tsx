@@ -356,14 +356,16 @@ export default function AccountPage() {
                     {subscriptionStatus.status === "trial" ? "Testphase" : subscriptionStatus.status}
                   </span>
                 </p>
-                {subscriptionStatus.currentPrice && (
+                {subscriptionStatus.currentPrice ? (
                   <p>
                     {subscriptionStatus.isTrialing ? "Gewählter Tarif:" : "Aktueller Tarif:"}{" "}
                     <span className="font-medium">
                       {subscriptionStatus.currentPrice.seats} Nutzer (€{(subscriptionStatus.currentPrice.monthlyPrice / 100).toFixed(2)}/Monat)
                     </span>
                   </p>
-                )}
+                ) : subscriptionStatus.isTrialing ? (
+                  <p>Tarif: <span className="font-medium text-amber-600">Noch kein Tarif gewählt</span></p>
+                ) : null}
                 {subscriptionStatus.trialEndsAt && (
                   <p>
                     Testphase endet: <span className="font-medium">
@@ -383,6 +385,15 @@ export default function AccountPage() {
                 </div>
               )}
             </div>
+
+            {subscriptionStatus.isTrialing && !subscriptionStatus.currentPrice && (
+              <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-800 flex gap-2 items-start">
+                <Info className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>
+                  Sie testen Tierarzt Cloud kostenlos. Wählen Sie jetzt einen Tarif — Sie werden erst nach Ablauf der Testphase belastet.
+                </span>
+              </div>
+            )}
 
             <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
               {[
@@ -470,7 +481,7 @@ export default function AccountPage() {
               </div>
             )}
 
-            {(subscriptionStatus.status === "active" || subscriptionStatus.status === "trial") && !subscriptionStatus.cancelledAtPeriodEnd && !subscriptionStatus.deactivatedAt && (
+            {(subscriptionStatus.status === "active" || subscriptionStatus.status === "trial") && !subscriptionStatus.cancelledAtPeriodEnd && !subscriptionStatus.deactivatedAt && subscriptionStatus.currentPrice && (
               <div className="mt-6 pt-6 border-t border-border">
                 <button
                   onClick={handleCancelSubscription}

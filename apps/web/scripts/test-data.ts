@@ -29,13 +29,22 @@ export const TEST_DATA = {
     themePreference: "sage" as const,
     typographyPreference: "modern" as const,
     websiteTemplate: "klassik" as const,
-    openingHours: [
+    consultationHours: [
       { dayOfWeek: 0, slots: [] },
       { dayOfWeek: 1, slots: [{ startHour: 9, startMin: 0, endHour: 11, endMin: 30 }, { startHour: 16, startMin: 0, endHour: 19, endMin: 0 }] },
       { dayOfWeek: 2, slots: [{ startHour: 15, startMin: 0, endHour: 18, endMin: 0 }] },
       { dayOfWeek: 3, slots: [{ startHour: 9, startMin: 0, endHour: 11, endMin: 30 }, { startHour: 16, startMin: 0, endHour: 19, endMin: 0 }] },
       { dayOfWeek: 4, slots: [{ startHour: 9, startMin: 0, endHour: 11, endMin: 30 }, { startHour: 16, startMin: 0, endHour: 19, endMin: 0 }] },
       { dayOfWeek: 5, slots: [{ startHour: 9, startMin: 0, endHour: 12, endMin: 0 }] },
+      { dayOfWeek: 6, slots: [] },
+    ],
+    openingHours: [
+      { dayOfWeek: 0, slots: [] },
+      { dayOfWeek: 1, slots: [{ startHour: 8, startMin: 30, endHour: 19, endMin: 0 }] },
+      { dayOfWeek: 2, slots: [{ startHour: 8, startMin: 30, endHour: 19, endMin: 0 }] },
+      { dayOfWeek: 3, slots: [{ startHour: 8, startMin: 30, endHour: 19, endMin: 0 }] },
+      { dayOfWeek: 4, slots: [{ startHour: 8, startMin: 30, endHour: 19, endMin: 0 }] },
+      { dayOfWeek: 5, slots: [{ startHour: 8, startMin: 30, endHour: 18, endMin: 0 }] },
       { dayOfWeek: 6, slots: [] },
     ],
     subscriptionStatus: "trial" as const,

@@ -22,3 +22,17 @@ coverage/
 # Generated RAG index (auto-refreshed via git hooks)
 .rag/
 *.tsbuildinfo
+.claude/mcp.json
+# Tenant-uploaded assets (binary content, not git)
+apps/web/public/tenant-assets/
+# Claude Code / tool artifacts
+.ai/
+.agents/
+.pi/
+.rtk/
+skills-lock.json
+.claude/skills/
+# Local Claude settings (may contain API keys / personal permissions)
+.claude/settings.local.json
+# Playwright test results
+apps/web/test-results/

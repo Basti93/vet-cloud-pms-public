@@ -37,6 +37,34 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
+        // Verify customer still exists in Stripe (may be deleted)
+        let customerDeleted = false;
+        try {
+          const customer = await stripe.customers.retrieve(tenant.stripeCustomerId);
+          customerDeleted = (customer as { deleted?: boolean }).deleted === true;
+        } catch (err) {
+          const stripeErr = err as { code?: string };
+          if (stripeErr.code === "resource_missing") {
+            customerDeleted = true;
+          } else {
+            throw err; // re-throw unexpected errors
+          }
+        }
+
+        if (customerDeleted) {
+          console.log(`[Stripe Sync] Customer ${tenant.stripeCustomerId} deleted in Stripe — clearing IDs for tenant ${tenant.id}`);
+          await appDb
+            .update(tenants)
+            .set({
+              stripeCustomerId: null,
+              stripeSubscriptionId: null,
+              currentStripePriceId: null,
+            })
+            .where(eq(tenants.id, tenant.id));
+          synced++;
+          continue;
+        }
+
         // Fetch subscriptions for this customer
         const subs = await stripe.subscriptions.list({
           customer: tenant.stripeCustomerId,
@@ -48,6 +76,7 @@ export async function POST(request: NextRequest) {
           (s) => s.status !== "canceled" && s.status !== "incomplete_expired"
         );
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const updateData: Record<string, any> = {};
 
         if (!activeSub && tenant.stripeSubscriptionId) {

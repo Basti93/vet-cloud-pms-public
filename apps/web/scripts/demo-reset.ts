@@ -402,6 +402,7 @@ async function main() {
     console.log(`   - Medications: ${summary.created.medications}`);
     console.log(`   - Vitals: ${summary.created.vitals}`);
     console.log(`   - Vaccinations: ${summary.created.vaccinations}`);
+    console.log(`   - Website project: ${summary.created.websiteProject ? "yes" : "no"}`);
 
     console.log("🔎 Persisted verification (demo tenant):");
     console.log(`   - Users: ${summary.verification.users}`);
@@ -411,6 +412,9 @@ async function main() {
     console.log(`   - Vaccinations: ${summary.verification.vaccinations}`);
     console.log(`   - Vet schedules: ${summary.verification.vetSchedules}`);
     console.log(`   - Vet absences: ${summary.verification.vetAbsences}`);
+    console.log(
+      `   - Website: /site/${summary.verification.websiteProject.slug} (${summary.verification.websiteProject.status}, published revisions: ${summary.verification.websiteProject.publishedRevisions})`
+    );
     console.log(
       `   - Appointment range: ${summary.verification.appointmentRange.minStartIso} -> ${summary.verification.appointmentRange.maxStartIso}`
     );

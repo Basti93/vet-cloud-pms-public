@@ -1,29 +1,23 @@
-# ── Stage 1: Install dependencies ────────────────────────────────────────────
-FROM node:24-alpine AS deps
-WORKDIR /app
-
-# Copy workspace manifests only (no source yet)
-COPY package.json package-lock.json .npmrc ./
-COPY apps/web/package.json ./apps/web/
-COPY apps/admin/package.json ./apps/admin/
-
-# Install all workspace deps so npm correctly resolves cross-workspace
-# version conflicts (e.g. @clerk/nextjs ^6 vs ^7)
-RUN npm ci
-
-# ── Stage 2: Build ────────────────────────────────────────────────────────────
+# ── Stage 1: Install & Build ──────────────────────────────────────────────────
 FROM node:24-alpine AS builder
 WORKDIR /app
 
-COPY --from=deps /app/node_modules ./node_modules
+RUN corepack enable && corepack prepare pnpm@11.1.2 --activate
+
+# Copy workspace manifests for dependency install layer caching
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY apps/web/package.json ./apps/web/
+COPY apps/admin/package.json ./apps/admin/
+
+RUN pnpm install --frozen-lockfile
 
 # Copy source (node_modules excluded via .dockerignore)
 COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build --workspace=admin
+RUN pnpm --filter admin build
 
-# ── Stage 3: Production image ─────────────────────────────────────────────────
+# ── Stage 2: Production image ─────────────────────────────────────────────────
 FROM node:24-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production

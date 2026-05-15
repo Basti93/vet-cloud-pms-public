@@ -6,10 +6,58 @@ import {
   normalizeEmbeddingDomains,
 } from '@/lib/booking/embed-origin';
 import { db } from '@/lib/db/client';
-import { tenants } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { tenants, websiteDomains, websiteProjects } from '@/lib/db/schema';
+import { and, eq } from 'drizzle-orm';
 
 const isPublicRoute = createRouteMatcher([...PUBLIC_ROUTES]);
+
+function normalizeHost(host: string | null) {
+  return (host ?? '').toLowerCase().replace(/^www\./, '').split(':')[0] ?? '';
+}
+
+function isPlatformHost(host: string) {
+  const configured = normalizeHost(process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? null);
+  return (
+    !host ||
+    (!!configured && host === configured) ||
+    host === 'localhost' ||
+    host === '127.0.0.1' ||
+    host.endsWith('.localhost')
+  );
+}
+
+type DomainCacheEntry = {
+  result: { projectSlug: string; ownerTenantId: string | null; tenantSlug: string | null } | null;
+  expiresAt: number;
+};
+const domainCache = new Map<string, DomainCacheEntry>();
+const DOMAIN_CACHE_TTL_MS = 5 * 60 * 1000;
+const DOMAIN_MISS_TTL_MS = 2 * 60 * 1000;
+
+async function resolveWebsiteDomain(host: string) {
+  const cached = domainCache.get(host);
+  if (cached && cached.expiresAt > Date.now()) return cached.result;
+
+  const [row] = await db
+    .select({
+      projectSlug: websiteProjects.slug,
+      ownerTenantId: websiteProjects.ownerTenantId,
+      tenantSlug: tenants.slug,
+    })
+    .from(websiteDomains)
+    .innerJoin(websiteProjects, eq(websiteProjects.id, websiteDomains.websiteProjectId))
+    .leftJoin(tenants, eq(tenants.id, websiteProjects.ownerTenantId))
+    .where(and(eq(websiteDomains.domain, host), eq(websiteDomains.status, 'active')))
+    .limit(1);
+
+  const result = row ?? null;
+  if (domainCache.size > 500) domainCache.clear();
+  domainCache.set(host, {
+    result,
+    expiresAt: Date.now() + (result ? DOMAIN_CACHE_TTL_MS : DOMAIN_MISS_TTL_MS),
+  });
+  return result;
+}
 
 async function getBookingFrameAncestors(pathname: string) {
   const tenantSlug = pathname.split('/')[2];
@@ -51,6 +99,28 @@ export default clerkMiddleware(async (auth, req) => {
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       },
     });
+  }
+
+  const host = normalizeHost(
+    req.headers.get('x-forwarded-host') ?? req.headers.get('host')
+  );
+  const pathname = req.nextUrl.pathname;
+
+  if (
+    !isPlatformHost(host) &&
+    !pathname.startsWith('/api') &&
+    !pathname.startsWith('/_next')
+  ) {
+    const websiteDomain = await resolveWebsiteDomain(host);
+    if (websiteDomain) {
+      const url = req.nextUrl.clone();
+      if (pathname === '/book' && websiteDomain.tenantSlug) {
+        url.pathname = `/book/${websiteDomain.tenantSlug}`;
+      } else {
+        url.pathname = `/site/${websiteDomain.projectSlug}${pathname === '/' ? '' : pathname}`;
+      }
+      return NextResponse.rewrite(url);
+    }
   }
 
   const response = NextResponse.next();

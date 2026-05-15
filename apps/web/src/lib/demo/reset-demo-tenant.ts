@@ -12,6 +12,9 @@ import {
   tenants,
   users,
   vaccinationEmailLogs,
+  websitePageRevisions,
+  websitePages,
+  websiteProjects,
   vaccinations,
   vaccinationSettings,
   vetAbsences,
@@ -19,11 +22,12 @@ import {
   vitals,
   voiceCalls,
 } from "@/lib/db/schema";
-import { TEST_DATA, DEMO_TENANT_ID } from "../../../scripts/test-data";
+import { TEST_DATA, DEMO_TENANT_ID, DEMO_TENANT_SLUG } from "../../../scripts/test-data";
 import {
   buildDemoVaccinationRows,
   getDemoReminderDefaults,
 } from "../../../scripts/lib/demo-fixtures";
+import { createDefaultWebsiteBlocks } from "@/lib/website-platform/default-blocks";
 
 export type DemoVetUser = {
   id: string;
@@ -56,6 +60,7 @@ export type DemoResetSummary = {
     appointments: number;
     vetSchedules: number;
     vetAbsences: number;
+    websiteProject: boolean;
   };
   verification: {
     users: number;
@@ -68,6 +73,11 @@ export type DemoResetSummary = {
     appointmentRange: {
       minStartIso: string;
       maxStartIso: string;
+    };
+    websiteProject: {
+      slug: string;
+      status: string;
+      publishedRevisions: number;
     };
   };
 };
@@ -99,6 +109,122 @@ export async function getDemoVetUsersFromTenant(db: Database): Promise<DemoVetUs
   return expectedVetEmails
     .map((email) => allUsers.find((u) => u.email.toLowerCase() === email))
     .filter((u): u is DemoVetUser => Boolean(u));
+}
+
+export async function ensureDemoWebsiteProject(db: Database) {
+  const demoTenant = TEST_DATA.tenant;
+  const blocks = createDefaultWebsiteBlocks({
+    practiceName: demoTenant.name,
+    tenantSlug: demoTenant.slug,
+    email: demoTenant.email,
+    phone: demoTenant.phone,
+    address: [demoTenant.address, demoTenant.postalCode].filter(Boolean).join(" "),
+    city: demoTenant.city,
+    consultationHours: demoTenant.consultationHours,
+    openingHours: demoTenant.openingHours,
+  });
+
+  const [project] = await db
+    .insert(websiteProjects)
+    .values({
+      ownerType: "tenant",
+      ownerTenantId: DEMO_TENANT_ID,
+      name: demoTenant.name,
+      slug: demoTenant.slug,
+      status: "published",
+      layoutKey: "praxis-classic",
+      themeConfig: {
+        palette: demoTenant.themePreference,
+        typography: demoTenant.typographyPreference,
+        radius: "lg",
+        density: "comfortable",
+      },
+      capabilities: {
+        booking: { enabled: true, mode: "pms", tenantSlug: demoTenant.slug },
+        contactForm: { enabled: true, notifyEmail: demoTenant.email },
+        teamProfiles: { enabled: true },
+        reviews: { enabled: false },
+        blog: { enabled: false },
+      },
+      seoConfig: {
+        title: `${demoTenant.name} · Demo Website`,
+        description: demoTenant.tagline,
+        robotsIndex: false,
+      },
+      publishedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: websiteProjects.ownerTenantId,
+      set: {
+        name: demoTenant.name,
+        slug: demoTenant.slug,
+        status: "published",
+        layoutKey: "praxis-classic",
+        themeConfig: {
+          palette: demoTenant.themePreference,
+          typography: demoTenant.typographyPreference,
+          radius: "lg",
+          density: "comfortable",
+        },
+        capabilities: {
+          booking: { enabled: true, mode: "pms", tenantSlug: demoTenant.slug },
+          contactForm: { enabled: true, notifyEmail: demoTenant.email },
+          teamProfiles: { enabled: true },
+          reviews: { enabled: false },
+          blog: { enabled: false },
+        },
+        seoConfig: {
+          title: `${demoTenant.name} · Demo Website`,
+          description: demoTenant.tagline,
+          robotsIndex: false,
+        },
+        publishedAt: new Date(),
+        updatedAt: new Date(),
+      },
+    })
+    .returning();
+
+  const [page] = await db
+    .insert(websitePages)
+    .values({
+      websiteProjectId: project.id,
+      path: "/",
+      title: demoTenant.name,
+      isHomepage: true,
+      seoConfig: {
+        title: demoTenant.name,
+        description: demoTenant.tagline,
+        robotsIndex: false,
+      },
+    })
+    .onConflictDoUpdate({
+      target: [websitePages.websiteProjectId, websitePages.path],
+      set: {
+        title: demoTenant.name,
+        isHomepage: true,
+        seoConfig: {
+          title: demoTenant.name,
+          description: demoTenant.tagline,
+          robotsIndex: false,
+        },
+        updatedAt: new Date(),
+      },
+    })
+    .returning();
+
+  await db.delete(websitePageRevisions).where(eq(websitePageRevisions.websitePageId, page.id));
+  await db.insert(websitePageRevisions).values([
+    { websitePageId: page.id, version: 1, state: "draft", blocks },
+    { websitePageId: page.id, version: 2, state: "published", blocks },
+  ]);
+
+  return {
+    projectId: project.id,
+    pageId: page.id,
+    slug: project.slug,
+    status: project.status,
+    blocks: blocks.length,
+  };
 }
 
 export async function resetDemoTenantData({
@@ -140,7 +266,7 @@ export async function resetDemoTenantData({
         monogram: demoTenant.monogram,
         themePreference: demoTenant.themePreference,
         typographyPreference: demoTenant.typographyPreference,
-        websiteTemplate: demoTenant.websiteTemplate,
+        consultationHours: demoTenant.consultationHours,
         openingHours: demoTenant.openingHours,
         subscriptionStatus: demoTenant.subscriptionStatus,
         subscriptionPlan: demoTenant.subscriptionPlan,
@@ -189,6 +315,8 @@ export async function resetDemoTenantData({
         updatedAt: new Date(),
       },
     });
+
+  const demoWebsite = await ensureDemoWebsiteProject(db);
 
   const appointmentEmailLogsResult = await db
     .delete(appointmentEmailLogs)
@@ -407,6 +535,20 @@ export async function resetDemoTenantData({
     .from(appointments)
     .where(eq(appointments.tenantId, DEMO_TENANT_ID));
 
+  const [persistedDemoWebsite] = await db
+    .select({
+      slug: websiteProjects.slug,
+      status: websiteProjects.status,
+    })
+    .from(websiteProjects)
+    .where(eq(websiteProjects.ownerTenantId, DEMO_TENANT_ID));
+  const [persistedPublishedRevisions] = await db
+    .select({ count: sql`count(*)` })
+    .from(websitePageRevisions)
+    .innerJoin(websitePages, eq(websitePages.id, websitePageRevisions.websitePageId))
+    .innerJoin(websiteProjects, eq(websiteProjects.id, websitePages.websiteProjectId))
+    .where(sql`${websiteProjects.ownerTenantId} = ${DEMO_TENANT_ID} and ${websitePageRevisions.state} = 'published'`);
+
   const verification = {
     users: toCount(persistedUsers?.count),
     owners: toCount(persistedOwners?.count),
@@ -419,6 +561,11 @@ export async function resetDemoTenantData({
       minStartIso: formatIso(appointmentRange?.minStart),
       maxStartIso: formatIso(appointmentRange?.maxStart),
     },
+    websiteProject: {
+      slug: persistedDemoWebsite?.slug ?? "n/a",
+      status: persistedDemoWebsite?.status ?? "missing",
+      publishedRevisions: toCount(persistedPublishedRevisions?.count),
+    },
   };
 
   if (
@@ -426,7 +573,10 @@ export async function resetDemoTenantData({
     verification.patients === 0 ||
     verification.appointments === 0 ||
     verification.vaccinations === 0 ||
-    verification.vetSchedules === 0
+    verification.vetSchedules === 0 ||
+    verification.websiteProject.slug !== DEMO_TENANT_SLUG ||
+    verification.websiteProject.status !== "published" ||
+    verification.websiteProject.publishedRevisions === 0
   ) {
     throw new Error(`Post-reset verification failed: ${JSON.stringify(verification)}`);
   }
@@ -457,6 +607,7 @@ export async function resetDemoTenantData({
       appointments: TEST_DATA.internalAppointments.length + TEST_DATA.onlineBookings.length,
       vetSchedules: TEST_DATA.vetSchedules.length,
       vetAbsences: TEST_DATA.vetAbsences.length,
+      websiteProject: Boolean(demoWebsite.projectId),
     },
     verification,
   };

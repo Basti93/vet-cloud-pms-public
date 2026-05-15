@@ -45,7 +45,7 @@ export const subscriptionsRouter = createTRPCRouter({
 
         const tenantData = tenant[0];
         const stripe = getStripeClient();
-        const price = getPriceBySeats(seats);
+        const price = await getPriceBySeats(seats);
 
         // Get or create Stripe customer
         let stripeCustomerId = tenantData.stripeCustomerId;
@@ -152,7 +152,7 @@ export const subscriptionsRouter = createTRPCRouter({
           });
         }
 
-        const newPrice = getPriceBySeats(seats);
+        const newPrice = await getPriceBySeats(seats);
 
         if (tenantData.currentStripePriceId === newPrice.priceId) {
           throw new TRPCError({
@@ -161,7 +161,7 @@ export const subscriptionsRouter = createTRPCRouter({
           });
         }
 
-        const currentPrice = getPriceById(tenantData.currentStripePriceId ?? "");
+        const currentPrice = await getPriceById(tenantData.currentStripePriceId ?? "");
         const isUpgrade = currentPrice ? newPrice.monthlyPrice > currentPrice.monthlyPrice : true;
 
         const stripe = getStripeClient();
@@ -319,7 +319,7 @@ export const subscriptionsRouter = createTRPCRouter({
         plan: tenantData.subscriptionPlan,
         maxUsers: tenantData.maxUsers,
         currentPrice: tenantData.currentStripePriceId
-          ? getPriceById(tenantData.currentStripePriceId)
+          ? await getPriceById(tenantData.currentStripePriceId)
           : null,
         trialEndsAt: tenantData.trialEndsAt,
         deactivatedAt: tenantData.deactivatedAt,

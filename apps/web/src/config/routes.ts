@@ -7,6 +7,7 @@ export const PUBLIC_ROUTES = [
   '/sign-up(.*)',
   '/invite/accept(.*)',
   '/book(.*)',          // Online booking pages
+  '/site(.*)',          // Public website platform pages
   '/impressum(.*)',     // Legal notice
   '/datenschutz(.*)',   // Privacy policy
   '/api/webhooks/clerk',
@@ -20,6 +21,7 @@ export const PUBLIC_ROUTES = [
   '/api/cron/check-trial-expirations',       // CRON_SECRET-protected trial expiration check
   '/api/cron/sync-stripe-subscriptions',     // CRON_SECRET-protected Stripe sync
   '/api/unsubscribe',                        // token-protected unsubscribe link from emails
+  '/api/website-leads',                      // Public website contact/lead form
   '/api/calendar(.*)',            // JWT-protected
   '/api/admin(.*)',               // Bearer-token protected (ADMIN_API_TOKEN)
   '/',

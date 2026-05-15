@@ -7,7 +7,7 @@ import { Phone, MapPin, Clock } from 'lucide-react';
 interface BrandPreviewProps {
   colorPreset: ColorPresetKey;
   typographyPairing: TypographyPairingKey;
-  template: WebsiteTemplateKey;
+  template?: WebsiteTemplateKey;
   brandName: string;
   tagline: string;
   monogram: string;
@@ -16,7 +16,7 @@ interface BrandPreviewProps {
 export function BrandPreview({
   colorPreset,
   typographyPairing,
-  template,
+  template = 'modern',
   brandName,
   tagline,
   monogram,

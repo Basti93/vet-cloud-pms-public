@@ -3,7 +3,7 @@
 import { ReactNode, useState } from "react";
 import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
-import { LayoutDashboard, Calendar, Users, Phone, ClipboardList, Clock, Menu, X, Settings, ChevronDown, User, Building2, Syringe, TrendingUp } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, Phone, ClipboardList, Clock, Menu, X, Settings, ChevronDown, User, Building2, Syringe, TrendingUp, Globe2 } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { useLocale } from "@/lib/user/preferences-context";
 import { usePraxis } from "@/lib/praxis/context";
@@ -40,6 +40,7 @@ function useUserNavItems() {
 function useAdminNavItems() {
   const { t } = useLocale();
   return [
+    { href: "/dashboard/websites", icon: Globe2, label: "Website", adminOnly: true },
     { href: "/dashboard/settings", icon: Building2, labelKey: "navigation.settings", label: t("navigation.settings"), adminOnly: true },
   ];
 }

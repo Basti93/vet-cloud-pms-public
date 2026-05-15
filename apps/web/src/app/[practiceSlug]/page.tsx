@@ -1,9 +1,11 @@
+import { redirect } from 'next/navigation';
 import { db } from '@/lib/db/client';
-import { tenants } from '@/lib/db/schema';
+import { tenants, websiteProjects } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
-import { type WebsiteTemplateKey } from '@/lib/theme';
-import { getTemplateComponent } from '@/lib/website-generator';
-import { openingHoursToDisplayRows, DEFAULT_OPENING_HOURS, type DaySchedule } from '@/lib/schedule-types';
+import { resolvePublishedWebsitePage } from '@/lib/website-platform/resolve-project';
+import { collectAssetIds } from '@/lib/website-platform/assets';
+import { loadAssetUrlMap } from '@/lib/website-platform/assets-server';
+import { PageRenderer } from '@/components/website-platform/renderer/PageRenderer';
 
 interface Props {
   params: Promise<{ practiceSlug: string }>;
@@ -12,27 +14,18 @@ interface Props {
 export default async function PracticeWebsitePage({ params }: Props) {
   const { practiceSlug } = await params;
 
-  const [tenant] = await db
+  const [row] = await db
     .select({
-      id: tenants.id,
-      name: tenants.name,
-      slug: tenants.slug,
-      email: tenants.email,
-      phone: tenants.phone,
-      address: tenants.address,
-      city: tenants.city,
-      tagline: tenants.tagline,
-      monogram: tenants.monogram,
-      themePreference: tenants.themePreference,
-      typographyPreference: tenants.typographyPreference,
-      websiteTemplate: tenants.websiteTemplate,
-      openingHours: tenants.openingHours,
+      tenantId: tenants.id,
+      projectId: websiteProjects.id,
+      primaryDomain: websiteProjects.primaryDomain,
     })
     .from(tenants)
+    .leftJoin(websiteProjects, eq(websiteProjects.ownerTenantId, tenants.id))
     .where(eq(tenants.slug, practiceSlug))
     .limit(1);
 
-  if (!tenant) {
+  if (!row) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -43,25 +36,36 @@ export default async function PracticeWebsitePage({ params }: Props) {
     );
   }
 
-  const TemplateComponent = getTemplateComponent(
-    (tenant.websiteTemplate as WebsiteTemplateKey) || 'modern'
-  );
+  const project = row.projectId ? { id: row.projectId, primaryDomain: row.primaryDomain } : null;
 
-  const hours = openingHoursToDisplayRows(
-    (tenant.openingHours as DaySchedule[] | null) ?? DEFAULT_OPENING_HOURS
-  );
+  if (!project) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-2">Website in Vorbereitung</h1>
+          <p className="text-gray-500">Diese Praxis-Website ist noch nicht eingerichtet.</p>
+        </div>
+      </div>
+    );
+  }
 
-  return (
-    <TemplateComponent
-      brandName={tenant.name}
-      tagline={tenant.tagline || ''}
-      monogram={tenant.monogram || tenant.name.slice(0, 2).toUpperCase()}
-      slug={tenant.slug}
-      phone={tenant.phone || undefined}
-      email={tenant.email || undefined}
-      address={tenant.address || undefined}
-      city={tenant.city || undefined}
-      hours={hours}
-    />
-  );
+  const resolved = await resolvePublishedWebsitePage({ projectId: project.id, path: '/' });
+
+  if (!resolved) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-2">Website im Entwurf</h1>
+          <p className="text-gray-500">Diese Praxis-Website ist aktuell nicht veröffentlicht.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (project.primaryDomain) {
+    redirect(`https://${project.primaryDomain}`);
+  }
+
+  const assetMap = await loadAssetUrlMap(collectAssetIds(resolved.blocks));
+  return <PageRenderer resolved={resolved} assetMap={assetMap} />;
 }

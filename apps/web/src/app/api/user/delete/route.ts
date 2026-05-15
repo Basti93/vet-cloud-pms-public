@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { clerkClient } from "@clerk/nextjs/server";
+import { rm } from "fs/promises";
+import path from "path";
 import { db } from "@/lib/db/client";
 import {
   users,
@@ -22,8 +24,10 @@ import {
   appointmentEmailLogs,
   calendarAccessTokens,
   calendarAccessAudit,
+  websiteAssets,
+  websiteProjects,
 } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 /**
  * DELETE /api/user/delete
@@ -120,6 +124,28 @@ export async function DELETE(request: NextRequest) {
       })
       .returning({ id: auditLogs.id })
       .then((result) => result[0]?.id);
+
+    // Delete website asset files from disk before DB cascade removes the rows
+    const tenantProjects = await db
+      .select({ id: websiteProjects.id })
+      .from(websiteProjects)
+      .where(eq(websiteProjects.ownerTenantId, tenantId));
+    if (tenantProjects.length > 0) {
+      const projectIds = tenantProjects.map((p) => p.id);
+      const assets = await db
+        .select({ storageKey: websiteAssets.storageKey })
+        .from(websiteAssets)
+        .where(inArray(websiteAssets.websiteProjectId, projectIds));
+      const publicBase = process.env.ASSET_PUBLIC_DIR ?? path.join(process.cwd(), "public");
+      await Promise.allSettled(
+        assets
+          .filter((a) => a.storageKey.startsWith("local:"))
+          .map((a) => {
+            const rel = a.storageKey.slice("local:".length);
+            return rm(path.join(publicBase, "tenant-assets", "website-projects", rel), { force: true });
+          })
+      );
+    }
 
     // Delete data in order of foreign key constraints
     // Start with dependent tables first

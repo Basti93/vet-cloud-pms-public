@@ -6,7 +6,7 @@ import { useAuth } from '@clerk/nextjs';
 import { trpc } from '@/lib/trpc/client';
 import { BrandSettingsForm } from '@/components/brand/BrandSettingsForm';
 import { BrandPreview } from '@/components/brand/BrandPreview';
-import { ColorPresetKey, TypographyPairingKey, WebsiteTemplateKey } from '@/lib/theme';
+import { ColorPresetKey, TypographyPairingKey } from '@/lib/theme';
 
 export default function BrandBuilderPage() {
   const params = useParams();
@@ -15,7 +15,6 @@ export default function BrandBuilderPage() {
 
   const [colorPreset, setColorPreset] = useState<ColorPresetKey>('sage');
   const [typographyPairing, setTypographyPairing] = useState<TypographyPairingKey>('modern');
-  const [template, setTemplate] = useState<WebsiteTemplateKey>('modern');
   const [brandName, setBrandName] = useState('');
   const [tagline, setTagline] = useState('');
   const [monogram, setMonogram] = useState('');
@@ -43,7 +42,6 @@ export default function BrandBuilderPage() {
     if (tenant) {
       setColorPreset(tenant.themePreference as ColorPresetKey || 'sage');
       setTypographyPairing(tenant.typographyPreference as TypographyPairingKey || 'modern');
-      setTemplate(tenant.websiteTemplate as WebsiteTemplateKey || 'modern');
       setBrandName(tenant.name || '');
       setTagline(tenant.tagline || '');
       setMonogram(tenant.monogram || '');
@@ -62,7 +60,6 @@ export default function BrandBuilderPage() {
       monogram,
       themePreference: colorPreset,
       typographyPreference: typographyPairing,
-      websiteTemplate: template,
     });
   };
 
@@ -105,8 +102,6 @@ export default function BrandBuilderPage() {
               onColorPresetChange={setColorPreset}
               typographyPairing={typographyPairing}
               onTypographyPairingChange={setTypographyPairing}
-              template={template}
-              onTemplateChange={setTemplate}
               brandName={brandName}
               onBrandNameChange={setBrandName}
               tagline={tagline}
@@ -125,7 +120,6 @@ export default function BrandBuilderPage() {
             <BrandPreview
               colorPreset={colorPreset}
               typographyPairing={typographyPairing}
-              template={template}
               brandName={brandName}
               tagline={tagline}
               monogram={monogram}

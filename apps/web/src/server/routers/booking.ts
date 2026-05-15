@@ -66,9 +66,9 @@ async function getVetSlotsForDay(
   vetId: string,
   date: Date
 ): Promise<{ start: Date; end: Date }[]> {
-  // Fetch tenant timezone + opening hours, and vet's slot duration
+  // Fetch tenant timezone + consultation hours, and vet's slot duration
   const [tenant] = await db
-    .select({ openingHours: tenants.openingHours, timezone: tenants.timezone })
+    .select({ consultationHours: tenants.consultationHours, openingHours: tenants.openingHours, timezone: tenants.timezone })
     .from(tenants)
     .where(eq(tenants.id, tenantId))
     .limit(1);
@@ -120,8 +120,11 @@ async function getVetSlotsForDay(
     return generateSlotsFromRanges(localDateStr, vetSchedule.slots as TimeRange[], timezone, slotDurationMin);
   }
 
-  // 3. No vet schedule → fall back to practice opening hours
-  const practiceDay = ((tenant?.openingHours as DaySchedule[] | null) ?? DEFAULT_OPENING_HOURS)
+  // 3. No vet schedule → fall back to practice consultation hours
+  const bookableHours = (tenant?.consultationHours as DaySchedule[] | null)
+    ?? (tenant?.openingHours as DaySchedule[] | null)
+    ?? DEFAULT_OPENING_HOURS;
+  const practiceDay = bookableHours
     .find((h) => h.dayOfWeek === dayOfWeek);
 
   return generateSlotsFromRanges(localDateStr, practiceDay?.slots ?? [], timezone, slotDurationMin);
@@ -406,7 +409,6 @@ export const bookingRouter = createTRPCRouter({
           tagline: tenants.tagline,
           themePreference: tenants.themePreference,
           typographyPreference: tenants.typographyPreference,
-          websiteTemplate: tenants.websiteTemplate,
           monogram: tenants.monogram,
           allowedEmbeddingDomains: tenants.allowedEmbeddingDomains,
         })
@@ -608,9 +610,9 @@ export const bookingRouter = createTRPCRouter({
       if (input.vetId) {
         allSlots = await getVetSlotsForDay(ctx.db, input.tenantId, input.vetId, input.date);
       } else {
-        // No vet selected: use practice opening hours (30min default, no per-vet duration)
+        // No vet selected: use practice consultation hours (30min default, no per-vet duration)
         const [tenant] = await ctx.db
-          .select({ openingHours: tenants.openingHours, timezone: tenants.timezone })
+          .select({ consultationHours: tenants.consultationHours, openingHours: tenants.openingHours, timezone: tenants.timezone })
           .from(tenants)
           .where(eq(tenants.id, input.tenantId))
           .limit(1);
@@ -618,7 +620,10 @@ export const bookingRouter = createTRPCRouter({
         const localDateStr = input.date.toLocaleDateString('sv', { timeZone: timezone });
         const localDate = new Date(localDateStr + 'T12:00:00Z');
         const dayOfWeek = localDate.getUTCDay();
-        const practiceDay = ((tenant?.openingHours as DaySchedule[] | null) ?? DEFAULT_OPENING_HOURS)
+        const bookableHours = (tenant?.consultationHours as DaySchedule[] | null)
+          ?? (tenant?.openingHours as DaySchedule[] | null)
+          ?? DEFAULT_OPENING_HOURS;
+        const practiceDay = bookableHours
           .find((h) => h.dayOfWeek === dayOfWeek);
         allSlots = generateSlotsFromRanges(localDateStr, practiceDay?.slots ?? [], timezone, 30);
       }
