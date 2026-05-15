@@ -11,6 +11,7 @@ const nextConfig: NextConfig = {
     root: path.resolve(process.cwd(), "../.."),
   },
   experimental: {
+    // Same as web app — allows Traefik requests through. See apps/web/next.config.js.
     trustHostHeader: true,
   },
 };
