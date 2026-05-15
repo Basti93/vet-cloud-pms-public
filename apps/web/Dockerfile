@@ -39,6 +39,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static     ./apps/web/.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public           ./apps/web/public
 
+# Next.js 16.2.6 bakes trustHostHeader:false into the standalone server.js config blob.
+# There is no public config API to override this. Patch it so Traefik requests
+# (Host: example.com) are accepted instead of being silently dropped.
+RUN sed -i 's/"trustHostHeader":false/"trustHostHeader":true/' apps/web/server.js
+
 # Pre-create upload dir so Docker initialises the named volume with nextjs ownership.
 # Without this Docker creates the volume mount point as root, causing EACCES on upload.
 RUN mkdir -p ./apps/web/public/tenant-assets && \
