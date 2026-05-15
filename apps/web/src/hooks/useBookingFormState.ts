@@ -93,7 +93,8 @@ export function useBookingFormState(_tenantSlug: string) {
   };
 
   const clear = () => {
-    setState({});
+    const sessionId = generateOrGetSessionId();
+    setState({ browserSessionId: sessionId });
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(TTL_KEY);
   };

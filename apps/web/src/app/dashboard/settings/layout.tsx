@@ -2,7 +2,7 @@
 
 import { ReactNode, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Palette, Users, Building2, Mail, CalendarClock, Shield, Cog, Lock } from "lucide-react";
+import { Palette, Users, Building2, Mail, CalendarClock, Shield, Cog, Lock, Code2 } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { PERMISSIONS } from "@/lib/db/schema";
 import { Tabs } from "@/components/ui/tabs";
@@ -17,6 +17,7 @@ const ALL_TABS = [
       { href: "/dashboard/settings/email", label: "E-Mails", icon: Mail },
       { href: "/dashboard/settings/vaccinations", label: "Impfungen", icon: Shield },
       { href: "/dashboard/settings/availability", label: "Verfügbarkeit", icon: CalendarClock },
+      { href: "/dashboard/settings/embedding", label: "Buchungs-Widget", icon: Code2 },
     ],
   },
   {

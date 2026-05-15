@@ -81,12 +81,15 @@ const nextConfig = {
   turbopack: {
     root: path.resolve(__dirname, "../.."),
   },
-  experimental: {
-    // Allows requests via Traefik (Host: example.com) to reach the standalone
-    // server bound to 0.0.0.0. Next.js otherwise only allows localhost by default.
-    // Marked @internal in Next.js source — revisit if Next.js adds a public API.
-    trustHostHeader: true,
-  },
+  serverExternalPackages: [
+    "@opentelemetry/sdk-node",
+    "@opentelemetry/instrumentation",
+    "@opentelemetry/exporter-trace-otlp-http",
+    "@opentelemetry/resources",
+    "@opentelemetry/sdk-trace-node",
+    "@opentelemetry/semantic-conventions",
+    "require-in-the-middle",
+  ],
 
   // Security & Rate Limiting Headers
   async headers() {

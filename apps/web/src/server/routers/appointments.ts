@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { eq, and, gte, lte } from "drizzle-orm";
+import { eq, and, gte, lte, ne, sql } from "drizzle-orm";
 import { createTRPCRouter, tenantProcedure, publicProcedure } from "@/server/trpc";
-import { appointments, patients, owners, users, PERMISSIONS } from "@/lib/db/schema";
+import { appointments, patients, owners, users, PERMISSIONS, APPOINTMENT_STATUSES } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
 import { verifyConfirmationToken } from "@/lib/tokens/confirmation";
 import { requirePermission } from "@/server/trpc/middleware";
@@ -169,9 +169,7 @@ export const appointmentsRouter = createTRPCRouter({
         description: z.string().optional(),
         startTime: z.date().optional(),
         endTime: z.date().optional(),
-        status: z
-          .enum(["scheduled", "confirmed", "completed", "cancelled", "no-show"])
-          .optional(),
+        status: z.enum(APPOINTMENT_STATUSES).optional(),
         vetId: z.string().uuid().optional(),
       })
     )
@@ -304,7 +302,12 @@ export const appointmentsRouter = createTRPCRouter({
       }
 
       const [appointment] = await ctx.db
-        .select({ source: appointments.source })
+        .select({
+          source: appointments.source,
+          status: appointments.status,
+          patientId: appointments.patientId,
+          tenantId: appointments.tenantId,
+        })
         .from(appointments)
         .where(eq(appointments.id, input.appointmentId))
         .limit(1);
@@ -316,11 +319,81 @@ export const appointmentsRouter = createTRPCRouter({
         });
       }
 
-      const newStatus = appointment.source === "online_booking" ? "confirmed" : "completed";
+      if (appointment.status !== "pending-confirmation") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Dieser Termin wurde bereits bestätigt oder ist nicht mehr ausstehend",
+        });
+      }
+
+      // Dedup/merge owner: if existing owner with same email found, repoint appointment
+      const [provisionalPatient] = await ctx.db
+        .select({
+          id: patients.id,
+          ownerId: patients.ownerId,
+          name: patients.name,
+          species: patients.species,
+          breed: patients.breed,
+        })
+        .from(patients)
+        .where(eq(patients.id, appointment.patientId))
+        .limit(1);
+
+      if (provisionalPatient) {
+        const [existingOwner] = await ctx.db
+          .select({ id: owners.id })
+          .from(owners)
+          .where(
+            and(
+              eq(owners.tenantId, appointment.tenantId),
+              sql`lower(${owners.email}) = lower(${decoded.ownerEmail})`,
+              ne(owners.id, provisionalPatient.ownerId)
+            )
+          )
+          .limit(1);
+
+        if (existingOwner) {
+          const [existingPatient] = await ctx.db
+            .select({ id: patients.id })
+            .from(patients)
+            .where(
+              and(
+                eq(patients.ownerId, existingOwner.id),
+                sql`lower(${patients.name}) = lower(${provisionalPatient.name})`
+              )
+            )
+            .limit(1);
+
+          let targetPatientId: string;
+          if (existingPatient) {
+            targetPatientId = existingPatient.id;
+          } else {
+            const [newPatient] = await ctx.db
+              .insert(patients)
+              .values({
+                tenantId: appointment.tenantId,
+                ownerId: existingOwner.id,
+                name: provisionalPatient.name,
+                species: provisionalPatient.species,
+                breed: provisionalPatient.breed ?? undefined,
+              })
+              .returning();
+            targetPatientId = newPatient.id;
+          }
+
+          await ctx.db
+            .update(appointments)
+            .set({ patientId: targetPatientId })
+            .where(eq(appointments.id, input.appointmentId));
+
+          await ctx.db.delete(patients).where(eq(patients.id, provisionalPatient.id));
+          await ctx.db.delete(owners).where(eq(owners.id, provisionalPatient.ownerId));
+        }
+      }
 
       const [updated] = await ctx.db
         .update(appointments)
-        .set({ status: newStatus, updatedAt: new Date() })
+        .set({ status: "scheduled", updatedAt: new Date() })
         .where(eq(appointments.id, input.appointmentId))
         .returning();
 

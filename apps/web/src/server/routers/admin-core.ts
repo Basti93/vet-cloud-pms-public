@@ -803,4 +803,40 @@ export const adminCoreRouter = createAdminRouter({
         items,
       };
     }),
+
+  generatePreviewToken: procedure
+    .input(z.object({ tenantId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const { randomBytes } = await import("crypto");
+      const token = randomBytes(32).toString("hex");
+      await db
+        .update(tenants)
+        .set({ previewToken: token, updatedAt: new Date() })
+        .where(eq(tenants.id, input.tenantId));
+      await writeAuditLog(ctx, {
+        tenantId: input.tenantId,
+        action: "config_change",
+        entity: { type: "tenant", id: input.tenantId },
+        event: "admin.preview_token_regenerated",
+        summary: "Admin regenerated preview token",
+      });
+      return { previewToken: token };
+    }),
+
+  toggleWebsiteEnabled: procedure
+    .input(z.object({ tenantId: z.string().uuid(), enabled: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await db
+        .update(tenants)
+        .set({ websiteEnabled: input.enabled, updatedAt: new Date() })
+        .where(eq(tenants.id, input.tenantId));
+      await writeAuditLog(ctx, {
+        tenantId: input.tenantId,
+        action: "config_change",
+        entity: { type: "tenant", id: input.tenantId },
+        event: input.enabled ? "admin.website_enabled" : "admin.website_disabled",
+        summary: `Admin ${input.enabled ? "enabled" : "disabled"} public website`,
+      });
+      return { success: true };
+    }),
 });

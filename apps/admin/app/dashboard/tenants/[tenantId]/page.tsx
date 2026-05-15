@@ -17,6 +17,7 @@ export default function TenantDetailPage() {
   >("free");
   const [aiReceptionOverride, setAiReceptionOverride] = useState<boolean | null>(null);
   const [systemRolesEditableOverride, setSystemRolesEditableOverride] = useState<boolean | null>(null);
+  const [copiedPreview, setCopiedPreview] = useState(false);
 
   const { data: tenant, isLoading, error } =
     trpc.adminDashboard.core.getTenantDetails.useQuery({
@@ -60,6 +61,14 @@ export default function TenantDetailPage() {
         setSystemRolesEditableOverride(null);
       },
     });
+
+  const utils = trpc.useUtils();
+  const generatePreviewTokenMutation = trpc.adminDashboard.core.generatePreviewToken.useMutation({
+    onSuccess: () => utils.adminDashboard.core.getTenantDetails.invalidate({ tenantId }),
+  });
+  const toggleWebsiteEnabledMutation = trpc.adminDashboard.core.toggleWebsiteEnabled.useMutation({
+    onSuccess: () => utils.adminDashboard.core.getTenantDetails.invalidate({ tenantId }),
+  });
 
   if (error) {
     return (
@@ -194,6 +203,71 @@ export default function TenantDetailPage() {
               </button>
             ) : null}
           </div>
+        </div>
+      </div>
+
+      {/* Website & Vorschau */}
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-gray-900">Website & Vorschau</h3>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500">Öffentlich aktiv</span>
+            <button
+              type="button"
+              onClick={() => toggleWebsiteEnabledMutation.mutate({ tenantId, enabled: !tenant.websiteEnabled })}
+              disabled={toggleWebsiteEnabledMutation.isPending}
+              className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ${
+                tenant.websiteEnabled ? "bg-green-500" : "bg-gray-300"
+              }`}
+              role="switch"
+              aria-checked={tenant.websiteEnabled}
+            >
+              <span
+                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ${
+                  tenant.websiteEnabled ? "translate-x-4" : "translate-x-0"
+                }`}
+              />
+            </button>
+          </div>
+        </div>
+        <div className="space-y-2">
+          <p className="text-xs text-gray-500">Vorschau-URLs</p>
+          {tenant.previewToken ? (
+            <div className="space-y-1.5">
+              {[
+                { label: "Website", path: `/${tenant.slug}` },
+                { label: "Buchung", path: `/book/${tenant.slug}` },
+              ].map(({ label, path }) => (
+                <div key={path} className="flex items-center gap-2">
+                  <span className="text-xs text-gray-400 w-12 flex-shrink-0">{label}</span>
+                  <code className="flex-1 text-xs bg-gray-50 border border-gray-200 rounded px-2 py-1.5 truncate text-blue-600">
+                    {`${path}?preview=${tenant.previewToken}`}
+                  </code>
+                  <button
+                      type="button"
+                      onClick={() => {
+                        void navigator.clipboard.writeText(`https://example.com${path}?preview=${tenant.previewToken}`);
+                        setCopiedPreview(true);
+                        setTimeout(() => setCopiedPreview(false), 2000);
+                      }}
+                      className="text-xs text-blue-600 hover:text-blue-700 font-medium whitespace-nowrap"
+                    >
+                      {copiedPreview ? "✓ Kopiert" : "Kopieren"}
+                    </button>
+                  </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-gray-400 italic">Kein Token — bitte generieren</p>
+          )}
+          <button
+            type="button"
+            onClick={() => generatePreviewTokenMutation.mutate({ tenantId })}
+            disabled={generatePreviewTokenMutation.isPending}
+            className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+          >
+            {generatePreviewTokenMutation.isPending ? "Generiert…" : tenant.previewToken ? "Neu generieren" : "Token generieren"}
+          </button>
         </div>
       </div>
 

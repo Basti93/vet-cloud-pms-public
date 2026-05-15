@@ -514,6 +514,9 @@ export const tenantRouter = createTRPCRouter({
         themePreference: tenants.themePreference,
         typographyPreference: tenants.typographyPreference,
         allowedEmbeddingDomains: tenants.allowedEmbeddingDomains,
+        websiteEnabled: tenants.websiteEnabled,
+        previewToken: tenants.previewToken,
+        subscriptionStatus: tenants.subscriptionStatus,
       })
       .from(tenants)
       .where(eq(tenants.id, user.tenantId))
@@ -585,6 +588,7 @@ export const tenantRouter = createTRPCRouter({
         allowedEmbeddingDomains: z.array(z.string()).optional(),
         themePreference: z.enum(["sage", "warmsand", "klinikblau", "bordeaux", "forest", "schiefer"]).optional(),
         typographyPreference: z.enum(["modern", "klassisch", "klinisch", "freundlich"]).optional(),
+        websiteEnabled: z.boolean().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -607,6 +611,7 @@ export const tenantRouter = createTRPCRouter({
       if (input.postalCode !== undefined) updateData.postalCode = input.postalCode;
       if (input.tagline !== undefined) updateData.tagline = input.tagline;
       if (input.monogram !== undefined) updateData.monogram = input.monogram;
+      if (input.websiteEnabled !== undefined) updateData.websiteEnabled = input.websiteEnabled;
       if (input.allowedEmbeddingDomains !== undefined) {
         updateData.allowedEmbeddingDomains = [
           ...new Set(
@@ -633,6 +638,26 @@ export const tenantRouter = createTRPCRouter({
       });
 
       return { success: true };
+    }),
+
+  generatePreviewToken: protectedProcedure
+    .use(requirePermission(PERMISSIONS.SETTINGS_MANAGE))
+    .mutation(async ({ ctx }) => {
+      const [user] = await ctx.db
+        .select({ tenantId: users.tenantId })
+        .from(users)
+        .where(eq(users.clerkId, ctx.userId))
+        .limit(1);
+
+      if (!user) throw new Error("User not found");
+
+      const token = randomBytes(32).toString("hex");
+      await ctx.db
+        .update(tenants)
+        .set({ previewToken: token, updatedAt: new Date() })
+        .where(eq(tenants.id, user.tenantId));
+
+      return { previewToken: token };
     }),
 
   delete: protectedProcedure

@@ -4,8 +4,7 @@ import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Globe, ExternalLink, CheckCircle, Save, Pencil, PlusCircle } from "lucide-react";
-import { EmbedHelpSection } from "@/components/settings/EmbedHelpSection";
+import { Globe, ExternalLink, CheckCircle, Save, Pencil, PlusCircle, Copy, RefreshCw, Lock } from "lucide-react";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -46,12 +45,11 @@ function TextInput({
 export default function PracticePage() {
   const { data: tenant } = trpc.tenant.getCurrent.useQuery();
   const { data: deletionStatus } = trpc.tenant.getDeletionStatus.useQuery();
-  const { data: embedCode } = trpc.booking.getEmbedCode.useQuery(
-    { slug: tenant?.slug || "" },
-    { enabled: !!tenant?.slug }
-  );
   const update = trpc.tenant.update.useMutation();
+  const generatePreviewToken = trpc.tenant.generatePreviewToken.useMutation();
+  const utils = trpc.useUtils();
   const { data: websiteProjects, isLoading: websitesLoading } = trpc.websitePlatform.listProjects.useQuery();
+  const [copiedPreview, setCopiedPreview] = useState(false);
 
   const [form, setForm] = useState({
     name: "",
@@ -62,10 +60,8 @@ export default function PracticePage() {
     postalCode: "",
     tagline: "",
     monogram: "",
-    allowedEmbeddingDomains: [] as string[],
   });
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [newDomain, setNewDomain] = useState("");
 
   useEffect(() => {
     if (tenant) {
@@ -78,8 +74,6 @@ export default function PracticePage() {
         postalCode: tenant.postalCode || "",
         tagline: tenant.tagline || "",
         monogram: tenant.monogram || "",
-        allowedEmbeddingDomains:
-          (tenant as { allowedEmbeddingDomains?: string[] }).allowedEmbeddingDomains || [],
       });
     }
   }, [tenant]);
@@ -119,8 +113,9 @@ export default function PracticePage() {
         </Card>
       )}
 
-      {/* Website-Status */}
+      {/* Website */}
       <Card className="p-5" style={{ borderColor: "var(--color-border)" }}>
+        {/* Row 1: Studio info + actions */}
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-3">
             <div
@@ -131,7 +126,7 @@ export default function PracticePage() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-sm">Öffentliche Website</span>
+                <span className="font-semibold text-sm">Website & Buchung</span>
                 <span
                   className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${websiteStatusClass}`}
                 >
@@ -181,6 +176,111 @@ export default function PracticePage() {
               </a>
             )}
           </div>
+        </div>
+
+        {/* Divider */}
+        <div className="my-4 border-t" style={{ borderColor: "var(--color-border)" }} />
+
+        {/* Row 2: Activate toggle */}
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <span className="text-sm font-medium">Öffentlich aktivieren</span>
+            <p className="text-xs mt-0.5" style={{ color: "var(--color-muted)" }}>
+              Wenn aktiv, ist Buchungsseite und Website öffentlich erreichbar und wird von Suchmaschinen indexiert.
+            </p>
+          </div>
+          {tenant?.subscriptionStatus !== "active" ? (
+            <div className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 border border-amber-200">
+              <Lock size={12} />
+              Erfordert aktives Abonnement
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                update.mutate(
+                  { websiteEnabled: !tenant.websiteEnabled },
+                  { onSuccess: () => utils.tenant.getCurrent.invalidate() }
+                );
+              }}
+              disabled={update.isPending}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
+                tenant?.websiteEnabled ? "bg-green-500" : "bg-gray-300"
+              }`}
+              role="switch"
+              aria-checked={tenant?.websiteEnabled ?? false}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ${
+                  tenant?.websiteEnabled ? "translate-x-5" : "translate-x-0"
+                }`}
+              />
+            </button>
+          )}
+        </div>
+
+        {/* Row 3: Preview URLs */}
+        <div className="mt-4 pt-4 border-t" style={{ borderColor: "var(--color-border)" }}>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-medium" style={{ color: "var(--color-muted)" }}>
+              Vorschau-Links (auch ohne aktive Website zugänglich)
+            </p>
+            <button
+              type="button"
+              onClick={() => generatePreviewToken.mutate(undefined, { onSuccess: () => utils.tenant.getCurrent.invalidate() })}
+              disabled={generatePreviewToken.isPending}
+              className="flex items-center gap-1 text-xs hover:opacity-70 transition-opacity"
+              style={{ color: "var(--color-muted)" }}
+              title="Neuen Token generieren"
+            >
+              <RefreshCw size={12} className={generatePreviewToken.isPending ? "animate-spin" : ""} />
+              {tenant?.previewToken ? "Neu generieren" : "Token generieren"}
+            </button>
+          </div>
+          {tenant?.previewToken ? (
+            <div className="space-y-2">
+              {[
+                { label: "Website", path: `/${tenant.slug}` },
+                { label: "Buchung", path: `/book/${tenant.slug}` },
+              ].map(({ label, path }) => {
+                const url = `${typeof window !== "undefined" ? window.location.origin : ""}${path}?preview=${tenant.previewToken}`;
+                return (
+                  <div key={path} className="flex items-center gap-2">
+                    <span className="text-xs w-12 flex-shrink-0" style={{ color: "var(--color-muted)" }}>{label}</span>
+                    <code
+                      className="flex-1 text-xs px-2 py-1.5 rounded truncate"
+                      style={{ backgroundColor: "var(--color-bg)", color: "var(--color-accent)" }}
+                    >
+                      {url}
+                    </code>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void navigator.clipboard.writeText(url);
+                        setCopiedPreview(true);
+                        setTimeout(() => setCopiedPreview(false), 2000);
+                      }}
+                      className="flex-shrink-0 p-1.5 rounded hover:bg-gray-100 transition-colors"
+                      title="Kopieren"
+                    >
+                      {copiedPreview ? <CheckCircle size={14} className="text-green-600" /> : <Copy size={14} />}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs gap-1.5"
+              onClick={() => generatePreviewToken.mutate(undefined, { onSuccess: () => utils.tenant.getCurrent.invalidate() })}
+              disabled={generatePreviewToken.isPending}
+            >
+              <RefreshCw size={13} className={generatePreviewToken.isPending ? "animate-spin" : ""} />
+              Vorschau-Link generieren
+            </Button>
+          )}
         </div>
       </Card>
 
@@ -237,95 +337,6 @@ export default function PracticePage() {
           {saveSuccess && (
             <span className="flex items-center gap-1.5 text-sm" style={{ color: "#166534" }}>
               <CheckCircle size={15} />
-              Gespeichert
-            </span>
-          )}
-        </div>
-      </Card>
-
-      {/* How to include booking */}
-      <EmbedHelpSection embedCode={embedCode} />
-
-      {/* Allowed embedding domains */}
-      <Card className="p-6" style={{ borderColor: "var(--color-border)" }}>
-        <h2 className="text-base font-semibold mb-4">Erlaubte Einbindungsdomänen</h2>
-        <p style={{ color: "var(--color-muted)" }} className="text-sm mb-4">
-          Nur diese Domains dürfen die Buchungs-Widget einbinden. Lassen Sie leer, um von überall zuzulassen.
-        </p>
-
-        <div className="space-y-3">
-          {form.allowedEmbeddingDomains.length > 0 && (
-            <div className="space-y-2">
-              {form.allowedEmbeddingDomains.map((domain, idx) => (
-                <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg" style={{ backgroundColor: "var(--color-bg)" }}>
-                  <span className="flex-1 text-sm">{domain}</span>
-                  <button
-                    onClick={() => setForm(prev => ({
-                      ...prev,
-                      allowedEmbeddingDomains: prev.allowedEmbeddingDomains.filter((_, i) => i !== idx)
-                    }))}
-                    className="text-red-500 text-sm hover:underline"
-                  >
-                    Entfernen
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={newDomain}
-              onChange={(e) => setNewDomain(e.target.value)}
-              placeholder="z.B. tierarzt-praxis.de, www.tierarzt-praxis.de"
-              className="flex-1 px-3 py-2 rounded-lg border text-sm"
-              style={{
-                borderColor: "var(--color-border)",
-                backgroundColor: "var(--color-bg)",
-                color: "var(--color-fg)",
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && newDomain.trim()) {
-                  setForm(prev => ({
-                    ...prev,
-                    allowedEmbeddingDomains: [...prev.allowedEmbeddingDomains, newDomain.trim()]
-                  }));
-                  setNewDomain("");
-                }
-              }}
-            />
-            <button
-              onClick={() => {
-                if (newDomain.trim()) {
-                  setForm(prev => ({
-                    ...prev,
-                    allowedEmbeddingDomains: [...prev.allowedEmbeddingDomains, newDomain.trim()]
-                  }));
-                  setNewDomain("");
-                }
-              }}
-              className="px-3 py-2 rounded-lg text-sm font-medium"
-              style={{ backgroundColor: "var(--color-accent)", color: "white" }}
-            >
-              Hinzufügen
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-4 pt-4 border-t" style={{ borderColor: "var(--color-border)" }}>
-          <button
-            onClick={handleSave}
-            disabled={update.isPending}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium"
-            style={{ backgroundColor: "var(--color-accent)", color: "white" }}
-          >
-            <Save size={14} />
-            {update.isPending ? "Wird gespeichert..." : "Speichern"}
-          </button>
-          {saveSuccess && (
-            <span className="flex items-center gap-1.5 text-sm mt-2" style={{ color: "#166534" }}>
-              <CheckCircle size={14} />
               Gespeichert
             </span>
           )}

@@ -76,7 +76,9 @@
     "cancelled": "Cancelled",
     "cancelled_description": "Appointment was cancelled or declined",
     "no_show": "No-Show",
-    "no_show_description": "Patient did not show up for the appointment"
+    "no_show_description": "Patient did not show up for the appointment",
+    "pending_confirmation": "Not Verified",
+    "pending_confirmation_description": "Booking awaiting email confirmation by the pet owner"
   },
   "booking": {
     "title": "Online Appointment Booking",

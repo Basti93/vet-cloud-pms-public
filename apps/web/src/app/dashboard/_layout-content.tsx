@@ -39,8 +39,12 @@ function useUserNavItems() {
 
 function useAdminNavItems() {
   const { t } = useLocale();
+  const { data: websiteProjects } = trpc.websitePlatform.listProjects.useQuery();
+  const websiteHref = websiteProjects?.[0]?.id
+    ? `/dashboard/websites/${websiteProjects[0].id}/editor`
+    : "/dashboard/websites";
   return [
-    { href: "/dashboard/websites", icon: Globe2, label: "Website", adminOnly: true },
+    { href: websiteHref, icon: Globe2, label: "Website", adminOnly: true },
     { href: "/dashboard/settings", icon: Building2, labelKey: "navigation.settings", label: t("navigation.settings"), adminOnly: true },
   ];
 }

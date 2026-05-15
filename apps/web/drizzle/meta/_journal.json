@@ -218,6 +218,13 @@
       "when": 1778788345319,
       "tag": "0030_drop-website-template",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1778844961534,
+      "tag": "0031_gigantic_husk",
+      "breakpoints": true
     }
   ]
 }

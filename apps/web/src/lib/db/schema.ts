@@ -114,6 +114,8 @@ export const tenants = pgTable(
     specialOpeningHours: jsonb("special_opening_hours"),
     // Allowed domains for embedding the booking widget (array of domain strings)
     allowedEmbeddingDomains: jsonb("allowed_embedding_domains"),
+    websiteEnabled: boolean("website_enabled").default(false).notNull(),
+    previewToken: varchar("preview_token", { length: 64 }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .default(sql`now()`)
       .notNull(),
@@ -580,6 +582,16 @@ export const patients = pgTable(
 // APPOINTMENTS (Termine)
 // ============================================================================
 
+export const APPOINTMENT_STATUSES = [
+  "scheduled",
+  "confirmed",
+  "completed",
+  "cancelled",
+  "no-show",
+  "pending-confirmation",
+] as const;
+export type AppointmentStatus = (typeof APPOINTMENT_STATUSES)[number];
+
 export const appointments = pgTable(
   "appointments",
   {
@@ -599,7 +611,7 @@ export const appointments = pgTable(
     description: text("description"),
     status: varchar("status", {
       length: 50,
-      enum: ["scheduled", "confirmed", "completed", "cancelled", "no-show"],
+      enum: APPOINTMENT_STATUSES,
     })
       .default("scheduled")
       .notNull(),

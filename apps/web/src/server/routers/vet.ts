@@ -83,7 +83,7 @@ export const vetRouter = createTRPCRouter({
         tenantId: z.string().uuid(),
         vetId: z.string().uuid().optional(),
         status: z
-          .enum(["scheduled", "completed", "cancelled", "no-show"])
+          .enum(["scheduled", "completed", "cancelled", "no-show", "pending-confirmation"])
           .optional(),
       })
     )
