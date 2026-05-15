@@ -81,6 +81,15 @@ const nextConfig = {
   turbopack: {
     root: path.resolve(__dirname, "../.."),
   },
+  serverExternalPackages: [
+    "@opentelemetry/sdk-node",
+    "@opentelemetry/instrumentation",
+    "@opentelemetry/exporter-trace-otlp-http",
+    "@opentelemetry/resources",
+    "@opentelemetry/sdk-trace-node",
+    "@opentelemetry/semantic-conventions",
+    "require-in-the-middle",
+  ],
 
   // Security & Rate Limiting Headers
   async headers() {
