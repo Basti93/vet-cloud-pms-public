@@ -1,0 +1,2 @@
+-- No DDL change: exported APPOINTMENT_STATUSES const and AppointmentStatus type from schema.ts.
+-- status column remains varchar(50) — enum array is TypeScript-only metadata.

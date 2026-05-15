@@ -24,7 +24,7 @@ type BookingItem = {
   startTime: Date | string;
   endTime: Date | string;
   vetId: string;
-  status: 'scheduled' | 'completed' | 'cancelled' | 'confirmed';
+  status: 'scheduled' | 'completed' | 'cancelled' | 'confirmed' | 'pending-confirmation';
   patient: {
     name: string;
     species: string;
@@ -101,6 +101,8 @@ function getStatusColor(status: string) {
       return 'bg-green-50 text-green-700 border-green-200';
     case 'cancelled':
       return 'bg-red-50 text-red-700 border-red-200';
+    case 'pending-confirmation':
+      return 'bg-orange-50 text-orange-700 border-orange-200';
     default:
       return 'bg-gray-50 text-gray-700 border-gray-200';
   }
@@ -117,6 +119,8 @@ function getStatusLabel(status: string): string {
       return 'Abgelehnt';
     case 'no-show':
       return 'Nicht erschienen';
+    case 'pending-confirmation':
+      return 'Nicht verifiziert';
     default:
       return status;
   }
@@ -194,7 +198,7 @@ export function AppointmentTable({
 
         if (vetItems.length === 0) return null;
 
-        const pending = vetItems.filter((i) => i.status === 'scheduled').length;
+        const pending = vetItems.filter((i) => i.status === 'scheduled' || i.status === 'pending-confirmation').length;
         const confirmed = vetItems.filter(
           (i) => i.status === 'completed' || i.status === 'confirmed'
         ).length;
@@ -320,7 +324,7 @@ export function AppointmentTable({
                               </span>
                             </td>
                             <td className="px-4 py-3 text-right">
-                              {item.status === 'scheduled' ? (
+                              {(item.status === 'scheduled' || item.status === 'pending-confirmation') ? (
                                 <div className="flex items-center justify-end gap-2">
                                   <button
                                     onClick={(e) => {
@@ -329,6 +333,7 @@ export function AppointmentTable({
                                     }}
                                     disabled={confirmingId === item.id || rejectingId !== null}
                                     className="inline-flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-600 rounded-md hover:bg-green-100 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium transition-colors"
+                                    title={item.status === 'pending-confirmation' ? 'E-Mail noch nicht bestätigt — trotzdem bestätigen' : undefined}
                                   >
                                     {confirmingId === item.id && (
                                       <Loader2 size={12} className="animate-spin" />

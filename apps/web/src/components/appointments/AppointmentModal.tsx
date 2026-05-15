@@ -151,7 +151,7 @@ export function AppointmentModal({
         description: form.description || undefined,
         startTime,
         endTime,
-        status: form.status as "scheduled" | "confirmed" | "completed" | "cancelled" | "no-show",
+        status: form.status as "scheduled" | "confirmed" | "completed" | "cancelled" | "no-show" | "pending-confirmation",
         vetId: form.vetId,
       });
     } else {

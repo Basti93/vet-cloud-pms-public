@@ -582,6 +582,16 @@ export const patients = pgTable(
 // APPOINTMENTS (Termine)
 // ============================================================================
 
+export const APPOINTMENT_STATUSES = [
+  "scheduled",
+  "confirmed",
+  "completed",
+  "cancelled",
+  "no-show",
+  "pending-confirmation",
+] as const;
+export type AppointmentStatus = (typeof APPOINTMENT_STATUSES)[number];
+
 export const appointments = pgTable(
   "appointments",
   {
@@ -601,7 +611,7 @@ export const appointments = pgTable(
     description: text("description"),
     status: varchar("status", {
       length: 50,
-      enum: ["scheduled", "confirmed", "completed", "cancelled", "no-show"],
+      enum: APPOINTMENT_STATUSES,
     })
       .default("scheduled")
       .notNull(),

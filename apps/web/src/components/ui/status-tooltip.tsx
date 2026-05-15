@@ -34,6 +34,10 @@ export function StatusTooltip() {
       status: t("status.no_show"),
       description: t("status.no_show_description"),
     },
+    "pending-confirmation": {
+      status: t("status.pending_confirmation"),
+      description: t("status.pending_confirmation_description"),
+    },
   };
 
   return (

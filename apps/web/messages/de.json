@@ -76,7 +76,9 @@
     "cancelled": "Abgesagt",
     "cancelled_description": "Termin wurde storniert oder abgesagt",
     "no_show": "Nicht erschienen",
-    "no_show_description": "Patient ist nicht zum Termin erschienen"
+    "no_show_description": "Patient ist nicht zum Termin erschienen",
+    "pending_confirmation": "Nicht verifiziert",
+    "pending_confirmation_description": "Buchung wartet auf E-Mail-Bestätigung durch den Tierhalter"
   },
   "booking": {
     "title": "Online-Terminbuchung",

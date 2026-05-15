@@ -1,10 +1,11 @@
 import { z } from "zod";
-import { eq, and, gte, lte, lt, or, isNull, count } from "drizzle-orm";
+import { eq, and, gte, gt, lte, lt, or, isNull, count, sql, ne, notInArray } from "drizzle-orm";
 import { createTRPCRouter, publicProcedure, publicBookingProcedure, tenantProcedure } from "@/server/trpc";
 import { tenants, appointments, owners, patients, users, userRoles, roles, appointmentHolds, emailSettings, vetSchedules, vetAbsences } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
-import { sendConfirmationEmail, sendBookingNotificationEmail } from "@/lib/email/service";
-import type { SendConfirmationEmailInput, SendBookingNotificationInput } from "@/lib/email/service";
+import { sendConfirmationEmail, sendBookingNotificationEmail, sendBookingRequestEmail } from "@/lib/email/service";
+import type { SendConfirmationEmailInput, SendBookingNotificationInput, SendBookingRequestEmailInput } from "@/lib/email/service";
+import { generateConfirmationToken, buildConfirmationUrl } from "@/lib/tokens/confirmation";
 import { DEFAULT_OPENING_HOURS, type DaySchedule, type TimeRange } from "@/lib/schedule-types";
 import { getMainDomain } from "@/lib/env";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
@@ -265,12 +266,13 @@ export const bookingRouter = createTRPCRouter({
       tenantId: z.string().uuid(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const [appointment] = await ctx.db
-        .update(appointments)
-        .set({
-          status: "confirmed", // Mark as confirmed/accepted by admin
-          updatedAt: new Date(),
+      const [existingAppt] = await ctx.db
+        .select({
+          id: appointments.id,
+          status: appointments.status,
+          patientId: appointments.patientId,
         })
+        .from(appointments)
         .where(
           and(
             eq(appointments.id, input.appointmentId),
@@ -278,6 +280,89 @@ export const bookingRouter = createTRPCRouter({
             eq(appointments.source, "online_booking")
           )
         )
+        .limit(1);
+
+      if (!existingAppt) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Termin nicht gefunden" });
+      }
+
+      // Staff confirms a pending-confirmation appointment: run owner dedup/merge
+      // (bypasses email verification step — equivalent to what confirmFromEmail does)
+      if (existingAppt.status === "pending-confirmation") {
+        const [provisionalPatient] = await ctx.db
+          .select({ id: patients.id, ownerId: patients.ownerId, name: patients.name, species: patients.species, breed: patients.breed })
+          .from(patients)
+          .where(eq(patients.id, existingAppt.patientId))
+          .limit(1);
+
+        if (provisionalPatient) {
+          const [provisionalOwner] = await ctx.db
+            .select({ id: owners.id, email: owners.email })
+            .from(owners)
+            .where(eq(owners.id, provisionalPatient.ownerId))
+            .limit(1);
+
+          if (provisionalOwner?.email) {
+            const [existingOwner] = await ctx.db
+              .select({ id: owners.id })
+              .from(owners)
+              .where(
+                and(
+                  eq(owners.tenantId, input.tenantId),
+                  sql`lower(${owners.email}) = lower(${provisionalOwner.email})`,
+                  ne(owners.id, provisionalPatient.ownerId)
+                )
+              )
+              .limit(1);
+
+            if (existingOwner) {
+              const [existingPatient] = await ctx.db
+                .select({ id: patients.id })
+                .from(patients)
+                .where(
+                  and(
+                    eq(patients.ownerId, existingOwner.id),
+                    sql`lower(${patients.name}) = lower(${provisionalPatient.name})`
+                  )
+                )
+                .limit(1);
+
+              let targetPatientId: string;
+              if (existingPatient) {
+                targetPatientId = existingPatient.id;
+              } else {
+                const [newPatient] = await ctx.db
+                  .insert(patients)
+                  .values({
+                    tenantId: input.tenantId,
+                    ownerId: existingOwner.id,
+                    name: provisionalPatient.name,
+                    species: provisionalPatient.species,
+                    breed: provisionalPatient.breed ?? undefined,
+                  })
+                  .returning();
+                targetPatientId = newPatient.id;
+              }
+
+              await ctx.db
+                .update(appointments)
+                .set({ patientId: targetPatientId })
+                .where(eq(appointments.id, input.appointmentId));
+
+              await ctx.db.delete(patients).where(eq(patients.id, provisionalPatient.id));
+              await ctx.db.delete(owners).where(eq(owners.id, provisionalPatient.ownerId));
+            }
+          }
+        }
+      }
+
+      const [appointment] = await ctx.db
+        .update(appointments)
+        .set({
+          status: "confirmed",
+          updatedAt: new Date(),
+        })
+        .where(eq(appointments.id, input.appointmentId))
         .returning();
 
       if (!appointment) {
@@ -582,56 +667,11 @@ export const bookingRouter = createTRPCRouter({
         embeddingOrigin: input.embeddingOrigin,
       });
 
-      const dayStart = new Date(input.date);
-      dayStart.setHours(0, 0, 0, 0);
-      const dayEnd = new Date(input.date);
-      dayEnd.setHours(23, 59, 59, 999);
-
-      const conditions = [
-        eq(appointments.tenantId, input.tenantId),
-        gte(appointments.startTime, dayStart),
-        lte(appointments.startTime, dayEnd),
-      ];
-
-      if (input.vetId) {
-        conditions.push(eq(appointments.vetId, input.vetId));
-      }
-
-      const booked = await ctx.db
-        .select({
-          startTime: appointments.startTime,
-          endTime: appointments.endTime,
-        })
-        .from(appointments)
-        .where(and(...conditions));
-
-      // Also filter out actively held slots (expires_at > now)
-      const holdBaseConditions = [
-        eq(appointmentHolds.tenantId, input.tenantId),
-        gte(appointmentHolds.slotDatetime, dayStart),
-        lte(appointmentHolds.slotDatetime, dayEnd),
-        gte(appointmentHolds.expiresAt, new Date()),
-      ];
-      const holdVetCondition = input.vetId
-        ? or(isNull(appointmentHolds.vetId), eq(appointmentHolds.vetId, input.vetId))
-        : undefined;
-
-      const holds = await ctx.db
-        .select({ slotDatetime: appointmentHolds.slotDatetime })
-        .from(appointmentHolds)
-        .where(
-          holdVetCondition
-            ? and(...holdBaseConditions, holdVetCondition)
-            : and(...holdBaseConditions)
-        );
-
-      // Use schedule-aware slot generation (requires vetId for per-vet hours)
-      // If no vetId, fall back to practice hours only
+      // Generate slots first — use their timestamps as the query range (avoids timezone math)
       let allSlots: { start: Date; end: Date }[];
       if (input.vetId) {
         allSlots = await getVetSlotsForDay(ctx.db, input.tenantId, input.vetId, input.date);
       } else {
-        // No vet selected: use practice consultation hours (30min default, no per-vet duration)
         const [tenant] = await ctx.db
           .select({ consultationHours: tenants.consultationHours, openingHours: tenants.openingHours, timezone: tenants.timezone })
           .from(tenants)
@@ -644,10 +684,47 @@ export const bookingRouter = createTRPCRouter({
         const bookableHours = (tenant?.consultationHours as DaySchedule[] | null)
           ?? (tenant?.openingHours as DaySchedule[] | null)
           ?? DEFAULT_OPENING_HOURS;
-        const practiceDay = bookableHours
-          .find((h) => h.dayOfWeek === dayOfWeek);
+        const practiceDay = bookableHours.find((h) => h.dayOfWeek === dayOfWeek);
         allSlots = generateSlotsFromRanges(localDateStr, practiceDay?.slots ?? [], timezone, 30);
       }
+
+      if (allSlots.length === 0) return [];
+
+      // Use actual slot timestamps as range bounds — no timezone conversion needed
+      const rangeStart = allSlots[0].start;
+      const rangeEnd = allSlots[allSlots.length - 1].end;
+
+      const bookedConditions = [
+        eq(appointments.tenantId, input.tenantId),
+        lte(appointments.startTime, rangeEnd),
+        gte(appointments.endTime, rangeStart),
+        notInArray(appointments.status, ["cancelled"]),
+      ];
+      if (input.vetId) {
+        bookedConditions.push(eq(appointments.vetId, input.vetId));
+      }
+
+      const booked = await ctx.db
+        .select({ startTime: appointments.startTime, endTime: appointments.endTime })
+        .from(appointments)
+        .where(and(...bookedConditions));
+
+      const holdVetCondition = input.vetId
+        ? or(isNull(appointmentHolds.vetId), eq(appointmentHolds.vetId, input.vetId))
+        : undefined;
+
+      const holds = await ctx.db
+        .select({ slotDatetime: appointmentHolds.slotDatetime })
+        .from(appointmentHolds)
+        .where(
+          and(
+            eq(appointmentHolds.tenantId, input.tenantId),
+            gte(appointmentHolds.slotDatetime, rangeStart),
+            lte(appointmentHolds.slotDatetime, rangeEnd),
+            gte(appointmentHolds.expiresAt, new Date()),
+            ...(holdVetCondition ? [holdVetCondition] : [])
+          )
+        );
 
       return allSlots
         .filter((slot) =>
@@ -729,13 +806,36 @@ export const bookingRouter = createTRPCRouter({
           and(
             eq(appointments.tenantId, input.tenantId),
             lte(appointments.startTime, input.slotEnd),
-            gte(appointments.endTime, input.slotStart)
+            gt(appointments.endTime, input.slotStart)
           )
         )
         .limit(1);
 
       if (conflict.length > 0) {
         throw new TRPCError({ code: "CONFLICT", message: "Dieser Termin ist leider nicht mehr frei" });
+      }
+
+      // Rate limit: max 3 pending email confirmations per email per 24h (anti-abuse)
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const [pendingCheck] = await ctx.db
+        .select({ cnt: sql<string>`count(*)` })
+        .from(appointments)
+        .innerJoin(patients, eq(patients.id, appointments.patientId))
+        .innerJoin(owners, eq(owners.id, patients.ownerId))
+        .where(
+          and(
+            eq(appointments.tenantId, input.tenantId),
+            eq(appointments.status, "pending-confirmation"),
+            sql`lower(${owners.email}) = lower(${input.owner.email})`,
+            gte(appointments.createdAt, twentyFourHoursAgo)
+          )
+        );
+
+      if (Number(pendingCheck?.cnt ?? 0) >= 3) {
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: "Zu viele ausstehende Buchungen. Bitte versuchen Sie es in 24 Stunden erneut.",
+        });
       }
 
       // Create owner
@@ -773,7 +873,7 @@ export const bookingRouter = createTRPCRouter({
           endTime: input.slotEnd,
           title: input.reason,
           source: "online_booking",
-          status: "scheduled",
+          status: "pending-confirmation",
         })
         .returning();
 
@@ -851,6 +951,57 @@ export const bookingRouter = createTRPCRouter({
       } catch (emailError) {
         // Log error but don't fail the booking
         console.error("Failed to send booking notification email:", emailError);
+      }
+
+      // Send booking request email to owner for email confirmation (fire and forget)
+      try {
+        const [tenantForRequest] = await ctx.db
+          .select({ tenantName: tenants.name })
+          .from(tenants)
+          .where(eq(tenants.id, input.tenantId))
+          .limit(1);
+
+        if (tenantForRequest) {
+          const [requestSettings] = await ctx.db
+            .select({ confirmationEmailEnabled: emailSettings.confirmationEmailEnabled })
+            .from(emailSettings)
+            .where(eq(emailSettings.tenantId, input.tenantId))
+            .limit(1);
+
+          if (requestSettings?.confirmationEmailEnabled !== false && owner.email) {
+            const startDate = new Date(appointment.startTime);
+            const dateStr = startDate.toLocaleDateString("de-DE", {
+              weekday: "long",
+              day: "2-digit",
+              month: "2-digit",
+              year: "numeric",
+            });
+            const timeStr = startDate.toLocaleTimeString("de-DE", {
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+            const confirmToken = generateConfirmationToken(appointment.id, owner.email, "confirm");
+            const cancelToken = generateConfirmationToken(appointment.id, owner.email, "cancel");
+            const baseUrl = getMainDomain();
+
+            const requestEmailInput: SendBookingRequestEmailInput = {
+              to: owner.email,
+              practiceName: tenantForRequest.tenantName,
+              ownerFirstName: owner.firstName ?? input.owner.firstName,
+              patientName: patient.name,
+              patientSpecies: patient.species,
+              appointmentDate: dateStr,
+              appointmentTime: timeStr,
+              appointmentDateTime: `${dateStr} um ${timeStr}`,
+              confirmUrl: buildConfirmationUrl(confirmToken, baseUrl, "confirm"),
+              cancelUrl: buildConfirmationUrl(cancelToken, baseUrl, "cancel"),
+            };
+
+            await sendBookingRequestEmail(requestEmailInput);
+          }
+        }
+      } catch (emailError) {
+        console.error("Failed to send booking request email:", emailError);
       }
 
       return {
@@ -943,7 +1094,7 @@ export const bookingRouter = createTRPCRouter({
       const bookingConflictConditions = [
         eq(appointments.tenantId, input.tenantId),
         lte(appointments.startTime, slotEnd),
-        gte(appointments.endTime, input.slotDatetime),
+        gt(appointments.endTime, input.slotDatetime),
       ];
       if (input.vetId) {
         bookingConflictConditions.push(eq(appointments.vetId, input.vetId));
@@ -1063,7 +1214,7 @@ export const bookingRouter = createTRPCRouter({
       const bookingConditions = [
         eq(appointments.tenantId, input.tenantId),
         lte(appointments.startTime, slotEnd),
-        gte(appointments.endTime, input.slotDatetime),
+        gt(appointments.endTime, input.slotDatetime),
       ];
       if (input.vetId) bookingConditions.push(eq(appointments.vetId, input.vetId));
 

@@ -128,7 +128,7 @@ export default function BookingsPage() {
       return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
     });
 
-  const pendingBookings = filteredBookings.filter((b) => b.status === 'scheduled');
+  const pendingBookings = filteredBookings.filter((b) => b.status === 'scheduled' || b.status === 'pending-confirmation');
   const confirmedBookings = filteredBookings.filter((b) => b.status === 'confirmed');
   const rejectedBookings = filteredBookings.filter((b) => b.status === 'cancelled');
   const allBookingsCount = filteredBookings.length;
@@ -167,6 +167,7 @@ export default function BookingsPage() {
         onReset={() => setFilters({ vetId: null, status: null, dateFrom: '', dateTo: '', searchQuery: '' })}
         showSearch={true}
         statusOptions={[
+          { value: 'pending-confirmation', label: 'Nicht verifiziert' },
           { value: 'scheduled', label: 'Ausstehend' },
           { value: 'confirmed', label: 'Bestätigt' },
           { value: 'cancelled', label: 'Abgelehnt' },

@@ -29,7 +29,7 @@ export function Badge({ variant = "default", children, className = "" }: BadgePr
 export function AppointmentStatusBadge({
   status,
 }: {
-  status: "scheduled" | "completed" | "cancelled" | "confirmed" | "no-show" | string;
+  status: "scheduled" | "completed" | "cancelled" | "confirmed" | "no-show" | "pending-confirmation" | string;
 }) {
   const map: Record<string, { variant: BadgeProps["variant"]; label: string }> = {
     scheduled: { variant: "info", label: "Geplant" },
@@ -37,6 +37,7 @@ export function AppointmentStatusBadge({
     confirmed: { variant: "success", label: "Bestätigt" },
     cancelled: { variant: "danger", label: "Abgesagt" },
     "no-show": { variant: "warning", label: "Nicht erschienen" },
+    "pending-confirmation": { variant: "warning", label: "Nicht verifiziert" },
   };
 
   const config = map[status] ?? { variant: "default", label: status };

@@ -7,7 +7,7 @@ import { useLocale } from "@/lib/user/preferences-context";
 import { getSystemDomain } from "@/lib/system-name";
 import { trackEvent } from "@/lib/analytics/tracker";
 import { AnalyticsEvents } from "@/lib/analytics/events";
-import { ChevronLeft, ChevronRight, Check, Phone, MapPin, Clock, Calendar, AlertCircle, Loader2, Stethoscope, PawPrint } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, Phone, MapPin, Clock, Calendar, AlertCircle, Loader2, Stethoscope, PawPrint, Mail } from "lucide-react";
 import { COLOR_PRESETS, TYPE_PAIRINGS, type ColorPresetKey, type TypographyPairingKey } from "@/lib/theme";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -323,10 +323,17 @@ function StepDate({
   onBack: () => void;
   onSelect: (slot: Slot, holdToken: string, holdExpiresAt: Date) => void;
 }) {
+  const utils = trpc.useUtils();
+
   const weekdays = buildWeekdays(14);
   const [page, setPage] = useState(0);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
+
+  // Clear cached slot data on mount so returning bookers never see stale availability
+  useEffect(() => {
+    utils.booking.getAvailableSlots.reset();
+  }, [utils.booking.getAvailableSlots]);
 
   // Hold state
   const [holdToken, setHoldToken] = useState<string | null>(null);
@@ -344,7 +351,7 @@ function StepDate({
         vetId: vetId || undefined,
         embeddingOrigin,
       },
-      { enabled: !!selectedDay }
+      { enabled: !!selectedDay, staleTime: 0 }
     );
 
   const holdSlotMutation = trpc.booking.holdSlot.useMutation();
@@ -909,6 +916,7 @@ function SuccessScreen({
   vetName,
   clinicName,
   primaryColor,
+  onNewBooking,
 }: {
   startTime: Date;
   ownerName: string;
@@ -916,6 +924,7 @@ function SuccessScreen({
   vetName?: string;
   clinicName: string;
   primaryColor: string;
+  onNewBooking: () => void;
 }) {
   return (
     <div className="text-center py-4 space-y-5">
@@ -926,7 +935,7 @@ function SuccessScreen({
         <Check size={28} style={{ color: primaryColor }} strokeWidth={2.5} />
       </div>
       <div>
-        <h2 className="text-xl text-gray-900">Termin angefragt!</h2>
+        <h2 className="text-xl text-gray-900">Fast geschafft!</h2>
         <p className="text-gray-500 mt-1.5 text-sm">
           Vielen Dank, {ownerName.split(" ")[0]}. Ihre Anfrage für {patientName} wurde erfolgreich übermittelt.
         </p>
@@ -945,13 +954,20 @@ function SuccessScreen({
           </div>
         )}
         <div className="flex items-center gap-3 text-sm">
-          <Clock size={16} className="text-gray-400 flex-shrink-0" />
-          <span className="text-gray-600">{clinicName} wird Ihre Anfrage in Kürze bestätigen.</span>
+          <Mail size={16} className="text-gray-400 flex-shrink-0" />
+          <span className="text-gray-600">Bitte bestätigen Sie Ihre E-Mail-Adresse, um die Buchung abzuschließen.</span>
         </div>
       </div>
       <p className="text-xs text-gray-400">
-        Eine Bestätigung wird an Ihre E-Mail-Adresse gesendet sobald die Praxis den Termin bestätigt hat.
+        Wir haben eine E-Mail an Ihre Adresse gesendet. Bitte klicken Sie auf den Bestätigungslink — danach prüft {clinicName} Ihre Anfrage und bestätigt den Termin.
       </p>
+      <button
+        onClick={onNewBooking}
+        className="w-full py-3 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
+        style={{ backgroundColor: primaryColor }}
+      >
+        Neue Buchung
+      </button>
     </div>
   );
 }
@@ -1251,6 +1267,7 @@ export default function BookingClient({
                   vetName={successData.vetName}
                   clinicName={clinic.name}
                   primaryColor={primaryColor}
+                  onNewBooking={() => { setSuccessData(null); setHoldToken(null); setHoldExpiresAt(null); clearFormState(); setStep("vet"); }}
                 />
               )}
             </div>

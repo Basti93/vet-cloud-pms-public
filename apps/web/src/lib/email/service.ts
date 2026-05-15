@@ -250,6 +250,56 @@ export async function sendReminderEmail(input: SendReminderEmailInput) {
   }
 }
 
+export interface SendBookingRequestEmailInput {
+  to: string;
+  practiceName: string;
+  ownerFirstName: string;
+  patientName: string;
+  patientSpecies: string;
+  appointmentDate: string;
+  appointmentTime: string;
+  appointmentDateTime: string;
+  confirmUrl: string;
+  cancelUrl: string;
+}
+
+/**
+ * Send booking confirmation request to patient owner (online booking — email verification step)
+ */
+export async function sendBookingRequestEmail(input: SendBookingRequestEmailInput) {
+  const body = `Hallo ${input.ownerFirstName},
+
+Ihre Buchungsanfrage für ${input.patientName} (${input.patientSpecies}) am ${input.appointmentDateTime} bei ${input.practiceName} ist eingegangen.
+
+Bitte bestätigen Sie Ihren Termin innerhalb von 24 Stunden:
+${input.confirmUrl}
+
+Wenn Sie diesen Termin nicht gebucht haben oder absagen möchten:
+${input.cancelUrl}
+
+Mit freundlichen Grüßen,
+${input.practiceName}`;
+
+  try {
+    const result = await getResend().emails.send({
+      from: tenantSender(input.practiceName),
+      to: input.to,
+      subject: `Terminanfrage bestätigen – ${input.practiceName}`,
+      text: body,
+    });
+
+    if (result.error) {
+      console.error("Resend error:", result.error);
+      return { success: false, error: result.error };
+    }
+
+    return { success: true, messageId: result.data?.id };
+  } catch (error) {
+    console.error("Error sending booking request email:", error);
+    return { success: false, error };
+  }
+}
+
 /**
  * Send booking notification to practice owner
  */
