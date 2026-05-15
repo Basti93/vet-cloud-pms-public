@@ -81,6 +81,9 @@ const nextConfig = {
   turbopack: {
     root: path.resolve(__dirname, "../.."),
   },
+  experimental: {
+    trustHostHeader: true,
+  },
 
   // Security & Rate Limiting Headers
   async headers() {
