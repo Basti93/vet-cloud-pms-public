@@ -10,6 +10,10 @@ const nextConfig: NextConfig = {
     // process.cwd() = apps/admin when the workspace build script runs
     root: path.resolve(process.cwd(), "../.."),
   },
+  experimental: {
+    // Same as web app — allows Traefik requests through. See apps/web/next.config.js.
+    trustHostHeader: true,
+  },
 };
 
 export default nextConfig;
