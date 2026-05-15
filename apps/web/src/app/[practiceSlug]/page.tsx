@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import type { Metadata } from 'next';
 import { db } from '@/lib/db/client';
 import { tenants, websiteProjects } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
@@ -9,6 +10,17 @@ import { PageRenderer } from '@/components/website-platform/renderer/PageRendere
 
 interface Props {
   params: Promise<{ practiceSlug: string }>;
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { practiceSlug } = await params;
+  const [row] = await db
+    .select({ name: tenants.name })
+    .from(tenants)
+    .where(eq(tenants.slug, practiceSlug))
+    .limit(1);
+  if (!row) return {};
+  return { title: row.name };
 }
 
 export default async function PracticeWebsitePage({ params }: Props) {
