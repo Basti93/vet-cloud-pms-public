@@ -240,9 +240,9 @@ export default function PracticePage() {
           {tenant?.previewToken ? (
             <div className="space-y-2">
               {[
-                { label: "Website", path: `/${tenant.slug}` },
+                { label: "Website", path: websiteProject?.slug ? `/site/${websiteProject.slug}` : null },
                 { label: "Buchung", path: `/book/${tenant.slug}` },
-              ].map(({ label, path }) => {
+              ].filter((item): item is { label: string; path: string } => Boolean(item.path)).map(({ label, path }) => {
                 const url = `${typeof window !== "undefined" ? window.location.origin : ""}${path}?preview=${tenant.previewToken}`;
                 return (
                   <div key={path} className="flex items-center gap-2">
