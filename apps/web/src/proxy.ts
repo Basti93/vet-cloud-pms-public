@@ -23,11 +23,7 @@ function isPlatformHost(host: string) {
     (!!configured && host === configured) ||
     host === 'localhost' ||
     host === '127.0.0.1' ||
-    host.endsWith('.localhost') ||
-    // Private network ranges (dev proxy sets x-forwarded-host to LAN IP)
-    /^10\./.test(host) ||
-    /^192\.168\./.test(host) ||
-    /^172\.(1[6-9]|2\d|3[01])\./.test(host)
+    host.endsWith('.localhost')
   );
 }
 

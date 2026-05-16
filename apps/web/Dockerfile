@@ -29,9 +29,6 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 # Next.js uses this origin for internal RSC self-fetches.
-# Without it, trustHostHeader causes Next.js to derive the origin from
-# x-forwarded-proto (https) + HOSTNAME, producing https://0.0.0.0:3000
-# which fails because the container serves plain HTTP.
 ENV __NEXT_PRIVATE_ORIGIN=http://localhost:3000
 # standalone output unpacks to /app, but Next.js serves public from /app/apps/web/public/
 ENV ASSET_PUBLIC_DIR=/app/apps/web/public
@@ -43,11 +40,6 @@ RUN apk add --no-cache curl && \
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static     ./apps/web/.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public           ./apps/web/public
-
-# Next.js 16.2.6 bakes trustHostHeader:false into the standalone server.js config blob.
-# There is no public config API to override this. Patch it so Traefik requests
-# (Host: example.com) are accepted instead of being silently dropped.
-RUN sed -i 's/"trustHostHeader":false/"trustHostHeader":true/' apps/web/server.js
 
 # Pre-create upload dir so Docker initialises the named volume with nextjs ownership.
 # Without this Docker creates the volume mount point as root, causing EACCES on upload.
