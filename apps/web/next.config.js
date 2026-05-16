@@ -82,13 +82,18 @@ const nextConfig = {
     root: path.resolve(__dirname, "../.."),
   },
   // Keep OTel + gRPC packages out of the webpack bundle — they use Node-only
-  // built-ins (stream, net, tls) that webpack cannot resolve.
+  // built-ins (stream, fs, net, tls) that webpack cannot resolve.
+  // @opentelemetry/sdk-node pulls in both trace and logs gRPC exporters as
+  // transitive deps even when only the HTTP exporter is used.
   serverExternalPackages: [
     "@opentelemetry/sdk-node",
     "@opentelemetry/exporter-trace-otlp-grpc",
     "@opentelemetry/exporter-trace-otlp-http",
+    "@opentelemetry/exporter-logs-otlp-grpc",
+    "@opentelemetry/otlp-grpc-exporter-base",
     "@opentelemetry/instrumentation",
     "@grpc/grpc-js",
+    "@grpc/proto-loader",
     "require-in-the-middle",
   ],
   experimental: {
