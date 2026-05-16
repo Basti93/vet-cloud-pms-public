@@ -81,13 +81,9 @@ const nextConfig = {
   turbopack: {
     root: path.resolve(__dirname, "../.."),
   },
-  experimental: {
-    // Allows requests via Traefik (Host: example.com) to reach the standalone
-    // server bound to 0.0.0.0. Next.js otherwise only allows localhost by default.
-    // Marked @internal in Next.js source — revisit if Next.js adds a public API.
-    trustHostHeader: true,
-  },
-
+  // sdk-trace-node uses async_hooks/perf_hooks (Node.js built-ins) — must not be bundled.
+  // All other OTel packages are pure JS and bundle cleanly.
+  serverExternalPackages: ['@opentelemetry/sdk-trace-node'],
   // Security & Rate Limiting Headers
   async headers() {
     return [
