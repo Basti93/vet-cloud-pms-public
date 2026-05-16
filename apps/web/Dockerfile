@@ -28,6 +28,11 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
+# Next.js uses this origin for internal RSC self-fetches.
+# Without it, trustHostHeader causes Next.js to derive the origin from
+# x-forwarded-proto (https) + HOSTNAME, producing https://0.0.0.0:3000
+# which fails because the container serves plain HTTP.
+ENV __NEXT_PRIVATE_ORIGIN=http://localhost:3000
 # standalone output unpacks to /app, but Next.js serves public from /app/apps/web/public/
 ENV ASSET_PUBLIC_DIR=/app/apps/web/public
 
