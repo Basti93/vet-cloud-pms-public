@@ -150,10 +150,7 @@ export async function proxy(req: NextRequest, event: NextFetchEvent) {
     );
   }
 
-  // Single-segment paths like /[practiceSlug] handle their own auth server-side
-  const isSingleSegmentPath = /^\/[^/]+\/?$/.test(pathname);
-
-  if (!isPublicRoute(req) && !isSingleSegmentPath) {
+  if (!isPublicRoute(req)) {
     if (pathname.startsWith('/api/trpc')) {
       return clerkAuthStateProxy(req, event);
     }

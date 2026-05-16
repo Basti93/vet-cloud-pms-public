@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SpeciesIcon } from "@/components/ui/badge";
 import { NewPatientModal } from "@/components/patients/NewPatientModal";
+import { AppointmentModal } from "@/components/appointments/AppointmentModal";
 import { trpc } from "@/lib/trpc/client";
 import { useTenant } from "@/hooks/useTenant";
 
@@ -27,6 +28,8 @@ export default function ClientDetailPage() {
   const { tenantId } = useTenant();
   const [editing, setEditing] = useState(false);
   const [showNewPet, setShowNewPet] = useState(false);
+  const [apptModalOpen, setApptModalOpen] = useState(false);
+  const [selectedAptId, setSelectedAptId] = useState<string | null>(null);
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
@@ -179,7 +182,11 @@ export default function ClientDetailPage() {
           </div>
           <div className="divide-y divide-border">
             {data.recentAppointments.length ? data.recentAppointments.map((appointment) => (
-              <div key={appointment.id} className="py-3">
+              <button
+                key={appointment.id}
+                onClick={() => { setSelectedAptId(appointment.id); setApptModalOpen(true); }}
+                className="w-full text-left py-3 hover:bg-muted-soft transition-colors cursor-pointer"
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="font-medium text-fg">{appointment.title}</div>
@@ -191,7 +198,7 @@ export default function ClientDetailPage() {
                     {formatDate(appointment.startTime)}
                   </div>
                 </div>
-              </div>
+              </button>
             )) : (
               <div className="py-12 text-center text-muted">Noch keine Termine</div>
             )}
@@ -207,6 +214,30 @@ export default function ClientDetailPage() {
           ownerId={ownerId}
           ownerName={ownerName}
           onSuccess={() => refetch()}
+        />
+      )}
+
+      {tenantId && (
+        <AppointmentModal
+          open={apptModalOpen}
+          onClose={() => { setApptModalOpen(false); setSelectedAptId(null); }}
+          tenantId={tenantId}
+          onSuccess={() => { setApptModalOpen(false); setSelectedAptId(null); refetch(); }}
+          editData={(() => {
+            const apt = data?.recentAppointments.find((a) => a.id === selectedAptId);
+            if (!apt || !apt.vetId) return undefined;
+            return {
+              id: apt.id,
+              title: apt.title,
+              description: apt.description ?? null,
+              startTime: new Date(apt.startTime),
+              endTime: new Date(apt.endTime),
+              status: apt.status,
+              patientId: apt.patientId,
+              vetId: apt.vetId,
+              patientName: apt.patientName,
+            };
+          })()}
         />
       )}
     </div>

@@ -121,10 +121,12 @@ export const ownersRouter = createTRPCRouter({
         .select({
           id: appointments.id,
           title: appointments.title,
+          description: appointments.description,
           startTime: appointments.startTime,
           endTime: appointments.endTime,
           status: appointments.status,
           source: appointments.source,
+          vetId: appointments.vetId,
           patientId: patients.id,
           patientName: patients.name,
           patientSpecies: patients.species,

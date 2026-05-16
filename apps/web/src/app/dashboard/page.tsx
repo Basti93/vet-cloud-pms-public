@@ -256,7 +256,7 @@ export default function DashboardHome() {
                 </span>
                 <div>
                   <p className="font-semibold text-sm text-fg">Neues Tier</p>
-                  <p className="text-xs text-muted mt-0.5">Neue Tierkarte erstellen</p>
+                  <p className="text-xs text-muted mt-0.5">Tier aufnehmen</p>
                 </div>
               </button>
 

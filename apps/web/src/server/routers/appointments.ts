@@ -216,11 +216,14 @@ export const appointmentsRouter = createTRPCRouter({
         .select({
           id: appointments.id,
           title: appointments.title,
+          description: appointments.description,
           startTime: appointments.startTime,
           endTime: appointments.endTime,
           status: appointments.status,
           source: appointments.source,
           createdAt: appointments.createdAt,
+          patientId: appointments.patientId,
+          vetId: appointments.vetId,
           vetFirstName: users.firstName,
           vetLastName: users.lastName,
         })

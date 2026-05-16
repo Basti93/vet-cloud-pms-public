@@ -27,6 +27,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/lib/toast/context';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { AppointmentModal } from '@/components/appointments/AppointmentModal';
 
 export default function PatientDetailPage() {
   const params = useParams();
@@ -37,6 +38,8 @@ export default function PatientDetailPage() {
   const [showMedicationForm, setShowMedicationForm] = useState(false);
   const [showVitalsForm, setShowVitalsForm] = useState(false);
   const [showVaccinationForm, setShowVaccinationForm] = useState(false);
+  const [apptModalOpen, setApptModalOpen] = useState(false);
+  const [selectedAptId, setSelectedAptId] = useState<string | null>(null);
   const [editingVaccinationId, setEditingVaccinationId] = useState<string | null>(null);
   const [deletingVaccinationId, setDeletingVaccinationId] = useState<string | null>(null);
   const [vaccinationTypeId, setVaccinationTypeId] = useState("");
@@ -361,7 +364,11 @@ export default function PatientDetailPage() {
           {appointmentsList && appointmentsList.length > 0 ? (
             <div className="space-y-3">
               {appointmentsList.map((apt) => (
-                <div key={apt.id} className="rounded-xl border border-border bg-bg p-3">
+                <button
+                  key={apt.id}
+                  onClick={() => { setSelectedAptId(apt.id); setApptModalOpen(true); }}
+                  className="w-full text-left rounded-xl border border-border bg-bg p-3 hover:bg-muted-soft transition-colors cursor-pointer"
+                >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1">
                       <p className="font-semibold text-fg">{apt.title}</p>
@@ -398,7 +405,7 @@ export default function PatientDetailPage() {
                       {apt.status === 'no-show' && 'Nicht erschienen'}
                     </span>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           ) : (
@@ -531,6 +538,31 @@ export default function PatientDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Appointment modal */}
+      {tenantId && (
+        <AppointmentModal
+          open={apptModalOpen}
+          onClose={() => { setApptModalOpen(false); setSelectedAptId(null); }}
+          tenantId={tenantId}
+          onSuccess={() => { setApptModalOpen(false); setSelectedAptId(null); }}
+          editData={(() => {
+            const apt = appointmentsList?.find((a) => a.id === selectedAptId);
+            if (!apt || !apt.vetId) return undefined;
+            return {
+              id: apt.id,
+              title: apt.title,
+              description: apt.description ?? null,
+              startTime: new Date(apt.startTime),
+              endTime: new Date(apt.endTime),
+              status: apt.status,
+              patientId: apt.patientId,
+              vetId: apt.vetId,
+              patientName: patient.name,
+            };
+          })()}
+        />
+      )}
 
       {/* Vaccination dialog */}
       <Dialog open={showVaccinationForm} onOpenChange={(open) => { setShowVaccinationForm(open); if (!open) { resetVaccinationForm(); setEditingVaccinationId(null); } }}>
