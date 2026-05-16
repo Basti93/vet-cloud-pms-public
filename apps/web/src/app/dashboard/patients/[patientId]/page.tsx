@@ -225,10 +225,13 @@ export default function PatientDetailPage() {
           </div>
           {/* Owner contact card */}
           <div className="text-right space-y-0.5">
-            <div className="text-xs font-medium uppercase tracking-wide text-gray-500 mb-1">Besitzer</div>
-            <div className="font-semibold text-gray-900">
+            <div className="text-xs font-medium uppercase tracking-wide text-gray-500 mb-1">Tierhalter</div>
+            <Link
+              href={`/dashboard/clients/${patient.ownerId}`}
+              className="font-semibold text-gray-900 hover:text-blue-600 hover:underline"
+            >
               {[patient.ownerFirstName, patient.ownerLastName].filter(Boolean).join(" ") || "—"}
-            </div>
+            </Link>
             {patient.ownerPhone && (
               <a
                 href={`tel:${patient.ownerPhone}`}

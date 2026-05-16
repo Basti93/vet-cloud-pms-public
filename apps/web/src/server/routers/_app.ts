@@ -1,6 +1,7 @@
 import { createTRPCRouter } from "@/server/trpc";
 import { appointmentsRouter } from "./appointments";
 import { patientsRouter } from "./patients";
+import { ownersRouter } from "./owners";
 import { bookingRouter } from "./booking";
 import { adminRouter } from "./admin";
 import { adminCoreRouter } from "./admin-core";
@@ -25,6 +26,7 @@ import { websitePlatformRouter } from "./website-platform";
 
 export const appRouter = createTRPCRouter({
   appointments: appointmentsRouter,
+  owners: ownersRouter,
   patients: patientsRouter,
   booking: bookingRouter,
   admin: adminRouter,

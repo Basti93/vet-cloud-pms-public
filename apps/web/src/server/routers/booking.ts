@@ -838,7 +838,7 @@ export const bookingRouter = createTRPCRouter({
         });
       }
 
-      // Create owner
+      // Create provisional owner + patient (confirmed on email verification)
       const [owner] = await ctx.db
         .insert(owners)
         .values({
@@ -847,10 +847,10 @@ export const bookingRouter = createTRPCRouter({
           lastName: input.owner.lastName,
           email: input.owner.email,
           phone: input.owner.phone,
+          provisional: true,
         })
         .returning();
 
-      // Create patient
       const [patient] = await ctx.db
         .insert(patients)
         .values({
@@ -859,6 +859,7 @@ export const bookingRouter = createTRPCRouter({
           name: input.patient.name,
           species: input.patient.species,
           breed: input.patient.breed ?? undefined,
+          provisional: true,
         })
         .returning();
 

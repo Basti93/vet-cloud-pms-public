@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq, and, ilike } from "drizzle-orm";
+import { eq, and, ilike, or, sql } from "drizzle-orm";
 import { createTRPCRouter, tenantProcedure } from "@/server/trpc";
 import { patients, owners, PERMISSIONS } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
@@ -21,7 +21,16 @@ export const patientsRouter = createTRPCRouter({
       const conditions = [eq(patients.tenantId, input.tenantId)];
 
       if (input.search) {
-        conditions.push(ilike(patients.name, `%${input.search}%`));
+        const term = `%${input.search}%`;
+        conditions.push(
+          or(
+            ilike(patients.name, term),
+            ilike(owners.firstName, term),
+            ilike(owners.lastName, term),
+            ilike(owners.email, term),
+            sql`${owners.firstName} || ' ' || ${owners.lastName} ilike ${term}`
+          )!
+        );
       }
 
       return ctx.db
@@ -67,16 +76,13 @@ export const patientsRouter = createTRPCRouter({
       return result[0];
     }),
 
-  // Create patient + owner
+  // Create patient under an existing owner
   create: tenantProcedure
     .use(requirePermission(PERMISSIONS.PATIENTS_CREATE))
     .input(
       z.object({
         tenantId: z.string().uuid(),
-        ownerFirstName: z.string().min(1),
-        ownerLastName: z.string().min(1),
-        ownerEmail: z.string().email().optional(),
-        ownerPhone: z.string().optional(),
+        ownerId: z.string().uuid(),
         name: z.string().min(1).max(100),
         species: z.string().min(1),
         breed: z.string().optional(),
@@ -88,21 +94,20 @@ export const patientsRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const [owner] = await ctx.db
-        .insert(owners)
-        .values({
-          tenantId: input.tenantId,
-          firstName: input.ownerFirstName,
-          lastName: input.ownerLastName,
-          email: input.ownerEmail,
-          phone: input.ownerPhone,
-        })
-        .returning();
+        .select({ id: owners.id })
+        .from(owners)
+        .where(and(eq(owners.id, input.ownerId), eq(owners.tenantId, input.tenantId)))
+        .limit(1);
+
+      if (!owner) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Tierhalter nicht gefunden" });
+      }
 
       const [patient] = await ctx.db
         .insert(patients)
         .values({
           tenantId: input.tenantId,
-          ownerId: owner!.id,
+          ownerId: owner.id,
           name: input.name,
           species: input.species,
           breed: input.breed,
@@ -120,7 +125,7 @@ export const patientsRouter = createTRPCRouter({
         event: "patient.created",
         summary: "Patient created",
         changes: {
-          ownerId: owner!.id,
+          ownerId: owner.id,
           species: patient!.species,
         },
       });

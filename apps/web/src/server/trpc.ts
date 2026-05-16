@@ -63,6 +63,9 @@ const enforceUserIsAuthenticated = t.middleware(({ ctx, next }) => {
   return next({ ctx: { ...ctx, userId: ctx.userId } });
 });
 
+// Procedures that remain accessible while a tenant's deletion is scheduled or
+// the tenant is deactivated. These paths let users view status and manage their
+// own account (cancel, reactivate, check seat info) without being fully locked out.
 const DEACTIVATION_ALLOWED_PATHS = new Set([
   "tenant.getDeletionStatus",
   "tenant.getCurrent",
@@ -78,6 +81,8 @@ const DEACTIVATION_ALLOWED_PATHS = new Set([
   "admin.toggleUserActive",
 ]);
 
+// Procedures accessible to deactivated users (e.g. seat limit exceeded on downgrade).
+// Kept minimal — just enough to show the user their status and let an admin fix it.
 const INACTIVE_USER_ALLOWED_PATHS = new Set([
   "admin.getCurrentUser",
   "admin.getUserPermissions",
@@ -299,19 +304,34 @@ const systemLoggingMiddleware = t.middleware(async ({ ctx, path, type, next }) =
 export const createTRPCRouter = t.router;
 export const createCallerFactory = t.createCallerFactory;
 
-/** Public procedure — no auth required */
+/**
+ * Middleware execution order for all authenticated procedures:
+ *
+ *   systemLoggingMiddleware   — logs slow requests + errors to `system_logs`
+ *   rateLimitMiddleware       — 100 req/60s per user ID (or IP if unauthenticated)
+ *   timingMiddleware          — console.log of duration (dev visibility)
+ *   enforceUserIsAuthenticated — validates Clerk session, narrows ctx.userId
+ *   enforceTenantIsActive      — resolves tenant, blocks deactivated tenants/users,
+ *                                injects ctx.tenantId + ctx.dbUserId
+ *   enforceTenantOwnership     — validates input.tenantId === ctx.tenantId (tenantProcedure only)
+ *
+ * ctx.tenantId and ctx.dbUserId are available to all procedures downstream of
+ * enforceTenantIsActive. Cast ctx when needed: `ctx as { tenantId: string; dbUserId: string }`.
+ */
+
+/** Public procedure — no auth, 100 req/60s rate limit */
 export const publicProcedure = t.procedure
   .use(systemLoggingMiddleware)
   .use(rateLimitMiddleware)
   .use(timingMiddleware);
 
-/** Public booking procedure — stricter rate limit (20 req/60s) for public booking endpoints */
+/** Public booking procedure — no auth, stricter 20 req/60s rate limit for public booking */
 export const publicBookingProcedure = t.procedure
   .use(systemLoggingMiddleware)
   .use(publicBookingRateLimitMiddleware)
   .use(timingMiddleware);
 
-/** Protected procedure — requires Clerk session */
+/** Protected procedure — requires Clerk session + active tenant */
 export const protectedProcedure = t.procedure
   .use(systemLoggingMiddleware)
   .use(rateLimitMiddleware)
@@ -320,10 +340,10 @@ export const protectedProcedure = t.procedure
   .use(enforceTenantIsActive);
 
 /**
- * Tenant-scoped procedure — extends protectedProcedure.
- * Use for any procedure that accepts a tenantId in its input.
- * Automatically validates input.tenantId === ctx.tenantId and logs
- * cross-tenant access attempts as security events.
+ * Tenant-scoped procedure — use for any procedure that accepts a `tenantId` input field.
+ * Extends protectedProcedure with cross-tenant ownership enforcement:
+ * input.tenantId must equal the authenticated user's tenant or the request is rejected
+ * and logged as a security event.
  */
 export const tenantProcedure = t.procedure
   .use(systemLoggingMiddleware)
@@ -333,7 +353,10 @@ export const tenantProcedure = t.procedure
   .use(enforceTenantIsActive)
   .use(enforceTenantOwnership);
 
-/** Admin procedure — requires Clerk session + ADMIN_CLERK_IDS env var */
+/**
+ * Admin procedure — requires Clerk session + presence in ADMIN_CLERK_IDS env var.
+ * Uses `adminDb` instead of `db` to bypass any future RLS policies.
+ */
 export const adminProcedure = t.procedure
   .use(({ ctx, next }) => next({ ctx: { ...ctx, db: ctx.adminDb } }))
   .use(rateLimitMiddleware)

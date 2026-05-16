@@ -9,6 +9,63 @@
 export const DEMO_TENANT_ID = "00000000-0000-4000-8000-000000000003";
 export const DEMO_TENANT_SLUG = "demo";
 
+const DEMO_OWNERS = [
+  ["Max", "Keller", "Berlin", "10115", "Ahornweg 1"],
+  ["Erika", "Schneider", "Musterstadt", "80331", "Birkenstraße 12"],
+  ["Thomas", "Wagner", "Hamburg", "20095", "Lindenallee 8"],
+  ["Julia", "Fischer", "Köln", "50667", "Rosenweg 4"],
+  ["Miriam", "Hoffmann", "Stuttgart", "70173", "Parkstraße 19"],
+  ["Jonas", "Becker", "Düsseldorf", "40213", "Marktplatz 3"],
+  ["Nadine", "Krause", "Leipzig", "04109", "Gartenstraße 22"],
+  ["Oliver", "Richter", "Dresden", "01067", "Bahnhofstraße 14"],
+  ["Sofia", "Neumann", "Bremen", "28195", "Seestraße 6"],
+  ["Lukas", "Wolf", "Nürnberg", "90402", "Hauptstraße 27"],
+  ["Katharina", "Schulz", "Hannover", "30159", "Kirchweg 9"],
+  ["Daniel", "Bauer", "Mannheim", "68159", "Mühlenweg 11"],
+  ["Leonie", "Zimmermann", "Freiburg", "79098", "Wiesenstraße 5"],
+  ["Felix", "Hartmann", "Augsburg", "86150", "Bachstraße 17"],
+  ["Anja", "Lange", "Bonn", "53111", "Feldstraße 2"],
+  ["Tobias", "Werner", "Münster", "48143", "Lessingstraße 24"],
+  ["Clara", "Koch", "Mainz", "55116", "Schillerplatz 7"],
+  ["Mehmet", "Yilmaz", "Essen", "45127", "Goethestraße 16"],
+  ["Sarah", "Brandt", "Dortmund", "44135", "Kastanienweg 10"],
+  ["Philipp", "Lehmann", "Hamburg", "22765", "Elbchaussee 31"],
+].map(([firstName, lastName, city, postalCode, address], index) => ({
+  firstName,
+  lastName,
+  email: `user+demo-owner${index + 1}@googlemail.com`,
+  phone: `+49 123 ${String(index + 1).padStart(2, "0")}${String(index + 1).padStart(2, "0")}${String(index + 1).padStart(2, "0")}`,
+  address,
+  city,
+  postalCode,
+  country: "DE",
+}));
+
+const DEMO_PATIENTS = [
+  { ownerIndex: 0, name: "Bella", species: "Hund", breed: "Golden Retriever", color: "Gold", weight: 32000 },
+  { ownerIndex: 0, name: "Milo", species: "Katze", breed: "Britisch Kurzhaar", color: "Grau", weight: 4500 },
+  { ownerIndex: 1, name: "Luna", species: "Hund", breed: "Husky", color: "Weiß/Grau", weight: 28000 },
+  { ownerIndex: 2, name: "Whiskers", species: "Kaninchen", breed: "Widder", color: "Braun", weight: 2000 },
+  { ownerIndex: 2, name: "Rex", species: "Hund", breed: "Deutscher Schäferhund", color: "Braun-Schwarz", weight: 38000 },
+  { ownerIndex: 3, name: "Tweety", species: "Vogel", breed: "Wellensittich", color: "Blau", weight: 35 },
+  { ownerIndex: 4, name: "Nala", species: "Katze", breed: "Europäisch Kurzhaar", color: "Getigert", weight: 4100 },
+  { ownerIndex: 5, name: "Bruno", species: "Hund", breed: "Französische Bulldogge", color: "Fawn", weight: 12500 },
+  { ownerIndex: 6, name: "Kiwi", species: "Vogel", breed: "Nymphensittich", color: "Grau/Gelb", weight: 90 },
+  { ownerIndex: 7, name: "Maja", species: "Kaninchen", breed: "Zwergkaninchen", color: "Weiß/Braun", weight: 1800 },
+  { ownerIndex: 7, name: "Teddy", species: "Meerschweinchen", breed: "Glatthaar", color: "Creme", weight: 1100 },
+  { ownerIndex: 8, name: "Oscar", species: "Hund", breed: "Dackel", color: "Rotbraun", weight: 9100 },
+  { ownerIndex: 9, name: "Coco", species: "Katze", breed: "Maine Coon", color: "Schwarz", weight: 7200 },
+  { ownerIndex: 10, name: "Sammy", species: "Hund", breed: "Beagle", color: "Tricolor", weight: 14200 },
+  { ownerIndex: 11, name: "Flocke", species: "Kaninchen", breed: "Löwenkopf", color: "Weiß", weight: 1600 },
+  { ownerIndex: 12, name: "Pepe", species: "Meerschweinchen", breed: "Rosette", color: "Braun/Weiß", weight: 950 },
+  { ownerIndex: 13, name: "Kira", species: "Hund", breed: "Border Collie", color: "Schwarz/Weiß", weight: 20500 },
+  { ownerIndex: 14, name: "Loki", species: "Katze", breed: "Siam", color: "Creme", weight: 4800 },
+  { ownerIndex: 15, name: "Amy", species: "Hund", breed: "Labrador Retriever", color: "Schwarz", weight: 29500 },
+  { ownerIndex: 16, name: "Speedy", species: "Reptil", breed: "Bartagame", color: "Sandfarben", weight: 420 },
+  { ownerIndex: 17, name: "Momo", species: "Katze", breed: "Ragdoll", color: "Seal Point", weight: 6100 },
+  { ownerIndex: 18, name: "Balu", species: "Hund", breed: "Berner Sennenhund", color: "Tricolor", weight: 46000 },
+  { ownerIndex: 19, name: "Goldie", species: "Fisch", breed: "Goldfisch", color: "Orange", weight: 20 },
+];
 
 export const TEST_DATA = {
   // ────────────────────────────────────────────────────────────────────────
@@ -108,102 +165,12 @@ export const TEST_DATA = {
   // ────────────────────────────────────────────────────────────────────────
   // OWNERS
   // ────────────────────────────────────────────────────────────────────────
-  owners: [
-    {
-      firstName: "Max",
-      lastName: "Mustermann",
-      email: "user+demo-owner1@example.com",
-      phone: "+49 123 111111",
-      address: "Beispielstraße 1",
-      city: "Berlin",
-      postalCode: "10115",
-      country: "DE",
-    },
-    {
-      firstName: "Erika",
-      lastName: "Beispiel",
-      email: "user+demo-owner2@example.com",
-      phone: "+49 123 222222",
-      address: "Beispielstraße 1",
-      city: "Musterstadt",
-      postalCode: "80331",
-      country: "DE",
-    },
-    {
-      firstName: "Thomas",
-      lastName: "Test",
-      email: "user+demo-owner3@example.com",
-      phone: "+49 123 333333",
-      address: "Beispielstraße 1",
-      city: "Hamburg",
-      postalCode: "20095",
-      country: "DE",
-    },
-    {
-      firstName: "Julia",
-      lastName: "Fischer",
-      email: "user+demo-owner4@example.com",
-      phone: "+49 123 444444",
-      address: "Beispielstraße 1",
-      city: "Köln",
-      postalCode: "50667",
-      country: "DE",
-    },
-  ],
+  owners: DEMO_OWNERS,
 
   // ────────────────────────────────────────────────────────────────────────
   // PATIENTS (indexed by ownerIndex)
   // ────────────────────────────────────────────────────────────────────────
-  patients: [
-    {
-      ownerIndex: 0,
-      name: "Bella",
-      species: "Hund",
-      breed: "Golden Retriever",
-      color: "Gold",
-      weight: 32000, // grams
-    },
-    {
-      ownerIndex: 0,
-      name: "Milo",
-      species: "Katze",
-      breed: "Britisch Kurzhaar",
-      color: "Grau",
-      weight: 4500,
-    },
-    {
-      ownerIndex: 1,
-      name: "Luna",
-      species: "Hund",
-      breed: "Husky",
-      color: "Weiß/Grau",
-      weight: 28000,
-    },
-    {
-      ownerIndex: 2,
-      name: "Whiskers",
-      species: "Kaninchen",
-      breed: "Widder",
-      color: "Braun",
-      weight: 2000,
-    },
-    {
-      ownerIndex: 2,
-      name: "Rex",
-      species: "Hund",
-      breed: "Deutscher Schäferhund",
-      color: "Braun-Schwarz",
-      weight: 38000,
-    },
-    {
-      ownerIndex: 3,
-      name: "Tweety",
-      species: "Vogel",
-      breed: "Wellensittich",
-      color: "Blau",
-      weight: 35,
-    },
-  ],
+  patients: DEMO_PATIENTS,
 
   // ────────────────────────────────────────────────────────────────────────
   // DIAGNOSES (indexed by patientIndex)

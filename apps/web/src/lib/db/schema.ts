@@ -12,6 +12,7 @@ import {
   index,
   primaryKey,
   unique,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -528,6 +529,8 @@ export const owners = pgTable(
     country: varchar("country", { length: 2 }).default("DE"),
     notes: text("notes"),
     emailOptOut: boolean("email_opt_out").default(false).notNull(),
+    active: boolean("active").default(true).notNull(),
+    provisional: boolean("provisional").default(false).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .default(sql`now()`)
       .notNull(),
@@ -538,6 +541,10 @@ export const owners = pgTable(
   (table) => ({
     tenantIdIdx: index("owners_tenant_id_idx").on(table.tenantId),
     emailIdx: index("owners_email_idx").on(table.email),
+    tenantEmailUniqueIdx: uniqueIndex("owners_tenant_email_unique").on(
+      table.tenantId,
+      sql`lower(${table.email})`
+    ).where(sql`${table.email} is not null`),
   })
 );
 
@@ -565,6 +572,7 @@ export const patients = pgTable(
     allergies: text("allergies"), // Komma-getrennte Liste oder JSON
     notes: text("notes"),
     active: boolean("active").default(true).notNull(),
+    provisional: boolean("provisional").default(false).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .default(sql`now()`)
       .notNull(),

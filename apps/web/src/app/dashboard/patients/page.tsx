@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Search, Plus, ChevronRight, Phone, PawPrint } from "lucide-react";
+import { Search, Plus, ChevronRight, Phone, PawPrint, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SpeciesIcon } from "@/components/ui/badge";
@@ -97,6 +97,13 @@ export default function PatientsPage() {
 
   return (
     <div className="space-y-6">
+      <Link
+        href="/dashboard/clients"
+        className="inline-flex items-center gap-2 text-sm font-medium text-[var(--color-accent)] hover:underline"
+      >
+        <Users size={16} /> Zu den Tierhaltern
+      </Link>
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-fg">Patienten</h1>

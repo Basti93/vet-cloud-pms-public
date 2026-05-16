@@ -1,7 +1,25 @@
+/**
+ * Immutable audit log writer — DSGVO compliance layer.
+ *
+ * Every mutation that touches patient data, permissions, or configuration must
+ * call `writeAuditLog`. Audit records are append-only (no update/delete on the
+ * `auditLogs` table) and include the actor's IP address and user agent so that
+ * access can be reconstructed for regulatory requests.
+ *
+ * The `changes` JSONB column follows `AUDIT_SCHEMA_VERSION` and contains:
+ *   - schemaVersion  — bumped when the shape of `changes` changes
+ *   - event          — dot-namespaced event name (e.g. "diagnosis.created")
+ *   - actor          — { clerkUserId, userId } of the authenticated user
+ *   - target         — { entityType, entityId } of the mutated record
+ *   - diff           — caller-supplied field-level changes (values, not SQL)
+ *   - occurredAt     — ISO 8601 timestamp at write time
+ */
+
 import type { TRPCContext } from "./trpc";
 import { auditLogs, users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
+/** Increment when the shape of the `changes` JSONB column changes. */
 export const AUDIT_SCHEMA_VERSION = "1.0.0";
 
 export type AuditAction =
@@ -20,8 +38,10 @@ interface AuditInput {
     type: string;
     id: string;
   };
+  /** Dot-namespaced event name, e.g. "diagnosis.created" */
   event: string;
   summary?: string;
+  /** Field-level changes to record in the diff — values, not SQL expressions */
   changes?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
 }
