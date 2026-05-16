@@ -81,21 +81,34 @@ const nextConfig = {
   turbopack: {
     root: path.resolve(__dirname, "../.."),
   },
-  // Keep OTel + gRPC packages out of the webpack bundle — they use Node-only
-  // built-ins (stream, fs, net, tls) that webpack cannot resolve.
-  // @opentelemetry/sdk-node pulls in both trace and logs gRPC exporters as
-  // transitive deps even when only the HTTP exporter is used.
-  serverExternalPackages: [
-    "@opentelemetry/sdk-node",
-    "@opentelemetry/exporter-trace-otlp-grpc",
-    "@opentelemetry/exporter-trace-otlp-http",
-    "@opentelemetry/exporter-logs-otlp-grpc",
-    "@opentelemetry/otlp-grpc-exporter-base",
-    "@opentelemetry/instrumentation",
-    "@grpc/grpc-js",
-    "@grpc/proto-loader",
-    "require-in-the-middle",
-  ],
+  // OTel/gRPC packages use Node.js built-ins that webpack cannot bundle.
+  // serverExternalPackages covers Turbopack; webpack() covers the instrumentation
+  // file which is compiled on a separate webpack config that bypasses that list.
+  serverExternalPackages: ["@opentelemetry/sdk-node", "require-in-the-middle"],
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      const prev = Array.isArray(config.externals)
+        ? config.externals
+        : config.externals
+        ? [config.externals]
+        : [];
+      config.externals = [
+        ...prev,
+        ({ request }, callback) => {
+          if (
+            request?.startsWith("@opentelemetry/") ||
+            request?.startsWith("@grpc/") ||
+            request === "require-in-the-middle" ||
+            request === "shimmer"
+          ) {
+            return callback(null, "commonjs " + request);
+          }
+          callback();
+        },
+      ];
+    }
+    return config;
+  },
   experimental: {
     // Allows requests via Traefik (Host: example.com) to reach the standalone
     // server bound to 0.0.0.0. Next.js otherwise only allows localhost by default.
