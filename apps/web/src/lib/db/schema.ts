@@ -530,7 +530,6 @@ export const owners = pgTable(
     notes: text("notes"),
     emailOptOut: boolean("email_opt_out").default(false).notNull(),
     active: boolean("active").default(true).notNull(),
-    provisional: boolean("provisional").default(false).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .default(sql`now()`)
       .notNull(),
@@ -572,7 +571,6 @@ export const patients = pgTable(
     allergies: text("allergies"), // Komma-getrennte Liste oder JSON
     notes: text("notes"),
     active: boolean("active").default(true).notNull(),
-    provisional: boolean("provisional").default(false).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .default(sql`now()`)
       .notNull(),

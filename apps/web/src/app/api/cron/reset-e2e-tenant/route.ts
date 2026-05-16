@@ -234,7 +234,7 @@ async function seedE2ETenantDemoData(tenantId: string) {
     TEST_DATA.owners.map((owner) =>
       db
         .insert(owners)
-        .values({ tenantId, ...owner, active: true, provisional: false })
+        .values({ tenantId, ...owner, active: true })
         .returning()
         .then((result) => result[0]!)
     )
@@ -250,7 +250,6 @@ async function seedE2ETenantDemoData(tenantId: string) {
           ...patientData,
           birthDate: new Date(new Date().getFullYear() - 3, 0, 1),
           active: true,
-          provisional: false,
         })
         .returning()
         .then((result) => result[0]!)

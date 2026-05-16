@@ -161,9 +161,7 @@ export default function ClientDetailPage() {
                     {patient.species}{patient.breed ? ` · ${patient.breed}` : ""}
                   </div>
                 </div>
-                {patient.provisional && (
-                  <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700">Nicht verifiziert</span>
-                )}
+
               </Link>
             )) : (
               <div className="py-12 text-center text-muted">

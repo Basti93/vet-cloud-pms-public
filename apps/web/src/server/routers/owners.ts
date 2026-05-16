@@ -65,7 +65,6 @@ export const ownersRouter = createTRPCRouter({
           city: owners.city,
           postalCode: owners.postalCode,
           active: owners.active,
-          provisional: owners.provisional,
           createdAt: owners.createdAt,
           patientCount: sql<number>`count(distinct ${patients.id})::int`,
           lastAppointment: max(appointments.startTime),
@@ -84,7 +83,6 @@ export const ownersRouter = createTRPCRouter({
           owners.city,
           owners.postalCode,
           owners.active,
-          owners.provisional,
           owners.createdAt
         )
         .orderBy(asc(owners.lastName), asc(owners.firstName))
@@ -114,7 +112,6 @@ export const ownersRouter = createTRPCRouter({
           birthDate: patients.birthDate,
           weight: patients.weight,
           active: patients.active,
-          provisional: patients.provisional,
         })
         .from(patients)
         .where(and(eq(patients.ownerId, input.id), eq(patients.tenantId, input.tenantId)))
@@ -175,7 +172,6 @@ export const ownersRouter = createTRPCRouter({
               country: input.country ?? existingOwner.country ?? "DE",
               notes: cleanOptional(input.notes),
               active: true,
-              provisional: false,
               updatedAt: new Date(),
             })
             .where(and(eq(owners.id, existingOwner.id), eq(owners.tenantId, input.tenantId)))
@@ -207,7 +203,6 @@ export const ownersRouter = createTRPCRouter({
           postalCode: cleanOptional(input.postalCode),
           country: input.country ?? "DE",
           notes: cleanOptional(input.notes),
-          provisional: false,
         })
         .returning();
 

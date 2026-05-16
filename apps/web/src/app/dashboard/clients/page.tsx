@@ -91,11 +91,7 @@ export default function ClientsPage() {
                   <div className="font-semibold text-fg">
                     {owner.firstName} {owner.lastName}
                   </div>
-                  {owner.provisional && (
-                    <span className="mt-1 inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
-                      Nicht verifiziert
-                    </span>
-                  )}
+
                 </div>
                 <div className="space-y-1 text-sm text-muted">
                   {owner.email && (
