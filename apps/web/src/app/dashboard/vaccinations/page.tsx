@@ -230,7 +230,7 @@ export default function VaccinationsPage() {
           <table className="min-w-full text-sm">
             <thead className="bg-bg text-left text-xs uppercase tracking-wide text-muted">
               <tr>
-                <th className="px-4 py-3">Patient</th>
+                <th className="px-4 py-3">Tier</th>
                 <th className="px-4 py-3">Tierart</th>
                 <th className="px-4 py-3">Besitzer</th>
                 <th className="px-4 py-3">Status</th>
@@ -250,8 +250,8 @@ export default function VaccinationsPage() {
                 <tr>
                   <td className="px-4 py-8 text-center text-muted" colSpan={7}>
                     {status === "all"
-                      ? "Keine Patienten vorhanden."
-                      : "Keine Patienten in dieser Kategorie."}
+                      ? "Keine Tiere vorhanden."
+                      : "Keine Tiere in dieser Kategorie."}
                   </td>
                 </tr>
               ) : (

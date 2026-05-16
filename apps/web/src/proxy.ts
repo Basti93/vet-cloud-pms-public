@@ -1,5 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
+import type { NextFetchEvent, NextRequest } from 'next/server';
 import { PUBLIC_ROUTES } from '@/config/routes';
 import {
   frameAncestorSourcesForDomain,
@@ -22,7 +23,11 @@ function isPlatformHost(host: string) {
     (!!configured && host === configured) ||
     host === 'localhost' ||
     host === '127.0.0.1' ||
-    host.endsWith('.localhost')
+    host.endsWith('.localhost') ||
+    // Private network ranges (dev proxy sets x-forwarded-host to LAN IP)
+    /^10\./.test(host) ||
+    /^192\.168\./.test(host) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(host)
   );
 }
 
@@ -87,7 +92,15 @@ async function getBookingFrameAncestors(pathname: string) {
   ];
 }
 
-export default clerkMiddleware(async (auth, req) => {
+const clerkProtectedProxy = clerkMiddleware(async (auth, req) => {
+  const authObj = await auth();
+  if (!authObj.userId) {
+    return authObj.redirectToSignIn();
+  }
+});
+const clerkAuthStateProxy = clerkMiddleware();
+
+export async function proxy(req: NextRequest, event: NextFetchEvent) {
   // Intercept CORS preflight before Clerk auth runs.
   // Bearer token auth doesn't need credentials mode, so wildcard origin is safe.
   if (req.method === 'OPTIONS') {
@@ -111,15 +124,19 @@ export default clerkMiddleware(async (auth, req) => {
     !pathname.startsWith('/api') &&
     !pathname.startsWith('/_next')
   ) {
-    const websiteDomain = await resolveWebsiteDomain(host);
-    if (websiteDomain) {
-      const url = req.nextUrl.clone();
-      if (pathname === '/book' && websiteDomain.tenantSlug) {
-        url.pathname = `/book/${websiteDomain.tenantSlug}`;
-      } else {
-        url.pathname = `/site/${websiteDomain.projectSlug}${pathname === '/' ? '' : pathname}`;
+    try {
+      const websiteDomain = await resolveWebsiteDomain(host);
+      if (websiteDomain) {
+        const url = req.nextUrl.clone();
+        if (pathname === '/book' && websiteDomain.tenantSlug) {
+          url.pathname = `/book/${websiteDomain.tenantSlug}`;
+        } else {
+          url.pathname = `/site/${websiteDomain.projectSlug}${pathname === '/' ? '' : pathname}`;
+        }
+        return NextResponse.rewrite(url);
       }
-      return NextResponse.rewrite(url);
+    } catch {
+      // DB unavailable or unknown host — fall through to normal routing
     }
   }
 
@@ -133,18 +150,20 @@ export default clerkMiddleware(async (auth, req) => {
     );
   }
 
-  // Single-segment paths like /[practiceSlug] handle their own auth server-side
-  const isSingleSegmentPath = /^\/[^/]+\/?$/.test(pathname);
-
-  if (!isPublicRoute(req) && !isSingleSegmentPath) {
-    const authObj = await auth();
-    if (!authObj.userId) {
-      authObj.redirectToSignIn();
+  if (!isPublicRoute(req)) {
+    if (pathname.startsWith('/api/trpc')) {
+      return clerkAuthStateProxy(req, event);
     }
+
+    return clerkProtectedProxy(req, event);
+  }
+
+  if (pathname.startsWith('/api/trpc')) {
+    return clerkAuthStateProxy(req, event);
   }
 
   return response;
-});
+}
 
 export const config = {
   matcher: [

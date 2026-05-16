@@ -81,16 +81,9 @@ const nextConfig = {
   turbopack: {
     root: path.resolve(__dirname, "../.."),
   },
-  serverExternalPackages: [
-    "@opentelemetry/sdk-node",
-    "@opentelemetry/instrumentation",
-    "@opentelemetry/exporter-trace-otlp-http",
-    "@opentelemetry/resources",
-    "@opentelemetry/sdk-trace-node",
-    "@opentelemetry/semantic-conventions",
-    "require-in-the-middle",
-  ],
-
+  // sdk-trace-node uses async_hooks/perf_hooks (Node.js built-ins) — must not be bundled.
+  // All other OTel packages are pure JS and bundle cleanly.
+  serverExternalPackages: ['@opentelemetry/sdk-trace-node'],
   // Security & Rate Limiting Headers
   async headers() {
     return [

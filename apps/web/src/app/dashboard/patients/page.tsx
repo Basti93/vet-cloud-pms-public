@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Search, Plus, ChevronRight, Phone, PawPrint } from "lucide-react";
+import { Search, Plus, ChevronRight, Phone, PawPrint, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SpeciesIcon } from "@/components/ui/badge";
@@ -97,15 +97,22 @@ export default function PatientsPage() {
 
   return (
     <div className="space-y-6">
+      <Link
+        href="/dashboard/clients"
+        className="inline-flex items-center gap-2 text-sm font-medium text-[var(--color-accent)] hover:underline"
+      >
+        <Users size={16} /> Zu den Tierhaltern
+      </Link>
+
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-fg">Patienten</h1>
+          <h1 className="text-3xl font-bold text-fg">Tiere</h1>
           <p className="text-muted mt-1">
-            {data ? `${data.length} Patienten` : "Alle Tierpatienten Ihrer Praxis"}
+            {data ? `${data.length} Tiere` : "Alle Tiere Ihrer Praxis"}
           </p>
         </div>
         <Button onClick={() => setShowNewModal(true)}>
-          <Plus size={16} /> Neuer Patient
+          <Plus size={16} /> Neues Tier
         </Button>
       </div>
 
@@ -113,7 +120,7 @@ export default function PatientsPage() {
 
       {tenantId && (
         <Input
-          placeholder="Patient oder Halter suchen…"
+          placeholder="Tier oder Halter suchen…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           icon={<Search size={16} />}
@@ -124,7 +131,7 @@ export default function PatientsPage() {
       {tenantId && (
         <div className="bg-surface rounded-2xl border border-border shadow-sm overflow-hidden">
           <div className="hidden md:grid grid-cols-[2.5rem_1fr_1fr_1.5rem] gap-4 px-6 py-3 bg-bg border-b border-border text-xs font-semibold text-muted uppercase tracking-wide">
-            <div /><div>Patient</div><div>Halter</div><div />
+            <div /><div>Tier</div><div>Halter</div><div />
           </div>
 
           {isLoading ? (
@@ -135,11 +142,11 @@ export default function PatientsPage() {
                 <PawPrint size={48} strokeWidth={1.5} />
               </div>
               <p className="font-medium">
-                {search ? `Keine Ergebnisse für „${search}"` : "Noch keine Patienten angelegt"}
+                {search ? `Keine Ergebnisse für „${search}"` : "Noch keine Tiere angelegt"}
               </p>
               {!search && (
                 <Button className="mt-4" onClick={() => setShowNewModal(true)}>
-                  <Plus size={16} /> Ersten Patienten anlegen
+                  <Plus size={16} /> Erstes Tier anlegen
                 </Button>
               )}
             </div>

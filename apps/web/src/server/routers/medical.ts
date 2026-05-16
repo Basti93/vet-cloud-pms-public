@@ -1,3 +1,27 @@
+/**
+ * Medical Router — clinical records for patients within a tenant.
+ *
+ * Sub-domains:
+ *   diagnoses  — ICD-10 coded diagnoses with severity + lifecycle status
+ *   medications — prescriptions linked optionally to a diagnosis
+ *   vitals     — weight, temperature, heart rate, respiratory rate snapshots
+ *   allergies  — free-text allergy notes stored on the patient record
+ *
+ * Security model:
+ *   - All procedures are `tenantProcedure` → requires Clerk session, active
+ *     tenant, and input.tenantId === ctx.tenantId (cross-tenant access blocked).
+ *   - Mutations require MEDICAL_CREATE or MEDICAL_UPDATE permission (Vet+ only;
+ *     Receptionist role has no MEDICAL_* permissions).
+ *   - Every create/update verifies the patientId belongs to the authenticated
+ *     tenant before writing, preventing cross-patient injection.
+ *   - All mutations write to the immutable audit log for DSGVO compliance.
+ *
+ * Known gap (backlog):
+ *   - list procedures do not check MEDICAL_READ, so any authenticated tenant
+ *     user (including Receptionist) can read medical records. Needs gating once
+ *     the patient-detail UI is audited for role visibility.
+ */
+
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
 import { createTRPCRouter, tenantProcedure } from "@/server/trpc";
@@ -6,7 +30,8 @@ import { TRPCError } from "@trpc/server";
 import { requirePermission } from "@/server/trpc/middleware";
 import { writeAuditLog } from "@/server/audit";
 
-// Diagnoses router
+// ── Diagnoses ─────────────────────────────────────────────────────────────────
+
 const diagnosesRouter = createTRPCRouter({
   list: tenantProcedure
     .input(z.object({ patientId: z.string().uuid(), tenantId: z.string().uuid() }))
@@ -124,7 +149,8 @@ const diagnosesRouter = createTRPCRouter({
     }),
 });
 
-// Medications router
+// ── Medications ───────────────────────────────────────────────────────────────
+
 const medicationsRouter = createTRPCRouter({
   list: tenantProcedure
     .input(z.object({ patientId: z.string().uuid(), tenantId: z.string().uuid() }))
@@ -147,6 +173,7 @@ const medicationsRouter = createTRPCRouter({
     }),
 
   create: tenantProcedure
+    .use(requirePermission(PERMISSIONS.MEDICAL_CREATE))
     .input(
       z.object({
         tenantId: z.string().uuid(),
@@ -210,6 +237,7 @@ const medicationsRouter = createTRPCRouter({
     }),
 
   update: tenantProcedure
+    .use(requirePermission(PERMISSIONS.MEDICAL_UPDATE))
     .input(
       z.object({
         medicationId: z.string().uuid(),
@@ -245,7 +273,8 @@ const medicationsRouter = createTRPCRouter({
     }),
 });
 
-// Vitals router
+// ── Vitals ────────────────────────────────────────────────────────────────────
+
 const vitalsRouter = createTRPCRouter({
   list: tenantProcedure
     .input(z.object({ patientId: z.string().uuid(), tenantId: z.string().uuid() }))
@@ -268,6 +297,7 @@ const vitalsRouter = createTRPCRouter({
     }),
 
   create: tenantProcedure
+    .use(requirePermission(PERMISSIONS.MEDICAL_CREATE))
     .input(
       z.object({
         patientId: z.string().uuid(),
@@ -328,9 +358,14 @@ const vitalsRouter = createTRPCRouter({
     }),
 });
 
-// Allergies router
+// ── Allergies ─────────────────────────────────────────────────────────────────
+
+// Stored as free-text on the patient record (not a separate table) — intentionally
+// simple for MVP. Structured allergy records (substance, reaction, severity) can
+// be added later without a breaking schema change.
 const allergiesRouter = createTRPCRouter({
   update: tenantProcedure
+    .use(requirePermission(PERMISSIONS.MEDICAL_UPDATE))
     .input(
       z.object({
         patientId: z.string().uuid(),
@@ -364,7 +399,8 @@ const allergiesRouter = createTRPCRouter({
     }),
 });
 
-// Main medical router
+// ── Exports ───────────────────────────────────────────────────────────────────
+
 export const medicalRouter = createTRPCRouter({
   diagnoses: diagnosesRouter,
   medications: medicationsRouter,

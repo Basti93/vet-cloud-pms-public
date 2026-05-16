@@ -27,6 +27,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/lib/toast/context';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { AppointmentModal } from '@/components/appointments/AppointmentModal';
 
 export default function PatientDetailPage() {
   const params = useParams();
@@ -37,29 +38,23 @@ export default function PatientDetailPage() {
   const [showMedicationForm, setShowMedicationForm] = useState(false);
   const [showVitalsForm, setShowVitalsForm] = useState(false);
   const [showVaccinationForm, setShowVaccinationForm] = useState(false);
-  // null = create mode, string id = edit mode
+  const [apptModalOpen, setApptModalOpen] = useState(false);
+  const [selectedAptId, setSelectedAptId] = useState<string | null>(null);
   const [editingVaccinationId, setEditingVaccinationId] = useState<string | null>(null);
-  // id of the vaccination pending delete confirmation
   const [deletingVaccinationId, setDeletingVaccinationId] = useState<string | null>(null);
-  // Selected vaccination type id ("custom" for free-text)
   const [vaccinationTypeId, setVaccinationTypeId] = useState("");
-  // Free-text name when vaccinationTypeId === "custom"
   const [vaccinationCustomType, setVaccinationCustomType] = useState("");
   const [vaccinationDate, setVaccinationDate] = useState("");
   const [vaccinationExpiry, setVaccinationExpiry] = useState("");
   const [vaccinationBatch, setVaccinationBatch] = useState("");
   const [vaccinationNotes, setVaccinationNotes] = useState("");
 
-  // Fetch patient data
   const { data: patients, isLoading } = trpc.patients.list.useQuery(
-    {
-      tenantId: tenantId || '',
-    },
+    { tenantId: tenantId || '' },
     { enabled: !!tenantId }
   );
   const patient = patients?.find((p) => p.id === patientId);
 
-  // Fetch medical data
   const { data: diagnosisList } = trpc.medical.diagnoses.list.useQuery(
     { patientId, tenantId: tenantId || '' },
     { enabled: !!patientId && !!tenantId }
@@ -84,8 +79,6 @@ export default function PatientDetailPage() {
     { patientId, tenantId: tenantId || "", days: 90 },
     { enabled: !!patientId && !!tenantId }
   );
-
-  // Vaccination type catalogue — tenant-aware, filtered in-memory by patient species
   const { data: allVacTypes } = trpc.vaccinations.getTypes.useQuery(
     { tenantId: tenantId ?? "", species: undefined },
     { enabled: !!tenantId }
@@ -100,7 +93,6 @@ export default function PatientDetailPage() {
     setVaccinationNotes("");
   };
 
-  // Auto-fill expiry date when type + administered date are both set
   const handleVacTypeChange = (typeId: string) => {
     setVaccinationTypeId(typeId);
     if (typeId === "custom") return;
@@ -129,7 +121,6 @@ export default function PatientDetailPage() {
 
   const openEditDialog = (v: VaccinationRow) => {
     setEditingVaccinationId(v.id);
-    // Restore type selection
     if (v.vaccinationTypeId) {
       setVaccinationTypeId(v.vaccinationTypeId);
       setVaccinationCustomType("");
@@ -151,9 +142,7 @@ export default function PatientDetailPage() {
       addToast("Impfung erfasst.", "success");
       await refetchVaccinations();
     },
-    onError: () => {
-      addToast("Impfung konnte nicht gespeichert werden.", "error");
-    },
+    onError: () => addToast("Impfung konnte nicht gespeichert werden.", "error"),
   });
 
   const updateVaccination = trpc.vaccinations.update.useMutation({
@@ -164,9 +153,7 @@ export default function PatientDetailPage() {
       addToast("Impfung aktualisiert.", "success");
       await refetchVaccinations();
     },
-    onError: () => {
-      addToast("Impfung konnte nicht aktualisiert werden.", "error");
-    },
+    onError: () => addToast("Impfung konnte nicht aktualisiert werden.", "error"),
   });
 
   const deleteVaccination = trpc.vaccinations.delete.useMutation({
@@ -175,17 +162,15 @@ export default function PatientDetailPage() {
       addToast("Impfung gelöscht.", "success");
       await refetchVaccinations();
     },
-    onError: () => {
-      addToast("Impfung konnte nicht gelöscht werden.", "error");
-    },
+    onError: () => addToast("Impfung konnte nicht gelöscht werden.", "error"),
   });
 
   if (isLoading) {
-    return <div className="text-center py-12">Loading...</div>;
+    return <div className="text-center py-12 text-muted">Wird geladen…</div>;
   }
 
   if (!patient) {
-    return <div className="text-center py-12 text-red-600">Patient not found</div>;
+    return <div className="text-center py-12 text-red-600">Tier nicht gefunden</div>;
   }
 
   const allergies: string[] = [];
@@ -196,138 +181,123 @@ export default function PatientDetailPage() {
 
   const formatDate = (date: string | Date) => {
     const d = typeof date === 'string' ? new Date(date) : date;
-    return d.toLocaleDateString('de-DE', {
-      year: '2-digit',
-      month: '2-digit',
-      day: '2-digit',
-    });
+    return d.toLocaleDateString('de-DE', { year: '2-digit', month: '2-digit', day: '2-digit' });
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 p-6">
-        <Link
-          href="/dashboard/patients"
-          className="inline-flex items-center text-blue-600 hover:text-blue-700 mb-4"
-        >
-          <ChevronLeft className="w-4 h-4 mr-1" />
-          Zurück zu Patienten
-        </Link>
+    <div className="space-y-6">
+      {/* Back link */}
+      <Link
+        href="/dashboard/patients"
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--color-accent)] hover:underline"
+      >
+        <ChevronLeft size={16} /> Zurück zu Tieren
+      </Link>
 
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-4xl font-bold text-gray-900">{patient.name}</h1>
-            <p className="text-gray-600 mt-1">
-              {patient.species}
-              {patient.breed && ` • ${patient.breed}`}
-            </p>
-          </div>
-          {/* Owner contact card */}
-          <div className="text-right space-y-0.5">
-            <div className="text-xs font-medium uppercase tracking-wide text-gray-500 mb-1">Besitzer</div>
-            <div className="font-semibold text-gray-900">
-              {[patient.ownerFirstName, patient.ownerLastName].filter(Boolean).join(" ") || "—"}
-            </div>
-            {patient.ownerPhone && (
-              <a
-                href={`tel:${patient.ownerPhone}`}
-                className="flex items-center justify-end gap-1.5 text-sm text-blue-600 hover:underline"
-              >
-                {patient.ownerPhone}
-              </a>
-            )}
-            {patient.ownerEmail && (
-              <a
-                href={`mailto:${patient.ownerEmail}`}
-                className="flex items-center justify-end gap-1.5 text-sm text-blue-600 hover:underline"
-              >
-                {patient.ownerEmail}
-              </a>
-            )}
-          </div>
+      {/* Header: name + owner card */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-fg">{patient.name}</h1>
+          <p className="text-muted mt-1">
+            {patient.species}
+            {patient.breed && ` · ${patient.breed}`}
+          </p>
+        </div>
+        <div className="text-right space-y-0.5 shrink-0">
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted mb-1">Tierhalter</div>
+          <Link
+            href={`/dashboard/clients/${patient.ownerId}`}
+            className="font-semibold text-fg hover:text-[var(--color-accent)] hover:underline block"
+          >
+            {[patient.ownerFirstName, patient.ownerLastName].filter(Boolean).join(" ") || "—"}
+          </Link>
+          {patient.ownerPhone && (
+            <a
+              href={`tel:${patient.ownerPhone}`}
+              className="text-sm text-[var(--color-accent)] hover:underline block"
+            >
+              {patient.ownerPhone}
+            </a>
+          )}
+          {patient.ownerEmail && (
+            <a
+              href={`mailto:${patient.ownerEmail}`}
+              className="text-sm text-[var(--color-accent)] hover:underline block"
+            >
+              {patient.ownerEmail}
+            </a>
+          )}
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-white rounded-lg p-4 border border-gray-200">
-            <p className="text-xs text-gray-600 font-medium">Gewicht</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">
-              {patient.weight ? (patient.weight / 1000).toFixed(1) : '-'} kg
-            </p>
-            {latestVital?.weight && (
-              <p className="text-xs text-gray-500 mt-1">
-                Letzte Messung: {formatDate(latestVital.recordedAt)}
-              </p>
-            )}
-          </div>
+      {/* Quick stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-surface rounded-2xl border border-border shadow-sm p-4">
+          <p className="text-xs text-muted font-medium">Gewicht</p>
+          <p className="text-2xl font-bold text-fg mt-1">
+            {patient.weight ? (patient.weight / 1000).toFixed(1) : '–'} kg
+          </p>
+          {latestVital?.weight && (
+            <p className="text-xs text-muted mt-1">Letzte Messung: {formatDate(latestVital.recordedAt)}</p>
+          )}
+        </div>
+        <div className="bg-surface rounded-2xl border border-border shadow-sm p-4">
+          <p className="text-xs text-muted font-medium">Farbe</p>
+          <p className="text-lg font-semibold text-fg mt-1">{patient.color || '–'}</p>
+        </div>
+        <div className="bg-surface rounded-2xl border border-border shadow-sm p-4">
+          <p className="text-xs text-muted font-medium">Aktive Diagnosen</p>
+          <p className="text-2xl font-bold text-fg mt-1">{activeDiagnoses.length}</p>
+        </div>
+        <div className="bg-surface rounded-2xl border border-border shadow-sm p-4">
+          <p className="text-xs text-muted font-medium">Medikamente</p>
+          <p className="text-2xl font-bold text-fg mt-1">{activeMeds.length}</p>
+        </div>
+      </div>
 
-          <div className="bg-white rounded-lg p-4 border border-gray-200">
-            <p className="text-xs text-gray-600 font-medium">Farbe</p>
-            <p className="text-lg font-semibold text-gray-900 mt-1">{patient.color || '-'}</p>
-          </div>
-
-          <div className="bg-white rounded-lg p-4 border border-gray-200">
-            <p className="text-xs text-gray-600 font-medium">Aktive Diagnosen</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{activeDiagnoses.length}</p>
-          </div>
-
-          <div className="bg-white rounded-lg p-4 border border-gray-200">
-            <p className="text-xs text-gray-600 font-medium">Medikamente</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{activeMeds.length}</p>
+      {/* Allergies alert */}
+      {allergies.length > 0 && (
+        <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-xl">
+          <div className="flex items-start gap-3">
+            <AlertTriangle size={18} className="text-red-600 shrink-0 mt-0.5" />
+            <div>
+              <h3 className="font-semibold text-red-900">Allergien</h3>
+              <p className="text-red-800 mt-1">{allergies.join(', ')}</p>
+            </div>
           </div>
         </div>
+      )}
 
-        {/* Allergies Alert */}
-        {allergies.length > 0 && (
-          <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <h3 className="font-semibold text-red-900">Allergien</h3>
-                <p className="text-red-800 mt-1">{allergies.join(', ')}</p>
-              </div>
-            </div>
+      {/* Diagnoses + Medications */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-surface rounded-2xl border border-border shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+            <h2 className="font-bold text-fg flex items-center gap-2">
+              <Stethoscope size={16} style={{ color: 'var(--color-accent)' }} />
+              Diagnosen
+            </h2>
+            <Button size="sm" variant="outline" onClick={() => setShowDiagnosisForm(true)}>
+              <Plus size={14} /> Hinzufügen
+            </Button>
           </div>
-        )}
-
-        {/* Medical Sections */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Diagnoses */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <Stethoscope className="w-5 h-5 text-blue-600" />
-                Diagnosen
-              </h2>
-              <button
-                onClick={() => setShowDiagnosisForm(true)}
-                className="flex items-center gap-1 px-3 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded text-sm font-medium"
-              >
-                <Plus className="w-4 h-4" />
-                Hinzufügen
-              </button>
-            </div>
-
-            {activeDiagnoses && activeDiagnoses.length > 0 ? (
+          <div className="p-6">
+            {activeDiagnoses.length > 0 ? (
               <div className="space-y-3">
                 {activeDiagnoses.map((dx) => (
-                  <div key={dx.id} className="border border-gray-200 rounded p-3">
-                    <div className="flex items-start justify-between">
+                  <div key={dx.id} className="rounded-xl border border-border bg-bg p-3">
+                    <div className="flex items-start justify-between gap-2">
                       <div>
-                        <p className="font-semibold text-gray-900">{dx.title}</p>
+                        <p className="font-semibold text-fg">{dx.title}</p>
                         {dx.description && (
-                          <p className="text-sm text-gray-600 mt-1">{dx.description}</p>
+                          <p className="text-sm text-muted mt-1">{dx.description}</p>
                         )}
-                        <p className="text-xs text-gray-500 mt-2">
+                        <p className="text-xs text-muted mt-2">
                           {formatDate(dx.dateOfDiagnosis)}
-                          {dx.severity && ` • ${dx.severity}`}
+                          {dx.severity && ` · ${dx.severity}`}
                         </p>
                       </div>
                       <span
-                        className={`px-2 py-1 rounded text-xs font-medium ${
+                        className={`px-2 py-1 rounded-lg text-xs font-medium shrink-0 ${
                           dx.status === 'active'
                             ? 'bg-yellow-100 text-yellow-800'
                             : dx.status === 'resolved'
@@ -342,67 +312,68 @@ export default function PatientDetailPage() {
                 ))}
               </div>
             ) : (
-              <p className="text-gray-500 text-center py-8">Keine aktiven Diagnosen</p>
+              <p className="text-muted text-center py-8">Keine aktiven Diagnosen</p>
             )}
           </div>
+        </div>
 
-          {/* Medications */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <Pill className="w-5 h-5 text-green-600" />
-                Medikamente
-              </h2>
-              <button
-                onClick={() => setShowMedicationForm(true)}
-                className="flex items-center gap-1 px-3 py-1 bg-green-50 text-green-600 hover:bg-green-100 rounded text-sm font-medium"
-              >
-                <Plus className="w-4 h-4" />
-                Hinzufügen
-              </button>
-            </div>
-
-            {activeMeds && activeMeds.length > 0 ? (
+        <div className="bg-surface rounded-2xl border border-border shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+            <h2 className="font-bold text-fg flex items-center gap-2">
+              <Pill size={16} style={{ color: 'var(--color-accent)' }} />
+              Medikamente
+            </h2>
+            <Button size="sm" variant="outline" onClick={() => setShowMedicationForm(true)}>
+              <Plus size={14} /> Hinzufügen
+            </Button>
+          </div>
+          <div className="p-6">
+            {activeMeds.length > 0 ? (
               <div className="space-y-3">
                 {activeMeds.map((med) => (
-                  <div key={med.id} className="border border-gray-200 rounded p-3">
-                    <p className="font-semibold text-gray-900">{med.medicationName}</p>
-                    <p className="text-sm text-gray-600 mt-1">
-                      {med.dosage} • {med.frequency}
+                  <div key={med.id} className="rounded-xl border border-border bg-bg p-3">
+                    <p className="font-semibold text-fg">{med.medicationName}</p>
+                    <p className="text-sm text-muted mt-1">
+                      {med.dosage} · {med.frequency}
                     </p>
-                    <p className="text-xs text-gray-500 mt-2">
-                      Seit {formatDate(med.startDate)} • Route: {med.route}
+                    <p className="text-xs text-muted mt-2">
+                      Seit {formatDate(med.startDate)} · Route: {med.route}
                     </p>
                     {med.notes && (
-                      <p className="text-xs text-gray-600 mt-2 italic">{med.notes}</p>
+                      <p className="text-xs text-muted mt-2 italic">{med.notes}</p>
                     )}
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-gray-500 text-center py-8">Keine aktiven Medikamente</p>
+              <p className="text-muted text-center py-8">Keine aktiven Medikamente</p>
             )}
           </div>
         </div>
+      </div>
 
-        {/* Appointments/Termine */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-indigo-600" />
-              Termine & Ärzte
-            </h2>
-          </div>
-
+      {/* Appointments */}
+      <div className="bg-surface rounded-2xl border border-border shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+          <h2 className="font-bold text-fg flex items-center gap-2">
+            <Calendar size={16} style={{ color: 'var(--color-accent)' }} />
+            Termine & Ärzte
+          </h2>
+        </div>
+        <div className="p-6">
           {appointmentsList && appointmentsList.length > 0 ? (
             <div className="space-y-3">
               {appointmentsList.map((apt) => (
-                <div key={apt.id} className="border border-gray-200 rounded p-3">
-                  <div className="flex items-start justify-between">
+                <button
+                  key={apt.id}
+                  onClick={() => { setSelectedAptId(apt.id); setApptModalOpen(true); }}
+                  className="w-full text-left rounded-xl border border-border bg-bg p-3 hover:bg-muted-soft transition-colors cursor-pointer"
+                >
+                  <div className="flex items-start justify-between gap-2">
                     <div className="flex-1">
-                      <p className="font-semibold text-gray-900">{apt.title}</p>
-                      <p className="text-sm text-gray-600 mt-1 flex items-center gap-2">
-                        <Clock className="w-4 h-4" />
+                      <p className="font-semibold text-fg">{apt.title}</p>
+                      <p className="text-sm text-muted mt-1 flex items-center gap-2">
+                        <Clock size={13} />
                         {new Date(apt.startTime).toLocaleDateString('de-DE', {
                           weekday: 'short',
                           day: '2-digit',
@@ -412,20 +383,20 @@ export default function PatientDetailPage() {
                         })}
                       </p>
                       {apt.vetFirstName && apt.vetLastName && (
-                        <p className="text-sm text-indigo-600 mt-1 font-medium">
+                        <p className="text-sm mt-1 font-medium" style={{ color: 'var(--color-accent)' }}>
                           Dr. {apt.vetFirstName} {apt.vetLastName}
                         </p>
                       )}
                     </div>
                     <span
-                      className={`px-2 py-1 rounded text-xs font-medium flex-shrink-0 ${
+                      className={`px-2 py-1 rounded-lg text-xs font-medium shrink-0 ${
                         apt.status === 'scheduled'
                           ? 'bg-yellow-100 text-yellow-800'
                           : apt.status === 'completed'
                           ? 'bg-green-100 text-green-800'
                           : apt.status === 'cancelled'
                           ? 'bg-red-100 text-red-800'
-                          : 'bg-gray-100 text-gray-800'
+                          : 'bg-muted-soft text-muted'
                       }`}
                     >
                       {apt.status === 'scheduled' && 'Geplant'}
@@ -434,78 +405,76 @@ export default function PatientDetailPage() {
                       {apt.status === 'no-show' && 'Nicht erschienen'}
                     </span>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           ) : (
-            <p className="text-gray-500 text-center py-8">Keine Termine erfasst</p>
+            <p className="text-muted text-center py-8">Keine Termine erfasst</p>
           )}
         </div>
+      </div>
 
-        {/* Vitals */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <TrendingDown className="w-5 h-5 text-purple-600" />
-              Vitalzeichen & Gewicht
-            </h2>
-            <button
-              onClick={() => setShowVitalsForm(true)}
-              className="flex items-center gap-1 px-3 py-1 bg-purple-50 text-purple-600 hover:bg-purple-100 rounded text-sm font-medium"
-            >
-              <Plus className="w-4 h-4" />
-              Messung hinzufügen
-            </button>
-          </div>
-
+      {/* Vitals */}
+      <div className="bg-surface rounded-2xl border border-border shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+          <h2 className="font-bold text-fg flex items-center gap-2">
+            <TrendingDown size={16} style={{ color: 'var(--color-accent)' }} />
+            Vitalzeichen & Gewicht
+          </h2>
+          <Button size="sm" variant="outline" onClick={() => setShowVitalsForm(true)}>
+            <Plus size={14} /> Messung hinzufügen
+          </Button>
+        </div>
+        <div className="p-6">
           {vitalsList && vitalsList.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
-                <thead className="border-b border-gray-200">
+                <thead className="border-b border-border">
                   <tr>
-                    <th className="text-left py-2 px-3 font-semibold text-gray-900">Datum</th>
-                    <th className="text-left py-2 px-3 font-semibold text-gray-900">Gewicht</th>
-                    <th className="text-left py-2 px-3 font-semibold text-gray-900">Temperatur</th>
-                    <th className="text-left py-2 px-3 font-semibold text-gray-900">Puls</th>
-                    <th className="text-left py-2 px-3 font-semibold text-gray-900">Atemf.</th>
-                    <th className="text-left py-2 px-3 font-semibold text-gray-900">Notizen</th>
+                    <th className="text-left py-2 px-3 font-semibold text-fg">Datum</th>
+                    <th className="text-left py-2 px-3 font-semibold text-fg">Gewicht</th>
+                    <th className="text-left py-2 px-3 font-semibold text-fg">Temperatur</th>
+                    <th className="text-left py-2 px-3 font-semibold text-fg">Puls</th>
+                    <th className="text-left py-2 px-3 font-semibold text-fg">Atemf.</th>
+                    <th className="text-left py-2 px-3 font-semibold text-fg">Notizen</th>
                   </tr>
                 </thead>
                 <tbody>
                   {vitalsList.map((vital) => (
-                    <tr key={vital.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-3 px-3">{formatDate(vital.recordedAt)}</td>
-                      <td className="py-3 px-3">
-                        {vital.weight ? (vital.weight / 1000).toFixed(1) : '-'} kg
+                    <tr key={vital.id} className="border-b border-border hover:bg-muted-soft transition-colors">
+                      <td className="py-3 px-3 text-fg">{formatDate(vital.recordedAt)}</td>
+                      <td className="py-3 px-3 text-fg">
+                        {vital.weight ? (vital.weight / 1000).toFixed(1) : '–'} kg
                       </td>
-                      <td className="py-3 px-3">{vital.temperature || '-'}</td>
-                      <td className="py-3 px-3">{vital.heartRate || '-'} bpm</td>
-                      <td className="py-3 px-3">{vital.respiratoryRate || '-'} /min</td>
-                      <td className="py-3 px-3 text-gray-600 text-xs">{vital.notes || '-'}</td>
+                      <td className="py-3 px-3 text-fg">{vital.temperature || '–'}</td>
+                      <td className="py-3 px-3 text-fg">{vital.heartRate || '–'} bpm</td>
+                      <td className="py-3 px-3 text-fg">{vital.respiratoryRate || '–'} /min</td>
+                      <td className="py-3 px-3 text-muted text-xs">{vital.notes || '–'}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           ) : (
-            <p className="text-gray-500 text-center py-8">Keine Vitalzeichen erfasst</p>
+            <p className="text-muted text-center py-8">Keine Vitalzeichen erfasst</p>
           )}
         </div>
+      </div>
 
-        <div id="impfhistorie" className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-900">Impfhistorie</h2>
-            <button
-              onClick={() => setShowVaccinationForm(true)}
-              className="flex items-center gap-1 px-3 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded text-sm font-medium"
-            >
-              <Plus className="w-4 h-4" />
-              Impfung hinzufügen
-            </button>
+      {/* Vaccination history */}
+      <div id="impfhistorie" className="bg-surface rounded-2xl border border-border shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+          <div>
+            <h2 className="font-bold text-fg">Impfhistorie</h2>
+            <p className="text-xs text-muted mt-0.5">
+              Anstehende Booster (90 Tage): {upcomingVaccinations?.length ?? 0}
+            </p>
           </div>
-          <p className="mb-4 text-sm text-gray-600">
-            Anstehende Booster (90 Tage): {upcomingVaccinations?.length ?? 0}
-          </p>
+          <Button size="sm" variant="outline" onClick={() => setShowVaccinationForm(true)}>
+            <Plus size={14} /> Impfung hinzufügen
+          </Button>
+        </div>
+        <div className="p-6">
           {vaccinationsList && vaccinationsList.length > 0 ? (
             <div className="space-y-2">
               {vaccinationsList.map((v) => {
@@ -515,7 +484,7 @@ export default function PatientDetailPage() {
                 const isOverdue = expiry < now;
                 const isDueSoon = !isOverdue && daysLeft <= 30;
                 return (
-                  <div key={v.id} className="flex items-start justify-between rounded-xl border border-border bg-surface p-3 shadow-sm group">
+                  <div key={v.id} className="flex items-start justify-between rounded-xl border border-border bg-bg p-3 shadow-sm group">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium text-fg text-sm">{v.type}</span>
@@ -550,14 +519,14 @@ export default function PatientDetailPage() {
                         className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-muted-soft text-muted hover:text-fg"
                         title="Bearbeiten"
                       >
-                        <Pencil className="w-3.5 h-3.5" />
+                        <Pencil size={14} />
                       </button>
                       <button
                         onClick={() => setDeletingVaccinationId(v.id)}
                         className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-red-50 text-muted hover:text-red-600"
                         title="Löschen"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 size={14} />
                       </button>
                     </div>
                   </div>
@@ -565,19 +534,43 @@ export default function PatientDetailPage() {
               })}
             </div>
           ) : (
-            <p className="text-muted text-center py-4 text-sm">Keine Impfungen erfasst</p>
+            <p className="text-muted text-center py-8 text-sm">Keine Impfungen erfasst</p>
           )}
         </div>
       </div>
 
-      {/* Vaccination Dialog */}
+      {/* Appointment modal */}
+      {tenantId && (
+        <AppointmentModal
+          open={apptModalOpen}
+          onClose={() => { setApptModalOpen(false); setSelectedAptId(null); }}
+          tenantId={tenantId}
+          onSuccess={() => { setApptModalOpen(false); setSelectedAptId(null); }}
+          editData={(() => {
+            const apt = appointmentsList?.find((a) => a.id === selectedAptId);
+            if (!apt || !apt.vetId) return undefined;
+            return {
+              id: apt.id,
+              title: apt.title,
+              description: apt.description ?? null,
+              startTime: new Date(apt.startTime),
+              endTime: new Date(apt.endTime),
+              status: apt.status,
+              patientId: apt.patientId,
+              vetId: apt.vetId,
+              patientName: patient.name,
+            };
+          })()}
+        />
+      )}
+
+      {/* Vaccination dialog */}
       <Dialog open={showVaccinationForm} onOpenChange={(open) => { setShowVaccinationForm(open); if (!open) { resetVaccinationForm(); setEditingVaccinationId(null); } }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{editingVaccinationId ? "Impfung bearbeiten" : "Impfung erfassen"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            {/* Vaccination type selector — species-filtered */}
             {(() => {
               const speciesTypes = (allVacTypes ?? []).filter((t) =>
                 patient?.species ? t.species.toLowerCase().includes(patient.species.toLowerCase()) : true
@@ -600,7 +593,6 @@ export default function PatientDetailPage() {
                     onChange={handleVacTypeChange}
                     options={typeOptions}
                   />
-                  {/* Custom free-text input */}
                   {vaccinationTypeId === "custom" && (
                     <label className="block text-sm text-fg">
                       Bezeichnung *
@@ -612,7 +604,6 @@ export default function PatientDetailPage() {
                       />
                     </label>
                   )}
-                  {/* Info bar for selected type */}
                   {selectedVt && (
                     <div className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 text-xs text-blue-700 space-y-0.5">
                       <div className="font-semibold">{selectedVt.name} ({selectedVt.code})</div>
@@ -685,11 +676,8 @@ export default function PatientDetailPage() {
                     : (selectedType?.name ?? "");
                 if (!tenantId || !resolvedName || !vaccinationDate || !vaccinationExpiry) return;
 
-                // Route FK to the right column based on type source
-                const globalTypeId =
-                  selectedType?.source === "global" ? selectedType.id : null;
-                const customConfigId =
-                  selectedType?.source === "custom" ? selectedType.id : null;
+                const globalTypeId = selectedType?.source === "global" ? selectedType.id : null;
+                const customConfigId = selectedType?.source === "custom" ? selectedType.id : null;
 
                 if (editingVaccinationId) {
                   updateVaccination.mutate({
@@ -724,7 +712,7 @@ export default function PatientDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete vaccination confirmation dialog */}
+      {/* Delete vaccination confirmation */}
       <Dialog open={!!deletingVaccinationId} onOpenChange={(open) => { if (!open) setDeletingVaccinationId(null); }}>
         <DialogContent>
           <DialogHeader>
@@ -749,13 +737,13 @@ export default function PatientDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Placeholder for other forms (diagnosis, medication, vitals) */}
+      {/* Placeholder forms (diagnosis, medication, vitals) */}
       {(showDiagnosisForm || showMedicationForm || showVitalsForm) && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-lg bg-white p-6">
+          <div className="w-full max-w-md rounded-2xl bg-surface border border-border p-6 shadow-xl">
             <p className="text-muted">Formular folgt im nächsten Sprint.</p>
             <button
-              className="mt-4 rounded border border-border px-3 py-2 text-sm text-fg"
+              className="mt-4 rounded-lg border border-border px-3 py-2 text-sm text-fg hover:bg-muted-soft transition-colors"
               onClick={() => {
                 setShowDiagnosisForm(false);
                 setShowMedicationForm(false);

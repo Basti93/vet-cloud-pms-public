@@ -181,13 +181,13 @@ export function AppointmentModal({
       open={open}
       onClose={onClose}
       title={isEdit ? "Termin bearbeiten" : "Neuer Termin"}
-      description={isEdit && editData?.patientName ? `Patient: ${editData.patientName}` : undefined}
+      description={isEdit && editData?.patientName ? `Tier: ${editData.patientName}` : undefined}
     >
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Patient */}
         <SearchableSelect
-          label="Patient *"
-          placeholder="Nach Patient oder Tierbesitzer suchen…"
+          label="Tier *"
+          placeholder="Nach Tier oder Tierbesitzer suchen…"
           value={form.patientId}
           onChange={(value) => set("patientId", value)}
           options={

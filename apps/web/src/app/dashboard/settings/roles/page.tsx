@@ -36,14 +36,14 @@ const PERMISSION_LABELS: Record<string, { label: string; category: string }> = {
     label: "Termine absagen",
     category: "Termine",
   },
-  [PERMISSIONS.PATIENTS_READ]: { label: "Patienten lesen", category: "Patienten" },
+  [PERMISSIONS.PATIENTS_READ]: { label: "Tiere lesen", category: "Tiere" },
   [PERMISSIONS.PATIENTS_CREATE]: {
-    label: "Patienten erstellen",
-    category: "Patienten",
+    label: "Tiere erstellen",
+    category: "Tiere",
   },
   [PERMISSIONS.PATIENTS_UPDATE]: {
-    label: "Patienten bearbeiten",
-    category: "Patienten",
+    label: "Tiere bearbeiten",
+    category: "Tiere",
   },
   [PERMISSIONS.SCHEDULE_MANAGE]: {
     label: "Verfügbarkeitszeiten verwalten",

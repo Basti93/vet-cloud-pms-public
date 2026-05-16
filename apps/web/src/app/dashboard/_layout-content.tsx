@@ -3,7 +3,7 @@
 import { ReactNode, useState } from "react";
 import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
-import { LayoutDashboard, Calendar, Users, Phone, ClipboardList, Clock, Menu, X, Settings, ChevronDown, User, Building2, Syringe, TrendingUp, Globe2 } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, Phone, ClipboardList, Clock, Menu, X, Settings, ChevronDown, User, Building2, Syringe, TrendingUp, Globe2, PawPrint } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { useLocale } from "@/lib/user/preferences-context";
 import { usePraxis } from "@/lib/praxis/context";
@@ -17,7 +17,8 @@ function useNavItems() {
     { href: "/dashboard", icon: LayoutDashboard, labelKey: "navigation.overview" },
     { href: "/dashboard/schedule", icon: Calendar, labelKey: "navigation.calendar" },
     { href: "/dashboard/appointments", icon: Clock, labelKey: "navigation.appointments" },
-    { href: "/dashboard/patients", icon: Users, labelKey: "navigation.patients" },
+    { href: "/dashboard/clients", icon: Users, labelKey: "navigation.clients" },
+    { href: "/dashboard/patients", icon: PawPrint, labelKey: "navigation.animals" },
     { href: "/dashboard/vaccinations", icon: Syringe, label: "Impfungen" },
     { href: "/dashboard/bookings", icon: ClipboardList, labelKey: "navigation.bookings" },
     { href: "/dashboard/statistics", icon: TrendingUp, labelKey: "navigation.statistics" },

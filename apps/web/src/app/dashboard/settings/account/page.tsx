@@ -528,7 +528,7 @@ export default function AccountPage() {
             <div className="mb-6">
               <h2 className="text-lg font-semibold text-fg mb-2">Datenexport (DSGVO Art. 20)</h2>
               <p className="text-sm text-muted">
-                Laden Sie eine Kopie aller Ihrer Daten herunter. Dies umfasst alle Praxisinformationen, Patientendaten, Termine und andere personenbezogene Daten.
+                Laden Sie eine Kopie aller Ihrer Daten herunter. Dies umfasst alle Praxisinformationen, Tierdaten, Termine und andere personenbezogene Daten.
               </p>
             </div>
 
@@ -564,7 +564,7 @@ export default function AccountPage() {
                   </p>
                   <ul className="text-sm text-red-800 list-disc list-inside space-y-1">
                     <li>Stellen Sie sicher, dass Sie keine ausstehenden Verträge haben</li>
-                    <li>Alle Patientendaten werden dauerhaft gelöscht</li>
+                    <li>Alle Tierdaten werden dauerhaft gelöscht</li>
                     <li>Diese Aktion kann nicht rückgängig gemacht werden</li>
                     <li>Sie erhalten eine E-Mail mit Reaktivierungslink</li>
                   </ul>

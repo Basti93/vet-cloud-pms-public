@@ -21,6 +21,7 @@ import {
   vitals,
   voiceCalls,
 } from "@/lib/db/schema";
+import { TEST_DATA } from "../../../../../scripts/test-data";
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
@@ -64,8 +65,9 @@ export async function POST(request: NextRequest) {
   try {
     const seeded = await seedE2ETenant({ tenantId, tenantSlug, clerkUserId, email });
     const deleted = await deleteE2ETenantData(tenantId);
+    const created = await seedE2ETenantDemoData(tenantId);
 
-    return NextResponse.json({ success: true, tenantId, seeded, deleted });
+    return NextResponse.json({ success: true, tenantId, seeded, deleted, created });
   } catch (error) {
     console.error("E2E tenant reset failed:", error);
     return NextResponse.json(
@@ -224,6 +226,39 @@ async function deleteE2ETenantData(tenantId: string) {
     appointments: toCount(appointmentsResult.count),
     patients: toCount(patientsResult.count),
     owners: toCount(ownersResult.count),
+  };
+}
+
+async function seedE2ETenantDemoData(tenantId: string) {
+  const createdOwners = await Promise.all(
+    TEST_DATA.owners.map((owner) =>
+      db
+        .insert(owners)
+        .values({ tenantId, ...owner, active: true })
+        .returning()
+        .then((result) => result[0]!)
+    )
+  );
+
+  const createdPatients = await Promise.all(
+    TEST_DATA.patients.map(({ ownerIndex, ...patientData }) =>
+      db
+        .insert(patients)
+        .values({
+          tenantId,
+          ownerId: createdOwners[ownerIndex]!.id,
+          ...patientData,
+          birthDate: new Date(new Date().getFullYear() - 3, 0, 1),
+          active: true,
+        })
+        .returning()
+        .then((result) => result[0]!)
+    )
+  );
+
+  return {
+    owners: createdOwners.length,
+    patients: createdPatients.length,
   };
 }
 
