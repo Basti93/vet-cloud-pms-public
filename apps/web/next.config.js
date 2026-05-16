@@ -81,15 +81,22 @@ const nextConfig = {
   turbopack: {
     root: path.resolve(__dirname, "../.."),
   },
+  // Keep OTel + gRPC packages out of the webpack bundle — they use Node-only
+  // built-ins (stream, net, tls) that webpack cannot resolve.
   serverExternalPackages: [
     "@opentelemetry/sdk-node",
-    "@opentelemetry/instrumentation",
+    "@opentelemetry/exporter-trace-otlp-grpc",
     "@opentelemetry/exporter-trace-otlp-http",
-    "@opentelemetry/resources",
-    "@opentelemetry/sdk-trace-node",
-    "@opentelemetry/semantic-conventions",
+    "@opentelemetry/instrumentation",
+    "@grpc/grpc-js",
     "require-in-the-middle",
   ],
+  experimental: {
+    // Allows requests via Traefik (Host: example.com) to reach the standalone
+    // server bound to 0.0.0.0. Next.js otherwise only allows localhost by default.
+    // Marked @internal in Next.js source — revisit if Next.js adds a public API.
+    trustHostHeader: true,
+  },
 
   // Security & Rate Limiting Headers
   async headers() {
