@@ -251,7 +251,7 @@ export function AppointmentTable({
                             Zeitslot
                           </th>
                           <th className="px-4 py-3 text-left font-semibold text-fg">
-                            Patient
+                            Tier
                           </th>
                           <th className="px-4 py-3 text-left font-semibold text-fg">
                             Besitzer

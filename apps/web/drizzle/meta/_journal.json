@@ -117,105 +117,105 @@
     {
       "idx": 16,
       "version": "7",
-      "when": 1779000000000,
+      "when": 1778900100000,
       "tag": "0015_add_stripe_subscription_fields",
       "breakpoints": true
     },
     {
       "idx": 17,
       "version": "7",
-      "when": 1779100000000,
+      "when": 1778900200000,
       "tag": "0016_add_cancelled_at_period_end",
       "breakpoints": true
     },
     {
       "idx": 18,
       "version": "7",
-      "when": 1779200000000,
+      "when": 1778900300000,
       "tag": "0017_add_payment_grace_fields",
       "breakpoints": true
     },
     {
       "idx": 19,
       "version": "7",
-      "when": 1779300000000,
+      "when": 1778900400000,
       "tag": "0018_add_trial_preservation_fields",
       "breakpoints": true
     },
     {
       "idx": 20,
       "version": "7",
-      "when": 1779400000000,
+      "when": 1778900500000,
       "tag": "0019_reconcile_missing_columns",
       "breakpoints": true
     },
     {
       "idx": 21,
       "version": "7",
-      "when": 1779500000000,
+      "when": 1778900600000,
       "tag": "0021_sour_stardust",
       "breakpoints": true
     },
     {
       "idx": 22,
       "version": "7",
-      "when": 1779600000000,
+      "when": 1778900700000,
       "tag": "0022_dry_prowler",
       "breakpoints": true
     },
     {
       "idx": 23,
       "version": "7",
-      "when": 1779700000000,
+      "when": 1778900800000,
       "tag": "0023_charming_molecule_man",
       "breakpoints": true
     },
     {
       "idx": 24,
       "version": "7",
-      "when": 1779800000000,
+      "when": 1778900900000,
       "tag": "0024_complex_loa",
       "breakpoints": true
     },
     {
       "idx": 25,
       "version": "7",
-      "when": 1778772482632,
+      "when": 1778901000000,
       "tag": "0025_opposite_expediter",
       "breakpoints": true
     },
     {
       "idx": 26,
       "version": "7",
-      "when": 1778773641970,
+      "when": 1778901100000,
       "tag": "0026_pretty_adam_destine",
       "breakpoints": true
     },
     {
       "idx": 27,
       "version": "7",
-      "when": 1778775308793,
+      "when": 1778901200000,
       "tag": "0027_schema-quality-fixes",
       "breakpoints": true
     },
     {
       "idx": 28,
       "version": "7",
-      "when": 1778776593445,
+      "when": 1778901300000,
       "tag": "0028_add-special-opening-hours",
       "breakpoints": true
     },
     {
       "idx": 29,
       "version": "7",
-      "when": 1778778241764,
+      "when": 1778901400000,
       "tag": "0029_add-consultation-hours",
       "breakpoints": true
     },
     {
       "idx": 30,
       "version": "7",
-      "when": 1778788345319,
+      "when": 1778901500000,
       "tag": "0030_drop-website-template",
       "breakpoints": true
     },
@@ -224,6 +224,13 @@
       "version": "7",
       "when": 1778844961534,
       "tag": "0031_gigantic_husk",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1778901600000,
+      "tag": "0034_bizarre_silvermane",
       "breakpoints": true
     }
   ]

@@ -164,11 +164,11 @@ export default function DashboardHome() {
           description={vetId ? "Nur meine Termine" : "Alle Tierärzte"}
         />
         <StatCard
-          label="Patienten gesamt"
+          label="Tiere gesamt"
           value={patients?.length ?? 0}
           icon={<Users size={18} />}
           loading={isLoading}
-          description="Alle Patienten der Praxis"
+          description="Alle Tiere der Praxis"
         />
         <StatCard
           label="Abgeschlossen (Monat)"
@@ -255,7 +255,7 @@ export default function DashboardHome() {
                   <Users size={16} />
                 </span>
                 <div>
-                  <p className="font-semibold text-sm text-fg">Neuer Patient</p>
+                  <p className="font-semibold text-sm text-fg">Neues Tier</p>
                   <p className="text-xs text-muted mt-0.5">Neue Tierkarte erstellen</p>
                 </div>
               </button>
