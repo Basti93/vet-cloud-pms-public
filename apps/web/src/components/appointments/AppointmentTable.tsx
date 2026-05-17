@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronDown, Calendar, Loader2 } from 'lucide-react';
 import { SpeciesIcon } from '@/components/ui/badge';
@@ -144,6 +144,24 @@ export function AppointmentTable({
   const [expandedVets, setExpandedVets] = useState<Set<string>>(
     new Set(vets.map((v) => v.id))
   );
+
+  useEffect(() => {
+    setExpandedVets((prev) => {
+      const nextVetIds = new Set(vets.map((v) => v.id));
+      const next = new Set<string>();
+
+      for (const vetId of prev) {
+        if (nextVetIds.has(vetId)) next.add(vetId);
+      }
+
+      // Default to expanded groups when vets arrive asynchronously.
+      if (next.size === 0) {
+        for (const vetId of nextVetIds) next.add(vetId);
+      }
+
+      return next;
+    });
+  }, [vets]);
 
   const toggleVetExpanded = (vetId: string) => {
     const newSet = new Set(expandedVets);
