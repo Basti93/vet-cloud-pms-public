@@ -25,6 +25,7 @@ interface Props {
   projectId: string;
   pagePath: string;
   templateVars?: TemplateVars;
+  previewToken?: string;
   tenantHoursRows?: { days: string; time: string }[] | null;
   tenantConsultationHoursRows?: { days: string; time: string }[] | null;
   tenantOpeningHoursRows?: { days: string; time: string }[] | null;

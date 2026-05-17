@@ -118,5 +118,5 @@ export default async function PracticeWebsitePage({ params, searchParams }: Prop
   }
 
   const assetMap = await loadAssetUrlMap(collectAssetIds(resolved.blocks));
-  return <PageRenderer resolved={resolved} assetMap={assetMap} />;
+  return <PageRenderer resolved={resolved} assetMap={assetMap} previewToken={preview} />;
 }

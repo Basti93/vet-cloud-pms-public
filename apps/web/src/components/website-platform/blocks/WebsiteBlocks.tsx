@@ -19,6 +19,7 @@ interface BlockProps<T extends WebsitePageBlock = WebsitePageBlock> {
   projectId: string;
   pagePath: string;
   templateVars?: TemplateVars;
+  previewToken?: string;
   tenantHoursRows?: { days: string; time: string }[] | null;
   tenantConsultationHoursRows?: { days: string; time: string }[] | null;
   tenantOpeningHoursRows?: { days: string; time: string }[] | null;
@@ -43,7 +44,8 @@ function SectionHeading({ icon, title, subtitle }: { icon?: React.ReactNode; tit
   );
 }
 
-export function BookingDialog({ tenantSlug, open, onClose }: { tenantSlug: string; open: boolean; onClose: () => void }) {
+export function BookingDialog({ tenantSlug, open, onClose, previewToken }: { tenantSlug: string; open: boolean; onClose: () => void; previewToken?: string }) {
+  const src = previewToken ? `/book/${tenantSlug}?preview=${previewToken}` : `/book/${tenantSlug}`;
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
       <DialogContent
@@ -54,7 +56,7 @@ export function BookingDialog({ tenantSlug, open, onClose }: { tenantSlug: strin
           <DialogTitle>Termin buchen</DialogTitle>
         </DialogHeader>
         <iframe
-          src={`/book/${tenantSlug}`}
+          src={src}
           style={{ flex: 1, width: '100%', border: 0, minHeight: 0 }}
           title="Termin buchen"
         />
@@ -65,7 +67,7 @@ export function BookingDialog({ tenantSlug, open, onClose }: { tenantSlug: strin
 
 // ─── Hero ──────────────────────────────────────────────────────────────────────
 
-export function HeroBlock({ block, capabilities, assetMap, templateVars = {} }: BlockProps<Extract<WebsitePageBlock, { type: 'hero' }>>) {
+export function HeroBlock({ block, capabilities, assetMap, templateVars = {}, previewToken }: BlockProps<Extract<WebsitePageBlock, { type: 'hero' }>>) {
   const [bookingOpen, setBookingOpen] = useState(false);
   const [slideIndex, setSlideIndex] = useState(0);
 
@@ -198,7 +200,7 @@ export function HeroBlock({ block, capabilities, assetMap, templateVars = {} }: 
         </div>
       </div>
 
-      {pmsSlug && <BookingDialog tenantSlug={pmsSlug} open={bookingOpen} onClose={() => setBookingOpen(false)} />}
+      {pmsSlug && <BookingDialog tenantSlug={pmsSlug} open={bookingOpen} onClose={() => setBookingOpen(false)} previewToken={previewToken} />}
     </section>
   );
 }
@@ -536,7 +538,7 @@ export function SpecialHoursBlock({ block, tenantSpecialHours }: BlockProps<Extr
 
 // ─── Contact Card ──────────────────────────────────────────────────────────────
 
-export function ContactCardBlock({ block, capabilities, tenantContactInfo }: BlockProps<Extract<WebsitePageBlock, { type: 'contactCard' }>>) {
+export function ContactCardBlock({ block, capabilities, tenantContactInfo, previewToken }: BlockProps<Extract<WebsitePageBlock, { type: 'contactCard' }>>) {
   const [bookingOpen, setBookingOpen] = useState(false);
   const address = !block.props.useManualOverride && tenantContactInfo
     ? [tenantContactInfo.address, tenantContactInfo.city].filter(Boolean).join('\n') || undefined
@@ -658,7 +660,7 @@ export function ContactCardBlock({ block, capabilities, tenantContactInfo }: Blo
           </div>
         </div>
       </div>
-      {pmsSlug && <BookingDialog tenantSlug={pmsSlug} open={bookingOpen} onClose={() => setBookingOpen(false)} />}
+      {pmsSlug && <BookingDialog tenantSlug={pmsSlug} open={bookingOpen} onClose={() => setBookingOpen(false)} previewToken={previewToken} />}
     </section>
   );
 }
@@ -731,7 +733,7 @@ export function ContactFormBlock({ block, projectId, pagePath }: BlockProps<Extr
 
 // ─── Booking CTA ───────────────────────────────────────────────────────────────
 
-export function BookingCtaBlock({ block, capabilities, templateVars = {} }: BlockProps<Extract<WebsitePageBlock, { type: 'bookingCta' }>>) {
+export function BookingCtaBlock({ block, capabilities, templateVars = {}, previewToken }: BlockProps<Extract<WebsitePageBlock, { type: 'bookingCta' }>>) {
   const [bookingOpen, setBookingOpen] = useState(false);
   const bookingUrl = getBookingUrl(capabilities);
   const pmsSlug = capabilities.booking.enabled && capabilities.booking.mode === 'pms' ? capabilities.booking.tenantSlug : null;
@@ -774,7 +776,7 @@ export function BookingCtaBlock({ block, capabilities, templateVars = {} }: Bloc
           )}
         </div>
       </div>
-      {pmsSlug && <BookingDialog tenantSlug={pmsSlug} open={bookingOpen} onClose={() => setBookingOpen(false)} />}
+      {pmsSlug && <BookingDialog tenantSlug={pmsSlug} open={bookingOpen} onClose={() => setBookingOpen(false)} previewToken={previewToken} />}
     </section>
   );
 }

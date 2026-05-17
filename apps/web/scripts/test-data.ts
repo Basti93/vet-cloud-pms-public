@@ -107,9 +107,9 @@ export const TEST_DATA = {
     subscriptionStatus: "trial" as const,
     subscriptionPlan: "starter" as const,
     maxUsers: 5,
-    stripeCustomerId: "cus_UUpHoyFjgB9Fxe",
-    stripeSubscriptionId: "sub_1TVprpFry6Q2J6YWKur8fIbo",
-    currentStripePriceId: "price_1TVoO7Fry6Q2J6YWKYI1bQCS",
+    stripeCustomerId: "cus_DEMO000000000000",
+    stripeSubscriptionId: "sub_DEMO000000000000",
+    currentStripePriceId: "price_DEMO000000000000",
     trialEndsAt: null as Date | null,
     cancelledAtPeriodEnd: null as Date | null,
     paymentFailureCount: 0,
@@ -127,7 +127,7 @@ export const TEST_DATA = {
     {
       clerkId: "user_demo_admin_001",
       tenantId: DEMO_TENANT_ID,
-      email: "user+demo-admin@example.com",
+      email: "demo-admin@beispiel-tierarztpraxis.de",
       firstName: "Admin",
       lastName: "User",
       role: "admin" as const,
@@ -136,7 +136,7 @@ export const TEST_DATA = {
     {
       clerkId: "user_demo_vet_001",
       tenantId: DEMO_TENANT_ID,
-      email: "user+demo-vet1@example.com",
+      email: "demo-vet1@beispiel-tierarztpraxis.de",
       title: "Dr.",
       firstName: "Max",
       lastName: "Mueller",
@@ -145,7 +145,7 @@ export const TEST_DATA = {
     {
       clerkId: "user_demo_vet_002",
       tenantId: DEMO_TENANT_ID,
-      email: "user+demo-vet2@example.com",
+      email: "demo-vet2@beispiel-tierarztpraxis.de",
       title: "Dr.",
       firstName: "Sarah",
       lastName: "Schmidt",
@@ -154,7 +154,7 @@ export const TEST_DATA = {
     {
       clerkId: "user_demo_vet_003",
       tenantId: DEMO_TENANT_ID,
-      email: "user+demo-vet3@example.com",
+      email: "demo-vet3@beispiel-tierarztpraxis.de",
       title: "Dr. med. vet.",
       firstName: "Alexander",
       lastName: "Weber",

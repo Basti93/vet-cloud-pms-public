@@ -249,6 +249,7 @@ export async function resetDemoTenantData({
     .insert(tenants)
     .values({
       ...demoTenant,
+      websiteEnabled: true,
       trialEndsAt: new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000),
     })
     .onConflictDoUpdate({
@@ -274,6 +275,7 @@ export async function resetDemoTenantData({
         stripeCustomerId: demoTenant.stripeCustomerId ?? null,
         stripeSubscriptionId: demoTenant.stripeSubscriptionId ?? null,
         currentStripePriceId: demoTenant.currentStripePriceId ?? null,
+        websiteEnabled: true,
         trialEndsAt: new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000),
         cancelledAtPeriodEnd: null,
         paymentFailureCount: 0,
