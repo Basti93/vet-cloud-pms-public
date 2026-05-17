@@ -74,15 +74,20 @@ test.describe("Booking page", () => {
     for (let pageIndex = 0; pageIndex < 3 && !selectedSlot; pageIndex += 1) {
       for (const day of await page.getByTestId("booking-date-day").all()) {
         await day.click();
-        const firstSlot = page.getByTestId("booking-date-slot").first();
-        try {
-          await firstSlot.waitFor({ state: "visible", timeout: 5_000 });
-          await firstSlot.click();
-          selectedSlot = true;
-          break;
-        } catch {
-          continue;
+        const slotButtons = await page.getByTestId("booking-date-slot").all();
+        for (const slot of slotButtons) {
+          try {
+            await slot.waitFor({ state: "visible", timeout: 2_000 });
+            await slot.click();
+            // A slot is only valid once the hold was acquired and "next" is enabled.
+            await expect(page.getByTestId("booking-date-next")).toBeEnabled({ timeout: 3_000 });
+            selectedSlot = true;
+            break;
+          } catch {
+            continue;
+          }
         }
+        if (selectedSlot) break;
       }
 
       if (!selectedSlot) {
