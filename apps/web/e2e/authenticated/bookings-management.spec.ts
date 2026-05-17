@@ -16,20 +16,14 @@ test.describe("Booking management", () => {
     await expect(page.getByTestId("bookings-page")).toBeVisible();
 
     const firstRequest = page.getByTestId("booking-request-row").first();
-    if ((await firstRequest.count()) === 0) {
-      test.skip(true, "No seeded booking requests available to confirm");
-    }
-
     await firstRequest.waitFor({ state: "visible" });
     const confirmButton = firstRequest.getByTestId("booking-request-confirm");
-    if ((await confirmButton.count()) === 0) {
-      test.skip(true, "First booking request is not pending confirmation");
-    }
 
     await confirmButton.click();
     await expect(confirmButton).toBeHidden({ timeout: 15_000 });
 
     await page.goto("/dashboard/appointments");
     await expect(page.getByTestId("appointments-page")).toBeVisible();
+    await expect(page.getByTestId("appointment-row").first()).toBeVisible();
   });
 });

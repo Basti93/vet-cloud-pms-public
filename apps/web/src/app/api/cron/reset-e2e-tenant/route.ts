@@ -25,6 +25,10 @@ import {
 import { TEST_DATA } from "../../../../../scripts/test-data";
 
 const CRON_SECRET = process.env.CRON_SECRET;
+const E2E_VET_CLERK_ID = "user_e2e_seed_vet";
+const E2E_VET_EMAIL = "user+e2e-vet@example.com";
+const E2E_SECOND_VET_CLERK_ID = "user_e2e_seed_vet_2";
+const E2E_SECOND_VET_EMAIL = "user+e2e-vet-2@example.com";
 
 /**
  * Seeds (if not yet present) then resets transient data for the E2E test tenant.
@@ -66,7 +70,7 @@ export async function POST(request: NextRequest) {
   try {
     const seeded = await seedE2ETenant({ tenantId, tenantSlug, clerkUserId, email });
     const deleted = await deleteE2ETenantData(tenantId);
-    const created = await seedE2ETenantDemoData(tenantId);
+    const created = await seedE2ETenantDemoData(tenantId, seeded.vetIds);
 
     return NextResponse.json({
       success: true,
@@ -122,7 +126,7 @@ async function seedE2ETenant({
 
   const previewToken = await ensurePreviewToken(tenantId);
 
-  // 2. Admin role
+  // 2. System roles needed by authenticated dashboard and public booking
   await db
     .insert(roles)
     .values({
@@ -135,13 +139,29 @@ async function seedE2ETenant({
     })
     .onConflictDoNothing();
 
-  const adminRole = await db
-    .select({ id: roles.id })
+  await db
+    .insert(roles)
+    .values({
+      tenantId,
+      code: "vet",
+      name: "Tierarzt",
+      description: "E2E booking vet",
+      isSystem: true,
+      baseVersion: 1,
+    })
+    .onConflictDoNothing();
+
+  const roleRows = await db
+    .select({ id: roles.id, code: roles.code })
     .from(roles)
     .where(eq(roles.tenantId, tenantId))
-    .limit(1);
+    .limit(20);
 
-  if (!adminRole[0]) throw new Error("Admin role not found after upsert");
+  const adminRole = roleRows.find((role) => role.code === "admin");
+  const vetRole = roleRows.find((role) => role.code === "vet");
+
+  if (!adminRole) throw new Error("Admin role not found after upsert");
+  if (!vetRole) throw new Error("Vet role not found after upsert");
 
   // 3. User — clerk_id unique constraint, safe to upsert
   await db
@@ -156,6 +176,34 @@ async function seedE2ETenant({
     })
     .onConflictDoNothing();
 
+  await db
+    .insert(users)
+    .values({
+      tenantId,
+      clerkId: E2E_SECOND_VET_CLERK_ID,
+      email: E2E_SECOND_VET_EMAIL,
+      title: "Dr.",
+      firstName: "E2E",
+      lastName: "Backup",
+      active: true,
+      slotDurationMin: 30,
+    })
+    .onConflictDoNothing();
+
+  await db
+    .insert(users)
+    .values({
+      tenantId,
+      clerkId: E2E_VET_CLERK_ID,
+      email: E2E_VET_EMAIL,
+      title: "Dr.",
+      firstName: "E2E",
+      lastName: "Vet",
+      active: true,
+      slotDurationMin: 30,
+    })
+    .onConflictDoNothing();
+
   const user = await db
     .select({ id: users.id })
     .from(users)
@@ -164,19 +212,82 @@ async function seedE2ETenant({
 
   if (!user[0]) throw new Error("E2E user not found after upsert");
 
+  await db
+    .update(users)
+    .set({ tenantId, active: true, updatedAt: new Date() })
+    .where(eq(users.id, user[0].id));
+
+  const [vetUser] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.clerkId, E2E_VET_CLERK_ID))
+    .limit(1);
+
+  if (!vetUser) throw new Error("E2E vet user not found after upsert");
+
+  const [secondVetUser] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.clerkId, E2E_SECOND_VET_CLERK_ID))
+    .limit(1);
+
+  if (!secondVetUser) throw new Error("Second E2E vet user not found after upsert");
+
+  await db
+    .update(users)
+    .set({ tenantId, active: true, slotDurationMin: 30, updatedAt: new Date() })
+    .where(eq(users.id, vetUser.id));
+
+  await db
+    .update(users)
+    .set({ tenantId, active: true, slotDurationMin: 30, updatedAt: new Date() })
+    .where(eq(users.id, secondVetUser.id));
+
   // 4. Role assignment
   await db
     .insert(userRoles)
-    .values({ userId: user[0].id, roleId: adminRole[0].id })
+    .values({ userId: user[0].id, roleId: adminRole.id })
+    .onConflictDoNothing();
+
+  await db
+    .insert(userRoles)
+    .values({ userId: vetUser.id, roleId: vetRole.id })
+    .onConflictDoNothing();
+
+  await db
+    .insert(userRoles)
+    .values({ userId: secondVetUser.id, roleId: vetRole.id })
     .onConflictDoNothing();
 
   // 5. Email settings (expected by dashboard queries)
   await db
     .insert(emailSettings)
-    .values({ tenantId, reminderEmailEnabled: false, reminderHoursBefore: 24 })
+    .values({
+      tenantId,
+      confirmationEmailEnabled: false,
+      reminderEmailEnabled: false,
+      bookingNotificationEnabled: false,
+      reminderHoursBefore: 24,
+    })
     .onConflictDoNothing();
 
-  return { tenant: tenantSlug, previewToken, userId: user[0].id, roleId: adminRole[0].id };
+  await db
+    .update(emailSettings)
+    .set({
+      confirmationEmailEnabled: false,
+      reminderEmailEnabled: false,
+      bookingNotificationEnabled: false,
+      updatedAt: new Date(),
+    })
+    .where(eq(emailSettings.tenantId, tenantId));
+
+  return {
+    tenant: tenantSlug,
+    previewToken,
+    userId: user[0].id,
+    roleId: adminRole.id,
+    vetIds: [vetUser.id, secondVetUser.id],
+  };
 }
 
 async function ensurePreviewToken(tenantId: string) {
@@ -257,7 +368,7 @@ async function deleteE2ETenantData(tenantId: string) {
   };
 }
 
-async function seedE2ETenantDemoData(tenantId: string) {
+async function seedE2ETenantDemoData(tenantId: string, vetIds: string[]) {
   const createdOwners = await Promise.all(
     TEST_DATA.owners.map((owner) =>
       db
@@ -284,10 +395,88 @@ async function seedE2ETenantDemoData(tenantId: string) {
     )
   );
 
+  await seedDeterministicBookingAvailability(tenantId, vetIds);
+  const seededBooking = await seedPendingOnlineBooking(tenantId, vetIds[0]!, createdPatients[0]!.id);
+
   return {
     owners: createdOwners.length,
     patients: createdPatients.length,
+    vetSchedules: vetIds.length * 5,
+    pendingBookingId: seededBooking.id,
   };
+}
+
+async function seedDeterministicBookingAvailability(tenantId: string, vetIds: string[]) {
+  const weekdaySlots = [{ startHour: 9, startMin: 0, endHour: 17, endMin: 0 }];
+  await db
+    .update(tenants)
+    .set({
+      timezone: "Europe/Berlin",
+      consultationHours: [
+        { dayOfWeek: 0, slots: [] },
+        { dayOfWeek: 1, slots: weekdaySlots },
+        { dayOfWeek: 2, slots: weekdaySlots },
+        { dayOfWeek: 3, slots: weekdaySlots },
+        { dayOfWeek: 4, slots: weekdaySlots },
+        { dayOfWeek: 5, slots: weekdaySlots },
+        { dayOfWeek: 6, slots: [] },
+      ],
+      openingHours: [
+        { dayOfWeek: 0, slots: [] },
+        { dayOfWeek: 1, slots: weekdaySlots },
+        { dayOfWeek: 2, slots: weekdaySlots },
+        { dayOfWeek: 3, slots: weekdaySlots },
+        { dayOfWeek: 4, slots: weekdaySlots },
+        { dayOfWeek: 5, slots: weekdaySlots },
+        { dayOfWeek: 6, slots: [] },
+      ],
+      updatedAt: new Date(),
+    })
+    .where(eq(tenants.id, tenantId));
+
+  await Promise.all(
+    vetIds.flatMap((vetId) =>
+      [1, 2, 3, 4, 5].map((dayOfWeek) =>
+        db.insert(vetSchedules).values({
+          tenantId,
+          vetId,
+          dayOfWeek,
+          slots: weekdaySlots,
+          notes: "E2E deterministic booking schedule",
+        })
+      )
+    )
+  );
+}
+
+async function seedPendingOnlineBooking(tenantId: string, vetId: string, patientId: string) {
+  const startTime = nextWeekdayAtLocalHour(9);
+  const endTime = new Date(startTime.getTime() + 30 * 60_000);
+  const [booking] = await db
+    .insert(appointments)
+    .values({
+      tenantId,
+      patientId,
+      vetId,
+      startTime,
+      endTime,
+      title: "E2E pending booking request",
+      source: "online_booking",
+      status: "pending-confirmation",
+    })
+    .returning();
+
+  return booking;
+}
+
+function nextWeekdayAtLocalHour(hour: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + 1);
+  while (date.getDay() === 0 || date.getDay() === 6) {
+    date.setDate(date.getDate() + 1);
+  }
+  date.setHours(hour, 0, 0, 0);
+  return date;
 }
 
 export const maxDuration = 60;

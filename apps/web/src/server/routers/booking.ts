@@ -579,8 +579,8 @@ export const bookingRouter = createTRPCRouter({
               ? and(
                   ...baseConditions,
                   and(
-                    lte(appointments.startTime, input.endTime),
-                    gte(appointments.endTime, input.startTime)
+                    lt(appointments.startTime, input.endTime),
+                    gt(appointments.endTime, input.startTime)
                   )
                 )
               : and(...baseConditions);
@@ -750,7 +750,7 @@ export const bookingRouter = createTRPCRouter({
         .where(
           and(
             eq(appointments.tenantId, input.tenantId),
-            lte(appointments.startTime, input.slotEnd),
+            lt(appointments.startTime, input.slotEnd),
             gt(appointments.endTime, input.slotStart)
           )
         )
@@ -1037,7 +1037,7 @@ export const bookingRouter = createTRPCRouter({
       // 3. Check if slot is already booked
       const bookingConflictConditions = [
         eq(appointments.tenantId, input.tenantId),
-        lte(appointments.startTime, slotEnd),
+        lt(appointments.startTime, slotEnd),
         gt(appointments.endTime, input.slotDatetime),
       ];
       if (input.vetId) {
@@ -1157,7 +1157,7 @@ export const bookingRouter = createTRPCRouter({
       // Check existing bookings
       const bookingConditions = [
         eq(appointments.tenantId, input.tenantId),
-        lte(appointments.startTime, slotEnd),
+        lt(appointments.startTime, slotEnd),
         gt(appointments.endTime, input.slotDatetime),
       ];
       if (input.vetId) bookingConditions.push(eq(appointments.vetId, input.vetId));
