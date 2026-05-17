@@ -135,7 +135,7 @@ export default function BookingsPage() {
 
 
   return (
-    <div className="space-y-6">
+    <div data-testid="bookings-page" className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-fg">Buchungsanfragen</h1>
         <p className="text-muted mt-1">Online-Buchungen von Kunden, die Sie bestätigen oder ablehnen müssen</p>

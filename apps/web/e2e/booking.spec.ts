@@ -22,6 +22,12 @@ function bookingUrl() {
 }
 
 test.describe("Booking page", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      window.localStorage.clear();
+    });
+  });
+
   test("loads and shows vet-selection step", async ({ page }) => {
     await page.goto(bookingUrl());
 
@@ -52,5 +58,62 @@ test.describe("Booking page", () => {
       "data-step",
       "date"
     );
+  });
+
+  test("completes public booking request happy path", async ({ page }) => {
+    await page.goto(bookingUrl());
+    await page.getByTestId("booking-page").waitFor({ state: "visible" });
+
+    await page.getByTestId("booking-vet-auto").click();
+    await expect(page.getByTestId("booking-step-indicator")).toHaveAttribute(
+      "data-step",
+      "date"
+    );
+
+    let selectedSlot = false;
+    for (let pageIndex = 0; pageIndex < 3 && !selectedSlot; pageIndex += 1) {
+      for (const day of await page.getByTestId("booking-date-day").all()) {
+        await day.click();
+        const firstSlot = page.getByTestId("booking-date-slot").first();
+        try {
+          await firstSlot.waitFor({ state: "visible", timeout: 5_000 });
+          await firstSlot.click();
+          selectedSlot = true;
+          break;
+        } catch {
+          continue;
+        }
+      }
+
+      if (!selectedSlot) {
+        const nextPage = page.getByTestId("booking-date-next-page");
+        if (await nextPage.isDisabled()) break;
+        await nextPage.click();
+      }
+    }
+
+    expect(selectedSlot).toBe(true);
+    await expect(page.getByTestId("booking-date-next")).toBeEnabled({ timeout: 10_000 });
+    await page.getByTestId("booking-date-next").click();
+    await expect(page.getByTestId("booking-step-indicator")).toHaveAttribute(
+      "data-step",
+      "details"
+    );
+
+    const unique = Date.now();
+    await page.getByTestId("booking-patient-name").fill(`E2E Pet ${unique}`);
+    await page.getByTestId("booking-patient-reason").fill("E2E Kontrolltermin");
+    await page.getByTestId("booking-owner-first-name").fill("E2E");
+    await page.getByTestId("booking-owner-last-name").fill("Booking");
+    await page.getByTestId("booking-owner-email").fill(`user+booking-${unique}@googlemail.com`);
+    await page.getByTestId("booking-owner-phone").fill("+491234567890");
+    await page.getByTestId("booking-details-next").click();
+
+    await expect(page.getByTestId("booking-step-indicator")).toHaveAttribute(
+      "data-step",
+      "confirm"
+    );
+    await page.getByTestId("booking-confirm-submit").click();
+    await expect(page.getByTestId("booking-success")).toBeVisible({ timeout: 20_000 });
   });
 });

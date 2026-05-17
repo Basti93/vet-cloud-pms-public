@@ -16,50 +16,15 @@ import {
   isRequestAllowedByEmbeddingDomains,
   normalizeEmbeddingDomains,
 } from "@/lib/booking/embed-origin";
+import {
+  filterAvailableSlots,
+  generateSlotsFromRanges,
+  selectVetByFairDistribution,
+} from "@/server/booking-core";
 
 // ── Slot generation ───────────────────────────────────────────────────────────
 
 type Db = PostgresJsDatabase<typeof schema>;
-
-/**
- * Convert a local date+time in a given IANA timezone to a UTC Date.
- * Uses Intl (built-in, no extra deps) and correctly handles DST.
- */
-function zonedToUtc(localDateStr: string, hour: number, min: number, timezone: string): Date {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  // Build a pseudo-UTC date using the local hour/min values
-  const pseudo = new Date(`${localDateStr}T${pad(hour)}:${pad(min)}:00Z`);
-  // What does that UTC instant look like in the target timezone?
-  const inTz = new Date(
-    pseudo.toLocaleString('sv', { timeZone: timezone }).replace(' ', 'T') + 'Z'
-  );
-  // Offset = difference between the two interpretations
-  return new Date(pseudo.getTime() + (pseudo.getTime() - inTz.getTime()));
-}
-
-/** Generate booking slots across multiple time ranges using the practice timezone. */
-function generateSlotsFromRanges(
-  localDateStr: string,
-  ranges: TimeRange[],
-  timezone: string,
-  slotDurationMin: number = 30
-): { start: Date; end: Date }[] {
-  const now = new Date();
-  const slots: { start: Date; end: Date }[] = [];
-
-  for (const range of ranges) {
-    let totalMin = range.startHour * 60 + range.startMin;
-    const endTotalMin = range.endHour * 60 + range.endMin;
-
-    while (totalMin + slotDurationMin <= endTotalMin) {
-      const start = zonedToUtc(localDateStr, Math.floor(totalMin / 60), totalMin % 60, timezone);
-      const end = new Date(start.getTime() + slotDurationMin * 60_000);
-      if (start > now) slots.push({ start, end });
-      totalMin += slotDurationMin;
-    }
-  }
-  return slots;
-}
 
 async function getVetSlotsForDay(
   db: Db,
@@ -204,16 +169,6 @@ async function assertEmbeddingOriginAllowed(
       message: "Diese Domain ist nicht autorisiert, das Buchungs-Widget einzubinden",
     });
   }
-}
-
-function selectVetByFairDistribution(
-  vets: Array<{ id: string; appointmentCount: number }>
-): string {
-  if (vets.length === 0) {
-    throw new Error("No vets available for assignment");
-  }
-
-  return vets.sort((a, b) => a.appointmentCount - b.appointmentCount)[0].id;
 }
 
 // ── Router ────────────────────────────────────────────────────────────────────
@@ -726,17 +681,7 @@ export const bookingRouter = createTRPCRouter({
           )
         );
 
-      return allSlots
-        .filter((slot) =>
-          !booked.some(
-            (a) =>
-              new Date(a.startTime) < slot.end &&
-              new Date(a.endTime) > slot.start
-          ) &&
-          !holds.some(
-            (h) => new Date(h.slotDatetime).getTime() === slot.start.getTime()
-          )
-        )
+      return filterAvailableSlots(allSlots, booked, holds)
         .map((s) => ({ start: s.start, end: s.end }));
     }),
 

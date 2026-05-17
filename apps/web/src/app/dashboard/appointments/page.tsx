@@ -104,7 +104,7 @@ export default function AppointmentsPage() {
 
 
   return (
-    <div className="space-y-6">
+    <div data-testid="appointments-page" className="space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-fg">Termine</h1>

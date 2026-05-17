@@ -448,6 +448,7 @@ function StepDate({
             <button
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0}
+              data-testid="booking-date-prev-page"
               className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-30 transition-colors"
             >
               <ChevronLeft size={16} />
@@ -458,6 +459,7 @@ function StepDate({
             <button
               onClick={() => setPage((p) => Math.min(maxPage, p + 1))}
               disabled={page === maxPage}
+              data-testid="booking-date-next-page"
               className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-30 transition-colors"
             >
               <ChevronRight size={16} />
@@ -471,6 +473,7 @@ function StepDate({
             return (
               <button
                 key={d.toISOString()}
+                data-testid="booking-date-day"
                 onClick={() => handleDayClick(d)}
                 className={`flex flex-col items-center py-3 px-1 rounded-xl border-2 transition-all text-sm font-medium ${
                   isSelected
@@ -517,6 +520,7 @@ function StepDate({
                 return (
                   <button
                     key={slotKey}
+                    data-testid="booking-date-slot"
                     onClick={() => handleSlotClick({ start: new Date(s.start), end: new Date(s.end) })}
                     disabled={holdSlotMutation.isPending && !isSelected}
                     className={`py-2.5 px-3 rounded-xl border-2 text-sm font-semibold transition-all flex items-center justify-center ${
@@ -548,6 +552,7 @@ function StepDate({
       <div className="flex gap-3 pt-2">
         <button
           onClick={handleBack}
+          data-testid="booking-date-back"
           className="flex items-center gap-1.5 px-4 py-3 rounded-xl border border-gray-300 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
         >
           <ChevronLeft size={15} /> Zurück
@@ -558,6 +563,7 @@ function StepDate({
               onSelect(selectedSlot, holdToken, holdExpiresAt);
             }
           }}
+          data-testid="booking-date-next"
           disabled={!canProceed}
           className="flex-1 py-3.5 rounded-xl font-semibold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed text-white flex items-center justify-center gap-2"
           style={{ backgroundColor: primaryColor }}
@@ -658,6 +664,7 @@ function StepDetails({
             {t("booking.petName")} <span className="text-red-500">*</span>
           </label>
           <input
+            data-testid="booking-patient-name"
             className={inputClass}
             placeholder={t("booking.petNamePlaceholder")}
             value={patient.name}
@@ -670,6 +677,7 @@ function StepDetails({
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">{t("booking.species")} <span className="text-red-500">*</span></label>
             <select
+              data-testid="booking-patient-species"
               className={inputClass + " bg-white"}
               value={patient.species}
               onChange={(e) => setP("species", e.target.value)}
@@ -680,6 +688,7 @@ function StepDetails({
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">{t("booking.breed")}</label>
             <input
+              data-testid="booking-patient-breed"
               className={inputClass}
               placeholder={t("booking.breedPlaceholder")}
               value={patient.breed}
@@ -693,6 +702,7 @@ function StepDetails({
             {t("booking.reason")} <span className="text-red-500">*</span>
           </label>
           <input
+            data-testid="booking-patient-reason"
             className={inputClass}
             placeholder={t("booking.reasonPlaceholder")}
             value={patient.reason}
@@ -709,12 +719,12 @@ function StepDetails({
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">{t("booking.firstName")} <span className="text-red-500">*</span></label>
-            <input className={inputClass} placeholder="Max" value={owner.firstName} onChange={(e) => setO("firstName", e.target.value)} />
+            <input data-testid="booking-owner-first-name" className={inputClass} placeholder="Max" value={owner.firstName} onChange={(e) => setO("firstName", e.target.value)} />
             <FieldError msg={errors.firstName} />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">{t("booking.lastName")} <span className="text-red-500">*</span></label>
-            <input className={inputClass} placeholder="Mustermann" value={owner.lastName} onChange={(e) => setO("lastName", e.target.value)} />
+            <input data-testid="booking-owner-last-name" className={inputClass} placeholder="Mustermann" value={owner.lastName} onChange={(e) => setO("lastName", e.target.value)} />
             <FieldError msg={errors.lastName} />
           </div>
         </div>
@@ -722,6 +732,7 @@ function StepDetails({
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">{t("booking.email")} <span className="text-red-500">*</span></label>
           <input
+            data-testid="booking-owner-email"
             type="email"
             className={inputClass}
             placeholder={t("booking.emailPlaceholder")}
@@ -734,6 +745,7 @@ function StepDetails({
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">{t("booking.phone")} <span className="text-red-500">*</span></label>
           <input
+            data-testid="booking-owner-phone"
             type="tel"
             className={inputClass}
             placeholder={t("booking.phonePlaceholder")}
@@ -748,12 +760,14 @@ function StepDetails({
       <div className="flex gap-3 pt-2">
         <button
           onClick={onBack}
+          data-testid="booking-details-back"
           className="flex items-center gap-1.5 px-4 py-3 rounded-xl border border-gray-300 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
         >
           <ChevronLeft size={15} /> {t("booking.buttons.back")}
         </button>
         <button
           onClick={handleSubmit}
+          data-testid="booking-details-next"
           className="flex-1 py-3 rounded-xl font-semibold text-sm text-white transition-all"
           style={{ backgroundColor: primaryColor }}
         >
@@ -882,6 +896,7 @@ function StepConfirm({
         <button
           onClick={onBack}
           disabled={bookMutation.isPending}
+          data-testid="booking-confirm-back"
           className="flex items-center gap-1.5 px-4 py-3 rounded-xl border border-gray-300 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-40"
         >
           <ChevronLeft size={15} /> Zurück
@@ -889,6 +904,7 @@ function StepConfirm({
         <button
           onClick={handleSubmit}
           disabled={bookMutation.isPending}
+          data-testid="booking-confirm-submit"
           className="flex-1 py-3 rounded-xl font-semibold text-sm text-white transition-all flex items-center justify-center gap-2 disabled:opacity-70"
           style={{ backgroundColor: primaryColor }}
         >
@@ -927,7 +943,7 @@ function SuccessScreen({
   onNewBooking: () => void;
 }) {
   return (
-    <div className="text-center py-4 space-y-5">
+    <div data-testid="booking-success" className="text-center py-4 space-y-5">
       <div
         className="w-16 h-16 rounded-full flex items-center justify-center mx-auto"
         style={{ backgroundColor: `${primaryColor}20` }}
