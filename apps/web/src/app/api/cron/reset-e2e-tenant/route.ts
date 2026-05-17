@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomBytes } from "crypto";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import {
@@ -67,7 +68,14 @@ export async function POST(request: NextRequest) {
     const deleted = await deleteE2ETenantData(tenantId);
     const created = await seedE2ETenantDemoData(tenantId);
 
-    return NextResponse.json({ success: true, tenantId, seeded, deleted, created });
+    return NextResponse.json({
+      success: true,
+      tenantId,
+      previewToken: seeded.previewToken,
+      seeded,
+      deleted,
+      created,
+    });
   } catch (error) {
     console.error("E2E tenant reset failed:", error);
     return NextResponse.json(
@@ -111,6 +119,8 @@ async function seedE2ETenant({
       trialEndsAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
     })
     .onConflictDoNothing();
+
+  const previewToken = await ensurePreviewToken(tenantId);
 
   // 2. Admin role
   await db
@@ -166,7 +176,25 @@ async function seedE2ETenant({
     .values({ tenantId, reminderEmailEnabled: false, reminderHoursBefore: 24 })
     .onConflictDoNothing();
 
-  return { tenant: tenantSlug, userId: user[0].id, roleId: adminRole[0].id };
+  return { tenant: tenantSlug, previewToken, userId: user[0].id, roleId: adminRole[0].id };
+}
+
+async function ensurePreviewToken(tenantId: string) {
+  const [tenant] = await db
+    .select({ previewToken: tenants.previewToken })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
+
+  if (tenant?.previewToken) return tenant.previewToken;
+
+  const previewToken = randomBytes(32).toString("hex");
+  await db
+    .update(tenants)
+    .set({ previewToken, updatedAt: new Date() })
+    .where(eq(tenants.id, tenantId));
+
+  return previewToken;
 }
 
 const toCount = (value: unknown) => Number(value ?? 0);

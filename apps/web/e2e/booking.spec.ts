@@ -11,10 +11,19 @@ import { test, expect } from "@playwright/test";
 
 // E2E tenant has 0 vets → vet step is never auto-skipped (demo has 1 vet → skips).
 const DEMO_SLUG = "REDACTED";
+const E2E_PREVIEW_TOKEN = process.env.E2E_PREVIEW_TOKEN;
+
+function bookingUrl() {
+  if (!E2E_PREVIEW_TOKEN) {
+    throw new Error("E2E_PREVIEW_TOKEN is required for booking preview tests");
+  }
+
+  return `/book/${DEMO_SLUG}?preview=${encodeURIComponent(E2E_PREVIEW_TOKEN)}`;
+}
 
 test.describe("Booking page", () => {
   test("loads and shows vet-selection step", async ({ page }) => {
-    await page.goto(`/book/${DEMO_SLUG}`);
+    await page.goto(bookingUrl());
 
     // Main card must be visible — confirms page rendered, not a 404/error
     await page.getByTestId("booking-page").waitFor({ state: "visible" });
@@ -32,7 +41,7 @@ test.describe("Booking page", () => {
   });
 
   test("clicking auto-assign advances to date step", async ({ page }) => {
-    await page.goto(`/book/${DEMO_SLUG}`);
+    await page.goto(bookingUrl());
     await page.getByTestId("booking-page").waitFor({ state: "visible" });
     await page.waitForLoadState("networkidle");
 
