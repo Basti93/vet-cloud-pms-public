@@ -209,7 +209,7 @@ export function AppointmentTable({
         const hasMore = compact && vetItems.length > 2;
 
         return (
-          <div key={vet.id} className="bg-surface rounded-lg border border-border overflow-hidden">
+          <div key={vet.id} data-testid="appointment-vet-group" className="bg-surface rounded-lg border border-border overflow-hidden">
             {/* Header */}
             <button
               onClick={() => toggleVetExpanded(vet.id)}
@@ -271,6 +271,8 @@ export function AppointmentTable({
                         {displayItems.map((item) => (
                           <tr
                             key={item.id}
+                            data-testid={showActions ? "booking-request-row" : "appointment-row"}
+                            data-appointment-id={item.id}
                             className="hover:bg-muted-soft cursor-pointer transition-colors"
                             onClick={() => {
                               if (onAppointmentClick) {
@@ -327,6 +329,7 @@ export function AppointmentTable({
                               {(item.status === 'scheduled' || item.status === 'pending-confirmation') ? (
                                 <div className="flex items-center justify-end gap-2">
                                   <button
+                                    data-testid="booking-request-confirm"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       onConfirm?.(item.id);
@@ -341,6 +344,7 @@ export function AppointmentTable({
                                     Bestätigen
                                   </button>
                                   <button
+                                    data-testid="booking-request-reject"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       onReject?.(item.id);
@@ -373,6 +377,8 @@ export function AppointmentTable({
                       return (
                         <div
                           key={item.id}
+                          data-testid="appointment-row"
+                          data-appointment-id={item.id}
                           className={`flex items-start gap-3 px-4 py-3 hover:bg-muted-soft transition-colors cursor-pointer ${
                             compact ? 'text-xs' : 'text-sm'
                           }`}
