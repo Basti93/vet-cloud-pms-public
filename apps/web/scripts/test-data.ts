@@ -127,7 +127,7 @@ export const TEST_DATA = {
     {
       clerkId: "user_demo_admin_001",
       tenantId: DEMO_TENANT_ID,
-      email: "demo-admin@beispiel-tierarztpraxis.de",
+      email: "user+demo-admin@example.com",
       firstName: "Admin",
       lastName: "User",
       role: "admin" as const,
@@ -136,7 +136,7 @@ export const TEST_DATA = {
     {
       clerkId: "user_demo_vet_001",
       tenantId: DEMO_TENANT_ID,
-      email: "demo-vet1@beispiel-tierarztpraxis.de",
+      email: "user+demo-vet1@example.com",
       title: "Dr.",
       firstName: "Max",
       lastName: "Mueller",
@@ -145,7 +145,7 @@ export const TEST_DATA = {
     {
       clerkId: "user_demo_vet_002",
       tenantId: DEMO_TENANT_ID,
-      email: "demo-vet2@beispiel-tierarztpraxis.de",
+      email: "user+demo-vet2@example.com",
       title: "Dr.",
       firstName: "Sarah",
       lastName: "Schmidt",
@@ -154,7 +154,7 @@ export const TEST_DATA = {
     {
       clerkId: "user_demo_vet_003",
       tenantId: DEMO_TENANT_ID,
-      email: "demo-vet3@beispiel-tierarztpraxis.de",
+      email: "user+demo-vet3@example.com",
       title: "Dr. med. vet.",
       firstName: "Alexander",
       lastName: "Weber",
