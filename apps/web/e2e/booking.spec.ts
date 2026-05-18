@@ -72,11 +72,15 @@ test.describe("Booking page", () => {
 
     let selectedSlot = false;
     for (let pageIndex = 0; pageIndex < 3 && !selectedSlot; pageIndex += 1) {
-      for (const day of await page.getByTestId("booking-date-day").all()) {
-        await day.click();
-        const slotButtons = await page.getByTestId("booking-date-slot").all();
-        for (const slot of slotButtons) {
+      const dayCount = await page.getByTestId("booking-date-day").count();
+      for (let dayIdx = 0; dayIdx < dayCount && !selectedSlot; dayIdx += 1) {
+        await page.getByTestId("booking-date-day").nth(dayIdx).click();
+        // Wait for slot list to settle after day selection re-render
+        await page.waitForLoadState("networkidle", { timeout: 3_000 }).catch(() => {});
+        const slotCount = await page.getByTestId("booking-date-slot").count();
+        for (let slotIdx = 0; slotIdx < slotCount; slotIdx += 1) {
           try {
+            const slot = page.getByTestId("booking-date-slot").nth(slotIdx);
             await slot.waitFor({ state: "visible", timeout: 2_000 });
             await slot.click();
             // A slot is only valid once the hold was acquired and "next" is enabled.
@@ -87,7 +91,6 @@ test.describe("Booking page", () => {
             continue;
           }
         }
-        if (selectedSlot) break;
       }
 
       if (!selectedSlot) {
