@@ -74,8 +74,8 @@ test.describe("Booking page", () => {
     for (let pageIndex = 0; pageIndex < 3 && !selectedSlot; pageIndex += 1) {
       const dayCount = await page.getByTestId("booking-date-day").count();
       for (let dayIdx = 0; dayIdx < dayCount && !selectedSlot; dayIdx += 1) {
-        await page.getByTestId("booking-date-day").nth(dayIdx).click();
-        // Wait for slot list to settle after day selection re-render
+        // force: true bypasses WebKit stability check that hangs on transition-all buttons
+        await page.getByTestId("booking-date-day").nth(dayIdx).click({ force: true });
         await page.waitForLoadState("networkidle", { timeout: 3_000 }).catch(() => {});
         const slotCount = await page.getByTestId("booking-date-slot").count();
         for (let slotIdx = 0; slotIdx < slotCount; slotIdx += 1) {
