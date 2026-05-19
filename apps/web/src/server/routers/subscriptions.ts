@@ -2,12 +2,16 @@ import { createTRPCRouter, protectedProcedure } from "@/server/trpc";
 import { z } from "zod";
 import { tenants, users, userRoles, roles, PERMISSIONS } from "@/lib/db/schema";
 import { db as appDb } from "@/lib/db/client";
-import { eq, and, count, inArray, sql } from "drizzle-orm";
+import { eq, and, count, inArray } from "drizzle-orm";
 import { getStripeClient } from "@/lib/stripe/client";
 import {
   TRIAL_DAYS,
-  getPriceBySeats,
-  getPriceById,
+  TIER_ORDER,
+  getPriceByTier,
+  getTierByPriceId,
+  getWebsiteBuilderPrice,
+  type TierName,
+  type BillingInterval,
 } from "@/lib/stripe/prices";
 import { TRPCError } from "@trpc/server";
 import { getMainDomain } from "@/lib/env";
@@ -15,21 +19,26 @@ import { logEventAsync, serializeLogError } from "@/server/trpc/logging-middlewa
 import { ROLE_CODES } from "@/lib/auth/roles";
 import { requirePermission } from "@/server/trpc/middleware";
 
+const tierSchema = z.enum(["solo", "praxis", "klinik"]);
+const intervalSchema = z.enum(["monthly", "annual"]).default("monthly");
+
 export const subscriptionsRouter = createTRPCRouter({
   createCheckoutSession: protectedProcedure
     .use(requirePermission(PERMISSIONS.SETTINGS_MANAGE))
     .input(
       z.object({
-        seats: z.number().int().min(1).max(10),
+        tier: tierSchema,
+        billingInterval: intervalSchema,
+        couponId: z.string().optional(),
+        includeWebsiteBuilder: z.boolean().default(false),
       })
     )
     .mutation(async ({ input, ctx }) => {
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const tenantId = (ctx as any).tenantId;
-        const { seats } = input;
+        const { tier, billingInterval, couponId, includeWebsiteBuilder } = input;
 
-        // Get tenant
         const tenant = await appDb
           .select()
           .from(tenants)
@@ -37,81 +46,76 @@ export const subscriptionsRouter = createTRPCRouter({
           .limit(1);
 
         if (!tenant.length) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Tenant not found",
-          });
+          throw new TRPCError({ code: "NOT_FOUND", message: "Tenant not found" });
         }
 
         const tenantData = tenant[0];
         const stripe = getStripeClient();
-        const price = await getPriceBySeats(seats);
+        const price = await getPriceByTier(tier, billingInterval);
 
-        // Get or create Stripe customer
         let stripeCustomerId = tenantData.stripeCustomerId;
 
         if (!stripeCustomerId) {
           const customer = await stripe.customers.create({
             email: tenantData.email,
             name: tenantData.name,
-            metadata: {
-              tenantId: tenantData.id,
-            },
+            metadata: { tenantId: tenantData.id },
           });
           stripeCustomerId = customer.id;
 
-          // Update tenant with Stripe customer ID
           await appDb
             .update(tenants)
             .set({ stripeCustomerId: customer.id })
             .where(eq(tenants.id, tenantId));
         }
 
-        // Check if tenant has existing trial
         const domain = getMainDomain();
         let trialPeriodDays = TRIAL_DAYS;
-        let metadataTrialDaysRemaining = undefined;
+        let metadataTrialDaysRemaining: string | undefined;
 
         if (
           tenantData.subscriptionStatus === "trial" &&
           tenantData.trialEndsAt &&
           new Date(tenantData.trialEndsAt) > new Date()
         ) {
-          // Existing trial still active — calculate remaining days
-          const remainingMs =
-            new Date(tenantData.trialEndsAt).getTime() - Date.now();
+          const remainingMs = new Date(tenantData.trialEndsAt).getTime() - Date.now();
           const remainingDays = Math.ceil(remainingMs / (1000 * 60 * 60 * 24));
           trialPeriodDays = Math.max(remainingDays, 0);
           metadataTrialDaysRemaining = remainingDays.toString();
         }
 
+        const lineItems: { price: string; quantity: number }[] = [
+          { price: price.priceId, quantity: 1 },
+        ];
+
+        if (includeWebsiteBuilder) {
+          const wbPrice = await getWebsiteBuilderPrice(billingInterval);
+          lineItems.push({ price: wbPrice.priceId, quantity: 1 });
+        }
+
         const session = await stripe.checkout.sessions.create({
           customer: stripeCustomerId,
           mode: "subscription",
-          line_items: [
-            {
-              price: price.priceId,
-              quantity: 1,
-            },
-          ],
+          line_items: lineItems,
+          automatic_tax: { enabled: true },
+          ...(couponId
+            ? { discounts: [{ coupon: couponId }] }
+            : { allow_promotion_codes: true }),
           subscription_data: {
             trial_period_days: trialPeriodDays > 0 ? trialPeriodDays : undefined,
             metadata: {
               tenantId: tenantData.id,
-              seats: seats.toString(),
-              ...(metadataTrialDaysRemaining && {
-                trialDaysRemaining: metadataTrialDaysRemaining,
-              }),
+              tier,
+              seats: price.seats.toString(),
+              billing_interval: billingInterval,
+              ...(metadataTrialDaysRemaining && { trialDaysRemaining: metadataTrialDaysRemaining }),
             },
           },
-          success_url: `${domain}/dashboard/settings/account?status=success`,
-          cancel_url: `${domain}/dashboard/settings/account?status=cancel`,
+          success_url: `${domain}/dashboard/settings/subscription?status=success`,
+          cancel_url: `${domain}/dashboard/settings/subscription?status=cancel`,
         });
 
-        return {
-          sessionId: session.id,
-          url: session.url,
-        };
+        return { sessionId: session.id, url: session.url };
       } catch (error) {
         logEventAsync({
           level: "error",
@@ -126,12 +130,17 @@ export const subscriptionsRouter = createTRPCRouter({
 
   changePlan: protectedProcedure
     .use(requirePermission(PERMISSIONS.SETTINGS_MANAGE))
-    .input(z.object({ seats: z.number().int().min(1).max(10) }))
+    .input(
+      z.object({
+        tier: tierSchema,
+        billingInterval: intervalSchema,
+      })
+    )
     .mutation(async ({ input, ctx }) => {
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const tenantId = (ctx as any).tenantId;
-        const { seats } = input;
+        const { tier, billingInterval } = input;
 
         const tenant = await appDb
           .select()
@@ -152,40 +161,38 @@ export const subscriptionsRouter = createTRPCRouter({
           });
         }
 
-        const newPrice = await getPriceBySeats(seats);
+        const newPrice = await getPriceByTier(tier, billingInterval);
 
         if (tenantData.currentStripePriceId === newPrice.priceId) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Already on this plan",
-          });
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Already on this plan" });
         }
 
-        const currentPrice = await getPriceById(tenantData.currentStripePriceId ?? "");
-        const isUpgrade = currentPrice ? newPrice.monthlyPrice > currentPrice.monthlyPrice : true;
+        const currentTier = await getTierByPriceId(tenantData.currentStripePriceId ?? "");
+        const currentTierIndex = currentTier ? TIER_ORDER.indexOf(currentTier.tier) : -1;
+        const newTierIndex = TIER_ORDER.indexOf(tier);
+        const isUpgrade = newTierIndex > currentTierIndex ||
+          (newTierIndex === currentTierIndex && currentTier?.interval === "monthly" && billingInterval === "annual");
 
         const stripe = getStripeClient();
         const subscription = await stripe.subscriptions.retrieve(tenantData.stripeSubscriptionId);
-        const currentItem = subscription.items.data[0];
 
-        if (!currentItem) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Subscription has no items",
-          });
+        // Find the main tier item (not Website Builder)
+        const tierItem = subscription.items.data.find((item) => {
+          const meta = (item.price as { metadata?: Record<string, string> }).metadata;
+          return !meta?.addon;
+        });
+
+        if (!tierItem) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Subscription has no tier item" });
         }
 
         const isOnTrial = subscription.status === "trialing";
-
-        // Trial: no proration needed (no charges yet)
-        // Upgrade: prorate immediately (charge difference on next invoice)
-        // Downgrade: no proration — new lower price starts next billing cycle, no refund
         const prorationType = isOnTrial ? "none" : isUpgrade ? "create_prorations" : "none";
 
         await stripe.subscriptions.update(tenantData.stripeSubscriptionId, {
-          items: [{ id: currentItem.id, price: newPrice.priceId }],
+          items: [{ id: tierItem.id, price: newPrice.priceId }],
           proration_behavior: prorationType,
-          metadata: { tenantId, seats: seats.toString() },
+          metadata: { tenantId, tier, seats: newPrice.seats.toString(), billing_interval: billingInterval },
         });
 
         await appDb
@@ -193,6 +200,8 @@ export const subscriptionsRouter = createTRPCRouter({
           .set({
             currentStripePriceId: newPrice.priceId,
             maxUsers: newPrice.seats,
+            subscriptionPlan: tier,
+            billingInterval,
           })
           .where(eq(tenants.id, tenantId));
 
@@ -259,7 +268,8 @@ export const subscriptionsRouter = createTRPCRouter({
             tenantId,
             fromPriceId: tenantData.currentStripePriceId,
             toPriceId: newPrice.priceId,
-            seats,
+            tier,
+            billingInterval,
             isOnTrial,
             isUpgrade,
             deactivatedUserCount,
@@ -271,6 +281,7 @@ export const subscriptionsRouter = createTRPCRouter({
           isUpgrade,
           isOnTrial,
           newPriceId: newPrice.priceId,
+          tier,
           seats: newPrice.seats,
           deactivatedUserCount,
         };
@@ -286,6 +297,136 @@ export const subscriptionsRouter = createTRPCRouter({
       }
     }),
 
+  addWebsiteBuilder: protectedProcedure
+    .use(requirePermission(PERMISSIONS.SETTINGS_MANAGE))
+    .input(z.object({ billingInterval: intervalSchema }))
+    .mutation(async ({ input, ctx }) => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const tenantId = (ctx as any).tenantId;
+        const { billingInterval } = input;
+
+        const tenant = await appDb
+          .select()
+          .from(tenants)
+          .where(eq(tenants.id, tenantId))
+          .limit(1);
+
+        if (!tenant.length) throw new TRPCError({ code: "NOT_FOUND", message: "Tenant not found" });
+
+        const tenantData = tenant[0];
+
+        if (!tenantData.stripeSubscriptionId) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "No active subscription" });
+        }
+
+        if (tenantData.hasWebsiteBuilder) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Website Builder already active" });
+        }
+
+        const wbPrice = await getWebsiteBuilderPrice(billingInterval);
+        const stripe = getStripeClient();
+
+        await stripe.subscriptions.update(tenantData.stripeSubscriptionId, {
+          items: [{ price: wbPrice.priceId, quantity: 1 }],
+          proration_behavior: "create_prorations",
+        });
+
+        await appDb
+          .update(tenants)
+          .set({ hasWebsiteBuilder: true, websiteBuilderPriceId: wbPrice.priceId })
+          .where(eq(tenants.id, tenantId));
+
+        logEventAsync({
+          level: "info",
+          category: "subscription",
+          eventType: "website_builder_added",
+          message: "Website Builder add-on added",
+          metadata: { tenantId, priceId: wbPrice.priceId, billingInterval },
+        });
+
+        return { success: true };
+      } catch (error) {
+        logEventAsync({
+          level: "error",
+          category: "stripe",
+          eventType: "add_website_builder_failed",
+          message: "Failed to add Website Builder add-on",
+          metadata: { error: serializeLogError(error) },
+        });
+        throw error;
+      }
+    }),
+
+  removeWebsiteBuilder: protectedProcedure
+    .use(requirePermission(PERMISSIONS.SETTINGS_MANAGE))
+    .mutation(async ({ ctx }) => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const tenantId = (ctx as any).tenantId;
+
+        const tenant = await appDb
+          .select()
+          .from(tenants)
+          .where(eq(tenants.id, tenantId))
+          .limit(1);
+
+        if (!tenant.length) throw new TRPCError({ code: "NOT_FOUND", message: "Tenant not found" });
+
+        const tenantData = tenant[0];
+
+        if (!tenantData.stripeSubscriptionId || !tenantData.hasWebsiteBuilder) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "No active Website Builder subscription" });
+        }
+
+        const stripe = getStripeClient();
+        const subscription = await stripe.subscriptions.retrieve(tenantData.stripeSubscriptionId);
+
+        // Resolve the Website Builder subscription item by stored price ID
+        const wbItemId = tenantData.websiteBuilderPriceId
+          ? subscription.items.data.find((item) => item.price.id === tenantData.websiteBuilderPriceId)?.id
+          : undefined;
+
+        if (!wbItemId) {
+          // Sync DB even if Stripe item not found
+          await appDb
+            .update(tenants)
+            .set({ hasWebsiteBuilder: false, websiteBuilderPriceId: null })
+            .where(eq(tenants.id, tenantId));
+          return { success: true };
+        }
+
+        await stripe.subscriptions.update(tenantData.stripeSubscriptionId, {
+          items: [{ id: wbItemId, deleted: true }],
+          proration_behavior: "none",
+        });
+
+        await appDb
+          .update(tenants)
+          .set({ hasWebsiteBuilder: false, websiteBuilderPriceId: null })
+          .where(eq(tenants.id, tenantId));
+
+        logEventAsync({
+          level: "info",
+          category: "subscription",
+          eventType: "website_builder_removed",
+          message: "Website Builder add-on removed",
+          metadata: { tenantId },
+        });
+
+        return { success: true };
+      } catch (error) {
+        logEventAsync({
+          level: "error",
+          category: "stripe",
+          eventType: "remove_website_builder_failed",
+          message: "Failed to remove Website Builder add-on",
+          metadata: { error: serializeLogError(error) },
+        });
+        throw error;
+      }
+    }),
+
   getSubscriptionStatus: protectedProcedure
     .input(z.object({}).optional())
     .query(async ({ ctx }) => {
@@ -293,10 +434,7 @@ export const subscriptionsRouter = createTRPCRouter({
       const tenantId = (ctx as any).tenantId;
 
       if (!tenantId) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "No tenant context",
-        });
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "No tenant context" });
       }
 
       const tenant = await appDb
@@ -306,21 +444,20 @@ export const subscriptionsRouter = createTRPCRouter({
         .limit(1);
 
       if (!tenant.length) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Tenant not found",
-        });
+        throw new TRPCError({ code: "NOT_FOUND", message: "Tenant not found" });
       }
 
       const tenantData = tenant[0];
+      const currentTier = tenantData.currentStripePriceId
+        ? await getTierByPriceId(tenantData.currentStripePriceId)
+        : null;
 
       return {
         status: tenantData.subscriptionStatus,
-        plan: tenantData.subscriptionPlan,
+        plan: tenantData.subscriptionPlan as TierName,
+        billingInterval: tenantData.billingInterval as BillingInterval,
         maxUsers: tenantData.maxUsers,
-        currentPrice: tenantData.currentStripePriceId
-          ? await getPriceById(tenantData.currentStripePriceId)
-          : null,
+        currentTier,
         trialEndsAt: tenantData.trialEndsAt,
         deactivatedAt: tenantData.deactivatedAt,
         lastPaymentFailedAt: tenantData.lastPaymentFailedAt,
@@ -329,14 +466,15 @@ export const subscriptionsRouter = createTRPCRouter({
         paymentGracePeriodEndsAt: tenantData.paymentGracePeriodEndsAt,
         trialDaysUsed: tenantData.trialDaysUsed || 0,
         originalTrialEndsAt: tenantData.originalTrialEndsAt,
+        hasWebsiteBuilder: tenantData.hasWebsiteBuilder,
+        pioneerTier: tenantData.pioneerTier,
         isTrialing:
           tenantData.subscriptionStatus === "trial" &&
           tenantData.trialEndsAt &&
           new Date(tenantData.trialEndsAt) > new Date(),
         daysUntilTrialEnds: tenantData.trialEndsAt
           ? Math.ceil(
-              (new Date(tenantData.trialEndsAt).getTime() - Date.now()) /
-                (1000 * 60 * 60 * 24)
+              (new Date(tenantData.trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
             )
           : null,
       };
@@ -356,30 +494,19 @@ export const subscriptionsRouter = createTRPCRouter({
           .where(eq(tenants.id, tenantId))
           .limit(1);
 
-        if (!tenant.length) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Tenant not found",
-          });
-        }
+        if (!tenant.length) throw new TRPCError({ code: "NOT_FOUND", message: "Tenant not found" });
 
         const tenantData = tenant[0];
 
         if (!tenantData.stripeSubscriptionId) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "No active subscription found",
-          });
+          throw new TRPCError({ code: "BAD_REQUEST", message: "No active subscription found" });
         }
 
         const stripe = getStripeClient();
+        const subscription = await stripe.subscriptions.update(tenantData.stripeSubscriptionId, {
+          cancel_at_period_end: true,
+        });
 
-        const subscription = await stripe.subscriptions.update(
-          tenantData.stripeSubscriptionId,
-          { cancel_at_period_end: true }
-        );
-
-        // Update DB with cancellation timestamp
         await appDb
           .update(tenants)
           .set({ cancelledAtPeriodEnd: new Date(subscription.cancel_at! * 1000) })
@@ -428,32 +555,20 @@ export const subscriptionsRouter = createTRPCRouter({
           .where(eq(tenants.id, tenantId))
           .limit(1);
 
-        if (!tenant.length) {
-          throw new TRPCError({ code: "NOT_FOUND", message: "Tenant not found" });
-        }
+        if (!tenant.length) throw new TRPCError({ code: "NOT_FOUND", message: "Tenant not found" });
 
         const tenantData = tenant[0];
 
         if (!tenantData.stripeSubscriptionId) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "No active subscription found",
-          });
+          throw new TRPCError({ code: "BAD_REQUEST", message: "No active subscription found" });
         }
 
         if (!tenantData.cancelledAtPeriodEnd) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Subscription is not scheduled for cancellation",
-          });
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Subscription is not scheduled for cancellation" });
         }
 
         const stripe = getStripeClient();
-
-        await stripe.subscriptions.update(tenantData.stripeSubscriptionId, {
-          cancel_at_period_end: false,
-        });
-
+        await stripe.subscriptions.update(tenantData.stripeSubscriptionId, { cancel_at_period_end: false });
         await appDb
           .update(tenants)
           .set({ cancelledAtPeriodEnd: null })
@@ -494,14 +609,8 @@ export const subscriptionsRouter = createTRPCRouter({
           .where(eq(tenants.id, tenantId))
           .limit(1);
 
-        if (!tenant.length) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Tenant not found",
-          });
-        }
+        if (!tenant.length) throw new TRPCError({ code: "NOT_FOUND", message: "Tenant not found" });
 
-        // Reactivate tenant by clearing deactivation and payment grace period
         await appDb
           .update(tenants)
           .set({
@@ -520,10 +629,7 @@ export const subscriptionsRouter = createTRPCRouter({
           metadata: { tenantId },
         });
 
-        return {
-          success: true,
-          message: "Subscription reactivated",
-        };
+        return { success: true, message: "Subscription reactivated" };
       } catch (error) {
         logEventAsync({
           level: "error",
@@ -535,5 +641,4 @@ export const subscriptionsRouter = createTRPCRouter({
         throw error;
       }
     }),
-
 });

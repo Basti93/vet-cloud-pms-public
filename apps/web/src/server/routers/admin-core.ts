@@ -19,7 +19,7 @@ import { sendTenantLifecycleEmail } from "@/lib/email/service";
 import { randomUUID } from "crypto";
 import { createDefaultRoles } from "@/lib/auth/permissions";
 import { invalidateAllRolePermissions } from "@/lib/auth/permission-cache";
-import { getPriceById } from "@/lib/stripe/prices";
+import { getTierByPriceId } from "@/lib/stripe/prices";
 
 function getStripeDashboardUrls(stripeCustomerId: string | null, stripeSubscriptionId: string | null) {
   const isTestMode = (process.env.STRIPE_SECRET_KEY ?? "").startsWith("sk_test_");
@@ -42,7 +42,7 @@ export const adminCoreRouter = createAdminRouter({
     .input(
       z.object({
         search: z.string().optional(),
-        plan: z.enum(["free", "starter", "pro", "enterprise"]).optional(),
+        plan: z.enum(["solo", "praxis", "klinik"]).optional(),
         status: z.enum(["trial", "active", "paused", "cancelled"]).optional(),
         limit: z.number().default(50),
         cursor: z.string().optional(),
@@ -169,7 +169,7 @@ export const adminCoreRouter = createAdminRouter({
           Number(systemRoleLockState?.editableCount ?? 0) > 0 &&
           Number(systemRoleLockState?.totalSystemCount ?? 0) > 0,
         stripeDashboardUrls: getStripeDashboardUrls(tenant.stripeCustomerId, tenant.stripeSubscriptionId),
-        currentPriceLabel: tenant.currentStripePriceId ? await getPriceById(tenant.currentStripePriceId) : null,
+        currentPriceLabel: tenant.currentStripePriceId ? await getTierByPriceId(tenant.currentStripePriceId) : null,
       };
     }),
 
@@ -540,7 +540,7 @@ export const adminCoreRouter = createAdminRouter({
     .input(
       z.object({
         tenantId: z.string().uuid(),
-        plan: z.enum(["free", "starter", "pro", "enterprise"]),
+        plan: z.enum(["solo", "praxis", "klinik"]),
       })
     )
     .mutation(async ({ ctx, input }) => {

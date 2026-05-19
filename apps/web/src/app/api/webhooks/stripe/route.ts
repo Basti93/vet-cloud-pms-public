@@ -4,8 +4,52 @@ import { db as appDb } from "@/lib/db/client";
 import { tenants } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { sendTrialEndingEmail, sendPaymentFailedAdminEmail } from "@/lib/email/service";
-import { TRIAL_DAYS } from "@/lib/stripe/prices";
+import { TRIAL_DAYS, getTierByPriceId, getAddonByPriceId, type TierName, type BillingInterval } from "@/lib/stripe/prices";
 import Stripe from "stripe";
+
+/** Extracts tier + billing interval + website builder state from subscription items. */
+async function syncSubscriptionItems(subscription: Stripe.Subscription): Promise<{
+  subscriptionPlan?: TierName;
+  maxUsers?: number;
+  billingInterval?: BillingInterval;
+  hasWebsiteBuilder?: boolean;
+  websiteBuilderPriceId?: string | null;
+}> {
+  const result: {
+    subscriptionPlan?: TierName;
+    maxUsers?: number;
+    billingInterval?: BillingInterval;
+    hasWebsiteBuilder?: boolean;
+    websiteBuilderPriceId?: string | null;
+  } = {};
+
+  let hasWb = false;
+  let wbPriceId: string | null = null;
+
+  for (const item of subscription.items.data) {
+    const priceId = item.price.id;
+    const [tier, addon] = await Promise.all([
+      getTierByPriceId(priceId),
+      getAddonByPriceId(priceId),
+    ]);
+
+    if (tier) {
+      result.subscriptionPlan = tier.tier;
+      result.maxUsers = tier.seats;
+      result.billingInterval = tier.interval;
+    }
+
+    if (addon?.addon === "website-builder") {
+      hasWb = true;
+      wbPriceId = priceId;
+    }
+  }
+
+  result.hasWebsiteBuilder = hasWb;
+  result.websiteBuilderPriceId = wbPriceId;
+
+  return result;
+}
 
 export async function POST(request: NextRequest) {
   const sig = request.headers.get("stripe-signature");
@@ -81,10 +125,10 @@ export async function POST(request: NextRequest) {
           break;
         }
 
-        const priceId =
-          Array.isArray(subscription.items?.data) && subscription.items.data.length > 0
-            ? subscription.items.data[0]?.price?.id
-            : null;
+        const tierPriceItem = subscription.items.data.find(
+          (item) => !(item.price as { metadata?: Record<string, string> }).metadata?.addon
+        );
+        const priceId = tierPriceItem?.price?.id ?? null;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const updateData: Record<string, any> = {
@@ -92,6 +136,10 @@ export async function POST(request: NextRequest) {
         };
 
         if (priceId) updateData.currentStripePriceId = priceId;
+
+        // Sync tier name, seats, and billing interval from Stripe price metadata
+        const itemSync = await syncSubscriptionItems(subscription);
+        Object.assign(updateData, itemSync);
 
         // Handle cancellation status
         if (subscription.cancel_at_period_end) {
@@ -233,7 +281,6 @@ export async function POST(request: NextRequest) {
       }
 
       case "customer.subscription.created": {
-        // New subscription — same sync logic as subscription.updated
         const subscription = event.data.object as Stripe.Subscription;
         const tenantId = subscription.metadata?.tenantId;
 
@@ -242,16 +289,20 @@ export async function POST(request: NextRequest) {
           break;
         }
 
-        const priceId =
-          Array.isArray(subscription.items?.data) && subscription.items.data.length > 0
-            ? subscription.items.data[0]?.price?.id
-            : null;
+        const tierPriceItemCreated = subscription.items.data.find(
+          (item) => !(item.price as { metadata?: Record<string, string> }).metadata?.addon
+        );
+        const createdPriceId = tierPriceItemCreated?.price?.id ?? null;
 
-        const createData: Record<string, unknown> = {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const createData: Record<string, any> = {
           stripeSubscriptionId: subscription.id,
         };
 
-        if (priceId) createData.currentStripePriceId = priceId;
+        if (createdPriceId) createData.currentStripePriceId = createdPriceId;
+
+        const createdItemSync = await syncSubscriptionItems(subscription);
+        Object.assign(createData, createdItemSync);
 
         if (subscription.trial_end && subscription.trial_end * 1000 > Date.now()) {
           createData.subscriptionStatus = "trial";
@@ -282,16 +333,23 @@ export async function POST(request: NextRequest) {
             .limit(1);
 
           if (tenant.length) {
-            // Fetch subscription to get price + trial info
             const stripe = getStripeClient();
             const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-            const priceId = subscription.items.data[0]?.price?.id ?? null;
 
-            const updateData: Record<string, unknown> = {
+            const tierItemCompleted = subscription.items.data.find(
+              (item) => !(item.price as { metadata?: Record<string, string> }).metadata?.addon
+            );
+            const completedPriceId = tierItemCompleted?.price?.id ?? null;
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const updateData: Record<string, any> = {
               stripeSubscriptionId: subscriptionId,
             };
 
-            if (priceId) updateData.currentStripePriceId = priceId;
+            if (completedPriceId) updateData.currentStripePriceId = completedPriceId;
+
+            const completedItemSync = await syncSubscriptionItems(subscription);
+            Object.assign(updateData, completedItemSync);
 
             if (subscription.trial_end && subscription.trial_end * 1000 > Date.now()) {
               updateData.subscriptionStatus = "trial";
@@ -305,7 +363,7 @@ export async function POST(request: NextRequest) {
               .set(updateData)
               .where(eq(tenants.id, tenant[0].id));
 
-            console.log(`[Stripe Webhook] checkout.session.completed — tenant ${tenant[0].id} linked to subscription ${subscriptionId}, price ${priceId}`);
+            console.log(`[Stripe Webhook] checkout.session.completed — tenant ${tenant[0].id} linked to subscription ${subscriptionId}, price ${completedPriceId}`);
           }
         }
         break;

@@ -118,7 +118,7 @@ async function seedE2ETenant({
       postalCode: "10115",
       country: "DE",
       subscriptionStatus: "active",
-      subscriptionPlan: "starter",
+      subscriptionPlan: "solo",
       maxUsers: 5,
       trialEndsAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
     })
