@@ -154,7 +154,7 @@ export async function proxy(req: NextRequest, event: NextFetchEvent) {
     return clerkProtectedProxy(req, event);
   }
 
-  if (pathname.startsWith('/api/trpc')) {
+  if (pathname.startsWith('/api/trpc') || pathname.startsWith('/site/')) {
     return clerkAuthStateProxy(req, event);
   }
 
