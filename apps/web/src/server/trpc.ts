@@ -48,14 +48,6 @@ const t = initTRPC.context<TRPCContext>().create({
 // Middleware
 // ============================================================================
 
-const timingMiddleware = t.middleware(async ({ next, path }) => {
-  const start = Date.now();
-  const result = await next();
-  const durationMs = Date.now() - start;
-  console.log(`[tRPC] ${path} took ${durationMs}ms`);
-  return result;
-});
-
 const enforceUserIsAuthenticated = t.middleware(({ ctx, next }) => {
   if (!ctx.userId) {
     throw new TRPCError({ code: "UNAUTHORIZED" });
@@ -307,9 +299,8 @@ export const createCallerFactory = t.createCallerFactory;
 /**
  * Middleware execution order for all authenticated procedures:
  *
- *   systemLoggingMiddleware   — logs slow requests + errors to `system_logs`
- *   rateLimitMiddleware       — 100 req/60s per user ID (or IP if unauthenticated)
- *   timingMiddleware          — console.log of duration (dev visibility)
+ *   systemLoggingMiddleware    — logs slow requests + errors to `system_logs`
+ *   rateLimitMiddleware        — 100 req/60s per user ID (or IP if unauthenticated)
  *   enforceUserIsAuthenticated — validates Clerk session, narrows ctx.userId
  *   enforceTenantIsActive      — resolves tenant, blocks deactivated tenants/users,
  *                                injects ctx.tenantId + ctx.dbUserId
@@ -322,20 +313,17 @@ export const createCallerFactory = t.createCallerFactory;
 /** Public procedure — no auth, 100 req/60s rate limit */
 export const publicProcedure = t.procedure
   .use(systemLoggingMiddleware)
-  .use(rateLimitMiddleware)
-  .use(timingMiddleware);
+  .use(rateLimitMiddleware);
 
 /** Public booking procedure — no auth, stricter 20 req/60s rate limit for public booking */
 export const publicBookingProcedure = t.procedure
   .use(systemLoggingMiddleware)
-  .use(publicBookingRateLimitMiddleware)
-  .use(timingMiddleware);
+  .use(publicBookingRateLimitMiddleware);
 
 /** Protected procedure — requires Clerk session + active tenant */
 export const protectedProcedure = t.procedure
   .use(systemLoggingMiddleware)
   .use(rateLimitMiddleware)
-  .use(timingMiddleware)
   .use(enforceUserIsAuthenticated)
   .use(enforceTenantIsActive);
 
@@ -348,7 +336,6 @@ export const protectedProcedure = t.procedure
 export const tenantProcedure = t.procedure
   .use(systemLoggingMiddleware)
   .use(rateLimitMiddleware)
-  .use(timingMiddleware)
   .use(enforceUserIsAuthenticated)
   .use(enforceTenantIsActive)
   .use(enforceTenantOwnership);
@@ -360,5 +347,4 @@ export const tenantProcedure = t.procedure
 export const adminProcedure = t.procedure
   .use(({ ctx, next }) => next({ ctx: { ...ctx, db: ctx.adminDb } }))
   .use(rateLimitMiddleware)
-  .use(timingMiddleware)
   .use(enforceIsAdmin);
