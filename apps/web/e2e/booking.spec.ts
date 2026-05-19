@@ -76,7 +76,8 @@ test.describe("Booking page", () => {
       for (let dayIdx = 0; dayIdx < dayCount && !selectedSlot; dayIdx += 1) {
         // force: true bypasses WebKit stability check that hangs on transition-all buttons
         await page.getByTestId("booking-date-day").nth(dayIdx).click({ force: true });
-        await page.waitForLoadState("networkidle", { timeout: 3_000 }).catch(() => {});
+        // Wait for slot list to render — networkidle resolves too early on WebKit
+        await page.getByTestId("booking-date-slot").first().waitFor({ state: "visible", timeout: 5_000 }).catch(() => {});
         const slotCount = await page.getByTestId("booking-date-slot").count();
         for (let slotIdx = 0; slotIdx < slotCount; slotIdx += 1) {
           try {
