@@ -97,7 +97,9 @@ export const subscriptionsRouter = createTRPCRouter({
           customer: stripeCustomerId,
           mode: "subscription",
           line_items: lineItems,
-          ...(couponId ? { discounts: [{ coupon: couponId }] } : {}),
+          ...(couponId
+            ? { discounts: [{ coupon: couponId }] }
+            : { allow_promotion_codes: true }),
           subscription_data: {
             trial_period_days: trialPeriodDays > 0 ? trialPeriodDays : undefined,
             metadata: {
@@ -108,8 +110,8 @@ export const subscriptionsRouter = createTRPCRouter({
               ...(metadataTrialDaysRemaining && { trialDaysRemaining: metadataTrialDaysRemaining }),
             },
           },
-          success_url: `${domain}/dashboard/settings/account?status=success`,
-          cancel_url: `${domain}/dashboard/settings/account?status=cancel`,
+          success_url: `${domain}/dashboard/settings/subscription?status=success`,
+          cancel_url: `${domain}/dashboard/settings/subscription?status=cancel`,
         });
 
         return { sessionId: session.id, url: session.url };

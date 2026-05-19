@@ -2,7 +2,7 @@
 
 import { ReactNode, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Palette, Users, Building2, Mail, CalendarClock, Shield, Cog, Lock, Code2 } from "lucide-react";
+import { Palette, Users, Building2, Mail, CalendarClock, Shield, Cog, Lock, Code2, CreditCard } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { PERMISSIONS } from "@/lib/db/schema";
 import { Tabs } from "@/components/ui/tabs";
@@ -33,6 +33,7 @@ const ALL_TABS = [
     label: "Datenschutz & Konto",
     icon: Lock,
     children: [
+      { href: "/dashboard/settings/subscription", label: "Abo", icon: CreditCard },
       { href: "/dashboard/settings/account", label: "Mein Konto", icon: Lock },
     ],
   },
