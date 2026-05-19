@@ -44,17 +44,19 @@ export default function AccountPage() {
   const reactivateSubscriptionMutation = trpc.subscriptions.reactivateSubscription.useMutation();
   const undoCancellationMutation = trpc.subscriptions.undoCancellation.useMutation();
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
-  const [pendingSeats, setPendingSeats] = useState<number | null>(null);
+  const [pendingTier, setPendingTier] = useState<"solo" | "praxis" | "klinik" | null>(null);
+  const [billingInterval, setBillingInterval] = useState<"monthly" | "annual">("monthly");
   const canManageSettings = Boolean(
     permissions?.includes(PERMISSIONS.SETTINGS_MANAGE)
   );
 
-  const PLAN_PRICES: Record<number, { label: string; price: string }> = {
-    1: { label: "1 Nutzer", price: "€30/Monat" },
-    3: { label: "3 Nutzer", price: "€50/Monat" },
-    5: { label: "5 Nutzer", price: "€100/Monat" },
-    10: { label: "10 Nutzer", price: "€200/Monat" },
-  };
+  const TIER_INFO = {
+    solo:   { label: "Solo",   desc: "bis 3 Nutzer", monthly: 59,  annual: 590  },
+    praxis: { label: "Praxis", desc: "bis 7 Nutzer", monthly: 119, annual: 1190 },
+    klinik: { label: "Klinik", desc: "bis 15 Nutzer", monthly: 199, annual: 1990 },
+  } as const;
+
+  const TIER_ORDER = ["solo", "praxis", "klinik"] as const;
 
   useEffect(() => {
     if (checkoutUrl) {
@@ -62,22 +64,21 @@ export default function AccountPage() {
     }
   }, [checkoutUrl]);
 
-  const handleSelectTier = (seats: number) => {
-    if (!subscriptionStatus?.currentPrice) {
-      // No existing sub → go straight to Stripe Checkout, no confirmation needed
-      handleCheckout(seats);
+  const handleSelectTier = (tier: "solo" | "praxis" | "klinik") => {
+    if (!subscriptionStatus?.currentTier) {
+      handleCheckout(tier);
       return;
     }
-    setPendingSeats(seats);
+    setPendingTier(tier);
     setErrorMessage("");
     setSuccessMessage("");
   };
 
-  const handleCheckout = async (seats: number) => {
+  const handleCheckout = async (tier: "solo" | "praxis" | "klinik") => {
     try {
       setErrorMessage("");
-      trackEvent(AnalyticsEvents.SUBSCRIPTION_CHECKOUT_STARTED, { seats });
-      const result = await createCheckoutMutation.mutateAsync({ seats });
+      trackEvent(AnalyticsEvents.SUBSCRIPTION_CHECKOUT_STARTED, { tier, billingInterval });
+      const result = await createCheckoutMutation.mutateAsync({ tier, billingInterval });
       if (result.url) {
         setCheckoutUrl(result.url);
       }
@@ -87,17 +88,23 @@ export default function AccountPage() {
   };
 
   const handleConfirmPlanChange = async () => {
-    if (!pendingSeats) return;
+    if (!pendingTier) return;
     try {
       setErrorMessage("");
-      const result = await changePlanMutation.mutateAsync({ seats: pendingSeats });
-      const currentSeats = subscriptionStatus?.currentPrice?.seats ?? 0;
-      const isUpgrade = pendingSeats > currentSeats;
-      trackEvent(AnalyticsEvents.SUBSCRIPTION_PLAN_CHANGED, { from_seats: currentSeats, to_seats: pendingSeats, direction: isUpgrade ? "upgrade" : "downgrade" });
+      const result = await changePlanMutation.mutateAsync({ tier: pendingTier, billingInterval });
+      const currentTierIndex = TIER_ORDER.indexOf(subscriptionStatus?.currentTier?.tier ?? "solo");
+      const newTierIndex = TIER_ORDER.indexOf(pendingTier);
+      const isUpgrade = newTierIndex > currentTierIndex;
+      trackEvent(AnalyticsEvents.SUBSCRIPTION_PLAN_CHANGED, {
+        from_tier: subscriptionStatus?.currentTier?.tier ?? "none",
+        to_tier: pendingTier,
+        billingInterval,
+        direction: isUpgrade ? "upgrade" : "downgrade",
+      });
       const deactivated = (result as { deactivatedUserCount?: number }).deactivatedUserCount ?? 0;
       if (deactivated > 0) {
         setSuccessMessage(
-          `Tarif geändert. ${deactivated} ${deactivated === 1 ? "Benutzer wurde" : "Benutzer wurden"} deaktiviert, da der neuen Tarif weniger Plätze hat. Sie können Benutzer unter Team & Benutzer verwalten reaktivieren, wenn Plätze frei werden.`
+          `Tarif geändert. ${deactivated} ${deactivated === 1 ? "Benutzer wurde" : "Benutzer wurden"} deaktiviert, da der neue Tarif weniger Plätze hat. Sie können Benutzer unter Team & Benutzer reaktivieren, wenn Plätze frei werden.`
         );
       } else {
         setSuccessMessage(
@@ -106,7 +113,7 @@ export default function AccountPage() {
             : "Tarif geändert. Der neue Tarif gilt ab dem nächsten Abrechnungszeitraum."
         );
       }
-      setPendingSeats(null);
+      setPendingTier(null);
       await utils.subscriptions.getSubscriptionStatus.invalidate();
     } catch (error) {
       console.error("Failed to change plan:", error);
@@ -356,11 +363,12 @@ export default function AccountPage() {
                     {subscriptionStatus.status === "trial" ? "Testphase" : subscriptionStatus.status}
                   </span>
                 </p>
-                {subscriptionStatus.currentPrice ? (
+                {subscriptionStatus.currentTier ? (
                   <p>
                     {subscriptionStatus.isTrialing ? "Gewählter Tarif:" : "Aktueller Tarif:"}{" "}
-                    <span className="font-medium">
-                      {subscriptionStatus.currentPrice.seats} Nutzer (€{(subscriptionStatus.currentPrice.monthlyPrice / 100).toFixed(2)}/Monat)
+                    <span className="font-medium capitalize">
+                      {TIER_INFO[subscriptionStatus.currentTier.tier as keyof typeof TIER_INFO]?.label ?? subscriptionStatus.currentTier.tier}{" "}
+                      ({subscriptionStatus.currentTier.interval === "annual" ? "Jahresabo" : "monatlich"})
                     </span>
                   </p>
                 ) : subscriptionStatus.isTrialing ? (
@@ -374,19 +382,23 @@ export default function AccountPage() {
                   </p>
                 )}
               </div>
-              {subscriptionStatus.isTrialing && subscriptionStatus.currentPrice && subscriptionStatus.trialEndsAt && (
+              {subscriptionStatus.isTrialing && subscriptionStatus.currentTier && subscriptionStatus.trialEndsAt && (
                 <div className="mt-3 p-3 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-800 flex gap-2">
                   <Info className="w-4 h-4 shrink-0 mt-0.5" />
                   <span>
                     Nach der Testphase ({new Date(subscriptionStatus.trialEndsAt).toLocaleDateString("de-DE")}) wird automatisch{" "}
-                    <strong>€{(subscriptionStatus.currentPrice.monthlyPrice / 100).toFixed(2)}/Monat ({subscriptionStatus.currentPrice.seats} Nutzer)</strong> berechnet.
+                    <strong>
+                      €{subscriptionStatus.currentTier.interval === "annual"
+                        ? (subscriptionStatus.currentTier.unitAmount / 100).toFixed(0) + "/Jahr"
+                        : (subscriptionStatus.currentTier.unitAmount / 100).toFixed(0) + "/Monat"}
+                    </strong> berechnet.
                     Sie können den Tarif jederzeit vor Ablauf der Testphase ändern.
                   </span>
                 </div>
               )}
             </div>
 
-            {subscriptionStatus.isTrialing && !subscriptionStatus.currentPrice && (
+            {subscriptionStatus.isTrialing && !subscriptionStatus.currentTier && (
               <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-800 flex gap-2 items-start">
                 <Info className="w-4 h-4 shrink-0 mt-0.5" />
                 <span>
@@ -395,39 +407,65 @@ export default function AccountPage() {
               </div>
             )}
 
-            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-              {[
-                { seats: 1, price: "€30", desc: "1 Nutzer" },
-                { seats: 3, price: "€50", desc: "3 Nutzer" },
-                { seats: 5, price: "€100", desc: "5 Nutzer" },
-                { seats: 10, price: "€200", desc: "10 Nutzer" },
-              ].map((tier) => (
+            {/* Billing interval toggle */}
+            <div className="mb-4 flex items-center gap-3">
+              <span className="text-sm text-muted">Abrechnung:</span>
+              <div className="flex rounded-lg border border-border overflow-hidden text-sm">
                 <button
-                  key={tier.seats}
-                  onClick={() => handleSelectTier(tier.seats)}
-                  disabled={
-                    createCheckoutMutation.isPending ||
-                    changePlanMutation.isPending ||
-                    !!subscriptionStatus.cancelledAtPeriodEnd ||
-                    subscriptionStatus.currentPrice?.seats === tier.seats ||
-                    pendingSeats === tier.seats
-                  }
-                  className="p-4 rounded-lg border border-gray-200 transition-all text-sm font-medium hover:border-blue-300 disabled:opacity-50 disabled:cursor-not-allowed data-[current=true]:border-blue-400 data-[current=true]:bg-blue-50"
-                  data-current={subscriptionStatus.currentPrice?.seats === tier.seats}
+                  onClick={() => setBillingInterval("monthly")}
+                  className={`px-3 py-1.5 transition-colors ${billingInterval === "monthly" ? "bg-accent text-white font-medium" : "bg-surface text-muted hover:bg-muted-soft"}`}
                 >
-                  <div>{tier.price}</div>
-                  <div className="text-xs text-gray-600 font-normal">{tier.desc}</div>
-                  {subscriptionStatus.currentPrice?.seats === tier.seats && (
-                    <div className="text-xs text-blue-600 font-medium mt-1">Aktuell</div>
-                  )}
+                  Monatlich
                 </button>
-              ))}
+                <button
+                  onClick={() => setBillingInterval("annual")}
+                  className={`px-3 py-1.5 transition-colors ${billingInterval === "annual" ? "bg-accent text-white font-medium" : "bg-surface text-muted hover:bg-muted-soft"}`}
+                >
+                  Jährlich <span className="text-xs opacity-75">(2 Monate gratis)</span>
+                </button>
+              </div>
             </div>
 
-            {pendingSeats && subscriptionStatus.currentPrice && (() => {
-              const isUpgrade = pendingSeats > subscriptionStatus.currentPrice.seats;
-              const pending = PLAN_PRICES[pendingSeats];
-              const current = PLAN_PRICES[subscriptionStatus.currentPrice.seats];
+            <div className="grid gap-3 md:grid-cols-3">
+              {(["solo", "praxis", "klinik"] as const).map((tier) => {
+                const info = TIER_INFO[tier];
+                const price = billingInterval === "annual" ? info.annual : info.monthly;
+                const isCurrent = subscriptionStatus.currentTier?.tier === tier;
+                const isPending = pendingTier === tier;
+                return (
+                  <button
+                    key={tier}
+                    onClick={() => handleSelectTier(tier)}
+                    disabled={
+                      createCheckoutMutation.isPending ||
+                      changePlanMutation.isPending ||
+                      !!subscriptionStatus.cancelledAtPeriodEnd ||
+                      isCurrent ||
+                      isPending
+                    }
+                    className="p-4 rounded-lg border transition-all text-sm font-medium hover:border-accent disabled:opacity-50 disabled:cursor-not-allowed text-left"
+                    style={{ borderColor: isCurrent ? "var(--color-accent)" : undefined, background: isCurrent ? "var(--color-accent-soft, #f0faf0)" : undefined }}
+                  >
+                    <div className="font-bold text-base">{info.label}</div>
+                    <div className="text-xs text-muted font-normal mt-0.5">{info.desc}</div>
+                    <div className="mt-2 font-semibold">
+                      €{price}<span className="text-xs font-normal text-muted">/{billingInterval === "annual" ? "Jahr" : "Monat"}</span>
+                    </div>
+                    {isCurrent && (
+                      <div className="mt-1 text-xs font-medium" style={{ color: "var(--color-accent)" }}>Aktuell</div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {pendingTier && subscriptionStatus.currentTier && (() => {
+              const currentIdx = TIER_ORDER.indexOf(subscriptionStatus.currentTier!.tier as "solo" | "praxis" | "klinik");
+              const newIdx = TIER_ORDER.indexOf(pendingTier);
+              const isUpgrade = newIdx > currentIdx;
+              const pending = TIER_INFO[pendingTier];
+              const current = TIER_INFO[subscriptionStatus.currentTier!.tier as keyof typeof TIER_INFO];
+              const pendingPrice = billingInterval === "annual" ? pending.annual : pending.monthly;
               return (
                 <div className="mt-4 p-4 rounded-lg border border-blue-200 bg-blue-50 text-sm">
                   <p className="font-semibold text-blue-900 mb-1">
@@ -436,7 +474,7 @@ export default function AccountPage() {
                       : isUpgrade ? "Upgrade bestätigen" : "Downgrade bestätigen"}
                   </p>
                   <p className="text-blue-800 mb-1">
-                    {current?.label} ({current?.price}) → {pending?.label} ({pending?.price})
+                    {current?.label} → {pending.label} (€{pendingPrice}/{billingInterval === "annual" ? "Jahr" : "Monat"})
                   </p>
                   <p className="text-blue-700 text-xs mb-3">
                     {subscriptionStatus.isTrialing
@@ -444,8 +482,8 @@ export default function AccountPage() {
                       : isUpgrade
                       ? "Die anteilige Differenz für den verbleibenden Abrechnungszeitraum wird Ihrer nächsten Rechnung hinzugefügt."
                       : `Der neue Tarif gilt ab dem nächsten Abrechnungszeitraum. Für den aktuellen Zeitraum erhalten Sie keine Rückerstattung.${
-                          (subscriptionStatus.maxUsers ?? 5) > pendingSeats
-                            ? ` Achtung: ${pendingSeats} Nutzerplätze bedeuten, dass überschüssige nicht-Admin-Benutzer automatisch deaktiviert werden.`
+                          (subscriptionStatus.maxUsers ?? 3) > (TIER_INFO[pendingTier].desc.match(/\d+/)?.[0] ? parseInt(TIER_INFO[pendingTier].desc) : 3)
+                            ? ` Achtung: Überschüssige nicht-Admin-Benutzer werden automatisch deaktiviert.`
                             : ""
                         }`}
                   </p>
@@ -458,7 +496,7 @@ export default function AccountPage() {
                       {changePlanMutation.isPending ? "Wird geändert..." : "Bestätigen"}
                     </button>
                     <button
-                      onClick={() => setPendingSeats(null)}
+                      onClick={() => setPendingTier(null)}
                       disabled={changePlanMutation.isPending}
                       className="px-3 py-1.5 rounded-lg text-xs font-medium text-blue-800 border border-blue-300 hover:bg-blue-100 disabled:opacity-50 transition-all"
                     >
@@ -481,7 +519,7 @@ export default function AccountPage() {
               </div>
             )}
 
-            {(subscriptionStatus.status === "active" || subscriptionStatus.status === "trial") && !subscriptionStatus.cancelledAtPeriodEnd && !subscriptionStatus.deactivatedAt && subscriptionStatus.currentPrice && (
+            {(subscriptionStatus.status === "active" || subscriptionStatus.status === "trial") && !subscriptionStatus.cancelledAtPeriodEnd && !subscriptionStatus.deactivatedAt && subscriptionStatus.currentTier && (
               <div className="mt-6 pt-6 border-t border-border">
                 <button
                   onClick={handleCancelSubscription}

@@ -223,7 +223,7 @@ export const tenantRouter = createTRPCRouter({
           country: "DE",
           timezone: "Europe/Berlin",
           subscriptionStatus: "trial",
-          subscriptionPlan: "starter",
+          subscriptionPlan: "solo",
           maxUsers: 5,
           themePreference: "sage",
           typographyPreference: "modern",

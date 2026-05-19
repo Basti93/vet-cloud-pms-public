@@ -150,7 +150,7 @@ export async function POST(req: Request) {
             country: "DE",
             timezone: "Europe/Berlin",
             subscriptionStatus: "trial",
-            subscriptionPlan: "starter",
+            subscriptionPlan: "solo",
           })
           .returning();
 

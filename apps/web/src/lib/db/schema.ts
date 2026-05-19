@@ -75,11 +75,25 @@ export const tenants = pgTable(
       .notNull(),
     subscriptionPlan: varchar("subscription_plan", {
       length: 50,
-      enum: ["free", "starter", "pro", "enterprise"],
+      enum: ["solo", "praxis", "klinik"],
     })
-      .default("starter")
+      .default("solo")
       .notNull(),
-    maxUsers: smallint("max_users").default(5),
+    maxUsers: smallint("max_users").default(3),
+    billingInterval: varchar("billing_interval", {
+      length: 10,
+      enum: ["monthly", "annual"],
+    })
+      .default("monthly")
+      .notNull(),
+    hasWebsiteBuilder: boolean("has_website_builder").default(false).notNull(),
+    websiteBuilderPriceId: varchar("website_builder_price_id", { length: 255 }),
+    pioneerTier: varchar("pioneer_tier", {
+      length: 20,
+      enum: ["none", "pioneer", "early_adopter"],
+    })
+      .default("none")
+      .notNull(),
     stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
     stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }),
     currentStripePriceId: varchar("current_stripe_price_id", { length: 255 }),

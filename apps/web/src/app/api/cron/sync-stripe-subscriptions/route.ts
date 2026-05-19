@@ -2,7 +2,36 @@ import { NextRequest, NextResponse } from "next/server";
 import { db as appDb } from "@/lib/db/client";
 import { tenants } from "@/lib/db/schema";
 import { getStripeClient } from "@/lib/stripe/client";
+import { getTierByPriceId, getAddonByPriceId } from "@/lib/stripe/prices";
 import { isNotNull, eq } from "drizzle-orm";
+import type Stripe from "stripe";
+
+async function syncSubscriptionItems(subscription: Stripe.Subscription) {
+  const result: Record<string, unknown> = {};
+  let hasWb = false;
+  let wbPriceId: string | null = null;
+
+  for (const item of subscription.items.data) {
+    const priceId = item.price.id;
+    const [tier, addon] = await Promise.all([
+      getTierByPriceId(priceId),
+      getAddonByPriceId(priceId),
+    ]);
+    if (tier) {
+      result.subscriptionPlan = tier.tier;
+      result.maxUsers = tier.seats;
+      result.billingInterval = tier.interval;
+    }
+    if (addon?.addon === "website-builder") {
+      hasWb = true;
+      wbPriceId = priceId;
+    }
+  }
+
+  result.hasWebsiteBuilder = hasWb;
+  result.websiteBuilderPriceId = wbPriceId;
+  return result;
+}
 
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
@@ -89,9 +118,16 @@ export async function POST(request: NextRequest) {
           // Active subscription found — sync from Stripe (source of truth)
           updateData.stripeSubscriptionId = activeSub.id;
 
-          if (activeSub.items.data[0]?.price?.id) {
-            updateData.currentStripePriceId = activeSub.items.data[0].price.id;
+          const tierItem = activeSub.items.data.find(
+            (item) => !(item.price as { metadata?: Record<string, string> }).metadata?.addon
+          );
+          if (tierItem?.price?.id) {
+            updateData.currentStripePriceId = tierItem.price.id;
           }
+
+          // Sync tier name, seats, billing interval, and website builder
+          const itemSync = await syncSubscriptionItems(activeSub);
+          Object.assign(updateData, itemSync);
 
           // Update trial status
           if (activeSub.trial_end && activeSub.trial_end * 1000 > Date.now()) {
