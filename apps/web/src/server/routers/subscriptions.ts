@@ -97,6 +97,7 @@ export const subscriptionsRouter = createTRPCRouter({
           customer: stripeCustomerId,
           mode: "subscription",
           line_items: lineItems,
+          automatic_tax: { enabled: true },
           ...(couponId
             ? { discounts: [{ coupon: couponId }] }
             : { allow_promotion_codes: true }),
