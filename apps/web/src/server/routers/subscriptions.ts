@@ -95,6 +95,7 @@ export const subscriptionsRouter = createTRPCRouter({
 
         const session = await stripe.checkout.sessions.create({
           customer: stripeCustomerId,
+          customer_update: { address: "auto" },
           mode: "subscription",
           line_items: lineItems,
           automatic_tax: { enabled: true },
