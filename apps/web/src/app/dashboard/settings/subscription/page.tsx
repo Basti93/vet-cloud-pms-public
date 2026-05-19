@@ -480,8 +480,8 @@ export default function SubscriptionPage() {
       )}
 
       {/* Website Builder Add-on */}
-      {subscriptionStatus && (subscriptionStatus.status === "active" || subscriptionStatus.status === "trial") && (() => {
-        const isLocked = subscriptionStatus.isTrialing && !subscriptionStatus.currentTier;
+      {subscriptionStatus && subscriptionStatus.status === "active" && (() => {
+        const isLocked = Boolean(subscriptionStatus.isTrialing) || !subscriptionStatus.currentTier;
         return (
           <div className={`bg-surface rounded-2xl border border-border shadow-sm p-6 transition-opacity ${isLocked ? "opacity-60" : ""}`}>
             <div className="flex items-start justify-between gap-4">
