@@ -30,7 +30,7 @@ const ALL_TABS = [
     ],
   },
   {
-    label: "Datenschutz & Konto",
+    label: "Konto & Abo",
     icon: Lock,
     children: [
       { href: "/dashboard/settings/subscription", label: "Abo", icon: CreditCard },

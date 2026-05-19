@@ -38,6 +38,9 @@ export default function SubscriptionPage() {
   const cancelSubscriptionMutation = trpc.subscriptions.cancelSubscription.useMutation();
   const reactivateSubscriptionMutation = trpc.subscriptions.reactivateSubscription.useMutation();
   const undoCancellationMutation = trpc.subscriptions.undoCancellation.useMutation();
+  const addWebsiteBuilderMutation = trpc.subscriptions.addWebsiteBuilder.useMutation();
+  const removeWebsiteBuilderMutation = trpc.subscriptions.removeWebsiteBuilder.useMutation();
+  const [wbLoading, setWbLoading] = useState(false);
 
   const canManageSettings = Boolean(permissions?.includes(PERMISSIONS.SETTINGS_MANAGE));
 
@@ -475,6 +478,85 @@ export default function SubscriptionPage() {
           </div>
         </>
       )}
+
+      {/* Website Builder Add-on */}
+      {subscriptionStatus && (subscriptionStatus.status === "active" || subscriptionStatus.status === "trial") && (() => {
+        const isLocked = subscriptionStatus.isTrialing && !subscriptionStatus.currentTier;
+        return (
+          <div className={`bg-surface rounded-2xl border border-border shadow-sm p-6 transition-opacity ${isLocked ? "opacity-60" : ""}`}>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold text-fg mb-1">Website Builder</h2>
+                <p className="text-sm text-muted mb-1">
+                  Moderne Praxiswebsite — direkt mit Ihrem Buchungssystem verbunden.
+                </p>
+                <p className="text-sm font-medium">
+                  €19<span className="text-xs font-normal text-muted">/Monat</span>
+                  <span className="text-xs text-muted ml-2">(zzgl. MwSt.)</span>
+                </p>
+              </div>
+              <div className="shrink-0">
+                {isLocked ? (
+                  <span className="px-4 py-2 rounded-lg text-sm font-medium text-muted border border-border cursor-not-allowed">
+                    Hinzubuchen
+                  </span>
+                ) : subscriptionStatus.hasWebsiteBuilder ? (
+                  <button
+                    onClick={async () => {
+                      const confirmed = window.confirm("Website Builder wirklich kündigen? Die Website wird deaktiviert.");
+                      if (!confirmed) return;
+                      try {
+                        setWbLoading(true);
+                        setErrorMessage("");
+                        await removeWebsiteBuilderMutation.mutateAsync();
+                        setSuccessMessage("Website Builder wurde gekündigt.");
+                        await utils.subscriptions.getSubscriptionStatus.invalidate();
+                      } catch (e) {
+                        setErrorMessage(e instanceof Error ? e.message : "Fehler beim Kündigen");
+                      } finally {
+                        setWbLoading(false);
+                      }
+                    }}
+                    disabled={wbLoading || !!subscriptionStatus.cancelledAtPeriodEnd}
+                    className="px-4 py-2 rounded-lg text-sm font-medium text-red-600 border border-red-300 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  >
+                    {wbLoading ? "Wird bearbeitet..." : "Kündigen"}
+                  </button>
+                ) : (
+                  <button
+                    onClick={async () => {
+                      try {
+                        setWbLoading(true);
+                        setErrorMessage("");
+                        await addWebsiteBuilderMutation.mutateAsync({ billingInterval });
+                        setSuccessMessage("Website Builder wurde aktiviert.");
+                        await utils.subscriptions.getSubscriptionStatus.invalidate();
+                      } catch (e) {
+                        setErrorMessage(e instanceof Error ? e.message : "Fehler beim Aktivieren");
+                      } finally {
+                        setWbLoading(false);
+                      }
+                    }}
+                    disabled={wbLoading || !!subscriptionStatus.cancelledAtPeriodEnd}
+                    className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{ backgroundColor: "var(--color-accent)" }}
+                  >
+                    {wbLoading ? "Wird aktiviert..." : "Hinzubuchen"}
+                  </button>
+                )}
+              </div>
+            </div>
+            {isLocked && (
+              <p className="mt-3 text-xs text-muted">
+                Verfügbar sobald ein Tarif aktiviert ist.
+              </p>
+            )}
+            {subscriptionStatus.hasWebsiteBuilder && (
+              <p className="mt-3 text-xs text-green-700 font-medium">✓ Aktiv</p>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Error / Success */}
       {errorMessage && (
