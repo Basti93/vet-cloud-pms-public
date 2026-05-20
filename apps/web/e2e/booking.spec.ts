@@ -73,10 +73,11 @@ test.describe("Booking page", () => {
 
     let selectedSlot = false;
     for (let pageIndex = 0; pageIndex < 3 && !selectedSlot; pageIndex += 1) {
-      const dayCount = await page.getByTestId("booking-date-day").count();
+      const visibleDays = page.locator('[data-testid="booking-date-day"]:visible');
+      await expect(visibleDays.first()).toBeVisible({ timeout: 10_000 });
+      const dayCount = await visibleDays.count();
       for (let dayIdx = 0; dayIdx < dayCount && !selectedSlot; dayIdx += 1) {
-        // force: true bypasses WebKit stability check that hangs on transition-all buttons
-        await page.getByTestId("booking-date-day").nth(dayIdx).click({ force: true });
+        await visibleDays.nth(dayIdx).click();
         // Wait for slot list to render — networkidle resolves too early on WebKit
         await page.getByTestId("booking-date-slot").first().waitFor({ state: "visible", timeout: 5_000 }).catch(() => {});
         const slotCount = await page.getByTestId("booking-date-slot").count();

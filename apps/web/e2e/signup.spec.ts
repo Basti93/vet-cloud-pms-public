@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext, type Locator, type Page } from "@playwright/test";
+import { expect, request as playwrightRequest, test, type APIRequestContext, type Locator, type Page } from "@playwright/test";
 import { clerkSetup, setupClerkTestingToken } from "@clerk/testing/playwright";
 
 const CLERK_API_BASE_URL = process.env.CLERK_API_BASE_URL ?? "https://api.clerk.com";
@@ -68,6 +68,7 @@ async function completeSignupForm(page: Page, email: string, password: string) {
 
 test.describe("Signup page", () => {
   test("can create a user via UI and clean it up in Clerk", async ({ page, request, isMobile }) => {
+    test.setTimeout(90_000);
     test.skip(isMobile, "Run full signup flow on desktop only.");
     test.skip(!process.env.CLERK_SECRET_KEY, "CLERK_SECRET_KEY is required for cleanup.");
 
@@ -112,7 +113,12 @@ test.describe("Signup page", () => {
       );
       expect(fatalCspOrCaptchaErrors).toEqual([]);
     } finally {
-      await deleteClerkUsersByEmail(request, email);
+      const cleanupRequest = await playwrightRequest.newContext();
+      try {
+        await deleteClerkUsersByEmail(cleanupRequest, email);
+      } finally {
+        await cleanupRequest.dispose();
+      }
     }
   });
 });
