@@ -1,5 +1,5 @@
 import { expect, test, type APIRequestContext, type Locator, type Page } from "@playwright/test";
-import { setupClerkTestingToken } from "@clerk/testing/playwright";
+import { clerkSetup, setupClerkTestingToken } from "@clerk/testing/playwright";
 
 const CLERK_API_BASE_URL = process.env.CLERK_API_BASE_URL ?? "https://api.clerk.com";
 
@@ -80,6 +80,7 @@ test.describe("Signup page", () => {
       if (msg.type() === "error") consoleErrors.push(msg.text());
     });
 
+    await clerkSetup();
     await setupClerkTestingToken({ page });
     await page.goto("/sign-up");
     await expect(page).toHaveURL(/\/sign-up/);
