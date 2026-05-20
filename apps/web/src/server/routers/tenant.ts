@@ -23,6 +23,7 @@ import { clerkClient } from "@clerk/nextjs/server";
 import { sendTenantLifecycleEmail } from "@/lib/email/service";
 import { createDefaultRoles } from "@/lib/auth/permissions";
 import { ROLE_CODES } from "@/lib/auth/roles";
+import { TRIAL_DAYS } from "@/lib/stripe/prices";
 
 // Helper function to generate a unique slug from tenant name
 async function generateUniqueSlug(
@@ -215,6 +216,17 @@ export const tenantRouter = createTRPCRouter({
       const slug = await generateUniqueSlug(ctx.db, input.name);
 
       // Update placeholder tenant with actual practice details
+      const [currentTenantTrial] = await ctx.db
+        .select({
+          trialEndsAt: tenants.trialEndsAt,
+          originalTrialEndsAt: tenants.originalTrialEndsAt,
+        })
+        .from(tenants)
+        .where(eq(tenants.id, currentUser.tenantId))
+        .limit(1);
+
+      const fallbackTrialEndsAt = new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
+
       const [updatedTenant] = await ctx.db
         .update(tenants)
         .set({
@@ -224,6 +236,11 @@ export const tenantRouter = createTRPCRouter({
           timezone: "Europe/Berlin",
           subscriptionStatus: "trial",
           subscriptionPlan: "solo",
+          trialEndsAt: currentTenantTrial?.trialEndsAt ?? fallbackTrialEndsAt,
+          originalTrialEndsAt:
+            currentTenantTrial?.originalTrialEndsAt ??
+            currentTenantTrial?.trialEndsAt ??
+            fallbackTrialEndsAt,
           maxUsers: 5,
           themePreference: "sage",
           typographyPreference: "modern",

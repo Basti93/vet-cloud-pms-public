@@ -5,6 +5,7 @@ import { db } from "@/lib/db/client";
 import { users, tenants, userInvitations } from "@/lib/db/schema";
 import { randomUUID } from "crypto";
 import { and, eq } from "drizzle-orm";
+import { TRIAL_DAYS } from "@/lib/stripe/prices";
 
 // Helper function to generate a unique slug
 async function generateUniqueSlug(baseName: string): Promise<string> {
@@ -140,6 +141,7 @@ export async function POST(req: Request) {
         const placeholderName = `${firstName || "User"} ${lastName || "Placeholder"}`;
         const uniqueSlug = await generateUniqueSlug(`temp-${placeholderName}`);
 
+        const trialEndsAt = new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
         const [tempTenant] = await db
           .insert(tenants)
           .values({
@@ -151,6 +153,8 @@ export async function POST(req: Request) {
             timezone: "Europe/Berlin",
             subscriptionStatus: "trial",
             subscriptionPlan: "solo",
+            trialEndsAt,
+            originalTrialEndsAt: trialEndsAt,
           })
           .returning();
 
