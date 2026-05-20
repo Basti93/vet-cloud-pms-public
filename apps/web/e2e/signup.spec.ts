@@ -21,7 +21,12 @@ async function findClerkUserIdsByEmail(request: APIRequestContext, email: string
   ];
 
   for (const url of urls) {
-    const res = await request.get(url, { headers });
+    let res;
+    try {
+      res = await request.get(url, { headers, timeout: 8_000 });
+    } catch {
+      continue;
+    }
     if (!res.ok()) continue;
 
     const body = (await res.json()) as Array<{
@@ -47,7 +52,11 @@ async function deleteClerkUsersByEmail(request: APIRequestContext, email: string
   const userIds = await findClerkUserIdsByEmail(request, email);
 
   for (const userId of userIds) {
-    await request.delete(`${CLERK_API_BASE_URL}/v1/users/${userId}`, { headers });
+    try {
+      await request.delete(`${CLERK_API_BASE_URL}/v1/users/${userId}`, { headers, timeout: 8_000 });
+    } catch {
+      // Best-effort cleanup only.
+    }
   }
 }
 
@@ -67,7 +76,7 @@ async function completeSignupForm(page: Page, email: string, password: string) {
 }
 
 test.describe("Signup page", () => {
-  test("can create a user via UI and clean it up in Clerk", async ({ page, request, isMobile }) => {
+  test("can create a user via UI and clean it up in Clerk", async ({ page, isMobile }) => {
     test.setTimeout(90_000);
     test.skip(isMobile, "Run full signup flow on desktop only.");
     test.skip(!process.env.CLERK_SECRET_KEY, "CLERK_SECRET_KEY is required for cleanup.");
@@ -81,6 +90,8 @@ test.describe("Signup page", () => {
       if (msg.type() === "error") consoleErrors.push(msg.text());
     });
 
+    const cleanupRequest = await playwrightRequest.newContext();
+
     await clerkSetup();
     await setupClerkTestingToken({ page });
     await page.goto("/sign-up");
@@ -90,13 +101,21 @@ test.describe("Signup page", () => {
       await expect(page.locator('input[name="emailAddress"]').first()).toBeVisible({ timeout: 20_000 });
       await completeSignupForm(page, email, password);
 
+      const signUpResponsePromise = page.waitForResponse(
+        (res) =>
+          res.url().includes("/v1/client/sign_ups") &&
+          ["POST", "PUT"].includes(res.request().method()),
+        { timeout: 20_000 }
+      );
+
       await page.locator('button[type="submit"]').first().click();
+      await expect(signUpResponsePromise).resolves.toBeTruthy();
 
       await expect
         .poll(async () => {
-          const ids = await findClerkUserIdsByEmail(request, email);
+          const ids = await findClerkUserIdsByEmail(cleanupRequest, email);
           return ids.length;
-        }, { timeout: 20_000 })
+        }, { timeout: 25_000, intervals: [2_000, 3_000, 5_000] })
         .toBeGreaterThan(0);
 
       const currentPath = new URL(page.url()).pathname;
@@ -113,12 +132,8 @@ test.describe("Signup page", () => {
       );
       expect(fatalCspOrCaptchaErrors).toEqual([]);
     } finally {
-      const cleanupRequest = await playwrightRequest.newContext();
-      try {
-        await deleteClerkUsersByEmail(cleanupRequest, email);
-      } finally {
-        await cleanupRequest.dispose();
-      }
+      await deleteClerkUsersByEmail(cleanupRequest, email);
+      await cleanupRequest.dispose();
     }
   });
 });
