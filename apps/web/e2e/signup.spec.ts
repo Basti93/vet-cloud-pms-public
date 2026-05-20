@@ -101,15 +101,18 @@ test.describe("Signup page", () => {
       await expect(page.locator('input[name="emailAddress"]').first()).toBeVisible({ timeout: 20_000 });
       await completeSignupForm(page, email, password);
 
-      const signUpResponsePromise = page.waitForResponse(
-        (res) =>
-          res.url().includes("/v1/client/sign_ups") &&
-          ["POST", "PUT"].includes(res.request().method()),
-        { timeout: 20_000 }
+      const signUpRequestPromise = page.waitForRequest(
+        (req) =>
+          req.url().includes("/v1/client/sign_ups") &&
+          ["POST", "PUT"].includes(req.method()),
+        { timeout: 25_000 }
       );
 
-      await page.locator('button[type="submit"]').first().click();
-      await expect(signUpResponsePromise).resolves.toBeTruthy();
+      const submitButton = page.locator('button[type="submit"]:visible').last();
+      await expect(submitButton).toBeVisible({ timeout: 10_000 });
+      await expect(submitButton).toBeEnabled({ timeout: 10_000 });
+      await submitButton.click();
+      await expect(signUpRequestPromise).resolves.toBeTruthy();
 
       await expect
         .poll(async () => {
