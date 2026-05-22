@@ -3,6 +3,7 @@ node_modules/
 **/e2e/.auth/
 # Local E2E credentials — copy from .env.test.example
 apps/web/.env.test
+.env.test
 .env.local
 .env.production.local
 .env.production
