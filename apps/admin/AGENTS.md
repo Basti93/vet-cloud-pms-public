@@ -1,3 +1,5 @@
+Read the root `AGENTS.md` first. It contains the shared Codex workflow, including OpenSpec discovery, propose/apply/archive flows, and repository-wide guardrails.
+
 <!-- BEGIN:nextjs-agent-rules -->
 # This is NOT the Next.js you know
 
