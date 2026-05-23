@@ -137,7 +137,7 @@ describe("booking.confirm", () => {
 
   it("deduplicates owner when confirming pending-confirmation with existing owner email", async () => {
     // Existing owner
-    const [existingOwner] = await db.insert(owners).values({ tenantId, firstName: "Existing", lastName: "Owner", email: "dedup@test.de" }).returning();
+    await db.insert(owners).values({ tenantId, firstName: "Existing", lastName: "Owner", email: "dedup@test.de" });
     // Provisional owner (from online booking) — same email
     const [provisionalOwner] = await db.insert(owners).values({ tenantId, firstName: "Provisional", lastName: "Owner", email: "dedup@test.de" }).returning();
     const [provisionalPatient] = await db.insert(patients).values({ tenantId, ownerId: provisionalOwner.id, name: "Buddy", species: "Hund" }).returning();
