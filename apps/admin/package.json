@@ -12,8 +12,8 @@
     "lint:styles": "stylelint \"**/*.{css,scss}\""
   },
   "dependencies": {
-    "@clerk/nextjs": "^6.12.0",
-    "@clerk/shared": "^3.23.1",
+    "@clerk/nextjs": "^6.39.4",
+    "@clerk/shared": "^3.47.6",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/api-logs": "^0.217.0",
     "@opentelemetry/instrumentation": "^0.217.0",

@@ -39,10 +39,16 @@
     "mcp:rag": "tsx mcp-servers/rag-server.ts"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["cpu-features", "ssh2"]
+    "onlyBuiltDependencies": [
+      "cpu-features",
+      "ssh2"
+    ],
+    "overrides": {
+      "js-cookie": "3.0.7"
+    }
   },
   "dependencies": {
-    "@clerk/localizations": "^4.5.5",
+    "@clerk/localizations": "^4.6.8",
     "drizzle-kit": "^0.31.10",
     "drizzle-orm": "^0.45.2",
     "eslint": "^9.39.4",
