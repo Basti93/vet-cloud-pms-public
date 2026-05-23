@@ -1,4 +1,4 @@
-import { createTRPCRouter, publicProcedure, protectedProcedure } from "@/server/trpc";
+import { createTRPCRouter, publicProcedure, protectedProcedure, tenantProcedure } from "@/server/trpc";
 import { z } from "zod";
 import {
   tenants,
@@ -468,7 +468,7 @@ export const tenantRouter = createTRPCRouter({
       return tenant[0];
     }),
 
-  updateTheme: protectedProcedure
+  updateTheme: tenantProcedure
     .input(
       z.object({
         tenantId: z.string().uuid(),
@@ -677,23 +677,19 @@ export const tenantRouter = createTRPCRouter({
       return { previewToken: token };
     }),
 
-  delete: protectedProcedure
+  delete: tenantProcedure
     .use(requirePermission(PERMISSIONS.SETTINGS_MANAGE))
     .input(z.object({ tenantId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      // Get current user's tenant context
+      // Get current user's email for lifecycle notifications
       const [user] = await ctx.db
-        .select({ id: users.id, tenantId: users.tenantId, email: users.email })
+        .select({ id: users.id, email: users.email })
         .from(users)
-        .where(eq(users.clerkId, ctx.userId))
+        .where(eq(users.id, ctx.dbUserId))
         .limit(1);
 
       if (!user) {
         throw new Error("User not found");
-      }
-
-      if (user.tenantId !== input.tenantId) {
-        throw new Error("Can only delete your own practice");
       }
 
       const [tenant] = await ctx.db
@@ -769,27 +765,23 @@ export const tenantRouter = createTRPCRouter({
     }
   }),
 
-  requestDeletion: protectedProcedure
+  requestDeletion: tenantProcedure
     .use(requirePermission(PERMISSIONS.SETTINGS_MANAGE))
     .input(z.object({ tenantId: z.string().uuid(), userId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       // Get current user
       const [user] = await ctx.db
-        .select({ id: users.id, tenantId: users.tenantId, email: users.email })
+        .select({ id: users.id, email: users.email })
         .from(users)
-        .where(eq(users.clerkId, ctx.userId))
+        .where(eq(users.id, ctx.dbUserId))
         .limit(1);
 
       if (!user) {
         throw new Error("User not found");
       }
 
-      if (user.tenantId !== input.tenantId) {
-        throw new Error("Can only delete your own practice");
-      }
-
       // Verify the userId matches the current user
-      if (input.userId !== user.id) {
+      if (input.userId !== ctx.dbUserId) {
         throw new Error("Can only request deletion for your own account");
       }
 

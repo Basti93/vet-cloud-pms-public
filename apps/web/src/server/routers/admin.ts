@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { and, eq, inArray, count } from "drizzle-orm";
-import { createTRPCRouter, protectedProcedure } from "@/server/trpc";
+import { createTRPCRouter, protectedProcedure, tenantProcedure } from "@/server/trpc";
 import {
   tenants,
   appointments,
@@ -232,24 +232,10 @@ export const adminRouter = createTRPCRouter({
    * List all users in tenant with their roles
    * Protected: USERS_MANAGE permission
    */
-  listUsers: protectedProcedure
+  listUsers: tenantProcedure
     .use(requirePermission(PERMISSIONS.USERS_MANAGE))
     .input(z.object({ tenantId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      // Verify current user is in this tenant
-      const [currentUser] = await ctx.db
-        .select({ tenantId: users.tenantId })
-        .from(users)
-        .where(eq(users.clerkId, ctx.userId!))
-        .limit(1);
-
-      if (currentUser?.tenantId !== input.tenantId) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Cannot list users from other tenants",
-        });
-      }
-
       // Get all users in the tenant
       const allUsers = await ctx.db
         .select({
@@ -306,7 +292,7 @@ export const adminRouter = createTRPCRouter({
    * Protected: USERS_MANAGE permission
    * Idempotent: assigning the same role twice returns success
    */
-  assignRole: protectedProcedure
+  assignRole: tenantProcedure
     .use(requirePermission(PERMISSIONS.USERS_MANAGE))
     .input(
       z.object({
@@ -316,20 +302,6 @@ export const adminRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Verify current user is admin in the target tenant
-      const [currentUser] = await ctx.db
-        .select({ tenantId: users.tenantId, id: users.id })
-        .from(users)
-        .where(eq(users.clerkId, ctx.userId!))
-        .limit(1);
-
-      if (currentUser?.tenantId !== input.tenantId) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Cannot assign roles in other tenants",
-        });
-      }
-
       // Verify target user is in the same tenant
       const [targetUser] = await ctx.db
         .select({ id: users.id, tenantId: users.tenantId })
@@ -368,7 +340,7 @@ export const adminRouter = createTRPCRouter({
         await ctx.db.insert(userRoles).values({
           userId: input.userId,
           roleId: input.roleId,
-          assignedBy: currentUser!.id,
+          assignedBy: ctx.dbUserId,
         });
         // Invalidate role permission cache since user's roles changed
         invalidateRolePermissionCache(input.roleId);
@@ -396,7 +368,7 @@ export const adminRouter = createTRPCRouter({
    * Protected: USERS_MANAGE permission
    * Constraint: User must always have at least one role
    */
-  removeUserRole: protectedProcedure
+  removeUserRole: tenantProcedure
     .use(requirePermission(PERMISSIONS.USERS_MANAGE))
     .input(
       z.object({
@@ -406,20 +378,6 @@ export const adminRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Verify current user is admin in the target tenant
-      const [currentUser] = await ctx.db
-        .select({ tenantId: users.tenantId })
-        .from(users)
-        .where(eq(users.clerkId, ctx.userId!))
-        .limit(1);
-
-      if (currentUser?.tenantId !== input.tenantId) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Cannot manage roles in other tenants",
-        });
-      }
-
       // Get user's current roles
       const userRolesList = await ctx.db
         .select({ roleId: userRoles.roleId })
@@ -452,23 +410,10 @@ export const adminRouter = createTRPCRouter({
    * Get all roles for a tenant
    * Protected: USERS_MANAGE permission
    */
-  listRoles: protectedProcedure
+  listRoles: tenantProcedure
     .use(requirePermission(PERMISSIONS.USERS_MANAGE))
     .input(z.object({ tenantId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      const [currentUser] = await ctx.db
-        .select({ tenantId: users.tenantId })
-        .from(users)
-        .where(eq(users.clerkId, ctx.userId!))
-        .limit(1);
-
-      if (currentUser?.tenantId !== input.tenantId) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Cannot list roles from other tenants",
-        });
-      }
-
       const allRoles = await ctx.db
         .select()
         .from(roles)
@@ -512,7 +457,7 @@ export const adminRouter = createTRPCRouter({
    * Protected: USERS_MANAGE permission
    * Idempotent: Adding same permission twice is safe
    */
-  addPermissionToRole: protectedProcedure
+  addPermissionToRole: tenantProcedure
     .use(requirePermission(PERMISSIONS.USERS_MANAGE))
     .input(
       z.object({
@@ -522,20 +467,6 @@ export const adminRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Verify current user is in this tenant
-      const [currentUser] = await ctx.db
-        .select({ tenantId: users.tenantId })
-        .from(users)
-        .where(eq(users.clerkId, ctx.userId!))
-        .limit(1);
-
-      if (currentUser?.tenantId !== input.tenantId) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Cannot manage roles in other tenants",
-        });
-      }
-
       // Verify role exists in this tenant
       const [roleExists] = await ctx.db
         .select({
@@ -588,7 +519,7 @@ export const adminRouter = createTRPCRouter({
    * Remove a permission from a role
    * Protected: USERS_MANAGE permission
    */
-  removePermissionFromRole: protectedProcedure
+  removePermissionFromRole: tenantProcedure
     .use(requirePermission(PERMISSIONS.USERS_MANAGE))
     .input(
       z.object({
@@ -598,20 +529,6 @@ export const adminRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Verify current user is in this tenant
-      const [currentUser] = await ctx.db
-        .select({ tenantId: users.tenantId })
-        .from(users)
-        .where(eq(users.clerkId, ctx.userId!))
-        .limit(1);
-
-      if (currentUser?.tenantId !== input.tenantId) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Cannot manage roles in other tenants",
-        });
-      }
-
       // Verify role exists in this tenant
       const [roleExists] = await ctx.db
         .select({ id: roles.id, code: roles.code, isSystem: roles.isSystem })
@@ -690,19 +607,10 @@ export const adminRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  listInvitations: protectedProcedure
+  listInvitations: tenantProcedure
     .use(requirePermission(PERMISSIONS.USERS_MANAGE))
     .input(z.object({ tenantId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      const [currentUser] = await ctx.db
-        .select({ tenantId: users.tenantId })
-        .from(users)
-        .where(eq(users.clerkId, ctx.userId!))
-        .limit(1);
-      if (currentUser?.tenantId !== input.tenantId) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Cannot list invitations from other tenants" });
-      }
-
       await expirePastInvitations(input.tenantId);
 
       return ctx.db
@@ -720,7 +628,7 @@ export const adminRouter = createTRPCRouter({
         .orderBy(userInvitations.createdAt);
     }),
 
-  createInvitation: protectedProcedure
+  createInvitation: tenantProcedure
     .use(requirePermission(PERMISSIONS.USERS_MANAGE))
     .input(
       z.object({
@@ -730,15 +638,6 @@ export const adminRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const [currentUser] = await ctx.db
-        .select({ id: users.id, tenantId: users.tenantId, email: users.email })
-        .from(users)
-        .where(eq(users.clerkId, ctx.userId!))
-        .limit(1);
-      if (!currentUser || currentUser.tenantId !== input.tenantId) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Cannot invite users for other tenants" });
-      }
-
       const [tenant] = await ctx.db
         .select({ name: tenants.name, maxUsers: tenants.maxUsers })
         .from(tenants)
@@ -761,7 +660,7 @@ export const adminRouter = createTRPCRouter({
 
       const invite = await createInvite({
         tenantId: input.tenantId,
-        invitedByUserId: currentUser.id,
+        invitedByUserId: ctx.dbUserId,
         email: input.email,
         role: input.role,
       });
@@ -783,7 +682,7 @@ export const adminRouter = createTRPCRouter({
           eventType: "user_invitation_email_failed",
           message: "Invitation created but email delivery failed",
           tenantId: input.tenantId,
-          userId: currentUser.id,
+          userId: ctx.dbUserId,
           metadata: {
             operation: "create_invitation",
             recipient: invite.email,
@@ -805,18 +704,10 @@ export const adminRouter = createTRPCRouter({
       return { success: true, invitationId: invite.invitationId, emailSent: emailResult.success };
     }),
 
-  resendInvitation: protectedProcedure
+  resendInvitation: tenantProcedure
     .use(requirePermission(PERMISSIONS.USERS_MANAGE))
     .input(z.object({ tenantId: z.string().uuid(), invitationId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const [currentUser] = await ctx.db
-        .select({ id: users.id, tenantId: users.tenantId })
-        .from(users)
-        .where(eq(users.clerkId, ctx.userId!))
-        .limit(1);
-      if (!currentUser || currentUser.tenantId !== input.tenantId) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Cannot resend invitations for other tenants" });
-      }
       const [tenant] = await ctx.db
         .select({ name: tenants.name })
         .from(tenants)
@@ -827,7 +718,7 @@ export const adminRouter = createTRPCRouter({
       const resent = await resendInvite({
         tenantId: input.tenantId,
         invitationId: input.invitationId,
-        invitedByUserId: currentUser.id,
+        invitedByUserId: ctx.dbUserId,
       });
 
       const acceptUrl = `${getMainDomain()}/invite/accept?token=${resent.token}`;
@@ -847,7 +738,7 @@ export const adminRouter = createTRPCRouter({
           eventType: "user_invitation_email_failed",
           message: "Invitation resent but email delivery failed",
           tenantId: input.tenantId,
-          userId: currentUser.id,
+          userId: ctx.dbUserId,
           metadata: {
             operation: "resend_invitation",
             recipient: resent.invitation.email,
@@ -869,19 +760,10 @@ export const adminRouter = createTRPCRouter({
       return { success: true, emailSent: emailResult.success };
     }),
 
-  revokeInvitation: protectedProcedure
+  revokeInvitation: tenantProcedure
     .use(requirePermission(PERMISSIONS.USERS_MANAGE))
     .input(z.object({ tenantId: z.string().uuid(), invitationId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const [currentUser] = await ctx.db
-        .select({ id: users.id, tenantId: users.tenantId })
-        .from(users)
-        .where(eq(users.clerkId, ctx.userId!))
-        .limit(1);
-      if (!currentUser || currentUser.tenantId !== input.tenantId) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Cannot revoke invitations for other tenants" });
-      }
-
       const invitation = await revokeInvite({ tenantId: input.tenantId, invitationId: input.invitationId });
 
       await writeAuditLog(ctx, {
@@ -896,19 +778,10 @@ export const adminRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  getSeatInfo: protectedProcedure
+  getSeatInfo: tenantProcedure
     .use(requirePermission(PERMISSIONS.USERS_MANAGE))
     .input(z.object({ tenantId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      const [currentUser] = await ctx.db
-        .select({ tenantId: users.tenantId })
-        .from(users)
-        .where(eq(users.clerkId, ctx.userId!))
-        .limit(1);
-      if (currentUser?.tenantId !== input.tenantId) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Cannot access seat info for other tenants" });
-      }
-
       const [tenant] = await ctx.db
         .select({ maxUsers: tenants.maxUsers })
         .from(tenants)
@@ -933,7 +806,7 @@ export const adminRouter = createTRPCRouter({
       };
     }),
 
-  toggleUserActive: protectedProcedure
+  toggleUserActive: tenantProcedure
     .use(requirePermission(PERMISSIONS.USERS_MANAGE))
     .input(z.object({
       tenantId: z.string().uuid(),
@@ -941,15 +814,6 @@ export const adminRouter = createTRPCRouter({
       active: z.boolean(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const [currentUser] = await ctx.db
-        .select({ id: users.id, tenantId: users.tenantId })
-        .from(users)
-        .where(eq(users.clerkId, ctx.userId!))
-        .limit(1);
-      if (!currentUser || currentUser.tenantId !== input.tenantId) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Cannot manage users in other tenants" });
-      }
-
       const [targetUser] = await ctx.db
         .select({ id: users.id, tenantId: users.tenantId, active: users.active, clerkId: users.clerkId })
         .from(users)

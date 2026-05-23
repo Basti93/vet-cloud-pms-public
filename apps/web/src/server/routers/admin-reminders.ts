@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createAdminRouter, procedure } from "../adminTrpc";
+import { adminProcedure as procedure, createTRPCRouter as createAdminRouter } from "../trpc";
 import { appointmentEmailLogs, tenants } from "@/lib/db/schema";
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 
@@ -82,4 +82,3 @@ export const adminRemindersRouter = createAdminRouter({
       return { items };
     }),
 });
-

@@ -1,7 +1,7 @@
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { z } from "zod";
 import { appointments, tenants, vaccinationEmailLogs, vaccinations } from "@/lib/db/schema";
-import { createAdminRouter, procedure } from "@/server/adminTrpc";
+import { adminProcedure as procedure, createTRPCRouter as createAdminRouter } from "@/server/trpc";
 
 /**
  * SQL fragment: true if a reminder in vaccination_email_logs resulted in an
