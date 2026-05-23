@@ -253,6 +253,13 @@
       "when": 1748037700000,
       "tag": "0036_add-missing-user-columns",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1748037800000,
+      "tag": "0037_vet-schedules-and-absences",
+      "breakpoints": true
     }
   ]
 }
