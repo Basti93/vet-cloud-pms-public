@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { eq, and, count, lte, gte, inArray } from "drizzle-orm";
+import { eq, and, count, inArray } from "drizzle-orm";
 import { createTRPCRouter, tenantProcedure } from "@/server/trpc";
 import { users, appointments, patients, owners, userRoles, roles } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
 import { ROLE_CODES } from "@/lib/auth/roles";
-import { selectVetByFairDistribution } from "@/server/booking-core";
+import { createScheduleService } from "@/server/schedule-service";
 
 export const vetRouter = createTRPCRouter({
   /** Protected: List all active vets for a tenant with their appointment counts */
@@ -133,72 +133,21 @@ export const vetRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Get all active vets
-      const vets = await ctx.db
-        .select({
-          id: users.id,
-          title: users.title,
-          firstName: users.firstName,
-          lastName: users.lastName,
-        })
-        .from(users)
-        .innerJoin(userRoles, eq(userRoles.userId, users.id))
-        .innerJoin(roles, eq(roles.id, userRoles.roleId))
-        .where(
-          and(
-            eq(users.tenantId, input.tenantId),
-            eq(roles.code, ROLE_CODES.VET),
-            eq(users.active, true)
-          )
-        );
-
-      if (vets.length === 0) {
+      const scheduleService = createScheduleService(ctx.db);
+      try {
+        return await scheduleService.selectVet({
+          tenantId: input.tenantId,
+          startTime: input.startTime,
+          endTime: input.endTime,
+        });
+      } catch (error) {
+        if (!(error instanceof Error) || error.message !== "No vets available for assignment") {
+          throw error;
+        }
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Kein Tierarzt konfiguriert",
         });
       }
-
-      // For each vet, count appointments in the target time range (if provided)
-      // Otherwise just count all scheduled appointments
-      const vetWithCounts = await Promise.all(
-        vets.map(async (vet) => {
-          const baseConditions = [
-            eq(appointments.tenantId, input.tenantId),
-            eq(appointments.vetId, vet.id),
-            eq(appointments.status, "scheduled"),
-          ];
-
-          const whereClause =
-            input.startTime && input.endTime
-              ? and(
-                  ...baseConditions,
-                  and(
-                    lte(appointments.startTime, input.endTime),
-                    gte(appointments.endTime, input.startTime)
-                  )
-                )
-              : and(...baseConditions);
-
-          const [result] = await ctx.db
-            .select({ count: count() })
-            .from(appointments)
-            .where(whereClause);
-
-          return {
-            id: vet.id,
-            title: vet.title,
-            firstName: vet.firstName,
-            lastName: vet.lastName,
-            appointmentCount: result.count || 0,
-          };
-        })
-      );
-
-      // Apply fair distribution
-      const suggestedVetId = selectVetByFairDistribution(vetWithCounts);
-      const suggestedVet = vetWithCounts.find((v) => v.id === suggestedVetId)!;
-
-      return suggestedVet;
     }),
 });
