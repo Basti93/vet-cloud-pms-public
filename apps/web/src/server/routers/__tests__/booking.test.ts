@@ -48,8 +48,9 @@ function bookInput(overrides: Record<string, unknown> = {}) {
 describe("booking.book", () => {
   it("creates owner + patient + appointment atomically with pending-confirmation status", async () => {
     const caller = createTestCaller(db, { clerkId: "", permissions: [] });
+    const input = bookInput({ slotStart: new Date("2026-09-01T09:00:00Z"), slotEnd: new Date("2026-09-01T09:30:00Z") });
 
-    const result = await caller.booking.book(bookInput({ slotStart: new Date("2026-09-01T09:00:00Z"), slotEnd: new Date("2026-09-01T09:30:00Z") }));
+    const result = await caller.booking.book(input);
 
     const [appt] = await db.select().from(appointments).where(eq(appointments.id, result.appointmentId));
     expect(appt.status).toBe("pending-confirmation");
@@ -60,7 +61,7 @@ describe("booking.book", () => {
     expect(patient.name).toBe("Bello");
 
     const [owner] = await db.select().from(owners).where(eq(owners.id, patient.ownerId));
-    expect(owner.email).toBe("max@muster.de");
+    expect(owner.email).toBe(input.owner.email);
   });
 
   it("cleans up holds for browser session after successful booking", async () => {
