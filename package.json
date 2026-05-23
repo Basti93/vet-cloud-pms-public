@@ -39,7 +39,7 @@
     "mcp:rag": "tsx mcp-servers/rag-server.ts"
   },
   "pnpm": {
-    "ignoredBuiltDependencies": ["cpu-features", "ssh2"]
+    "onlyBuiltDependencies": ["cpu-features", "ssh2"]
   },
   "dependencies": {
     "@clerk/localizations": "^4.5.5",
