@@ -38,6 +38,9 @@
     "rag:search": "tsx scripts/dev-rag/search.ts",
     "mcp:rag": "tsx mcp-servers/rag-server.ts"
   },
+  "pnpm": {
+    "ignoredBuiltDependencies": ["cpu-features", "ssh2"]
+  },
   "dependencies": {
     "@clerk/localizations": "^4.5.5",
     "drizzle-kit": "^0.31.10",
