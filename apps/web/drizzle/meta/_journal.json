@@ -239,6 +239,13 @@
       "when": 1779139351864,
       "tag": "0033_third_nehzno",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1748037600000,
+      "tag": "0035_add-missing-tenant-columns",
+      "breakpoints": true
     }
   ]
 }
