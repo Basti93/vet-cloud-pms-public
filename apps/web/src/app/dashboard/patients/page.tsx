@@ -50,6 +50,7 @@ function PatientRow({
     <Link
       href={`/dashboard/patients/${patient.id}`}
       className="flex items-center gap-4 px-6 py-4 hover:bg-muted-soft transition-colors group border-b border-border last:border-0"
+      data-testid="patient-row"
     >
       <div
         className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
@@ -96,7 +97,7 @@ export default function PatientsPage() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="patients-page">
       <Link
         href="/dashboard/clients"
         className="inline-flex items-center gap-2 text-sm font-medium text-[var(--color-accent)] hover:underline"
@@ -111,7 +112,7 @@ export default function PatientsPage() {
             {data ? `${data.length} Tiere` : "Alle Tiere Ihrer Praxis"}
           </p>
         </div>
-        <Button onClick={() => setShowNewModal(true)}>
+        <Button onClick={() => setShowNewModal(true)} data-testid="new-patient-button">
           <Plus size={16} /> Neues Tier
         </Button>
       </div>
@@ -125,6 +126,7 @@ export default function PatientsPage() {
           onChange={(e) => setSearch(e.target.value)}
           icon={<Search size={16} />}
           className="max-w-sm"
+          data-testid="patient-search-input"
         />
       )}
 

@@ -183,7 +183,7 @@ export function AppointmentModal({
       title={isEdit ? "Termin bearbeiten" : "Neuer Termin"}
       description={isEdit && editData?.patientName ? `Tier: ${editData.patientName}` : undefined}
     >
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-5" data-testid="appointment-form">
         {/* Patient */}
         <SearchableSelect
           label="Tier *"
@@ -224,6 +224,7 @@ export function AppointmentModal({
           value={form.title}
           onChange={(e) => set("title", e.target.value)}
           error={errors.title}
+          data-testid="appointment-title-input"
         />
 
         {/* Date/Time */}
@@ -274,6 +275,7 @@ export function AppointmentModal({
             label="Status"
             value={form.status}
             onChange={(e) => set("status", e.target.value)}
+            data-testid="appointment-status-select"
           >
             <option value="scheduled">Geplant</option>
             <option value="completed">Abgeschlossen</option>
@@ -308,7 +310,7 @@ export function AppointmentModal({
           <Button type="button" variant="outline" onClick={onClose} className="flex-1">
             Abbrechen
           </Button>
-          <Button type="submit" loading={isLoading} className="flex-1">
+          <Button type="submit" loading={isLoading} className="flex-1" data-testid="appointment-submit">
             {isEdit ? "Speichern" : "Termin anlegen"}
           </Button>
         </div>

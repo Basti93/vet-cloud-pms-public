@@ -20,11 +20,13 @@ function TextInput({
   onChange,
   placeholder,
   type = "text",
+  "data-testid": testId,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   type?: string;
+  "data-testid"?: string;
 }) {
   return (
     <input
@@ -32,6 +34,7 @@ function TextInput({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
+      data-testid={testId}
       className="w-full px-3 py-2 rounded-lg border text-sm"
       style={{
         borderColor: "var(--color-border)",
@@ -102,7 +105,7 @@ export default function PracticePage() {
       : "bg-muted text-muted-foreground";
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-2xl space-y-6" data-testid="practice-settings-page">
       {deletionStatus?.isDeactivationScheduled && deletionStatus.scheduledFor && (
         <Card className="p-5 border-red-200 bg-red-50">
           <h2 className="text-base font-semibold text-red-700">Deaktivierung aktiv</h2>
@@ -289,7 +292,7 @@ export default function PracticePage() {
         <h2 className="text-base font-semibold mb-5">Praxisinformationen</h2>
         <div className="space-y-4">
           <Field label="Praxisname">
-            <TextInput value={form.name} onChange={set("name")} placeholder="Tierarztpraxis Dr. Müller" />
+            <TextInput value={form.name} onChange={set("name")} placeholder="Tierarztpraxis Dr. Müller" data-testid="practice-name-input" />
           </Field>
 
           <div className="grid grid-cols-2 gap-4">
@@ -330,7 +333,7 @@ export default function PracticePage() {
         </div>
 
         <div className="mt-6 flex items-center gap-3">
-          <Button onClick={handleSave} disabled={update.isPending} className="gap-2">
+          <Button onClick={handleSave} disabled={update.isPending} className="gap-2" data-testid="practice-save-button">
             <Save size={15} />
             {update.isPending ? "Wird gespeichert..." : "Speichern"}
           </Button>

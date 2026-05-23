@@ -227,7 +227,7 @@ export default function SchedulePage() {
               <Share2 size={16} /> Kalender Export
             </Button>
           </Link>
-          <Button onClick={() => openNew()} disabled={!tenantId}>
+          <Button onClick={() => openNew()} disabled={!tenantId} data-testid="new-appointment-button">
             <Plus size={16} /> Neuer Termin
           </Button>
         </div>
