@@ -30,6 +30,7 @@ afterAll(async () => {
   await cleanup?.();
 });
 
+let ownerEmailCounter = 0;
 function bookInput(overrides: Record<string, unknown> = {}) {
   return {
     tenantId,
@@ -37,7 +38,7 @@ function bookInput(overrides: Record<string, unknown> = {}) {
     slotEnd: new Date("2026-09-01T09:30:00Z"),
     reason: "Impfung",
     patient: { name: "Bello", species: "Hund" },
-    owner: { firstName: "Max", lastName: "Muster", email: "max@muster.de", phone: "+49123456789" },
+    owner: { firstName: "Max", lastName: "Muster", email: `max${++ownerEmailCounter}@muster.de`, phone: "+49123456789" },
     vetId: vetUserId,
     browserSessionId,
     ...overrides,

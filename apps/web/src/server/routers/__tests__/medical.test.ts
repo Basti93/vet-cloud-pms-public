@@ -37,7 +37,7 @@ describe("medical.diagnoses.list — MEDICAL_READ guard", () => {
     const caller = createTestCaller(db, { clerkId, permissions: [] });
     await expect(
       caller.medical.diagnoses.list({ patientId, tenantId })
-    ).rejects.toThrow("FORBIDDEN");
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
   it("returns records with MEDICAL_READ permission", async () => {
@@ -55,7 +55,7 @@ describe("medical.medications.list — MEDICAL_READ guard", () => {
     const caller = createTestCaller(db, { clerkId, permissions: [] });
     await expect(
       caller.medical.medications.list({ patientId, tenantId })
-    ).rejects.toThrow("FORBIDDEN");
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
   it("returns records with MEDICAL_READ permission", async () => {
@@ -73,7 +73,7 @@ describe("medical.vitals.list — MEDICAL_READ guard", () => {
     const caller = createTestCaller(db, { clerkId, permissions: [] });
     await expect(
       caller.medical.vitals.list({ patientId, tenantId })
-    ).rejects.toThrow("FORBIDDEN");
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
   it("returns records with MEDICAL_READ permission", async () => {
@@ -100,7 +100,7 @@ describe("medical.diagnoses.create — MEDICAL_CREATE guard", () => {
         status: "active",
         dateOfDiagnosis: new Date("2026-05-01"),
       })
-    ).rejects.toThrow("FORBIDDEN");
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
   it("creates diagnosis with MEDICAL_CREATE permission", async () => {

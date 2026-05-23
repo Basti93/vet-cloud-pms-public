@@ -61,7 +61,7 @@ describe("appointments.create", () => {
         endTime: new Date("2026-06-01T09:30:00Z"),
         title: "Impfung",
       })
-    ).rejects.toThrow("FORBIDDEN");
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
   it("creates appointment with status scheduled", async () => {
@@ -99,7 +99,7 @@ describe("appointments.update", () => {
     const caller = createTestCaller(db, { clerkId, permissions: [] });
     await expect(
       caller.appointments.update({ id: appt.id, tenantId, status: "confirmed" })
-    ).rejects.toThrow("FORBIDDEN");
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
   it("transitions status scheduled → confirmed → completed", async () => {
@@ -164,7 +164,7 @@ describe("appointments.delete", () => {
     const caller = createTestCaller(db, { clerkId, permissions: [] });
     await expect(
       caller.appointments.delete({ id: appt.id, tenantId })
-    ).rejects.toThrow("FORBIDDEN");
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
   it("returns NOT_FOUND for unknown appointment", async () => {
