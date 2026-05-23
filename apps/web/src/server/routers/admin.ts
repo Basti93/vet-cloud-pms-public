@@ -31,9 +31,9 @@ import {
 } from "@/server/invitations";
 import { sendUserInvitationEmail } from "@/lib/email/service";
 import { getMainDomain } from "@/lib/env";
-import { writeAuditLog } from "@/server/audit";
 import { logEventAsync, serializeLogError } from "@/server/trpc/logging-middleware";
 import { ROLE_CODES } from "@/lib/auth/roles";
+import { auditedMutation, auditedProtectedMutation } from "@/server/trpc/audited-mutation";
 
 const DEMO_TENANT_ID = process.env.NEXT_PUBLIC_DEMO_TENANT_ID!;
 const DEMO_TENANT_SLUG = "demo";
@@ -628,7 +628,21 @@ export const adminRouter = createTRPCRouter({
         .orderBy(userInvitations.createdAt);
     }),
 
-  createInvitation: tenantProcedure
+  createInvitation: auditedMutation({
+    entity: "user_invitation",
+    event: "user.invitation_created",
+    action: "create",
+    summary: "User invitation created",
+    entityId: (result) => (result as { invitationId: string }).invitationId,
+    changes: (result, input) => {
+      const data = result as { inviteEmail: string; expiresAt: string };
+      return {
+        email: data.inviteEmail,
+        role: (input as { role: string }).role,
+        expiresAt: data.expiresAt,
+      };
+    },
+  })
     .use(requirePermission(PERMISSIONS.USERS_MANAGE))
     .input(
       z.object({
@@ -692,19 +706,23 @@ export const adminRouter = createTRPCRouter({
         });
       }
 
-      await writeAuditLog(ctx, {
-        tenantId: input.tenantId,
-        action: "create",
-        entity: { type: "user_invitation", id: invite.invitationId },
-        event: "user.invitation_created",
-        summary: "User invitation created",
-        changes: { email: invite.email, role: input.role, expiresAt: invite.expiresAt.toISOString() },
-      });
-
-      return { success: true, invitationId: invite.invitationId, emailSent: emailResult.success };
+      return {
+        success: true,
+        invitationId: invite.invitationId,
+        emailSent: emailResult.success,
+        inviteEmail: invite.email,
+        expiresAt: invite.expiresAt.toISOString(),
+      };
     }),
 
-  resendInvitation: tenantProcedure
+  resendInvitation: auditedMutation({
+    entity: "user_invitation",
+    event: "user.invitation_resent",
+    action: "update",
+    summary: "User invitation resent",
+    entityId: (result) => (result as { invitationId: string }).invitationId,
+    changes: (result) => ({ expiresAt: (result as { expiresAt: string }).expiresAt }),
+  })
     .use(requirePermission(PERMISSIONS.USERS_MANAGE))
     .input(z.object({ tenantId: z.string().uuid(), invitationId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
@@ -748,34 +766,28 @@ export const adminRouter = createTRPCRouter({
         });
       }
 
-      await writeAuditLog(ctx, {
-        tenantId: input.tenantId,
-        action: "update",
-        entity: { type: "user_invitation", id: resent.invitation.id },
-        event: "user.invitation_resent",
-        summary: "User invitation resent",
-        changes: { expiresAt: resent.expiresAt.toISOString() },
-      });
-
-      return { success: true, emailSent: emailResult.success };
+      return {
+        success: true,
+        emailSent: emailResult.success,
+        invitationId: resent.invitation.id,
+        expiresAt: resent.expiresAt.toISOString(),
+      };
     }),
 
-  revokeInvitation: tenantProcedure
+  revokeInvitation: auditedMutation({
+    entity: "user_invitation",
+    event: "user.invitation_revoked",
+    action: "update",
+    summary: "User invitation revoked",
+    entityId: (result) => (result as { invitationId: string }).invitationId,
+    changes: (result) => ({ email: (result as { email: string }).email }),
+  })
     .use(requirePermission(PERMISSIONS.USERS_MANAGE))
     .input(z.object({ tenantId: z.string().uuid(), invitationId: z.string().uuid() }))
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ input }) => {
       const invitation = await revokeInvite({ tenantId: input.tenantId, invitationId: input.invitationId });
 
-      await writeAuditLog(ctx, {
-        tenantId: input.tenantId,
-        action: "update",
-        entity: { type: "user_invitation", id: invitation.id },
-        event: "user.invitation_revoked",
-        summary: "User invitation revoked",
-        changes: { email: invitation.email },
-      });
-
-      return { success: true };
+      return { success: true, invitationId: invitation.id, email: invitation.email };
     }),
 
   getSeatInfo: tenantProcedure
@@ -806,7 +818,16 @@ export const adminRouter = createTRPCRouter({
       };
     }),
 
-  toggleUserActive: tenantProcedure
+  toggleUserActive: auditedMutation({
+    entity: "user",
+    event: (_result, input) =>
+      (input as { active: boolean }).active ? "user.activated" : "user.deactivated",
+    action: "update",
+    entityId: (_result, input) => (input as { userId: string }).userId,
+    summary: (_result: unknown, input: unknown) =>
+      (input as { active: boolean }).active ? "User activated" : "User deactivated",
+    changes: (_result, input) => ({ active: (input as { active: boolean }).active }),
+  })
     .use(requirePermission(PERMISSIONS.USERS_MANAGE))
     .input(z.object({
       tenantId: z.string().uuid(),
@@ -875,33 +896,32 @@ export const adminRouter = createTRPCRouter({
         .set({ active: input.active, updatedAt: new Date() })
         .where(eq(users.id, input.userId));
 
-      await writeAuditLog(ctx, {
-        tenantId: input.tenantId,
-        action: "update",
-        entity: { type: "user", id: input.userId },
-        event: input.active ? "user.activated" : "user.deactivated",
-        summary: input.active ? "User activated" : "User deactivated",
-        changes: { active: input.active },
-      });
-
       return { success: true };
     }),
 
-  acceptInvitation: protectedProcedure
+  acceptInvitation: auditedProtectedMutation({
+    entity: "user_invitation",
+    event: "user.invitation_accepted",
+    action: "update",
+    summary: "User invitation accepted",
+    tenantId: (result) => (result as { tenantId: string }).tenantId,
+    entityId: (result) => (result as { invitationId: string }).invitationId,
+    changes: (result) => {
+      const data = result as { role: string; userId: string };
+      return { role: data.role, userId: data.userId };
+    },
+  })
     .input(z.object({ token: z.string().min(20) }))
     .mutation(async ({ ctx, input }) => {
       if (!ctx.userId) throw new TRPCError({ code: "UNAUTHORIZED" });
       const accepted = await acceptInvite({ token: input.token, clerkUserId: ctx.userId });
 
-      await writeAuditLog(ctx, {
+      return {
+        success: true,
         tenantId: accepted.tenantId,
-        action: "update",
-        entity: { type: "user_invitation", id: accepted.invitationId },
-        event: "user.invitation_accepted",
-        summary: "User invitation accepted",
-        changes: { role: accepted.role, userId: accepted.userId },
-      });
-
-      return { success: true, tenantId: accepted.tenantId };
+        invitationId: accepted.invitationId,
+        role: accepted.role,
+        userId: accepted.userId,
+      };
     }),
 });

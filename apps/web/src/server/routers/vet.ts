@@ -4,21 +4,7 @@ import { createTRPCRouter, tenantProcedure } from "@/server/trpc";
 import { users, appointments, patients, owners, userRoles, roles } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
 import { ROLE_CODES } from "@/lib/auth/roles";
-
-// ── Fair Distribution Algorithm ───────────────────────────────────────────
-/**
- * Finds the vet with the fewest appointments in the given time range
- * Useful for auto-assigning appointments when user doesn't select a vet
- */
-function selectVetByFairDistribution(
-  vets: Array<{ id: string; appointmentCount: number }>
-): string {
-  if (vets.length === 0) {
-    throw new Error("No vets available for assignment");
-  }
-  // Sort by appointment count and pick the one with fewest
-  return vets.sort((a, b) => a.appointmentCount - b.appointmentCount)[0].id;
-}
+import { selectVetByFairDistribution } from "@/server/booking-core";
 
 export const vetRouter = createTRPCRouter({
   /** Protected: List all active vets for a tenant with their appointment counts */

@@ -1,11 +1,11 @@
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
-import { createTRPCRouter, protectedProcedure } from "@/server/trpc";
+import { createTRPCRouter, tenantProcedure } from "@/server/trpc";
 import { tenants, vetSchedules, vetAbsences, users, userRoles, roles } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
 import { DEFAULT_OPENING_HOURS, normalizeWeekSchedule, type DaySchedule } from "@/lib/schedule-types";
-import { writeAuditLog } from "@/server/audit";
 import { ROLE_CODES } from "@/lib/auth/roles";
+import { auditedMutation } from "@/server/trpc/audited-mutation";
 
 const timeRangeSchema = z.object({
   startHour: z.number().int().min(0).max(23),
@@ -44,7 +44,7 @@ function normalizeSpecialOpeningHours(value: unknown): SpecialOpeningHours[] {
 export const scheduleRouter = createTRPCRouter({
   // ── Practice Consultation Hours ─────────────────────────────────────────────
 
-  getConsultationHours: protectedProcedure
+  getConsultationHours: tenantProcedure
     .input(z.object({ tenantId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const [tenant] = await ctx.db
@@ -60,7 +60,14 @@ export const scheduleRouter = createTRPCRouter({
       });
     }),
 
-  updateConsultationHours: protectedProcedure
+  updateConsultationHours: auditedMutation({
+    entity: "tenant_consultation_schedule",
+    event: "schedule.consultation_hours_updated",
+    action: "config_change",
+    summary: "Practice consultation hours updated",
+    entityId: (_result, input) => (input as { tenantId: string }).tenantId,
+    changes: (_result, input) => ({ daysConfigured: (input as { hours: unknown[] }).hours.length }),
+  })
     .input(z.object({
       tenantId: z.string().uuid(),
       hours: z.array(dayScheduleSchema).min(0).max(7),
@@ -73,20 +80,12 @@ export const scheduleRouter = createTRPCRouter({
         .set({ consultationHours: normalizedHours, updatedAt: new Date() })
         .where(eq(tenants.id, input.tenantId));
 
-      await writeAuditLog(ctx, {
-        tenantId: input.tenantId,
-        action: "config_change",
-        entity: { type: "tenant_consultation_schedule", id: input.tenantId },
-        event: "schedule.consultation_hours_updated",
-        summary: "Practice consultation hours updated",
-        changes: { daysConfigured: normalizedHours.length },
-      });
       return { success: true };
     }),
 
   // ── Practice Opening Hours ──────────────────────────────────────────────────
 
-  getPracticeHours: protectedProcedure
+  getPracticeHours: tenantProcedure
     .input(z.object({ tenantId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const [tenant] = await ctx.db
@@ -102,7 +101,14 @@ export const scheduleRouter = createTRPCRouter({
       });
     }),
 
-  updatePracticeHours: protectedProcedure
+  updatePracticeHours: auditedMutation({
+    entity: "tenant_schedule",
+    event: "schedule.practice_hours_updated",
+    action: "config_change",
+    summary: "Practice opening hours updated",
+    entityId: (_result, input) => (input as { tenantId: string }).tenantId,
+    changes: (_result, input) => ({ daysConfigured: (input as { hours: unknown[] }).hours.length }),
+  })
     .input(z.object({
       tenantId: z.string().uuid(),
       hours: z.array(dayScheduleSchema).min(0).max(7),
@@ -115,20 +121,12 @@ export const scheduleRouter = createTRPCRouter({
         .set({ openingHours: normalizedHours, updatedAt: new Date() })
         .where(eq(tenants.id, input.tenantId));
 
-      await writeAuditLog(ctx, {
-        tenantId: input.tenantId,
-        action: "config_change",
-        entity: { type: "tenant_schedule", id: input.tenantId },
-        event: "schedule.practice_hours_updated",
-        summary: "Practice opening hours updated",
-        changes: { daysConfigured: normalizedHours.length },
-      });
       return { success: true };
     }),
 
   // ── Practice Special Opening Hours ─────────────────────────────────────────
 
-  getSpecialOpeningHours: protectedProcedure
+  getSpecialOpeningHours: tenantProcedure
     .input(z.object({ tenantId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const [tenant] = await ctx.db
@@ -142,7 +140,14 @@ export const scheduleRouter = createTRPCRouter({
       return normalizeSpecialOpeningHours(tenant.specialOpeningHours);
     }),
 
-  updateSpecialOpeningHours: protectedProcedure
+  updateSpecialOpeningHours: auditedMutation({
+    entity: "tenant_special_hours",
+    event: "schedule.special_hours_updated",
+    action: "config_change",
+    summary: "Practice special opening hours updated",
+    entityId: (_result, input) => (input as { tenantId: string }).tenantId,
+    changes: (_result, input) => ({ entriesConfigured: (input as { entries: unknown[] }).entries.length }),
+  })
     .input(z.object({
       tenantId: z.string().uuid(),
       entries: z.array(specialOpeningHoursSchema).max(20),
@@ -159,20 +164,12 @@ export const scheduleRouter = createTRPCRouter({
         .set({ specialOpeningHours: input.entries, updatedAt: new Date() })
         .where(eq(tenants.id, input.tenantId));
 
-      await writeAuditLog(ctx, {
-        tenantId: input.tenantId,
-        action: "config_change",
-        entity: { type: "tenant_special_hours", id: input.tenantId },
-        event: "schedule.special_hours_updated",
-        summary: "Practice special opening hours updated",
-        changes: { entriesConfigured: input.entries.length },
-      });
       return { success: true };
     }),
 
   // ── Vet Weekly Schedules ────────────────────────────────────────────────────
 
-  getVetSchedules: protectedProcedure
+  getVetSchedules: tenantProcedure
     .input(z.object({ tenantId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const vets = await ctx.db
@@ -208,7 +205,23 @@ export const scheduleRouter = createTRPCRouter({
       }));
     }),
 
-  upsertVetDaySchedule: protectedProcedure
+  upsertVetDaySchedule: auditedMutation({
+    entity: "vet_schedule",
+    event: "schedule.vet_day_upserted",
+    action: "config_change",
+    summary: "Vet day schedule updated",
+    entityId: (result, input) =>
+      (result as { scheduleId?: string }).scheduleId ??
+      `${(input as { vetId: string }).vetId}:${(input as { dayOfWeek: number }).dayOfWeek}`,
+    changes: (_result, input) => {
+      const data = input as { vetId: string; dayOfWeek: number; slots: unknown[] };
+      return {
+        vetId: data.vetId,
+        dayOfWeek: data.dayOfWeek,
+        slotsCount: data.slots.length,
+      };
+    },
+  })
     .input(z.object({
       tenantId: z.string().uuid(),
       vetId: z.string().uuid(),
@@ -244,22 +257,19 @@ export const scheduleRouter = createTRPCRouter({
         });
       }
 
-      await writeAuditLog(ctx, {
-        tenantId: input.tenantId,
-        action: "config_change",
-        entity: { type: "vet_schedule", id: existing?.id ?? `${input.vetId}:${input.dayOfWeek}` },
-        event: "schedule.vet_day_upserted",
-        summary: "Vet day schedule updated",
-        changes: {
-          vetId: input.vetId,
-          dayOfWeek: input.dayOfWeek,
-          slotsCount: input.slots.length,
-        },
-      });
-      return { success: true };
+      return { success: true, scheduleId: existing?.id };
     }),
 
-  updateVetSlotDuration: protectedProcedure
+  updateVetSlotDuration: auditedMutation({
+    entity: "vet",
+    event: "schedule.slot_duration_updated",
+    action: "config_change",
+    summary: "Vet slot duration updated",
+    entityId: (_result, input) => (input as { vetId: string }).vetId,
+    changes: (_result, input) => ({
+      slotDurationMin: (input as { slotDurationMin: number }).slotDurationMin,
+    }),
+  })
     .input(z.object({
       tenantId: z.string().uuid(),
       vetId: z.string().uuid(),
@@ -271,20 +281,12 @@ export const scheduleRouter = createTRPCRouter({
         .set({ slotDurationMin: input.slotDurationMin, updatedAt: new Date() })
         .where(and(eq(users.id, input.vetId), eq(users.tenantId, input.tenantId)));
 
-      await writeAuditLog(ctx, {
-        tenantId: input.tenantId,
-        action: "config_change",
-        entity: { type: "vet", id: input.vetId },
-        event: "schedule.slot_duration_updated",
-        summary: "Vet slot duration updated",
-        changes: { slotDurationMin: input.slotDurationMin },
-      });
       return { success: true };
     }),
 
   // ── Absences ────────────────────────────────────────────────────────────────
 
-  getAbsences: protectedProcedure
+  getAbsences: tenantProcedure
     .input(z.object({
       tenantId: z.string().uuid(),
       vetId: z.string().uuid().optional(),
@@ -317,7 +319,27 @@ export const scheduleRouter = createTRPCRouter({
       return absences.filter((a) => a.endDate >= todayStr);
     }),
 
-  createAbsence: protectedProcedure
+  createAbsence: auditedMutation({
+    entity: "vet_absence",
+    event: "schedule.absence_created",
+    action: "create",
+    summary: "Vet absence created",
+    entityId: (result) => (result as { id: string }).id,
+    changes: (_result, input) => {
+      const data = input as {
+        vetId: string;
+        startDate: string;
+        endDate: string;
+        type: string;
+      };
+      return {
+        vetId: data.vetId,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        type: data.type,
+      };
+    },
+  })
     .input(z.object({
       tenantId: z.string().uuid(),
       vetId: z.string().uuid(),
@@ -342,23 +364,17 @@ export const scheduleRouter = createTRPCRouter({
         })
         .returning({ id: vetAbsences.id });
 
-      await writeAuditLog(ctx, {
-        tenantId: input.tenantId,
-        action: "create",
-        entity: { type: "vet_absence", id: created!.id },
-        event: "schedule.absence_created",
-        summary: "Vet absence created",
-        changes: {
-          vetId: input.vetId,
-          startDate: input.startDate,
-          endDate: input.endDate,
-          type: input.type,
-        },
-      });
       return created;
     }),
 
-  deleteAbsence: protectedProcedure
+  deleteAbsence: auditedMutation({
+    entity: "vet_absence",
+    event: "schedule.absence_deleted",
+    action: "delete",
+    summary: "Vet absence deleted",
+    entityId: (_result, input) => (input as { absenceId: string }).absenceId,
+    changes: () => ({ deleted: true }),
+  })
     .input(z.object({
       tenantId: z.string().uuid(),
       absenceId: z.string().uuid(),
@@ -368,14 +384,6 @@ export const scheduleRouter = createTRPCRouter({
         .delete(vetAbsences)
         .where(and(eq(vetAbsences.id, input.absenceId), eq(vetAbsences.tenantId, input.tenantId)));
 
-      await writeAuditLog(ctx, {
-        tenantId: input.tenantId,
-        action: "delete",
-        entity: { type: "vet_absence", id: input.absenceId },
-        event: "schedule.absence_deleted",
-        summary: "Vet absence deleted",
-        changes: { deleted: true },
-      });
       return { success: true };
     }),
 });
