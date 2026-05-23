@@ -11,14 +11,8 @@ export default defineConfig({
     exclude: ['node_modules', 'e2e/**'],
     // Cap parallel workers — testcontainers integration tests start Postgres
     // containers; 2 workers = 2 containers max, safe on 4GB server.
-    // @ts-expect-error — poolOptions.threads is a valid runtime config in Vitest 4.x
-    // but not fully reflected in the shipped TypeScript declarations.
-    poolOptions: {
-      threads: {
-        maxThreads: 2,
-        minThreads: 1,
-      },
-    },
+    maxWorkers: 2,
+    minWorkers: 1,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'json-summary', 'html', 'lcov'],

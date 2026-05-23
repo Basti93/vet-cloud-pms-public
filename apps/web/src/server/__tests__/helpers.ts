@@ -9,8 +9,9 @@
 //   afterAll(cleanup);
 
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
-import { drizzle } from "drizzle-orm/node-postgres";
-import { migrate } from "drizzle-orm/node-postgres/migrator";
+import { drizzle } from "drizzle-orm/postgres-js";
+import { migrate } from "drizzle-orm/postgres-js/migrator";
+import postgres from "postgres";
 import { resolve } from "path";
 import * as schema from "@/lib/db/schema";
 import { tenants, users } from "@/lib/db/schema";
@@ -24,13 +25,15 @@ const createCaller = createCallerFactory(appRouter);
 export async function createTestDb() {
   const container = await new PostgreSqlContainer("postgres:16-alpine").start();
   const connectionUri = container.getConnectionUri();
-  const db = drizzle(connectionUri, { schema }) as TestDb;
+  const sql = postgres(connectionUri, { max: 1 });
+  const db = drizzle(sql, { schema }) as TestDb;
   await migrate(db as any, {
     migrationsFolder: resolve(process.cwd(), "drizzle"),
   });
   return {
     db,
     cleanup: async () => {
+      await sql.end();
       await container.stop();
     },
   };
