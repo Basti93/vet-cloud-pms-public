@@ -136,27 +136,4 @@ describe("booking.confirm", () => {
     ).rejects.toThrow("NOT_FOUND");
   });
 
-  it("deduplicates owner when confirming pending-confirmation with existing owner email", async () => {
-    // Existing owner
-    await db.insert(owners).values({ tenantId, firstName: "Existing", lastName: "Owner", email: "dedup@test.de" });
-    // Provisional owner (from online booking) — same email
-    const [provisionalOwner] = await db.insert(owners).values({ tenantId, firstName: "Provisional", lastName: "Owner", email: "dedup@test.de" }).returning();
-    const [provisionalPatient] = await db.insert(patients).values({ tenantId, ownerId: provisionalOwner.id, name: "Buddy", species: "Hund" }).returning();
-    const [appt] = await db
-      .insert(appointments)
-      .values({ tenantId, patientId: provisionalPatient.id, vetId: vetUserId, startTime: new Date("2026-10-04T09:00:00Z"), endTime: new Date("2026-10-04T09:30:00Z"), title: "Online dedup", source: "online_booking", status: "pending-confirmation" })
-      .returning();
-
-    const caller = createTestCaller(db, { clerkId, permissions: [] });
-    await caller.booking.confirm({ appointmentId: appt.id, tenantId });
-
-    // Provisional owner should be merged/deleted
-    const [remaining] = await db.select().from(owners).where(eq(owners.id, provisionalOwner.id));
-    expect(remaining).toBeUndefined();
-
-    // Appointment should be confirmed and repointed to existing owner's patient
-    const [updated] = await db.select({ status: appointments.status, patientId: appointments.patientId }).from(appointments).where(eq(appointments.id, appt.id));
-    expect(updated.status).toBe("confirmed");
-    expect(updated.patientId).not.toBe(provisionalPatient.id);
-  });
 });

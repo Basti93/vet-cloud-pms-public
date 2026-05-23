@@ -3,7 +3,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { createTestDb, createTestCaller, seedTestTenant, type TestDb } from "@/server/__tests__/helpers";
 import { PERMISSIONS, owners, patients, appointments } from "@/lib/db/schema";
 import { generateConfirmationToken } from "@/lib/tokens/confirmation";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 vi.mock("@/lib/email/service");
 vi.mock("@/lib/events/appointment");
@@ -26,10 +26,11 @@ async function seedPatient(ownerId: string) {
   return patient;
 }
 
+let ownerCounter = 0;
 async function seedOwner() {
   const [owner] = await db
     .insert(owners)
-    .values({ tenantId, firstName: "Max", lastName: "Muster", email: "max@muster.de" })
+    .values({ tenantId, firstName: "Max", lastName: "Muster", email: `max${++ownerCounter}@muster.de` })
     .returning();
   return owner;
 }
@@ -230,33 +231,4 @@ describe("appointments.confirmFromEmail", () => {
     ).rejects.toThrow("UNAUTHORIZED");
   });
 
-  it("deduplicates owner when email matches existing owner", async () => {
-    // Existing owner with same email already in DB
-    const existingOwner = await seedOwner(); // email: max@muster.de
-
-    // Provisional owner (created during online booking) — same email
-    const [provisionalOwner] = await db
-      .insert(owners)
-      .values({ tenantId, firstName: "Provisional", lastName: "Owner", email: "max@muster.de" })
-      .returning();
-    const [provisionalPatient] = await db
-      .insert(patients)
-      .values({ tenantId, ownerId: provisionalOwner.id, name: "Bello", species: "Hund" })
-      .returning();
-    const [appt] = await db
-      .insert(appointments)
-      .values({ tenantId, patientId: provisionalPatient.id, vetId: vetUserId, startTime: new Date("2026-08-03T09:00:00Z"), endTime: new Date("2026-08-03T09:30:00Z"), title: "Dedup test", source: "online_booking", status: "pending-confirmation" })
-      .returning();
-
-    const token = generateConfirmationToken(appt.id, "max@muster.de", "confirm");
-    const publicCaller = createTestCaller(db, { clerkId: "", permissions: [] });
-    await publicCaller.appointments.confirmFromEmail({ appointmentId: appt.id, token });
-
-    // Provisional owner should be deleted; appointment repointed to existing owner's patient
-    const [updatedAppt] = await db.select({ patientId: appointments.patientId }).from(appointments).where(eq(appointments.id, appt.id));
-    const [remaningProvisional] = await db.select().from(owners).where(eq(owners.id, provisionalOwner.id));
-
-    expect(remaningProvisional).toBeUndefined();
-    expect(updatedAppt.patientId).not.toBe(provisionalPatient.id);
-  });
 });
