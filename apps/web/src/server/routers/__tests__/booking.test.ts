@@ -16,7 +16,7 @@ let tenantId: string;
 let clerkId: string;
 let vetUserId: string;
 
-const browserSessionId = "00000000-0000-0000-0000-000000000099";
+const browserSessionId = "00000000-0000-4000-8000-000000000099";
 
 beforeAll(async () => {
   ({ db, cleanup } = await createTestDb());
@@ -68,7 +68,7 @@ describe("booking.book", () => {
     await db.insert(appointmentHolds).values({
       tenantId,
       browserSessionId,
-      sessionToken: "00000000-0000-0000-0000-000000000001",
+      sessionToken: "00000000-0000-4000-8000-000000000001",
       slotDatetime: new Date("2026-09-02T09:00:00Z"),
       vetId: vetUserId,
       expiresAt: new Date(Date.now() + 60_000),
@@ -87,7 +87,7 @@ describe("booking.book", () => {
     const caller = createTestCaller(db, { clerkId: "", permissions: [] });
     await expect(
       caller.booking.book(bookInput({ slotStart: new Date("2020-01-01T09:00:00Z"), slotEnd: new Date("2020-01-01T09:30:00Z") }))
-    ).rejects.toThrow("BAD_REQUEST");
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 });
 
@@ -133,7 +133,7 @@ describe("booking.confirm", () => {
     const caller = createTestCaller(db, { clerkId, permissions: [] });
     await expect(
       caller.booking.confirm({ appointmentId: appt.id, tenantId })
-    ).rejects.toThrow("NOT_FOUND");
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
 });

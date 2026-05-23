@@ -175,7 +175,7 @@ describe("appointments.delete", () => {
     });
     await expect(
       caller.appointments.delete({ id: "00000000-0000-0000-0000-000000000000", tenantId })
-    ).rejects.toThrow("NOT_FOUND");
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 });
 
@@ -228,7 +228,7 @@ describe("appointments.confirmFromEmail", () => {
     const publicCaller = createTestCaller(db, { clerkId: "", permissions: [] });
     await expect(
       publicCaller.appointments.confirmFromEmail({ appointmentId: appt.id, token: "invalid-token" })
-    ).rejects.toThrow("UNAUTHORIZED");
+    ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
   });
 
 });
