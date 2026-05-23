@@ -5,8 +5,10 @@ allowBuilds:
   '@clerk/shared': true
   '@parcel/watcher': true
   '@swc/core': true
+  cpu-features: set this to true or false
   esbuild: true
   protobufjs: true
   sharp: true
+  ssh2: set this to true or false
   tree-sitter: true
   unrs-resolver: true

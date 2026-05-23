@@ -16,10 +16,9 @@
  *     tenant before writing, preventing cross-patient injection.
  *   - All mutations write to the immutable audit log for DSGVO compliance.
  *
- * Known gap (backlog):
- *   - list procedures do not check MEDICAL_READ, so any authenticated tenant
- *     user (including Receptionist) can read medical records. Needs gating once
- *     the patient-detail UI is audited for role visibility.
+ * Security model note:
+ *   - All list procedures now require MEDICAL_READ (added 2026-05-23).
+ *     Receptionist role has no MEDICAL_* permissions and cannot read records.
  */
 
 import { z } from "zod";
@@ -34,6 +33,7 @@ import { auditedMutation } from "@/server/trpc/audited-mutation";
 
 const diagnosesRouter = createTRPCRouter({
   list: tenantProcedure
+    .use(requirePermission(PERMISSIONS.MEDICAL_READ))
     .input(z.object({ patientId: z.string().uuid(), tenantId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const [patient] = await ctx.db
@@ -160,6 +160,7 @@ const diagnosesRouter = createTRPCRouter({
 
 const medicationsRouter = createTRPCRouter({
   list: tenantProcedure
+    .use(requirePermission(PERMISSIONS.MEDICAL_READ))
     .input(z.object({ patientId: z.string().uuid(), tenantId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const [patient] = await ctx.db
@@ -292,6 +293,7 @@ const medicationsRouter = createTRPCRouter({
 
 const vitalsRouter = createTRPCRouter({
   list: tenantProcedure
+    .use(requirePermission(PERMISSIONS.MEDICAL_READ))
     .input(z.object({ patientId: z.string().uuid(), tenantId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const [patient] = await ctx.db
