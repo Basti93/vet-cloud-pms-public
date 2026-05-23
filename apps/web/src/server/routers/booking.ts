@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq, and, gte, gt, lte, lt, or, isNull, sql, ne } from "drizzle-orm";
+import { eq, and, gte, gt, lt, sql, ne } from "drizzle-orm";
 import { createTRPCRouter, publicProcedure, publicBookingProcedure, tenantProcedure } from "@/server/trpc";
 import { tenants, appointments, owners, patients, users, userRoles, roles, appointmentHolds, emailSettings } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
@@ -883,57 +883,12 @@ export const bookingRouter = createTRPCRouter({
         embeddingOrigin: input.embeddingOrigin,
       });
 
-      const now = new Date();
-
-      // Fetch vet's slot duration if specified, otherwise default to 30 min
-      let slotDurationMin = 30;
-      if (input.vetId) {
-        const [vet] = await ctx.db
-          .select({ slotDurationMin: users.slotDurationMin })
-          .from(users)
-          .where(eq(users.id, input.vetId))
-          .limit(1);
-        if (vet) slotDurationMin = vet.slotDurationMin;
-      }
-
-      const slotEnd = new Date(input.slotDatetime.getTime() + slotDurationMin * 60_000);
-
-      // Check active holds
-      const holdBase = [
-        eq(appointmentHolds.tenantId, input.tenantId),
-        eq(appointmentHolds.slotDatetime, input.slotDatetime),
-        gte(appointmentHolds.expiresAt, now),
-      ];
-      const holdVet = input.vetId
-        ? or(isNull(appointmentHolds.vetId), eq(appointmentHolds.vetId, input.vetId))
-        : undefined;
-
-      const [activeHold] = await ctx.db
-        .select({ id: appointmentHolds.id })
-        .from(appointmentHolds)
-        .where(holdVet ? and(...holdBase, holdVet) : and(...holdBase))
-        .limit(1);
-
-      if (activeHold) return { available: false, reason: "held" as const };
-
-      // Check existing bookings
-      const bookingConditions = [
-        eq(appointments.tenantId, input.tenantId),
-        lt(appointments.startTime, slotEnd),
-        gt(appointments.endTime, input.slotDatetime),
-      ];
-      if (input.vetId) bookingConditions.push(eq(appointments.vetId, input.vetId));
-
-      const [booking] = await ctx.db
-        .select({ id: appointments.id })
-        .from(appointments)
-        .where(and(...bookingConditions))
-        .limit(1);
-
-      return {
-        available: !booking,
-        reason: booking ? ("booked" as const) : undefined,
-      };
+      const scheduleService = createScheduleService(ctx.db);
+      return scheduleService.checkSlotAvailability({
+        tenantId: input.tenantId,
+        vetId: input.vetId,
+        slotDatetime: input.slotDatetime,
+      });
     }),
 
   /** Public: Check which vets have available slots in next 14 days */
@@ -950,79 +905,8 @@ export const bookingRouter = createTRPCRouter({
         embeddingOrigin: input.embeddingOrigin,
       });
 
-      // Get all active vets
-      const vets = await ctx.db
-        .select({
-          id: users.id,
-          title: users.title,
-          firstName: users.firstName,
-          lastName: users.lastName,
-        })
-        .from(users)
-        .innerJoin(userRoles, eq(userRoles.userId, users.id))
-        .innerJoin(roles, eq(roles.id, userRoles.roleId))
-        .where(
-          and(
-            eq(users.tenantId, input.tenantId),
-            eq(roles.code, ROLE_CODES.VET),
-            eq(users.active, true)
-          )
-        );
-
-      // Generate next 28 calendar days (enough to find working days per vet's schedule)
-      const nextDays: Date[] = [];
-      const cursor = new Date();
-      cursor.setDate(cursor.getDate() + 1);
-      for (let i = 0; i < 28; i++) {
-        nextDays.push(new Date(cursor));
-        cursor.setDate(cursor.getDate() + 1);
-      }
-
-      // For each vet, check if they have any available slots in the next 28 days
-      const vetAvailability = await Promise.all(
-        vets.map(async (vet) => {
-          for (const day of nextDays) {
-            // Schedule-aware: checks practice hours, vet schedule, absences
-            const scheduleService = createScheduleService(ctx.db);
-            const allSlots = await scheduleService.getVetSlotsForDay(input.tenantId, vet.id, day);
-            if (allSlots.length === 0) continue;
-
-            const dayStart = new Date(day);
-            dayStart.setHours(0, 0, 0, 0);
-            const dayEnd = new Date(day);
-            dayEnd.setHours(23, 59, 59, 999);
-
-            const booked = await ctx.db
-              .select({ startTime: appointments.startTime, endTime: appointments.endTime })
-              .from(appointments)
-              .where(
-                and(
-                  eq(appointments.tenantId, input.tenantId),
-                  eq(appointments.vetId, vet.id),
-                  gte(appointments.startTime, dayStart),
-                  lte(appointments.startTime, dayEnd)
-                )
-              );
-
-            const hasFreeSlot = allSlots.some(
-              (slot) =>
-                !booked.some(
-                  (a) =>
-                    new Date(a.startTime) < slot.end &&
-                    new Date(a.endTime) > slot.start
-                )
-            );
-
-            if (hasFreeSlot) {
-              return { id: vet.id, title: vet.title, firstName: vet.firstName, lastName: vet.lastName, hasAvailableSlots: true };
-            }
-          }
-
-          return { id: vet.id, title: vet.title, firstName: vet.firstName, lastName: vet.lastName, hasAvailableSlots: false };
-        })
-      );
-
-      return vetAvailability;
+      const scheduleService = createScheduleService(ctx.db);
+      return scheduleService.getVetAvailability(input.tenantId);
     }),
 
   getEmbedCode: publicProcedure

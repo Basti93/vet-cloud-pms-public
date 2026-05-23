@@ -41,6 +41,21 @@ export interface ReserveSlotParams {
   holdTtlMin?: number;
 }
 
+export interface CheckSlotAvailabilityParams {
+  tenantId: string;
+  vetId?: string;
+  slotDatetime: Date;
+  durationMin?: number;
+}
+
+export interface VetAvailability {
+  id: string;
+  title: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  hasAvailableSlots: boolean;
+}
+
 export interface ScheduleService {
   getVetSlotsForDay(tenantId: string, vetId: string, date: Date): Promise<BookingSlot[]>;
   getAvailableSlots(params: GetAvailableSlotsParams): Promise<BookingSlot[]>;
@@ -52,6 +67,10 @@ export interface ScheduleService {
     appointmentCount: number;
   }>;
   reserveSlot(params: ReserveSlotParams): Promise<{ holdToken: string; expiresAt: Date }>;
+  checkSlotAvailability(
+    params: CheckSlotAvailabilityParams
+  ): Promise<{ available: boolean; reason?: "held" | "booked" }>;
+  getVetAvailability(tenantId: string): Promise<VetAvailability[]>;
 }
 
 export function createScheduleService(db: Database): ScheduleService {
@@ -321,6 +340,100 @@ export function createScheduleService(db: Database): ScheduleService {
         .returning();
 
       return { holdToken: hold.sessionToken, expiresAt: hold.expiresAt };
+    },
+
+    async checkSlotAvailability(params) {
+      const now = new Date();
+      let slotDurationMin = params.durationMin ?? 30;
+      if (params.vetId && params.durationMin === undefined) {
+        const [vet] = await db
+          .select({ slotDurationMin: users.slotDurationMin })
+          .from(users)
+          .where(eq(users.id, params.vetId))
+          .limit(1);
+        if (vet) slotDurationMin = vet.slotDurationMin;
+      }
+
+      const slotEnd = new Date(params.slotDatetime.getTime() + slotDurationMin * 60_000);
+      const holdBase = [
+        eq(appointmentHolds.tenantId, params.tenantId),
+        eq(appointmentHolds.slotDatetime, params.slotDatetime),
+        gte(appointmentHolds.expiresAt, now),
+      ];
+      const holdVet = params.vetId
+        ? or(isNull(appointmentHolds.vetId), eq(appointmentHolds.vetId, params.vetId))
+        : undefined;
+
+      const [activeHold] = await db
+        .select({ id: appointmentHolds.id })
+        .from(appointmentHolds)
+        .where(holdVet ? and(...holdBase, holdVet) : and(...holdBase))
+        .limit(1);
+
+      if (activeHold) return { available: false, reason: "held" };
+
+      const bookingConditions = [
+        eq(appointments.tenantId, params.tenantId),
+        lt(appointments.startTime, slotEnd),
+        gt(appointments.endTime, params.slotDatetime),
+      ];
+      if (params.vetId) bookingConditions.push(eq(appointments.vetId, params.vetId));
+
+      const [booking] = await db
+        .select({ id: appointments.id })
+        .from(appointments)
+        .where(and(...bookingConditions))
+        .limit(1);
+
+      return {
+        available: !booking,
+        reason: booking ? "booked" : undefined,
+      };
+    },
+
+    async getVetAvailability(tenantId) {
+      const vets = await db
+        .select({
+          id: users.id,
+          title: users.title,
+          firstName: users.firstName,
+          lastName: users.lastName,
+        })
+        .from(users)
+        .innerJoin(userRoles, eq(userRoles.userId, users.id))
+        .innerJoin(roles, eq(roles.id, userRoles.roleId))
+        .where(
+          and(
+            eq(users.tenantId, tenantId),
+            eq(roles.code, ROLE_CODES.VET),
+            eq(users.active, true)
+          )
+        );
+
+      const nextDays: Date[] = [];
+      const cursor = new Date();
+      cursor.setDate(cursor.getDate() + 1);
+      for (let i = 0; i < 28; i++) {
+        nextDays.push(new Date(cursor));
+        cursor.setDate(cursor.getDate() + 1);
+      }
+
+      return Promise.all(
+        vets.map(async (vet) => {
+          for (const day of nextDays) {
+            const availableSlots = await this.getAvailableSlots({
+              tenantId,
+              vetId: vet.id,
+              date: day,
+            });
+            if (availableSlots.length > 0) {
+              return { ...vet, hasAvailableSlots: true };
+            }
+          }
+
+          return { ...vet, hasAvailableSlots: false };
+        })
+      );
     },
   };
 }
