@@ -43,7 +43,7 @@ beforeAll(async () => {
 }, 60_000);
 
 afterAll(async () => {
-  await cleanup();
+  await cleanup?.();
 });
 
 describe("appointments.create", () => {

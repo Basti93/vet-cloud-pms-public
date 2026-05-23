@@ -27,7 +27,7 @@ beforeAll(async () => {
 }, 60_000);
 
 afterAll(async () => {
-  await cleanup();
+  await cleanup?.();
 });
 
 // Regression test for known bug: list procedures lacked MEDICAL_READ guard.
