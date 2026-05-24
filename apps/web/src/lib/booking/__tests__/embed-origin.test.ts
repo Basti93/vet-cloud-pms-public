@@ -44,4 +44,27 @@ describe("booking embed origin helpers", () => {
       "https://www.example.de",
     ]);
   });
+
+  it("handles 127.0.0.1 as local frame ancestor", () => {
+    expect(frameAncestorSourcesForDomain("127.0.0.1")).toEqual(["http://127.0.0.1:*"]);
+  });
+
+  it("normalizeEmbeddingDomain returns null for empty string", () => {
+    expect(normalizeEmbeddingDomain("   ")).toBeNull();
+  });
+
+  it("isRequestAllowedByEmbeddingDomains returns false when no referer or origin header", () => {
+    expect(
+      isRequestAllowedByEmbeddingDomains(new Headers(), ["practice.example"])
+    ).toBe(false);
+  });
+
+  it("isRequestAllowedByEmbeddingDomains falls back to origin when referer absent", () => {
+    expect(
+      isRequestAllowedByEmbeddingDomains(
+        new Headers({ origin: "https://practice.example" }),
+        ["practice.example"]
+      )
+    ).toBe(true);
+  });
 });

@@ -26,6 +26,7 @@ export default defineConfig({
         'scripts/**',
         'src/server/trpc.ts',
         'src/server/adminTrpc.ts',
+        'src/lib/db/**',
       ],
     },
   },

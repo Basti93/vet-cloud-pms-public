@@ -43,4 +43,11 @@ describe("appointment confirmation tokens", () => {
       "https://app.example/api/appointments/cancel?token=abc"
     );
   });
+
+  it("throws when JWT_SECRET is the placeholder value", () => {
+    process.env.JWT_SECRET = "your-secret-key-change-this";
+    expect(() =>
+      generateConfirmationToken("appt-1", "owner@test.de", "confirm")
+    ).toThrow("JWT_SECRET");
+  });
 });
