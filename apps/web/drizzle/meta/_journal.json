@@ -260,6 +260,13 @@
       "when": 1748037800000,
       "tag": "0037_vet-schedules-and-absences",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1748131200000,
+      "tag": "0038_enable_rls",
+      "breakpoints": true
     }
   ]
 }

@@ -4,7 +4,8 @@ import superjson from "superjson";
 import { ZodError } from "zod";
 import { adminDb, db } from "@/lib/db/client";
 import { tenantDeletionSchedules, users, tenants } from "@/lib/db/schema";
-import { and, eq, isNotNull } from "drizzle-orm";
+import { and, eq, isNotNull, sql } from "drizzle-orm";
+import type { Database } from "@/lib/db/client";
 import { checkRateLimit, getRateLimitInfo } from "@/lib/rateLimit";
 import { logEvent, logEventAsync } from "./trpc/logging-middleware";
 
@@ -43,6 +44,23 @@ const t = initTRPC.context<TRPCContext>().create({
     };
   },
 });
+
+// ============================================================================
+// Tenant context helper
+// ============================================================================
+
+// Wraps a callback in a DB transaction with app.current_tenant_id set via SET LOCAL.
+// The transaction-scoped client (tx) is passed to the callback so RLS policies apply.
+// SET LOCAL is scoped to the transaction — safe with connection pools.
+const withTenantContext = async <T>(
+  tenantId: string,
+  fn: (tx: Database) => Promise<T>
+): Promise<T> => {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`);
+    return fn(tx as unknown as Database);
+  });
+};
 
 // ============================================================================
 // Middleware
@@ -85,7 +103,9 @@ const enforceTenantIsActive = t.middleware(async ({ ctx, path, next }) => {
     throw new TRPCError({ code: "UNAUTHORIZED" });
   }
 
-  const [user] = await ctx.db
+  // Use adminDb (superuser) for bootstrap lookups — RLS is not yet set on this connection
+  // because app.current_tenant_id hasn't been established yet.
+  const [user] = await ctx.adminDb
     .select({ id: users.id, tenantId: users.tenantId, active: users.active })
     .from(users)
     .where(eq(users.clerkId, ctx.userId))
@@ -102,7 +122,7 @@ const enforceTenantIsActive = t.middleware(async ({ ctx, path, next }) => {
     });
   }
 
-  const [scheduledDeletion] = await ctx.db
+  const [scheduledDeletion] = await ctx.adminDb
     .select({ id: tenantDeletionSchedules.id })
     .from(tenantDeletionSchedules)
     .where(
@@ -113,7 +133,7 @@ const enforceTenantIsActive = t.middleware(async ({ ctx, path, next }) => {
     )
     .limit(1);
 
-  const [tenantData] = await ctx.db
+  const [tenantData] = await ctx.adminDb
     .select({ deactivatedAt: tenants.deactivatedAt })
     .from(tenants)
     .where(eq(tenants.id, user.tenantId))
@@ -128,11 +148,12 @@ const enforceTenantIsActive = t.middleware(async ({ ctx, path, next }) => {
     });
   }
 
-  // Inject resolved tenant into context so downstream procedures and middlewares
-  // can use ctx.tenantId / ctx.dbUserId without repeating the DB lookup.
-  // Only pass the new fields — tRPC merges them with existing ctx (including
-  // the userId: string narrowing from enforceUserIsAuthenticated).
-  return next({ ctx: { tenantId: user.tenantId, dbUserId: user.id } });
+  // Wrap the downstream procedure in a transaction with SET LOCAL app.current_tenant_id.
+  // ctx.db is replaced by the transaction client so all procedures get RLS-scoped queries
+  // without any changes to individual procedure handlers.
+  return withTenantContext(user.tenantId, (tx) =>
+    next({ ctx: { tenantId: user.tenantId, dbUserId: user.id, db: tx } })
+  );
 });
 
 // Validates that input.tenantId (when present) matches the authenticated user's
@@ -222,7 +243,8 @@ const systemLoggingMiddleware = t.middleware(async ({ ctx, path, type, next }) =
   const resolveUserContext = async () => {
     if (!ctx.userId) return { tenantId: undefined, userId: undefined };
 
-    const [user] = await ctx.db
+    // Use adminDb — this runs before tenant context is established (no SET LOCAL yet)
+    const [user] = await ctx.adminDb
       .select({ id: users.id, tenantId: users.tenantId })
       .from(users)
       .where(eq(users.clerkId, ctx.userId))
