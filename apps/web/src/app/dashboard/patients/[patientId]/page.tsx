@@ -29,25 +29,83 @@ import { useToast } from '@/lib/toast/context';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { AppointmentModal } from '@/components/appointments/AppointmentModal';
 
+const SEVERITY_LABELS: Record<string, string> = {
+  mild: 'Leicht',
+  moderate: 'Mittel',
+  severe: 'Schwer',
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  active: 'Aktiv',
+  resolved: 'Geheilt',
+  monitoring: 'Beobachtung',
+};
+
+const ROUTE_LABELS: Record<string, string> = {
+  oral: 'Oral',
+  injection: 'Injektion',
+  topical: 'Topisch',
+  ophthalmic: 'Augen',
+  other: 'Sonstiges',
+};
+
 export default function PatientDetailPage() {
   const params = useParams();
   const patientId = params.patientId as string;
   const { tenantId } = useTenant();
   const { addToast } = useToast();
+
+  // Dialog open state
   const [showDiagnosisForm, setShowDiagnosisForm] = useState(false);
   const [showMedicationForm, setShowMedicationForm] = useState(false);
   const [showVitalsForm, setShowVitalsForm] = useState(false);
   const [showVaccinationForm, setShowVaccinationForm] = useState(false);
+  const [showAllergiesForm, setShowAllergiesForm] = useState(false);
+
+  // Appointment modal
   const [apptModalOpen, setApptModalOpen] = useState(false);
   const [selectedAptId, setSelectedAptId] = useState<string | null>(null);
+
+  // Vaccination form state
   const [editingVaccinationId, setEditingVaccinationId] = useState<string | null>(null);
   const [deletingVaccinationId, setDeletingVaccinationId] = useState<string | null>(null);
-  const [vaccinationTypeId, setVaccinationTypeId] = useState("");
-  const [vaccinationCustomType, setVaccinationCustomType] = useState("");
-  const [vaccinationDate, setVaccinationDate] = useState("");
-  const [vaccinationExpiry, setVaccinationExpiry] = useState("");
-  const [vaccinationBatch, setVaccinationBatch] = useState("");
-  const [vaccinationNotes, setVaccinationNotes] = useState("");
+  const [vaccinationTypeId, setVaccinationTypeId] = useState('');
+  const [vaccinationCustomType, setVaccinationCustomType] = useState('');
+  const [vaccinationDate, setVaccinationDate] = useState('');
+  const [vaccinationExpiry, setVaccinationExpiry] = useState('');
+  const [vaccinationBatch, setVaccinationBatch] = useState('');
+  const [vaccinationNotes, setVaccinationNotes] = useState('');
+
+  // Diagnosis form state
+  const [dxTitle, setDxTitle] = useState('');
+  const [dxDescription, setDxDescription] = useState('');
+  const [dxIcd10, setDxIcd10] = useState('');
+  const [dxSeverity, setDxSeverity] = useState<'mild' | 'moderate' | 'severe' | ''>('');
+  const [dxStatus, setDxStatus] = useState<'active' | 'resolved' | 'monitoring'>('active');
+  const [dxDate, setDxDate] = useState(() => new Date().toISOString().split('T')[0]);
+
+  // Medication form state
+  const [medName, setMedName] = useState('');
+  const [medDosage, setMedDosage] = useState('');
+  const [medFrequency, setMedFrequency] = useState('');
+  const [medRoute, setMedRoute] = useState<'oral' | 'injection' | 'topical' | 'ophthalmic' | 'other'>('oral');
+  const [medStartDate, setMedStartDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [medEndDate, setMedEndDate] = useState('');
+  const [medNotes, setMedNotes] = useState('');
+  const [medDiagnosisId, setMedDiagnosisId] = useState('');
+
+  // Vitals form state
+  const [vitWeight, setVitWeight] = useState('');
+  const [vitTemp, setVitTemp] = useState('');
+  const [vitHr, setVitHr] = useState('');
+  const [vitRr, setVitRr] = useState('');
+  const [vitNotes, setVitNotes] = useState('');
+  const [vitDate, setVitDate] = useState(() => new Date().toISOString().split('T')[0]);
+
+  // Allergies form state
+  const [allergiesText, setAllergiesText] = useState('');
+
+  // ── Queries ────────────────────────────────────────────────────────────────
 
   const { data: patients, isLoading } = trpc.patients.list.useQuery(
     { tenantId: tenantId || '' },
@@ -55,15 +113,15 @@ export default function PatientDetailPage() {
   );
   const patient = patients?.find((p) => p.id === patientId);
 
-  const { data: diagnosisList } = trpc.medical.diagnoses.list.useQuery(
+  const { data: diagnosisList, refetch: refetchDiagnoses } = trpc.medical.diagnoses.list.useQuery(
     { patientId, tenantId: tenantId || '' },
     { enabled: !!patientId && !!tenantId }
   );
-  const { data: medicationsList } = trpc.medical.medications.list.useQuery(
+  const { data: medicationsList, refetch: refetchMedications } = trpc.medical.medications.list.useQuery(
     { patientId, tenantId: tenantId || '' },
     { enabled: !!patientId && !!tenantId }
   );
-  const { data: vitalsList } = trpc.medical.vitals.list.useQuery(
+  const { data: vitalsList, refetch: refetchVitals } = trpc.medical.vitals.list.useQuery(
     { patientId, tenantId: tenantId || '' },
     { enabled: !!patientId && !!tenantId }
   );
@@ -72,77 +130,66 @@ export default function PatientDetailPage() {
     { enabled: !!patientId && !!tenantId }
   );
   const { data: vaccinationsList, refetch: refetchVaccinations } = trpc.vaccinations.list.useQuery(
-    { patientId, tenantId: tenantId || "" },
+    { patientId, tenantId: tenantId || '' },
     { enabled: !!patientId && !!tenantId }
   );
   const { data: upcomingVaccinations } = trpc.vaccinations.getUpcoming.useQuery(
-    { patientId, tenantId: tenantId || "", days: 90 },
+    { patientId, tenantId: tenantId || '', days: 90 },
     { enabled: !!patientId && !!tenantId }
   );
   const { data: allVacTypes } = trpc.vaccinations.getTypes.useQuery(
-    { tenantId: tenantId ?? "", species: undefined },
+    { tenantId: tenantId ?? '', species: undefined },
     { enabled: !!tenantId }
   );
 
-  const resetVaccinationForm = () => {
-    setVaccinationTypeId("");
-    setVaccinationCustomType("");
-    setVaccinationDate("");
-    setVaccinationExpiry("");
-    setVaccinationBatch("");
-    setVaccinationNotes("");
-  };
+  // ── Mutations ──────────────────────────────────────────────────────────────
 
-  const handleVacTypeChange = (typeId: string) => {
-    setVaccinationTypeId(typeId);
-    if (typeId === "custom") return;
-    const vt = allVacTypes?.find((t) => t.id === typeId);
-    if (vt && vaccinationDate) {
-      const administered = new Date(vaccinationDate);
-      const expiry = new Date(administered);
-      expiry.setMonth(expiry.getMonth() + vt.defaultIntervalMonths);
-      setVaccinationExpiry(expiry.toISOString().split("T")[0]);
-    }
-  };
+  const createDiagnosis = trpc.medical.diagnoses.create.useMutation({
+    onSuccess: async () => {
+      setShowDiagnosisForm(false);
+      resetDxForm();
+      addToast('Diagnose gespeichert.', 'success');
+      await refetchDiagnoses();
+    },
+    onError: () => addToast('Diagnose konnte nicht gespeichert werden.', 'error'),
+  });
 
-  const handleVacDateChange = (dateStr: string) => {
-    setVaccinationDate(dateStr);
-    if (!vaccinationTypeId || vaccinationTypeId === "custom") return;
-    const vt = allVacTypes?.find((t) => t.id === vaccinationTypeId);
-    if (vt && dateStr) {
-      const administered = new Date(dateStr);
-      const expiry = new Date(administered);
-      expiry.setMonth(expiry.getMonth() + vt.defaultIntervalMonths);
-      setVaccinationExpiry(expiry.toISOString().split("T")[0]);
-    }
-  };
+  const createMedication = trpc.medical.medications.create.useMutation({
+    onSuccess: async () => {
+      setShowMedicationForm(false);
+      resetMedForm();
+      addToast('Medikament gespeichert.', 'success');
+      await refetchMedications();
+    },
+    onError: () => addToast('Medikament konnte nicht gespeichert werden.', 'error'),
+  });
 
-  type VaccinationRow = NonNullable<typeof vaccinationsList>[number];
+  const createVital = trpc.medical.vitals.create.useMutation({
+    onSuccess: async () => {
+      setShowVitalsForm(false);
+      resetVitForm();
+      addToast('Vitalzeichen gespeichert.', 'success');
+      await refetchVitals();
+    },
+    onError: () => addToast('Vitalzeichen konnten nicht gespeichert werden.', 'error'),
+  });
 
-  const openEditDialog = (v: VaccinationRow) => {
-    setEditingVaccinationId(v.id);
-    if (v.vaccinationTypeId) {
-      setVaccinationTypeId(v.vaccinationTypeId);
-      setVaccinationCustomType("");
-    } else {
-      setVaccinationTypeId("custom");
-      setVaccinationCustomType(v.type);
-    }
-    setVaccinationDate(new Date(v.administeredDate).toISOString().split("T")[0]);
-    setVaccinationExpiry(new Date(v.expiryDate).toISOString().split("T")[0]);
-    setVaccinationBatch(v.batchNumber ?? "");
-    setVaccinationNotes(v.notes ?? "");
-    setShowVaccinationForm(true);
-  };
+  const updateAllergies = trpc.medical.allergies.update.useMutation({
+    onSuccess: async () => {
+      setShowAllergiesForm(false);
+      addToast('Allergien aktualisiert.', 'success');
+    },
+    onError: () => addToast('Allergien konnten nicht aktualisiert werden.', 'error'),
+  });
 
   const createVaccination = trpc.vaccinations.create.useMutation({
     onSuccess: async () => {
       setShowVaccinationForm(false);
       resetVaccinationForm();
-      addToast("Impfung erfasst.", "success");
+      addToast('Impfung erfasst.', 'success');
       await refetchVaccinations();
     },
-    onError: () => addToast("Impfung konnte nicht gespeichert werden.", "error"),
+    onError: () => addToast('Impfung konnte nicht gespeichert werden.', 'error'),
   });
 
   const updateVaccination = trpc.vaccinations.update.useMutation({
@@ -150,39 +197,101 @@ export default function PatientDetailPage() {
       setShowVaccinationForm(false);
       setEditingVaccinationId(null);
       resetVaccinationForm();
-      addToast("Impfung aktualisiert.", "success");
+      addToast('Impfung aktualisiert.', 'success');
       await refetchVaccinations();
     },
-    onError: () => addToast("Impfung konnte nicht aktualisiert werden.", "error"),
+    onError: () => addToast('Impfung konnte nicht aktualisiert werden.', 'error'),
   });
 
   const deleteVaccination = trpc.vaccinations.delete.useMutation({
     onSuccess: async () => {
       setDeletingVaccinationId(null);
-      addToast("Impfung gelöscht.", "success");
+      addToast('Impfung gelöscht.', 'success');
       await refetchVaccinations();
     },
-    onError: () => addToast("Impfung konnte nicht gelöscht werden.", "error"),
+    onError: () => addToast('Impfung konnte nicht gelöscht werden.', 'error'),
   });
 
-  if (isLoading) {
-    return <div className="text-center py-12 text-muted">Wird geladen…</div>;
-  }
+  // ── Form helpers ───────────────────────────────────────────────────────────
 
-  if (!patient) {
-    return <div className="text-center py-12 text-red-600">Tier nicht gefunden</div>;
-  }
+  const resetDxForm = () => {
+    setDxTitle(''); setDxDescription(''); setDxIcd10('');
+    setDxSeverity(''); setDxStatus('active');
+    setDxDate(new Date().toISOString().split('T')[0]);
+  };
+  const resetMedForm = () => {
+    setMedName(''); setMedDosage(''); setMedFrequency('');
+    setMedRoute('oral'); setMedStartDate(new Date().toISOString().split('T')[0]);
+    setMedEndDate(''); setMedNotes(''); setMedDiagnosisId('');
+  };
+  const resetVitForm = () => {
+    setVitWeight(''); setVitTemp(''); setVitHr(''); setVitRr('');
+    setVitNotes(''); setVitDate(new Date().toISOString().split('T')[0]);
+  };
+  const resetVaccinationForm = () => {
+    setVaccinationTypeId(''); setVaccinationCustomType('');
+    setVaccinationDate(''); setVaccinationExpiry('');
+    setVaccinationBatch(''); setVaccinationNotes('');
+  };
 
-  const allergies: string[] = [];
-  // TODO: Allergies field will be available after DB migration
-  const activeMeds = medicationsList?.filter((m) => !m.endDate) || [];
-  const activeDiagnoses = diagnosisList?.filter((d) => d.status === 'active') || [];
-  const latestVital = vitalsList?.[vitalsList.length - 1];
+  const handleVacTypeChange = (typeId: string) => {
+    setVaccinationTypeId(typeId);
+    if (typeId === 'custom') return;
+    const vt = allVacTypes?.find((t) => t.id === typeId);
+    if (vt && vaccinationDate) {
+      const expiry = new Date(vaccinationDate);
+      expiry.setMonth(expiry.getMonth() + vt.defaultIntervalMonths);
+      setVaccinationExpiry(expiry.toISOString().split('T')[0]);
+    }
+  };
+
+  const handleVacDateChange = (dateStr: string) => {
+    setVaccinationDate(dateStr);
+    if (!vaccinationTypeId || vaccinationTypeId === 'custom') return;
+    const vt = allVacTypes?.find((t) => t.id === vaccinationTypeId);
+    if (vt && dateStr) {
+      const expiry = new Date(dateStr);
+      expiry.setMonth(expiry.getMonth() + vt.defaultIntervalMonths);
+      setVaccinationExpiry(expiry.toISOString().split('T')[0]);
+    }
+  };
+
+  type VaccinationRow = NonNullable<typeof vaccinationsList>[number];
+  const openEditVaccinationDialog = (v: VaccinationRow) => {
+    setEditingVaccinationId(v.id);
+    setVaccinationTypeId(v.vaccinationTypeId ?? 'custom');
+    setVaccinationCustomType(v.vaccinationTypeId ? '' : v.type);
+    setVaccinationDate(new Date(v.administeredDate).toISOString().split('T')[0]);
+    setVaccinationExpiry(new Date(v.expiryDate).toISOString().split('T')[0]);
+    setVaccinationBatch(v.batchNumber ?? '');
+    setVaccinationNotes(v.notes ?? '');
+    setShowVaccinationForm(true);
+  };
 
   const formatDate = (date: string | Date) => {
     const d = typeof date === 'string' ? new Date(date) : date;
     return d.toLocaleDateString('de-DE', { year: '2-digit', month: '2-digit', day: '2-digit' });
   };
+
+  // ── Loading / not-found ────────────────────────────────────────────────────
+
+  if (isLoading) {
+    return <div className="text-center py-12 text-muted">Wird geladen…</div>;
+  }
+  if (!patient) {
+    return <div className="text-center py-12 text-red-600">Tier nicht gefunden</div>;
+  }
+
+  const activeMeds = medicationsList?.filter((m) => !m.endDate) || [];
+  const activeDiagnoses = diagnosisList?.filter((d) => d.status === 'active') || [];
+  const latestVital = vitalsList?.[vitalsList.length - 1];
+  const patientAllergies = (patient as { allergies?: string | null }).allergies;
+
+  // Diagnosis options for medication linking
+  const diagnosisOptions = (diagnosisList ?? []).map((d) => ({
+    value: d.id,
+    label: `${d.title} (${STATUS_LABELS[d.status] ?? d.status})`,
+  }));
 
   return (
     <div className="space-y-6">
@@ -194,7 +303,7 @@ export default function PatientDetailPage() {
         <ChevronLeft size={16} /> Zurück zu Tieren
       </Link>
 
-      {/* Header: name + owner card */}
+      {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-fg">{patient.name}</h1>
@@ -209,21 +318,15 @@ export default function PatientDetailPage() {
             href={`/dashboard/clients/${patient.ownerId}`}
             className="font-semibold text-fg hover:text-[var(--color-accent)] hover:underline block"
           >
-            {[patient.ownerFirstName, patient.ownerLastName].filter(Boolean).join(" ") || "—"}
+            {[patient.ownerFirstName, patient.ownerLastName].filter(Boolean).join(' ') || '—'}
           </Link>
           {patient.ownerPhone && (
-            <a
-              href={`tel:${patient.ownerPhone}`}
-              className="text-sm text-[var(--color-accent)] hover:underline block"
-            >
+            <a href={`tel:${patient.ownerPhone}`} className="text-sm text-[var(--color-accent)] hover:underline block">
               {patient.ownerPhone}
             </a>
           )}
           {patient.ownerEmail && (
-            <a
-              href={`mailto:${patient.ownerEmail}`}
-              className="text-sm text-[var(--color-accent)] hover:underline block"
-            >
+            <a href={`mailto:${patient.ownerEmail}`} className="text-sm text-[var(--color-accent)] hover:underline block">
               {patient.ownerEmail}
             </a>
           )}
@@ -256,20 +359,36 @@ export default function PatientDetailPage() {
       </div>
 
       {/* Allergies alert */}
-      {allergies.length > 0 && (
-        <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-xl">
+      {patientAllergies && (
+        <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-xl flex items-start justify-between gap-3">
           <div className="flex items-start gap-3">
             <AlertTriangle size={18} className="text-red-600 shrink-0 mt-0.5" />
             <div>
               <h3 className="font-semibold text-red-900">Allergien</h3>
-              <p className="text-red-800 mt-1">{allergies.join(', ')}</p>
+              <p className="text-red-800 mt-1 text-sm">{patientAllergies}</p>
             </div>
           </div>
+          <button
+            onClick={() => { setAllergiesText(patientAllergies); setShowAllergiesForm(true); }}
+            className="shrink-0 p-1 rounded hover:bg-red-100 text-red-400 hover:text-red-600 transition-colors"
+            title="Allergien bearbeiten"
+          >
+            <Pencil size={14} />
+          </button>
         </div>
+      )}
+      {!patientAllergies && (
+        <button
+          onClick={() => { setAllergiesText(''); setShowAllergiesForm(true); }}
+          className="text-xs text-muted hover:text-fg transition-colors flex items-center gap-1"
+        >
+          <Plus size={12} /> Allergien erfassen
+        </button>
       )}
 
       {/* Diagnoses + Medications */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Diagnoses */}
         <div className="bg-surface rounded-2xl border border-border shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-border flex items-center justify-between">
             <h2 className="font-bold text-fg flex items-center gap-2">
@@ -281,19 +400,22 @@ export default function PatientDetailPage() {
             </Button>
           </div>
           <div className="p-6">
-            {activeDiagnoses.length > 0 ? (
+            {diagnosisList && diagnosisList.length > 0 ? (
               <div className="space-y-3">
-                {activeDiagnoses.map((dx) => (
+                {diagnosisList.map((dx) => (
                   <div key={dx.id} className="rounded-xl border border-border bg-bg p-3">
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <p className="font-semibold text-fg">{dx.title}</p>
+                        {dx.icd10Code && (
+                          <p className="text-xs font-mono text-muted mt-0.5">{dx.icd10Code}</p>
+                        )}
                         {dx.description && (
                           <p className="text-sm text-muted mt-1">{dx.description}</p>
                         )}
                         <p className="text-xs text-muted mt-2">
                           {formatDate(dx.dateOfDiagnosis)}
-                          {dx.severity && ` · ${dx.severity}`}
+                          {dx.severity && ` · ${SEVERITY_LABELS[dx.severity] ?? dx.severity}`}
                         </p>
                       </div>
                       <span
@@ -305,18 +427,19 @@ export default function PatientDetailPage() {
                             : 'bg-blue-100 text-blue-800'
                         }`}
                       >
-                        {dx.status}
+                        {STATUS_LABELS[dx.status] ?? dx.status}
                       </span>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-muted text-center py-8">Keine aktiven Diagnosen</p>
+              <p className="text-muted text-center py-8">Keine Diagnosen erfasst</p>
             )}
           </div>
         </div>
 
+        {/* Medications */}
         <div className="bg-surface rounded-2xl border border-border shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-border flex items-center justify-between">
             <h2 className="font-bold text-fg flex items-center gap-2">
@@ -328,25 +451,33 @@ export default function PatientDetailPage() {
             </Button>
           </div>
           <div className="p-6">
-            {activeMeds.length > 0 ? (
+            {medicationsList && medicationsList.length > 0 ? (
               <div className="space-y-3">
-                {activeMeds.map((med) => (
-                  <div key={med.id} className="rounded-xl border border-border bg-bg p-3">
-                    <p className="font-semibold text-fg">{med.medicationName}</p>
-                    <p className="text-sm text-muted mt-1">
-                      {med.dosage} · {med.frequency}
-                    </p>
-                    <p className="text-xs text-muted mt-2">
-                      Seit {formatDate(med.startDate)} · Route: {med.route}
-                    </p>
-                    {med.notes && (
-                      <p className="text-xs text-muted mt-2 italic">{med.notes}</p>
-                    )}
+                {medicationsList.map((med) => (
+                  <div key={med.id} className={`rounded-xl border bg-bg p-3 ${med.endDate ? 'border-border opacity-60' : 'border-border'}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-semibold text-fg">{med.medicationName}</p>
+                        <p className="text-sm text-muted mt-1">
+                          {med.dosage} · {med.frequency} · {med.route ? (ROUTE_LABELS[med.route] ?? med.route) : ''}
+                        </p>
+                        <p className="text-xs text-muted mt-2">
+                          Ab {formatDate(med.startDate)}
+                          {med.endDate && ` bis ${formatDate(med.endDate)}`}
+                        </p>
+                        {med.notes && <p className="text-xs text-muted mt-1 italic">{med.notes}</p>}
+                      </div>
+                      {med.endDate ? (
+                        <span className="px-2 py-1 rounded-lg text-xs font-medium bg-muted-soft text-muted shrink-0">Beendet</span>
+                      ) : (
+                        <span className="px-2 py-1 rounded-lg text-xs font-medium bg-green-100 text-green-800 shrink-0">Aktiv</span>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-muted text-center py-8">Keine aktiven Medikamente</p>
+              <p className="text-muted text-center py-8">Keine Medikamente erfasst</p>
             )}
           </div>
         </div>
@@ -357,7 +488,7 @@ export default function PatientDetailPage() {
         <div className="px-6 py-4 border-b border-border flex items-center justify-between">
           <h2 className="font-bold text-fg flex items-center gap-2">
             <Calendar size={16} style={{ color: 'var(--color-accent)' }} />
-            Termine & Ärzte
+            Termine
           </h2>
         </div>
         <div className="p-6">
@@ -367,7 +498,7 @@ export default function PatientDetailPage() {
                 <button
                   key={apt.id}
                   onClick={() => { setSelectedAptId(apt.id); setApptModalOpen(true); }}
-                  className="w-full text-left rounded-xl border border-border bg-bg p-3 hover:bg-muted-soft transition-colors cursor-pointer"
+                  className="w-full text-left rounded-xl border border-border bg-bg p-3 hover:bg-muted-soft transition-colors"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1">
@@ -375,11 +506,8 @@ export default function PatientDetailPage() {
                       <p className="text-sm text-muted mt-1 flex items-center gap-2">
                         <Clock size={13} />
                         {new Date(apt.startTime).toLocaleDateString('de-DE', {
-                          weekday: 'short',
-                          day: '2-digit',
-                          month: '2-digit',
-                          hour: '2-digit',
-                          minute: '2-digit',
+                          weekday: 'short', day: '2-digit', month: '2-digit',
+                          hour: '2-digit', minute: '2-digit',
                         })}
                       </p>
                       {apt.vetFirstName && apt.vetLastName && (
@@ -388,17 +516,12 @@ export default function PatientDetailPage() {
                         </p>
                       )}
                     </div>
-                    <span
-                      className={`px-2 py-1 rounded-lg text-xs font-medium shrink-0 ${
-                        apt.status === 'scheduled'
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : apt.status === 'completed'
-                          ? 'bg-green-100 text-green-800'
-                          : apt.status === 'cancelled'
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-muted-soft text-muted'
-                      }`}
-                    >
+                    <span className={`px-2 py-1 rounded-lg text-xs font-medium shrink-0 ${
+                      apt.status === 'scheduled' ? 'bg-yellow-100 text-yellow-800'
+                        : apt.status === 'completed' ? 'bg-green-100 text-green-800'
+                        : apt.status === 'cancelled' ? 'bg-red-100 text-red-800'
+                        : 'bg-muted-soft text-muted'
+                    }`}>
                       {apt.status === 'scheduled' && 'Geplant'}
                       {apt.status === 'completed' && 'Abgeschlossen'}
                       {apt.status === 'cancelled' && 'Abgesagt'}
@@ -447,8 +570,8 @@ export default function PatientDetailPage() {
                         {vital.weight ? (vital.weight / 1000).toFixed(1) : '–'} kg
                       </td>
                       <td className="py-3 px-3 text-fg">{vital.temperature || '–'}</td>
-                      <td className="py-3 px-3 text-fg">{vital.heartRate || '–'} bpm</td>
-                      <td className="py-3 px-3 text-fg">{vital.respiratoryRate || '–'} /min</td>
+                      <td className="py-3 px-3 text-fg">{vital.heartRate ? `${vital.heartRate} bpm` : '–'}</td>
+                      <td className="py-3 px-3 text-fg">{vital.respiratoryRate ? `${vital.respiratoryRate} /min` : '–'}</td>
                       <td className="py-3 px-3 text-muted text-xs">{vital.notes || '–'}</td>
                     </tr>
                   ))}
@@ -480,7 +603,7 @@ export default function PatientDetailPage() {
               {vaccinationsList.map((v) => {
                 const now = new Date();
                 const expiry = new Date(v.expiryDate);
-                const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+                const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / 86400000);
                 const isOverdue = expiry < now;
                 const isDueSoon = !isOverdue && daysLeft <= 30;
                 return (
@@ -490,32 +613,28 @@ export default function PatientDetailPage() {
                         <span className="font-medium text-fg text-sm">{v.type}</span>
                         {v.typeCategory && (
                           <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                            v.typeCategory === "core"
-                              ? "bg-blue-100 text-blue-700"
-                              : v.typeCategory === "recommended"
-                              ? "bg-amber-100 text-amber-700"
-                              : "bg-muted-soft text-muted"
+                            v.typeCategory === 'core' ? 'bg-blue-100 text-blue-700'
+                              : v.typeCategory === 'recommended' ? 'bg-amber-100 text-amber-700'
+                              : 'bg-muted-soft text-muted'
                           }`}>
-                            {v.typeCategory === "core" ? "Core" : v.typeCategory === "recommended" ? "Empfohlen" : "Optional"}
+                            {v.typeCategory === 'core' ? 'Core' : v.typeCategory === 'recommended' ? 'Empfohlen' : 'Optional'}
                           </span>
                         )}
                       </div>
                       <p className="text-xs text-muted mt-1">
                         Verabreicht: {formatDate(v.administeredDate)}
-                        {v.vetFirstName && ` · ${v.vetFirstName} ${v.vetLastName ?? ""}`}
+                        {v.vetFirstName && ` · ${v.vetFirstName} ${v.vetLastName ?? ''}`}
                         {v.batchNumber && ` · Charge: ${v.batchNumber}`}
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0 ml-3">
-                      <span className={`text-xs font-medium ${isOverdue ? "text-red-600" : isDueSoon ? "text-amber-600" : "text-green-600"}`}>
-                        {isOverdue
-                          ? `Überfällig seit ${Math.abs(daysLeft)} T.`
-                          : isDueSoon
-                          ? `Fällig in ${daysLeft} T.`
+                      <span className={`text-xs font-medium ${isOverdue ? 'text-red-600' : isDueSoon ? 'text-amber-600' : 'text-green-600'}`}>
+                        {isOverdue ? `Überfällig seit ${Math.abs(daysLeft)} T.`
+                          : isDueSoon ? `Fällig in ${daysLeft} T.`
                           : formatDate(v.expiryDate)}
                       </span>
                       <button
-                        onClick={() => openEditDialog(v)}
+                        onClick={() => openEditVaccinationDialog(v)}
                         className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-muted-soft text-muted hover:text-fg"
                         title="Bearbeiten"
                       >
@@ -539,6 +658,8 @@ export default function PatientDetailPage() {
         </div>
       </div>
 
+      {/* ── Dialogs ─────────────────────────────────────────────────────────── */}
+
       {/* Appointment modal */}
       {tenantId && (
         <AppointmentModal
@@ -550,25 +671,360 @@ export default function PatientDetailPage() {
             const apt = appointmentsList?.find((a) => a.id === selectedAptId);
             if (!apt || !apt.vetId) return undefined;
             return {
-              id: apt.id,
-              title: apt.title,
-              description: apt.description ?? null,
-              startTime: new Date(apt.startTime),
-              endTime: new Date(apt.endTime),
-              status: apt.status,
-              patientId: apt.patientId,
-              vetId: apt.vetId,
+              id: apt.id, title: apt.title, description: apt.description ?? null,
+              startTime: new Date(apt.startTime), endTime: new Date(apt.endTime),
+              status: apt.status, patientId: apt.patientId, vetId: apt.vetId,
               patientName: patient.name,
             };
           })()}
         />
       )}
 
+      {/* Diagnosis dialog */}
+      <Dialog open={showDiagnosisForm} onOpenChange={(o) => { setShowDiagnosisForm(o); if (!o) resetDxForm(); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Diagnose erfassen</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <label className="block text-sm text-fg">
+              Bezeichnung *
+              <input
+                className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-fg placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                placeholder="z.B. Otitis externa"
+                value={dxTitle}
+                onChange={(e) => setDxTitle(e.target.value)}
+              />
+            </label>
+            <label className="block text-sm text-fg">
+              ICD-10 Code
+              <input
+                className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm font-mono text-fg placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                placeholder="z.B. H60.0"
+                value={dxIcd10}
+                onChange={(e) => setDxIcd10(e.target.value)}
+              />
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block text-sm text-fg">
+                Schweregrad
+                <select
+                  className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                  value={dxSeverity}
+                  onChange={(e) => setDxSeverity(e.target.value as typeof dxSeverity)}
+                >
+                  <option value="">—</option>
+                  <option value="mild">Leicht</option>
+                  <option value="moderate">Mittel</option>
+                  <option value="severe">Schwer</option>
+                </select>
+              </label>
+              <label className="block text-sm text-fg">
+                Status
+                <select
+                  className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                  value={dxStatus}
+                  onChange={(e) => setDxStatus(e.target.value as typeof dxStatus)}
+                >
+                  <option value="active">Aktiv</option>
+                  <option value="monitoring">Beobachtung</option>
+                  <option value="resolved">Geheilt</option>
+                </select>
+              </label>
+            </div>
+            <label className="block text-sm text-fg">
+              Datum der Diagnose *
+              <input
+                type="date"
+                className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-fg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                value={dxDate}
+                onChange={(e) => setDxDate(e.target.value)}
+              />
+            </label>
+            <label className="block text-sm text-fg">
+              Beschreibung
+              <textarea
+                rows={3}
+                className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-fg placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                placeholder="Klinische Befunde, Verlauf…"
+                value={dxDescription}
+                onChange={(e) => setDxDescription(e.target.value)}
+              />
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowDiagnosisForm(false); resetDxForm(); }}>Abbrechen</Button>
+            <Button
+              loading={createDiagnosis.isPending}
+              disabled={!dxTitle || !dxDate}
+              onClick={() => {
+                if (!tenantId || !dxTitle || !dxDate) return;
+                createDiagnosis.mutate({
+                  tenantId, patientId,
+                  title: dxTitle,
+                  description: dxDescription || undefined,
+                  icd10Code: dxIcd10 || undefined,
+                  severity: dxSeverity || undefined,
+                  status: dxStatus,
+                  dateOfDiagnosis: new Date(dxDate),
+                });
+              }}
+            >
+              Speichern
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Medication dialog */}
+      <Dialog open={showMedicationForm} onOpenChange={(o) => { setShowMedicationForm(o); if (!o) resetMedForm(); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Medikament erfassen</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <label className="block text-sm text-fg">
+              Medikamentenname *
+              <input
+                className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-fg placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                placeholder="z.B. Amoxicillin"
+                value={medName}
+                onChange={(e) => setMedName(e.target.value)}
+              />
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block text-sm text-fg">
+                Dosierung *
+                <input
+                  className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-fg placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                  placeholder="z.B. 250 mg"
+                  value={medDosage}
+                  onChange={(e) => setMedDosage(e.target.value)}
+                />
+              </label>
+              <label className="block text-sm text-fg">
+                Häufigkeit *
+                <input
+                  className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-fg placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                  placeholder="z.B. 2x täglich"
+                  value={medFrequency}
+                  onChange={(e) => setMedFrequency(e.target.value)}
+                />
+              </label>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block text-sm text-fg">
+                Verabreichungsweg
+                <select
+                  className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                  value={medRoute}
+                  onChange={(e) => setMedRoute(e.target.value as typeof medRoute)}
+                >
+                  <option value="oral">Oral</option>
+                  <option value="injection">Injektion</option>
+                  <option value="topical">Topisch</option>
+                  <option value="ophthalmic">Augen</option>
+                  <option value="other">Sonstiges</option>
+                </select>
+              </label>
+              <label className="block text-sm text-fg">
+                Start *
+                <input
+                  type="date"
+                  className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-fg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                  value={medStartDate}
+                  onChange={(e) => setMedStartDate(e.target.value)}
+                />
+              </label>
+            </div>
+            <label className="block text-sm text-fg">
+              Ende (optional)
+              <input
+                type="date"
+                className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-fg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                value={medEndDate}
+                onChange={(e) => setMedEndDate(e.target.value)}
+              />
+            </label>
+            {diagnosisOptions.length > 0 && (
+              <div>
+                <p className="text-sm text-fg mb-1">Diagnose verknüpfen</p>
+                <SearchableSelect
+                  label=""
+                  placeholder="Diagnose auswählen (optional)"
+                  value={medDiagnosisId}
+                  onChange={setMedDiagnosisId}
+                  options={[{ value: '', label: '— Keine —' }, ...diagnosisOptions]}
+                />
+              </div>
+            )}
+            <label className="block text-sm text-fg">
+              Notizen
+              <textarea
+                rows={2}
+                className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-fg placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                placeholder="Hinweise zur Einnahme…"
+                value={medNotes}
+                onChange={(e) => setMedNotes(e.target.value)}
+              />
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowMedicationForm(false); resetMedForm(); }}>Abbrechen</Button>
+            <Button
+              loading={createMedication.isPending}
+              disabled={!medName || !medDosage || !medFrequency || !medStartDate}
+              onClick={() => {
+                if (!tenantId || !medName || !medDosage || !medFrequency || !medStartDate) return;
+                createMedication.mutate({
+                  tenantId, patientId,
+                  medicationName: medName,
+                  dosage: medDosage,
+                  frequency: medFrequency,
+                  route: medRoute,
+                  startDate: new Date(medStartDate),
+                  endDate: medEndDate ? new Date(medEndDate) : undefined,
+                  diagnosisId: medDiagnosisId || undefined,
+                  notes: medNotes || undefined,
+                });
+              }}
+            >
+              Speichern
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Vitals dialog */}
+      <Dialog open={showVitalsForm} onOpenChange={(o) => { setShowVitalsForm(o); if (!o) resetVitForm(); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Vitalzeichen erfassen</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <label className="block text-sm text-fg">
+              Datum der Messung *
+              <input
+                type="date"
+                className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-fg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                value={vitDate}
+                onChange={(e) => setVitDate(e.target.value)}
+              />
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block text-sm text-fg">
+                Gewicht (g)
+                <input
+                  type="number"
+                  min="0"
+                  className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-fg placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                  placeholder="z.B. 4500"
+                  value={vitWeight}
+                  onChange={(e) => setVitWeight(e.target.value)}
+                />
+              </label>
+              <label className="block text-sm text-fg">
+                Temperatur
+                <input
+                  className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-fg placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                  placeholder="z.B. 38.5°C"
+                  value={vitTemp}
+                  onChange={(e) => setVitTemp(e.target.value)}
+                />
+              </label>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block text-sm text-fg">
+                Puls (bpm)
+                <input
+                  type="number"
+                  min="0"
+                  className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-fg placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                  placeholder="z.B. 80"
+                  value={vitHr}
+                  onChange={(e) => setVitHr(e.target.value)}
+                />
+              </label>
+              <label className="block text-sm text-fg">
+                Atemfrequenz (/min)
+                <input
+                  type="number"
+                  min="0"
+                  className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-fg placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                  placeholder="z.B. 20"
+                  value={vitRr}
+                  onChange={(e) => setVitRr(e.target.value)}
+                />
+              </label>
+            </div>
+            <label className="block text-sm text-fg">
+              Notizen
+              <textarea
+                rows={2}
+                className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-fg placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                placeholder="Optionale Anmerkungen"
+                value={vitNotes}
+                onChange={(e) => setVitNotes(e.target.value)}
+              />
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowVitalsForm(false); resetVitForm(); }}>Abbrechen</Button>
+            <Button
+              loading={createVital.isPending}
+              disabled={!vitDate || (!vitWeight && !vitTemp && !vitHr && !vitRr)}
+              onClick={() => {
+                if (!tenantId || !vitDate) return;
+                createVital.mutate({
+                  tenantId, patientId,
+                  recordedAt: new Date(vitDate),
+                  weight: vitWeight ? parseInt(vitWeight, 10) : undefined,
+                  temperature: vitTemp || undefined,
+                  heartRate: vitHr ? parseInt(vitHr, 10) : undefined,
+                  respiratoryRate: vitRr ? parseInt(vitRr, 10) : undefined,
+                  notes: vitNotes || undefined,
+                });
+              }}
+            >
+              Speichern
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Allergies dialog */}
+      <Dialog open={showAllergiesForm} onOpenChange={(o) => { setShowAllergiesForm(o); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Allergien bearbeiten</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <label className="block text-sm text-fg">
+              Allergien
+              <textarea
+                rows={3}
+                className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-fg placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                placeholder="z.B. Penicillin, Flohspeichel"
+                value={allergiesText}
+                onChange={(e) => setAllergiesText(e.target.value)}
+              />
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAllergiesForm(false)}>Abbrechen</Button>
+            <Button
+              loading={updateAllergies.isPending}
+              onClick={() => {
+                if (!tenantId) return;
+                updateAllergies.mutate({
+                  tenantId, patientId,
+                  allergies: allergiesText || undefined,
+                });
+              }}
+            >
+              Speichern
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Vaccination dialog */}
       <Dialog open={showVaccinationForm} onOpenChange={(open) => { setShowVaccinationForm(open); if (!open) { resetVaccinationForm(); setEditingVaccinationId(null); } }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingVaccinationId ? "Impfung bearbeiten" : "Impfung erfassen"}</DialogTitle>
+            <DialogTitle>{editingVaccinationId ? 'Impfung bearbeiten' : 'Impfung erfassen'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             {(() => {
@@ -576,12 +1032,8 @@ export default function PatientDetailPage() {
                 patient?.species ? t.species.toLowerCase().includes(patient.species.toLowerCase()) : true
               );
               const typeOptions = [
-                ...speciesTypes.map((t) => ({
-                  value: t.id,
-                  label: t.name,
-                  searchText: `${t.code} ${t.category}`,
-                })),
-                { value: "custom", label: "Sonstiges (frei eingeben)" },
+                ...speciesTypes.map((t) => ({ value: t.id, label: t.name, searchText: `${t.code} ${t.category}` })),
+                { value: 'custom', label: 'Sonstiges (frei eingeben)' },
               ];
               const selectedVt = allVacTypes?.find((t) => t.id === vaccinationTypeId);
               return (
@@ -593,12 +1045,12 @@ export default function PatientDetailPage() {
                     onChange={handleVacTypeChange}
                     options={typeOptions}
                   />
-                  {vaccinationTypeId === "custom" && (
+                  {vaccinationTypeId === 'custom' && (
                     <label className="block text-sm text-fg">
                       Bezeichnung *
                       <input
                         className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-fg placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
-                        placeholder="z.B. Combo XY, Spezialimpfung"
+                        placeholder="z.B. Combo XY"
                         value={vaccinationCustomType}
                         onChange={(e) => setVaccinationCustomType(e.target.value)}
                       />
@@ -607,106 +1059,52 @@ export default function PatientDetailPage() {
                   {selectedVt && (
                     <div className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 text-xs text-blue-700 space-y-0.5">
                       <div className="font-semibold">{selectedVt.name} ({selectedVt.code})</div>
-                      <div>Standardintervall: {selectedVt.defaultIntervalMonths} Monate · Kategorie: {selectedVt.category === "core" ? "Core-Impfung" : selectedVt.category === "recommended" ? "Empfohlen" : "Optional"}</div>
+                      <div>Standardintervall: {selectedVt.defaultIntervalMonths} Monate · {selectedVt.category === 'core' ? 'Core-Impfung' : selectedVt.category === 'recommended' ? 'Empfohlen' : 'Optional'}</div>
                       {selectedVt.notes && <div className="text-blue-600">{selectedVt.notes}</div>}
                       {selectedVt.requiresBatchNumber && (
-                        <div className="font-semibold text-amber-700">⚠ Chargennummer erforderlich (z.B. für EU-Heimtierausweis)</div>
+                        <div className="font-semibold text-amber-700">⚠ Chargennummer erforderlich</div>
                       )}
                     </div>
                   )}
                 </>
               );
             })()}
-
             <label className="block text-sm text-fg">
               Verabreicht am *
-              <input
-                type="date"
-                className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-fg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
-                value={vaccinationDate}
-                onChange={(e) => handleVacDateChange(e.target.value)}
-              />
+              <input type="date" className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-fg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]" value={vaccinationDate} onChange={(e) => handleVacDateChange(e.target.value)} />
             </label>
             <label className="block text-sm text-fg">
               Fällig am (Auffrischung) *
-              <input
-                type="date"
-                className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-fg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
-                value={vaccinationExpiry}
-                onChange={(e) => setVaccinationExpiry(e.target.value)}
-              />
+              <input type="date" className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-fg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]" value={vaccinationExpiry} onChange={(e) => setVaccinationExpiry(e.target.value)} />
             </label>
             <label className="block text-sm text-fg">
               Chargennummer
-              <input
-                className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-fg placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
-                placeholder="z.B. B2024-001"
-                value={vaccinationBatch}
-                onChange={(e) => setVaccinationBatch(e.target.value)}
-              />
+              <input className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-fg placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]" placeholder="z.B. B2024-001" value={vaccinationBatch} onChange={(e) => setVaccinationBatch(e.target.value)} />
             </label>
             <label className="block text-sm text-fg">
               Notizen
-              <textarea
-                rows={2}
-                className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-fg placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
-                placeholder="Optionale Anmerkungen"
-                value={vaccinationNotes}
-                onChange={(e) => setVaccinationNotes(e.target.value)}
-              />
+              <textarea rows={2} className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-fg placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]" placeholder="Optionale Anmerkungen" value={vaccinationNotes} onChange={(e) => setVaccinationNotes(e.target.value)} />
             </label>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowVaccinationForm(false); setEditingVaccinationId(null); resetVaccinationForm(); }}>
-              Abbrechen
-            </Button>
+            <Button variant="outline" onClick={() => { setShowVaccinationForm(false); setEditingVaccinationId(null); resetVaccinationForm(); }}>Abbrechen</Button>
             <Button
               loading={createVaccination.isPending || updateVaccination.isPending}
-              disabled={
-                !vaccinationTypeId ||
-                (vaccinationTypeId === "custom" && !vaccinationCustomType) ||
-                !vaccinationDate ||
-                !vaccinationExpiry
-              }
+              disabled={!vaccinationTypeId || (vaccinationTypeId === 'custom' && !vaccinationCustomType) || !vaccinationDate || !vaccinationExpiry}
               onClick={() => {
                 const selectedType = allVacTypes?.find((t) => t.id === vaccinationTypeId);
-                const resolvedName =
-                  vaccinationTypeId === "custom"
-                    ? vaccinationCustomType
-                    : (selectedType?.name ?? "");
+                const resolvedName = vaccinationTypeId === 'custom' ? vaccinationCustomType : (selectedType?.name ?? '');
                 if (!tenantId || !resolvedName || !vaccinationDate || !vaccinationExpiry) return;
-
-                const globalTypeId = selectedType?.source === "global" ? selectedType.id : null;
-                const customConfigId = selectedType?.source === "custom" ? selectedType.id : null;
-
+                const globalTypeId = selectedType?.source === 'global' ? selectedType.id : null;
+                const customConfigId = selectedType?.source === 'custom' ? selectedType.id : null;
                 if (editingVaccinationId) {
-                  updateVaccination.mutate({
-                    tenantId,
-                    vaccinationId: editingVaccinationId,
-                    vaccinationTypeId: globalTypeId,
-                    tenantVaccinationTypeConfigId: customConfigId,
-                    type: resolvedName,
-                    administeredDate: new Date(vaccinationDate),
-                    expiryDate: new Date(vaccinationExpiry),
-                    batchNumber: vaccinationBatch || null,
-                    notes: vaccinationNotes || null,
-                  });
+                  updateVaccination.mutate({ tenantId, vaccinationId: editingVaccinationId, vaccinationTypeId: globalTypeId, tenantVaccinationTypeConfigId: customConfigId, type: resolvedName, administeredDate: new Date(vaccinationDate), expiryDate: new Date(vaccinationExpiry), batchNumber: vaccinationBatch || null, notes: vaccinationNotes || null });
                 } else {
-                  createVaccination.mutate({
-                    tenantId,
-                    patientId,
-                    vaccinationTypeId: globalTypeId ?? undefined,
-                    tenantVaccinationTypeConfigId: customConfigId ?? undefined,
-                    type: resolvedName,
-                    administeredDate: new Date(vaccinationDate),
-                    expiryDate: new Date(vaccinationExpiry),
-                    batchNumber: vaccinationBatch || undefined,
-                    notes: vaccinationNotes || undefined,
-                  });
+                  createVaccination.mutate({ tenantId, patientId, vaccinationTypeId: globalTypeId ?? undefined, tenantVaccinationTypeConfigId: customConfigId ?? undefined, type: resolvedName, administeredDate: new Date(vaccinationDate), expiryDate: new Date(vaccinationExpiry), batchNumber: vaccinationBatch || undefined, notes: vaccinationNotes || undefined });
                 }
               }}
             >
-              {editingVaccinationId ? "Aktualisieren" : "Speichern"}
+              {editingVaccinationId ? 'Aktualisieren' : 'Speichern'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -715,14 +1113,10 @@ export default function PatientDetailPage() {
       {/* Delete vaccination confirmation */}
       <Dialog open={!!deletingVaccinationId} onOpenChange={(open) => { if (!open) setDeletingVaccinationId(null); }}>
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Impfung löschen?</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted">Diese Aktion kann nicht rückgängig gemacht werden. Der Impfeintrag wird dauerhaft gelöscht.</p>
+          <DialogHeader><DialogTitle>Impfung löschen?</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted">Diese Aktion kann nicht rückgängig gemacht werden.</p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeletingVaccinationId(null)}>
-              Abbrechen
-            </Button>
+            <Button variant="outline" onClick={() => setDeletingVaccinationId(null)}>Abbrechen</Button>
             <Button
               variant="destructive"
               loading={deleteVaccination.isPending}
@@ -736,25 +1130,6 @@ export default function PatientDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Placeholder forms (diagnosis, medication, vitals) */}
-      {(showDiagnosisForm || showMedicationForm || showVitalsForm) && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-surface border border-border p-6 shadow-xl">
-            <p className="text-muted">Formular folgt im nächsten Sprint.</p>
-            <button
-              className="mt-4 rounded-lg border border-border px-3 py-2 text-sm text-fg hover:bg-muted-soft transition-colors"
-              onClick={() => {
-                setShowDiagnosisForm(false);
-                setShowMedicationForm(false);
-                setShowVitalsForm(false);
-              }}
-            >
-              Schließen
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
