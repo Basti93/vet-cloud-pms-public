@@ -4,8 +4,8 @@ import superjson from "superjson";
 import { ZodError } from "zod";
 import { adminDb, db } from "@/lib/db/client";
 import { tenantDeletionSchedules, users, tenants } from "@/lib/db/schema";
-import { and, eq, isNotNull, sql } from "drizzle-orm";
-import type { Database } from "@/lib/db/client";
+import { and, eq, isNotNull } from "drizzle-orm";
+import { withTenantContext } from "./tenant-context";
 import { checkRateLimit, getRateLimitInfo } from "@/lib/rateLimit";
 import { logEvent, logEventAsync } from "./trpc/logging-middleware";
 
@@ -44,23 +44,6 @@ const t = initTRPC.context<TRPCContext>().create({
     };
   },
 });
-
-// ============================================================================
-// Tenant context helper
-// ============================================================================
-
-// Wraps a callback in a DB transaction with app.current_tenant_id set via SET LOCAL.
-// The transaction-scoped client (tx) is passed to the callback so RLS policies apply.
-// SET LOCAL is scoped to the transaction — safe with connection pools.
-const withTenantContext = async <T>(
-  tenantId: string,
-  fn: (tx: Database) => Promise<T>
-): Promise<T> => {
-  return db.transaction(async (tx) => {
-    await tx.execute(sql`SELECT set_config('app.current_tenant_id', ${tenantId}, true)`);
-    return fn(tx as unknown as Database);
-  });
-};
 
 // ============================================================================
 // Middleware
@@ -151,7 +134,7 @@ const enforceTenantIsActive = t.middleware(async ({ ctx, path, next }) => {
   // Wrap the downstream procedure in a transaction with SET LOCAL app.current_tenant_id.
   // ctx.db is replaced by the transaction client so all procedures get RLS-scoped queries
   // without any changes to individual procedure handlers.
-  return withTenantContext(user.tenantId, (tx) =>
+  return withTenantContext(db, user.tenantId, (tx) =>
     next({ ctx: { tenantId: user.tenantId, dbUserId: user.id, db: tx } })
   );
 });
