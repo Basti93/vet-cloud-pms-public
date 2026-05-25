@@ -711,6 +711,7 @@ export const adminRouter = createTRPCRouter({
         invitationId: invite.invitationId,
         emailSent: emailResult.success,
         inviteEmail: invite.email,
+        acceptUrl,
         expiresAt: invite.expiresAt.toISOString(),
       };
     }),

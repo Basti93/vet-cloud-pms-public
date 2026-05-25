@@ -217,6 +217,8 @@ export default function TeamPage() {
             {activeUsers.map((user: UserWithRoles) => (
               <div
                 key={user.id}
+                data-testid="team-user-row"
+                data-user-email={user.email}
                 className="rounded-xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4"
                 style={{
                   backgroundColor: "var(--color-surface)",
@@ -286,6 +288,7 @@ export default function TeamPage() {
 
                   {!user.isAdmin && (
                     <button
+                      data-testid="team-user-deactivate"
                       onClick={() => handleToggleActive(user.id, true)}
                       disabled={toggleUserActiveMutation.isPending}
                       className="px-2.5 py-1 rounded-lg text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
@@ -319,6 +322,8 @@ export default function TeamPage() {
             {inactiveUsers.map((user: UserWithRoles) => (
               <div
                 key={user.id}
+                data-testid="team-user-row"
+                data-user-email={user.email}
                 className="rounded-xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 opacity-60"
                 style={{
                   backgroundColor: "var(--color-surface)",
@@ -390,8 +395,9 @@ export default function TeamPage() {
         }}
       >
         <h3 className="text-base font-semibold">Einladungen</h3>
-        <form onSubmit={handleCreateInvitation} className="grid gap-3 sm:grid-cols-[1fr_auto_auto]">
+        <form data-testid="team-invite-form" onSubmit={handleCreateInvitation} className="grid gap-3 sm:grid-cols-[1fr_auto_auto]">
           <input
+            data-testid="team-invite-email"
             type="email"
             value={inviteEmail}
             onChange={(e) => setInviteEmail(e.target.value)}
@@ -401,6 +407,7 @@ export default function TeamPage() {
             required
           />
           <select
+            data-testid="team-invite-role"
             value={inviteRole}
             onChange={(e) => setInviteRole(e.target.value as "admin" | "vet" | "reception")}
             className="rounded-lg px-3 py-2 border"
@@ -411,6 +418,7 @@ export default function TeamPage() {
             <option value="reception">Reception</option>
           </select>
           <button
+            data-testid="team-invite-submit"
             type="submit"
             disabled={createInvitationMutation.isPending || seatsAvailable <= 0}
             className="px-4 py-2 rounded-lg text-white font-medium disabled:opacity-50"

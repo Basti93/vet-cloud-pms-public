@@ -30,7 +30,7 @@ export default function AcceptInvitationClient() {
   return (
     <div className="min-h-screen flex items-center justify-center p-6">
       <div className="max-w-md w-full rounded-xl border p-6 space-y-3" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-surface)" }}>
-        <h1 className="text-xl font-semibold">Einladung akzeptieren</h1>
+        <h1 data-testid="invite-accept-title" className="text-xl font-semibold">Einladung akzeptieren</h1>
         {!token ? (
           <p style={{ color: "var(--color-muted)" }}>Ungültiger Einladungslink.</p>
         ) : !isLoaded ? (
@@ -42,6 +42,7 @@ export default function AcceptInvitationClient() {
             </p>
             <div className="flex gap-2">
               <a
+                data-testid="invite-accept-register"
                 href={`/sign-up?redirect_url=${encodeURIComponent(redirectBackUrl)}`}
                 className="px-3 py-2 rounded-lg text-sm font-medium"
                 style={{ backgroundColor: "var(--color-accent)", color: "white" }}
@@ -49,6 +50,7 @@ export default function AcceptInvitationClient() {
                 Registrieren
               </a>
               <a
+                data-testid="invite-accept-signin"
                 href={`/sign-in?redirect_url=${encodeURIComponent(redirectBackUrl)}`}
                 className="px-3 py-2 rounded-lg text-sm font-medium border"
                 style={{ borderColor: "var(--color-border)", color: "var(--color-fg)" }}
