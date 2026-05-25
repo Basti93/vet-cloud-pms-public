@@ -2,7 +2,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { ReactNode } from "react";
-import { db } from "@/lib/db/client";
+import { adminDb } from "@/lib/db/client";
 import { tenantDeletionSchedules, tenants, users } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
 import { generateThemeStyles } from "@/lib/theme-utils";
@@ -27,7 +27,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       }
     | undefined;
 
-  const [user] = await db
+  const [user] = await adminDb
     .select({ tenantId: users.tenantId, active: users.active })
     .from(users)
     .where(eq(users.clerkId, userId))
@@ -36,7 +36,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   const isUserInactive = user && !user.active;
 
   if (user?.tenantId) {
-    const [found] = await db
+    const [found] = await adminDb
       .select({
         id: tenants.id,
         name: tenants.name,
@@ -51,7 +51,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       hasTenantAssignment = true;
       tenant = found;
 
-      const [schedule] = await db
+      const [schedule] = await adminDb
         .select({ scheduledFor: tenantDeletionSchedules.scheduledFor })
         .from(tenantDeletionSchedules)
         .where(
