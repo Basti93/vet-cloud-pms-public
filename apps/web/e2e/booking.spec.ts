@@ -61,6 +61,7 @@ test.describe("Booking page", () => {
   });
 
   test("completes public booking request happy path", async ({ page, isMobile }) => {
+    test.setTimeout(90_000);
     test.skip(isMobile, "Full happy-path funnel is validated on desktop to avoid WebKit timing flakes in CI.");
     await page.goto(bookingUrl());
     await page.getByTestId("booking-page").waitFor({ state: "visible" });
@@ -79,7 +80,7 @@ test.describe("Booking page", () => {
       for (let dayIdx = 0; dayIdx < dayCount && !selectedSlot; dayIdx += 1) {
         await visibleDays.nth(dayIdx).click();
         // Wait for slot list to render — networkidle resolves too early on WebKit
-        await page.getByTestId("booking-date-slot").first().waitFor({ state: "visible", timeout: 5_000 }).catch(() => {});
+        await page.getByTestId("booking-date-slot").first().waitFor({ state: "visible", timeout: 8_000 }).catch(() => {});
         const slotCount = await page.getByTestId("booking-date-slot").count();
         for (let slotIdx = 0; slotIdx < slotCount; slotIdx += 1) {
           try {

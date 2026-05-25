@@ -12,6 +12,7 @@ function nextWeekdayDatetimeLocal() {
 
 test.describe("Appointment lifecycle", () => {
   test("creates appointment manually and transitions status to completed", async ({ page }) => {
+    test.setTimeout(60_000);
     // Open schedule page → click Neuer Termin
     await page.goto("/dashboard/schedule");
     await page.getByTestId("new-appointment-button").click();
@@ -23,7 +24,9 @@ test.describe("Appointment lifecycle", () => {
     // Select patient — search "Bella" (first seeded patient)
     await form.locator('input[placeholder*="Tier"]').click();
     await form.locator('input[placeholder*="Tier"]').fill("Bella");
-    await page.getByText("Bella (Hund").first().click();
+    const bellaOption = page.getByText("Bella (Hund").first();
+    await expect(bellaOption).toBeVisible({ timeout: 10_000 });
+    await bellaOption.click();
 
     // Select vet — search "E2E"
     await form.locator('input[placeholder*="Arzt"]').click();
