@@ -108,7 +108,7 @@ test.describe("Signup page", () => {
         { timeout: 25_000 }
       );
 
-      const submitButton = page.locator('button[type="submit"]:visible').last();
+      const submitButton = page.locator('[data-localization-key="formButtonPrimary"]');
       await expect(submitButton).toBeVisible({ timeout: 10_000 });
       await expect(submitButton).toBeEnabled({ timeout: 10_000 });
       await submitButton.click();
