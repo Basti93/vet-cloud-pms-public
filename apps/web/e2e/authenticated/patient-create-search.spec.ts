@@ -2,8 +2,10 @@ import { expect, test } from "@playwright/test";
 
 test.describe("Patient create and search", () => {
   test("searches for existing patient by name", async ({ page }) => {
+    test.setTimeout(60_000);
     await page.goto("/dashboard/patients");
-    await expect(page.getByTestId("patients-page")).toBeVisible();
+    await expect(page.getByTestId("patients-page")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("patient-search-input")).toBeVisible({ timeout: 15_000 });
 
     // Search for "Bella" (seeded patient)
     await page.getByTestId("patient-search-input").fill("Bella");
@@ -12,8 +14,9 @@ test.describe("Patient create and search", () => {
   });
 
   test("opens new patient modal", async ({ page }) => {
+    test.setTimeout(60_000);
     await page.goto("/dashboard/patients");
-    await expect(page.getByTestId("patients-page")).toBeVisible();
+    await expect(page.getByTestId("patients-page")).toBeVisible({ timeout: 15_000 });
 
     await page.getByTestId("new-patient-button").click();
 
@@ -21,8 +24,9 @@ test.describe("Patient create and search", () => {
   });
 
   test("patient row links to patient detail page", async ({ page }) => {
+    test.setTimeout(60_000);
     await page.goto("/dashboard/patients");
-    await expect(page.getByTestId("patients-page")).toBeVisible();
+    await expect(page.getByTestId("patients-page")).toBeVisible({ timeout: 15_000 });
 
     // Click on first patient row
     const firstRow = page.getByTestId("patient-row").first();

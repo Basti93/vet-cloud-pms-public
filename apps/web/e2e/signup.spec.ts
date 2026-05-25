@@ -1,6 +1,9 @@
 import { expect, request as playwrightRequest, test, type APIRequestContext, type Locator, type Page } from "@playwright/test";
 import { clerkSetup, setupClerkTestingToken } from "@clerk/testing/playwright";
 
+// clerkSetup must run in the same worker process as setupClerkTestingToken because
+// it writes CLERK_FAPI to process.env which does not cross worker process boundaries.
+
 const CLERK_API_BASE_URL = process.env.CLERK_API_BASE_URL ?? "https://api.clerk.com";
 
 async function fillIfVisible(locator: Locator, value: string) {
@@ -111,6 +114,7 @@ test.describe("Signup page", () => {
 
     const cleanupRequest = await playwrightRequest.newContext();
 
+    await clerkSetup();
     await setupClerkTestingToken({ page });
     await page.goto("/sign-up");
     await expect(page).toHaveURL(/\/sign-up/);
