@@ -11,6 +11,7 @@
     "lint:styles": "stylelint \"src/**/*.{css,scss}\"",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --coverage",
+    "test:unit": "vitest run --coverage --exclude 'src/server/routers/__tests__/**'",
     "test:watch": "vitest --coverage",
     "test:ui": "vitest --ui",
     "db:generate": "drizzle-kit generate",

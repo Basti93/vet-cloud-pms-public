@@ -1,6 +1,9 @@
 packages:
   - "apps/*"
   - "packages/*"
+overrides:
+  js-cookie: "3.0.7"
+
 allowBuilds:
   '@clerk/shared': true
   '@parcel/watcher': true
