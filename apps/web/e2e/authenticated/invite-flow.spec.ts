@@ -115,7 +115,7 @@ async function createInvitation(page: Page, email: string) {
     (response) =>
       response.url().includes("/api/trpc/admin.createInvitation") &&
       response.request().method() === "POST",
-    { timeout: 75_000 }
+    { timeout: 10_000 }
   );
 
   await page.getByTestId("team-invite-email").fill(email);

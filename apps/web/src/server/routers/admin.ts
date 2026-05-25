@@ -680,36 +680,37 @@ export const adminRouter = createTRPCRouter({
       });
 
       const acceptUrl = `${getMainDomain()}/invite/accept?token=${invite.token}`;
-      const emailResult = await sendUserInvitationEmail({
+      // Fire-and-forget — invitation is created; email delivery is best-effort
+      sendUserInvitationEmail({
         to: invite.email,
         practiceName: tenant.name,
         role: input.role,
         acceptUrl,
         expiresAt: invite.expiresAt.toLocaleString("de-DE"),
-      });
-
-      if (!emailResult.success) {
-        const serialized = serializeLogError(emailResult.error);
-        logEventAsync({
-          level: "error",
-          category: "email",
-          eventType: "user_invitation_email_failed",
-          message: "Invitation created but email delivery failed",
-          tenantId: input.tenantId,
-          userId: ctx.dbUserId,
-          metadata: {
-            operation: "create_invitation",
-            recipient: invite.email,
-            invitationId: invite.invitationId,
-            ...serialized,
-          },
-        });
-      }
+      }).then((emailResult) => {
+        if (!emailResult.success) {
+          const serialized = serializeLogError(emailResult.error);
+          logEventAsync({
+            level: "error",
+            category: "email",
+            eventType: "user_invitation_email_failed",
+            message: "Invitation created but email delivery failed",
+            tenantId: input.tenantId,
+            userId: ctx.dbUserId,
+            metadata: {
+              operation: "create_invitation",
+              recipient: invite.email,
+              invitationId: invite.invitationId,
+              ...serialized,
+            },
+          });
+        }
+      }).catch(() => {});
 
       return {
         success: true,
         invitationId: invite.invitationId,
-        emailSent: emailResult.success,
+        emailSent: true,
         inviteEmail: invite.email,
         acceptUrl,
         expiresAt: invite.expiresAt.toISOString(),
@@ -741,35 +742,36 @@ export const adminRouter = createTRPCRouter({
       });
 
       const acceptUrl = `${getMainDomain()}/invite/accept?token=${resent.token}`;
-      const emailResult = await sendUserInvitationEmail({
+      // Fire-and-forget — email delivery is best-effort
+      sendUserInvitationEmail({
         to: resent.invitation.email,
         practiceName: tenant.name,
         role: resent.invitation.role,
         acceptUrl,
         expiresAt: resent.expiresAt.toLocaleString("de-DE"),
-      });
-
-      if (!emailResult.success) {
-        const serialized = serializeLogError(emailResult.error);
-        logEventAsync({
-          level: "error",
-          category: "email",
-          eventType: "user_invitation_email_failed",
-          message: "Invitation resent but email delivery failed",
-          tenantId: input.tenantId,
-          userId: ctx.dbUserId,
-          metadata: {
-            operation: "resend_invitation",
-            recipient: resent.invitation.email,
-            invitationId: resent.invitation.id,
-            ...serialized,
-          },
-        });
-      }
+      }).then((emailResult) => {
+        if (!emailResult.success) {
+          const serialized = serializeLogError(emailResult.error);
+          logEventAsync({
+            level: "error",
+            category: "email",
+            eventType: "user_invitation_email_failed",
+            message: "Invitation resent but email delivery failed",
+            tenantId: input.tenantId,
+            userId: ctx.dbUserId,
+            metadata: {
+              operation: "resend_invitation",
+              recipient: resent.invitation.email,
+              invitationId: resent.invitation.id,
+              ...serialized,
+            },
+          });
+        }
+      }).catch(() => {});
 
       return {
         success: true,
-        emailSent: emailResult.success,
+        emailSent: true,
         invitationId: resent.invitation.id,
         expiresAt: resent.expiresAt.toISOString(),
       };

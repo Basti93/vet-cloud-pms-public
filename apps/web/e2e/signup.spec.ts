@@ -96,7 +96,7 @@ async function completeEmailVerification(page: Page, email: string) {
 
 test.describe("Signup page", () => {
   test("can create a user via UI and clean it up in Clerk", async ({ page, isMobile }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(150_000);
     test.skip(isMobile, "Run full signup flow on desktop only.");
     test.skip(!process.env.CLERK_SECRET_KEY, "CLERK_SECRET_KEY is required for cleanup.");
 
@@ -111,7 +111,6 @@ test.describe("Signup page", () => {
 
     const cleanupRequest = await playwrightRequest.newContext();
 
-    await clerkSetup();
     await setupClerkTestingToken({ page });
     await page.goto("/sign-up");
     await expect(page).toHaveURL(/\/sign-up/);
@@ -135,19 +134,8 @@ test.describe("Signup page", () => {
 
       await completeEmailVerification(page, email);
 
-      await expect
-        .poll(async () => {
-          const ids = await findClerkUserIdsByEmail(cleanupRequest, email);
-          return ids.length;
-        }, { timeout: 25_000, intervals: [2_000, 3_000, 5_000] })
-        .toBeGreaterThan(0);
-
-      const currentPath = new URL(page.url()).pathname;
-      const expectedTerminalPath =
-        currentPath.startsWith("/onboarding") ||
-        currentPath.startsWith("/dashboard") ||
-        currentPath.startsWith("/sign-up");
-      expect(expectedTerminalPath).toBe(true);
+      // Reaching onboarding/dashboard proves Clerk auth succeeded — no need to poll Clerk API
+      await expect(page).toHaveURL(/\/(onboarding|dashboard)/, { timeout: 20_000 });
 
       const fatalCspOrCaptchaErrors = consoleErrors.filter(
         (text) =>

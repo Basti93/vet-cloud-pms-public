@@ -145,6 +145,7 @@ export function SearchableSelect({
               }}
               onKeyDown={handleKeyDown}
               onFocus={() => !disabled && setIsOpen(true)}
+              onClick={(e) => e.stopPropagation()}
               disabled={disabled}
               className="flex-1 bg-transparent outline-none text-sm placeholder:opacity-50"
               style={{ color: "var(--color-fg)" }}

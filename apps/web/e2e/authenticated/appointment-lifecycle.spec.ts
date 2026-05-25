@@ -25,7 +25,7 @@ test.describe("Appointment lifecycle", () => {
     await page.getByTestId("appointment-patient-input").click();
     await page.getByTestId("appointment-patient-input").fill("Bella");
     const patientOption = page.getByTestId("appointment-patient-option").first();
-    await expect(patientOption).toBeVisible({ timeout: 20_000 });
+    await expect(patientOption).toBeVisible({ timeout: 10_000 });
     await patientOption.click();
 
     // Select vet — search "E2E"
