@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db/client";
+import { adminDb as db } from "@/lib/db/client";
 import {
   appointments,
   emailSettings,
@@ -119,6 +119,11 @@ export async function POST(request: NextRequest) {
     }> = [];
 
     for (const tenant of allTenants) {
+      if (!tenant.id) {
+        console.error("[Cron] Skipping tenant with missing id", tenant);
+        continue;
+      }
+
       const tenantStats = {
         tenantId: tenant.id,
         tenantSlug: tenant.slug,
@@ -476,7 +481,7 @@ export async function POST(request: NextRequest) {
       }
 
       tenantDebugStats.push(tenantStats);
-    }
+    } // end per-tenant try block (individual errors caught above per operation)
 
     return NextResponse.json(
       {

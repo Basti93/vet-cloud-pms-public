@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db as appDb } from "@/lib/db/client";
+import { adminDb as appDb } from "@/lib/db/client";
 import { tenants, users } from "@/lib/db/schema";
 import { sendTrialExpiredAdminEmail } from "@/lib/email/service";
 import { isNull, lt, and, eq } from "drizzle-orm";

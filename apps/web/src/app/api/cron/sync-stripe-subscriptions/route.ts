@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db as appDb } from "@/lib/db/client";
+import { adminDb as appDb } from "@/lib/db/client";
 import { tenants } from "@/lib/db/schema";
 import { getStripeClient } from "@/lib/stripe/client";
 import { getTierByPriceId, getAddonByPriceId } from "@/lib/stripe/prices";
