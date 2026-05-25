@@ -134,7 +134,7 @@ const enforceTenantIsActive = t.middleware(async ({ ctx, path, next }) => {
   // Wrap the downstream procedure in a transaction with SET LOCAL app.current_tenant_id.
   // ctx.db is replaced by the transaction client so all procedures get RLS-scoped queries
   // without any changes to individual procedure handlers.
-  return withTenantContext(db, user.tenantId, (tx) =>
+  return withTenantContext(ctx.db, user.tenantId, (tx) =>
     next({ ctx: { tenantId: user.tenantId, dbUserId: user.id, db: tx } })
   );
 });
