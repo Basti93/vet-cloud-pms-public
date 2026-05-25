@@ -12,8 +12,7 @@ test.describe("Medical records", () => {
 
     await expect(page).toHaveURL(/\/dashboard\/patients\/[0-9a-f-]+/);
 
-    // Diagnosen section must be present
-    await expect(page.getByText("Diagnosen")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("heading", { name: "Diagnosen" })).toBeVisible({ timeout: 10_000 });
 
     // "Hinzufügen" button triggers the diagnosis form
     await page.getByRole("button", { name: "Hinzufügen" }).first().click();
