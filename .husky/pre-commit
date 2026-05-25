@@ -1,5 +1,30 @@
 #!/bin/sh
 
+# Check: journal when timestamps must be monotonically increasing.
+# Drizzle silently skips migrations whose when < last applied created_at.
+STAGED_JOURNAL=$(git diff --cached --name-only -- 'apps/web/drizzle/meta/_journal.json')
+if [ -n "$STAGED_JOURNAL" ]; then
+  python3 -c "
+import json, sys, time
+now = int(time.time() * 1000)
+with open('apps/web/drizzle/meta/_journal.json') as f:
+    entries = json.load(f)['entries']
+ok = True
+for i, e in enumerate(entries):
+    if e['when'] > now:
+        print(f\"❌ Journal idx {e['idx']} 'when' is in the future ({e['when']} > {now})\")
+        print(f\"   Use a realistic timestamp, e.g. {now}\")
+        ok = False
+    if i > 0 and e['when'] <= entries[i-1]['when']:
+        print(f\"❌ Journal 'when' not monotonically increasing: idx {e['idx']} ({e['when']}) <= idx {entries[i-1]['idx']} ({entries[i-1]['when']})\")
+        print(f\"   Set when > {entries[i-1]['when']} (e.g. {entries[i-1]['when'] + 100000})\")
+        ok = False
+if not ok:
+    sys.exit(1)
+print('✓ Journal when timestamps OK')
+" || exit 1
+fi
+
 # Check: if schema.ts changed, drizzle migrations must also have changes
 STAGED_SCHEMA=$(git diff --cached --name-only -- 'apps/web/src/lib/db/schema.ts')
 STAGED_MIGRATIONS=$(git diff --cached --name-only -- 'apps/web/drizzle/')
