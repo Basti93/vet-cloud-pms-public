@@ -395,7 +395,7 @@ export default function PatientDetailPage() {
               <Stethoscope size={16} style={{ color: 'var(--color-accent)' }} />
               Diagnosen
             </h2>
-            <Button size="sm" variant="outline" onClick={() => setShowDiagnosisForm(true)}>
+            <Button size="sm" variant="outline" onClick={() => setShowDiagnosisForm(true)} data-testid="add-diagnosis-button">
               <Plus size={14} /> Hinzufügen
             </Button>
           </div>
@@ -682,7 +682,7 @@ export default function PatientDetailPage() {
 
       {/* Diagnosis dialog */}
       <Dialog open={showDiagnosisForm} onOpenChange={(o) => { setShowDiagnosisForm(o); if (!o) resetDxForm(); }}>
-        <DialogContent>
+        <DialogContent data-testid="medical-record-modal">
           <DialogHeader><DialogTitle>Diagnose erfassen</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <label className="block text-sm text-fg">

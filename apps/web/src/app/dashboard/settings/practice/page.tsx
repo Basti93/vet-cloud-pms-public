@@ -338,7 +338,7 @@ export default function PracticePage() {
             {update.isPending ? "Wird gespeichert..." : "Speichern"}
           </Button>
           {saveSuccess && (
-            <span className="flex items-center gap-1.5 text-sm" style={{ color: "#166534" }}>
+            <span className="flex items-center gap-1.5 text-sm" style={{ color: "#166534" }} data-testid="toast-success">
               <CheckCircle size={15} />
               Gespeichert
             </span>

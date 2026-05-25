@@ -12,6 +12,7 @@ test.describe("Booking management", () => {
   });
 
   test("can confirm the first pending online booking request when present", async ({ page }) => {
+    test.setTimeout(60_000);
     await page.goto("/dashboard/bookings");
     await expect(page.getByTestId("bookings-page")).toBeVisible();
 

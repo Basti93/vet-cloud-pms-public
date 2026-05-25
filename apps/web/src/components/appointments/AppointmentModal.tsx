@@ -199,6 +199,8 @@ export function AppointmentModal({
           }
           error={errors.patientId}
           disabled={isEdit || !!preselectedPatientId}
+          inputTestId="appointment-patient-input"
+          optionTestId="appointment-patient-option"
         />
 
         {/* Vet */}
@@ -215,6 +217,8 @@ export function AppointmentModal({
             })) ?? []
           }
           error={errors.vetId}
+          inputTestId="appointment-vet-input"
+          optionTestId="appointment-vet-option"
         />
 
         {/* Title */}

@@ -18,6 +18,8 @@ interface SearchableSelectProps {
   error?: string;
   disabled?: boolean;
   maxHeight?: string;
+  inputTestId?: string;
+  optionTestId?: string;
 }
 
 export function SearchableSelect({
@@ -29,6 +31,8 @@ export function SearchableSelect({
   error,
   disabled = false,
   maxHeight = "300px",
+  inputTestId,
+  optionTestId,
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -144,6 +148,7 @@ export function SearchableSelect({
               disabled={disabled}
               className="flex-1 bg-transparent outline-none text-sm placeholder:opacity-50"
               style={{ color: "var(--color-fg)" }}
+              data-testid={inputTestId}
             />
           )}
           {value && !isOpen && !disabled && (
@@ -180,6 +185,7 @@ export function SearchableSelect({
                 onClick={() => handleSelect(opt.value)}
                 onMouseEnter={() => setHighlightedIndex(idx)}
                 className="px-3 py-2.5 text-sm cursor-pointer transition-colors"
+                data-testid={optionTestId}
                 style={{
                   backgroundColor: idx === highlightedIndex ? "var(--color-bg)" : "transparent",
                   color: idx === highlightedIndex ? "var(--color-fg)" : "var(--color-fg)",

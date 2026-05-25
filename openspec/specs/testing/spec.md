@@ -5,7 +5,7 @@ Vet Cloud PMS uses a four-layer testing approach — TypeScript types, Vitest un
 ## Requirements
 
 ### Requirement: Test Selector Language-Safety
-Tests MUST NOT hardcode German-language strings as selectors. Selectors SHALL use `data-testid` attributes as the primary mechanism, semantic ARIA roles as the secondary mechanism, and translated label keys only after i18n is implemented for that component.
+Tests MUST NOT use German-language strings as selectors. Selectors SHALL follow strict priority order defined in `openspec/specs/e2e-conventions/spec.md`: (1) `data-testid`, (2) ARIA role with name, (3) `[name=]` for Clerk-owned fields, (4) `[data-localization-key=]` for Clerk buttons. `getByText` with translated copy, `getByPlaceholder` with translated copy, and CSS class selectors are prohibited. Clerk-owned UI (sign-in, sign-up, email verification) is exempt from `data-testid` requirements as those components are not authored by this project.
 
 #### Scenario: Booking form selector
 - **WHEN** a Playwright test targets the booking submit button
@@ -13,14 +13,30 @@ Tests MUST NOT hardcode German-language strings as selectors. Selectors SHALL us
 
 #### Scenario: CSS class selector prohibited
 - **WHEN** a developer writes a new Playwright test
-- **THEN** selectors using `.some-class > span` patterns are rejected in code review — only `data-testid`, `getByRole`, and post-i18n `getByLabel` are permitted
+- **THEN** selectors using `.some-class > span` patterns are rejected in code review — only `data-testid`, `getByRole`, and Clerk-specific attribute selectors are permitted
+
+#### Scenario: Clerk sign-up field exception
+- **WHEN** a test must fill Clerk's sign-up form
+- **THEN** the test uses `locator('input[name="emailAddress"]')` — this is the documented Clerk field name, not German copy
+
+#### Scenario: Success toast selector
+- **WHEN** a test verifies a save action succeeded
+- **THEN** the test uses `getByTestId("toast-success")` not `getByText("Gespeichert")`
 
 ### Requirement: data-testid Attribute Convention
-Every new interactive element added to the UI SHALL include a `data-testid` attribute in the same PR as the feature code. The attribute MUST follow the `[feature]-[element]` naming pattern.
+Every new interactive element added to the UI SHALL include a `data-testid` attribute in the same PR as the feature code. The attribute MUST follow the `[feature]-[element]` naming pattern. Shared UI components (`Modal`, combobox, toast) SHALL accept a `testId` prop and stamp it on the root interactive element. Option items in comboboxes SHALL render `data-testid="[feature]-[field]-option"`.
 
 #### Scenario: New button added
 - **WHEN** a developer adds a new interactive button or input to the UI
 - **THEN** the element has a `data-testid` attribute following the pattern (e.g. `patient-create-btn`, `appointment-save-btn`) in the same commit
+
+#### Scenario: Modal component used in REDACTEDed flow
+- **WHEN** a developer uses `<Modal>` in a page that has or will have E2E coverage
+- **THEN** they pass `testId="[name]-modal"` to the Modal component so tests can assert on `getByTestId("[name]-modal")` instead of text content
+
+#### Scenario: Combobox option items
+- **WHEN** a combobox renders search results that a test must click
+- **THEN** each option element has `data-testid="[feature]-[field]-option"` so tests can use `getByTestId` instead of `getByText`
 
 ### Requirement: Unit Tests Cover Pure Logic Only
 Vitest unit tests SHALL target pure functions with non-trivial logic. Unit tests MUST NOT mock or instantiate a database, network connection, or React component. tRPC procedure handlers and functions that only call the database SHALL NOT have unit tests.
@@ -76,6 +92,17 @@ Every new feature SHALL satisfy all applicable checklist items before merging: T
 #### Scenario: Feature with tenant-scoped logic
 - **WHEN** a developer ships a new feature that queries or writes tenant-scoped data
 - **THEN** an integration test covering tenant isolation for that feature is present before the PR is merged
+
+### Requirement: E2E Tests Declare Explicit Timeout Tiers
+Every Playwright test SHALL declare `test.setTimeout(N)` matching the complexity tier defined in `openspec/specs/e2e-conventions/spec.md`. Tests with a single async interaction use 60s, multi-step flows use 90s, and auth flows (Clerk sign-up/invitation) use 120s. The 30s default is reserved for navigation-only tests.
+
+#### Scenario: Multi-step test without timeout declaration
+- **WHEN** a code review sees a test that creates a record, navigates, and asserts — but has no `test.setTimeout` call
+- **THEN** the reviewer requests `test.setTimeout(90_000)` be added before merge
+
+#### Scenario: waitForResponse on tRPC mutation
+- **WHEN** a test uses `page.waitForResponse` to intercept a tRPC POST
+- **THEN** the timeout argument is at least 30_000 to handle cold-server Clerk latency
 
 ### Requirement: Deliberate Test Exclusions
 Snapshot tests, 100% coverage targets, database mocking in integration tests, E2E tests for edge/error cases, visual regression tests, and load/performance tests SHALL NOT be added. Edge cases belong in integration tests; visual testing is not done at current scale.

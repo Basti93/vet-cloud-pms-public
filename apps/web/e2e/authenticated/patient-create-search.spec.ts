@@ -17,8 +17,7 @@ test.describe("Patient create and search", () => {
 
     await page.getByTestId("new-patient-button").click();
 
-    // Modal component is a custom <div> (no role=dialog); heading is reliable anchor
-    await expect(page.getByRole("heading", { name: "Tier hinzufügen" })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId("new-patient-modal")).toBeVisible({ timeout: 10_000 });
   });
 
   test("patient row links to patient detail page", async ({ page }) => {

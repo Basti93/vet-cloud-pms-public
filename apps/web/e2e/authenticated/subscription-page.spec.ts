@@ -17,6 +17,6 @@ test.describe("Subscription page", () => {
 
     // E2E tenant has subscriptionPlan: "solo" and subscriptionStatus: "active"
     // Status section should display current info
-    await expect(page.getByText(/Status/i)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId("subscription-status")).toBeVisible({ timeout: 10_000 });
   });
 });

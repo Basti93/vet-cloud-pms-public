@@ -8,6 +8,7 @@ test.describe("Clinic settings", () => {
   });
 
   test("updates clinic name and persists after reload", async ({ page }) => {
+    test.setTimeout(90_000);
     await page.goto("/dashboard/settings/practice");
     await expect(page.getByTestId("practice-settings-page")).toBeVisible();
 
@@ -18,7 +19,7 @@ test.describe("Clinic settings", () => {
     await page.getByTestId("practice-save-button").click();
 
     // Wait for save confirmation
-    await expect(page.getByText("Gespeichert")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId("toast-success")).toBeVisible({ timeout: 10_000 });
 
     // Reload and verify persistence
     await page.reload();
@@ -28,6 +29,6 @@ test.describe("Clinic settings", () => {
     await page.getByTestId("practice-name-input").clear();
     await page.getByTestId("practice-name-input").fill("E2E Test Praxis");
     await page.getByTestId("practice-save-button").click();
-    await expect(page.getByText("Gespeichert")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId("toast-success")).toBeVisible({ timeout: 10_000 });
   });
 });

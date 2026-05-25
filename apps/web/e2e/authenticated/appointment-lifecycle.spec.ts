@@ -22,16 +22,18 @@ test.describe("Appointment lifecycle", () => {
     await expect(form).toBeVisible({ timeout: 10_000 });
 
     // Select patient — search "Bella" (first seeded patient)
-    await form.locator('input[placeholder*="Tier"]').click();
-    await form.locator('input[placeholder*="Tier"]').fill("Bella");
-    const bellaOption = page.getByText("Bella (Hund").first();
-    await expect(bellaOption).toBeVisible({ timeout: 10_000 });
-    await bellaOption.click();
+    await page.getByTestId("appointment-patient-input").click();
+    await page.getByTestId("appointment-patient-input").fill("Bella");
+    const patientOption = page.getByTestId("appointment-patient-option").first();
+    await expect(patientOption).toBeVisible({ timeout: 10_000 });
+    await patientOption.click();
 
     // Select vet — search "E2E"
-    await form.locator('input[placeholder*="Arzt"]').click();
-    await form.locator('input[placeholder*="Arzt"]').fill("E2E");
-    await page.getByText(/E2E.*Vet|E2E.*Backup/).first().click();
+    await page.getByTestId("appointment-vet-input").click();
+    await page.getByTestId("appointment-vet-input").fill("E2E");
+    const vetOption = page.getByTestId("appointment-vet-option").first();
+    await expect(vetOption).toBeVisible({ timeout: 10_000 });
+    await vetOption.click();
 
     // Fill title
     await page.getByTestId("appointment-title-input").fill("E2E Lifecycle Test");

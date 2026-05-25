@@ -142,7 +142,7 @@ export function NewPatientModal({
   const isSaving = createOwner.isPending || createPatient.isPending;
 
   return (
-    <Modal open={open} onClose={handleClose} title="Tier hinzufügen" size="lg">
+    <Modal open={open} onClose={handleClose} title="Tier hinzufügen" size="lg" testId="new-patient-modal">
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
           <div className="flex items-center justify-between gap-3 mb-3">
@@ -182,6 +182,7 @@ export function NewPatientModal({
                 onChange={(event) => setOwnerSearch(event.target.value)}
                 icon={<Search size={16} />}
                 error={errors.ownerId}
+                data-testid="new-patient-owner-input"
               />
               <div className="max-h-44 overflow-auto rounded-xl border border-gray-200 divide-y divide-gray-100">
                 {owners?.length ? owners.map((owner) => (
@@ -193,6 +194,7 @@ export function NewPatientModal({
                       setErrors((current) => ({ ...current, ownerId: "" }));
                     }}
                     className={`w-full px-4 py-3 text-left text-sm hover:bg-gray-50 ${selectedOwnerId === owner.id ? "bg-blue-50" : "bg-white"}`}
+                    data-testid="new-patient-owner-option"
                   >
                     <span className="font-medium text-gray-900">{owner.firstName} {owner.lastName}</span>
                     <span className="block text-xs text-gray-500">

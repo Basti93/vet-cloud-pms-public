@@ -270,7 +270,7 @@ export default function SubscriptionPage() {
           <div className="bg-surface rounded-2xl border border-border shadow-sm p-6">
             <div className="mb-6">
               <h2 className="text-lg font-semibold text-fg mb-2">Abonnement</h2>
-              <div className="text-sm text-muted space-y-1">
+              <div className="text-sm text-muted space-y-1" data-testid="subscription-status">
                 <p>
                   Status:{" "}
                   <span className="font-medium capitalize">

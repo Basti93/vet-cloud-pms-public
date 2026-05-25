@@ -10,6 +10,7 @@ interface ModalProps {
   description?: string;
   children: React.ReactNode;
   size?: "sm" | "md" | "lg" | "xl";
+  testId?: string;
 }
 
 export function Modal({
@@ -19,6 +20,7 @@ export function Modal({
   description,
   children,
   size = "md",
+  testId,
 }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
 
@@ -59,6 +61,7 @@ export function Modal({
       {/* Panel */}
       <div
         className={`relative z-10 w-full ${sizes[size]} bg-white rounded-2xl shadow-2xl flex flex-col max-h-[90vh]`}
+        data-testid={testId}
       >
         {/* Header */}
         <div className="flex items-start justify-between px-6 pt-6 pb-4 border-b border-gray-100 flex-shrink-0">

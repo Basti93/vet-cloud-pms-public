@@ -5,8 +5,8 @@ test.describe("Vet team management", () => {
     await page.goto("/dashboard/settings/team");
     await expect(page).toHaveURL(/\/dashboard\/settings\/team/);
 
-    // E2E tenant has two seeded vets: "E2E Vet" and "E2E Backup"
-    await expect(page.getByText(/E2E.*Vet|E2E.*Backup/).first()).toBeVisible({ timeout: 10_000 });
+    // E2E tenant has two seeded vets visible as team-user-row entries
+    await expect(page.getByTestId("team-user-row").first()).toBeVisible({ timeout: 10_000 });
   });
 
   test("vets appear in appointment creation dropdown", async ({ page }) => {
@@ -17,8 +17,8 @@ test.describe("Vet team management", () => {
     await expect(form).toBeVisible({ timeout: 10_000 });
 
     // Open vet dropdown and verify E2E vet appears
-    await form.locator('input[placeholder*="Arzt"]').click();
-    await form.locator('input[placeholder*="Arzt"]').fill("E2E");
-    await expect(page.getByText(/E2E.*Vet|E2E.*Backup/).first()).toBeVisible({ timeout: 5_000 });
+    await page.getByTestId("appointment-vet-input").click();
+    await page.getByTestId("appointment-vet-input").fill("E2E");
+    await expect(page.getByTestId("appointment-vet-option").first()).toBeVisible({ timeout: 10_000 });
   });
 });

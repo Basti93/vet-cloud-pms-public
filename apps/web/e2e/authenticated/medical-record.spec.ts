@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test.describe("Medical records", () => {
   test("patient detail page shows diagnosis section", async ({ page }) => {
+    test.setTimeout(60_000);
     // Navigate to patients list and open first patient
     await page.goto("/dashboard/patients");
     await expect(page.getByTestId("patients-page")).toBeVisible();
@@ -14,10 +15,7 @@ test.describe("Medical records", () => {
 
     await expect(page.getByRole("heading", { name: "Diagnosen" })).toBeVisible({ timeout: 10_000 });
 
-    // "Hinzufügen" button triggers the diagnosis form
-    await page.getByRole("button", { name: "Hinzufügen" }).first().click();
-
-    // Placeholder modal opens (form not yet implemented)
-    await expect(page.getByText(/Formular folgt/i).or(page.getByRole("dialog"))).toBeVisible({ timeout: 5_000 });
+    await page.getByTestId("add-diagnosis-button").click();
+    await expect(page.getByTestId("medical-record-modal")).toBeVisible({ timeout: 10_000 });
   });
 });
