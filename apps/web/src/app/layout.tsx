@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Script from "next/script";
+import { Inter, Source_Serif_4, IBM_Plex_Sans, Public_Sans } from "next/font/google";
 import { auth } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db/client";
@@ -16,6 +17,11 @@ import { EnvironmentBanner } from "@/components/EnvironmentBanner";
 import type { PraxisPreferences, UserPreferences } from "@/lib/user/preferences";
 import { getSystemDomain } from "@/lib/system-name";
 import "./globals.css";
+
+const inter = Inter({ subsets: ["latin"], display: "swap", variable: "--font-inter" });
+const sourceSerif4 = Source_Serif_4({ subsets: ["latin"], weight: ["400", "600", "700"], display: "swap", variable: "--font-source-serif-4" });
+const ibmPlexSans = IBM_Plex_Sans({ subsets: ["latin"], weight: ["400", "500", "600"], display: "swap", variable: "--font-ibm-plex-sans" });
+const publicSans = Public_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700"], display: "swap", variable: "--font-public-sans" });
 
 const SYSTEM_DOMAIN = getSystemDomain();
 
@@ -82,7 +88,7 @@ export default async function RootLayout({
   return (
     <ClerkProviderWrapper>
       <html lang={htmlLang}>
-        <body>
+        <body className={`${inter.variable} ${sourceSerif4.variable} ${ibmPlexSans.variable} ${publicSans.variable}`}>
           <EnvironmentBanner />
           <TRPCProvider>
             <PraxisProvider praxis={praxisData}>

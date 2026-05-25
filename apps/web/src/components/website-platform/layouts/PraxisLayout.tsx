@@ -10,8 +10,6 @@ import { generateThemeStyles, getPrimaryHex } from '@/lib/theme-utils';
 import { resolveAssetUrl } from '@/lib/website-platform/assets';
 import { BookingDialog } from '@/components/website-platform/blocks/WebsiteBlocks';
 
-const FONTS_HREF =
-  'https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Public+Sans:wght@400;500;600;700&display=swap';
 
 export function PraxisLayout({ resolved, assetMap, children }: { resolved: ResolvedWebsitePage; assetMap?: Record<string, string>; children?: ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -43,8 +41,6 @@ export function PraxisLayout({ resolved, assetMap, children }: { resolved: Resol
 
   return (
     <div style={{ ...themeStyles, fontFamily: 'var(--font-body)', color: 'var(--color-fg)', background: 'var(--color-bg)' }} className="min-h-screen">
-      <link rel="preconnect" href="https://fonts.googleapis.com" />
-      <link rel="stylesheet" href={FONTS_HREF} />
       <link rel="icon" href={faviconHref} />
 
       {/* Custom CSS override */}
