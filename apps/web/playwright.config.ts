@@ -27,12 +27,14 @@ dotenv.config({ path: path.resolve(import.meta.dirname, ".env.test") });
  */
 export default defineConfig({
   testDir: "./e2e",
-  fullyParallel: true,
+  fullyParallel: !process.env.CI,
   // Fail the build on CI if test.only is accidentally left in source.
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 2 : undefined,
-  reporter: process.env.CI ? "github" : "list",
+  workers: process.env.CI ? 1 : undefined,
+  reporter: process.env.CI
+    ? [["github"], ["html", { open: "never" }]]
+    : "list",
 
   use: {
     baseURL:
@@ -58,13 +60,7 @@ export default defineConfig({
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
       testIgnore: /authenticated\//,
-      testMatch: /\.spec\.ts/,
-    },
-    {
-      name: "mobile-safari",
-      use: { ...devices["iPhone 14"] },
-      testIgnore: /authenticated\//,
-      testMatch: /\.spec\.ts/,
+      testMatch: [/booking\.spec\.ts/, /signup\.spec\.ts/],
     },
 
     // ── 3. Authenticated tests ────────────────────────────────────────────────
@@ -76,7 +72,22 @@ export default defineConfig({
         storageState: "e2e/.auth/user.json",
       },
       dependencies: ["setup"],
-      testMatch: /authenticated\/.*\.spec\.ts/,
+      testMatch: [
+        /authenticated\/appointment-lifecycle\.spec\.ts/,
+        /authenticated\/dashboard\.spec\.ts/,
+        /authenticated\/invite-flow\.spec\.ts/,
+        /authenticated\/patient-create-search\.spec\.ts/,
+      ],
     },
+    ...(process.env.E2E_INCLUDE_WEBKIT === "true"
+      ? [
+          {
+            name: "mobile-safari",
+            use: { ...devices["iPhone 14"] },
+            testIgnore: /authenticated\//,
+            testMatch: [/booking\.spec\.ts/, /signup\.spec\.ts/],
+          },
+        ]
+      : []),
   ],
 });

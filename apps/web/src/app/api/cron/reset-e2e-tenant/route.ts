@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
+import { createDefaultRoles } from "@/lib/auth/permissions";
 import { adminDb as db } from "@/lib/db/client";
 import {
   appointments,
@@ -11,6 +12,8 @@ import {
   medications,
   owners,
   patients,
+  PERMISSIONS,
+  rolePermissions,
   roles,
   tenants,
   userRoles,
@@ -71,6 +74,13 @@ export async function POST(request: NextRequest) {
     const seeded = await seedE2ETenant({ tenantId, tenantSlug, clerkUserId, email });
     const deleted = await deleteE2ETenantData(tenantId);
     const created = await seedE2ETenantDemoData(tenantId, seeded.vetIds);
+    const readiness = await assertE2EReadiness({
+      tenantId,
+      clerkUserId,
+      previewToken: seeded.previewToken,
+      seeded,
+      created,
+    });
 
     return NextResponse.json({
       success: true,
@@ -79,6 +89,7 @@ export async function POST(request: NextRequest) {
       seeded,
       deleted,
       created,
+      readiness,
     });
   } catch (error) {
     console.error("E2E tenant reset failed:", error);
@@ -126,30 +137,10 @@ async function seedE2ETenant({
 
   const previewToken = await ensurePreviewToken(tenantId);
 
-  // 2. System roles needed by authenticated dashboard and public booking
-  await db
-    .insert(roles)
-    .values({
-      tenantId,
-      code: "admin",
-      name: "Admin",
-      description: "Full access",
-      isSystem: true,
-      baseVersion: 1,
-    })
-    .onConflictDoNothing();
-
-  await db
-    .insert(roles)
-    .values({
-      tenantId,
-      code: "vet",
-      name: "Tierarzt",
-      description: "E2E booking vet",
-      isSystem: true,
-      baseVersion: 1,
-    })
-    .onConflictDoNothing();
+  // 2. System roles needed by authenticated dashboard and public booking.
+  // This syncs role permissions too; manually upserting roles leaves the E2E
+  // admin unable to access settings/team/subscription pages after a reset.
+  await createDefaultRoles(tenantId);
 
   const roleRows = await db
     .select({ id: roles.id, code: roles.code })
@@ -306,6 +297,81 @@ async function ensurePreviewToken(tenantId: string) {
     .where(eq(tenants.id, tenantId));
 
   return previewToken;
+}
+
+async function assertE2EReadiness({
+  tenantId,
+  clerkUserId,
+  previewToken,
+  seeded,
+  created,
+}: {
+  tenantId: string;
+  clerkUserId: string;
+  previewToken: string;
+  seeded: Awaited<ReturnType<typeof seedE2ETenant>>;
+  created: Awaited<ReturnType<typeof seedE2ETenantDemoData>>;
+}) {
+  const requiredPermissions = [
+    PERMISSIONS.APPOINTMENTS_CREATE,
+    PERMISSIONS.APPOINTMENTS_READ,
+    PERMISSIONS.APPOINTMENTS_UPDATE,
+    PERMISSIONS.PATIENTS_CREATE,
+    PERMISSIONS.PATIENTS_READ,
+    PERMISSIONS.SETTINGS_MANAGE,
+    PERMISSIONS.USERS_MANAGE,
+  ];
+
+  const [user] = await db
+    .select({ id: users.id, tenantId: users.tenantId, active: users.active })
+    .from(users)
+    .where(eq(users.clerkId, clerkUserId))
+    .limit(1);
+
+  const permissionRows = user
+    ? await db
+        .select({ permission: rolePermissions.permission })
+        .from(userRoles)
+        .innerJoin(rolePermissions, eq(rolePermissions.roleId, userRoles.roleId))
+        .where(
+          and(
+            eq(userRoles.userId, user.id),
+            inArray(rolePermissions.permission, requiredPermissions)
+          )
+        )
+    : [];
+
+  const permissions = new Set(permissionRows.map((row) => row.permission));
+  const missingPermissions = requiredPermissions.filter(
+    (permission) => !permissions.has(permission)
+  );
+
+  const checks = {
+    previewToken: previewToken.length > 0,
+    userExists: Boolean(user),
+    userInTenant: user?.tenantId === tenantId,
+    userActive: user?.active === true,
+    adminPermissions: missingPermissions.length === 0,
+    vetsSeeded: seeded.vetIds.length >= 2,
+    schedulesSeeded: created.vetSchedules >= 10,
+    patientsSeeded: created.patients > 0,
+  };
+
+  const ok = Object.values(checks).every(Boolean);
+  if (!ok) {
+    throw new Error(
+      `E2E readiness failed: ${JSON.stringify({
+        checks,
+        missingPermissions,
+      })}`
+    );
+  }
+
+  return {
+    ok,
+    checks,
+    missingPermissions,
+  };
 }
 
 const toCount = (value: unknown) => Number(value ?? 0);
