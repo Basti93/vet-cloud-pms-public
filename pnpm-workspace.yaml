@@ -11,5 +11,4 @@ allowBuilds:
   esbuild: true
   protobufjs: true
   sharp: true
-  tree-sitter: true
   unrs-resolver: true
