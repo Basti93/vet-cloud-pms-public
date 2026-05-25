@@ -8,12 +8,16 @@ import { dirname, join } from "path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-if (!process.env.DATABASE_URL) {
-  console.error("DATABASE_URL is not set — cannot run migrations");
+// Migrations run as superuser to create roles, enable RLS, and manage policies.
+// DATABASE_URL_ADMIN = superuser connection (required when DATABASE_URL is app_user).
+// Falls back to DATABASE_URL so local dev and existing deploys need no changes.
+const migrationUrl = process.env.DATABASE_URL_ADMIN ?? process.env.DATABASE_URL;
+if (!migrationUrl) {
+  console.error("DATABASE_URL_ADMIN (or DATABASE_URL) is not set — cannot run migrations");
   process.exit(1);
 }
 
-const sql = postgres(process.env.DATABASE_URL, { max: 1 });
+const sql = postgres(migrationUrl, { max: 1 });
 const db = drizzle(sql);
 
 try {
