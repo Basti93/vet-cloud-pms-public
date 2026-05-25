@@ -75,6 +75,25 @@ async function completeSignupForm(page: Page, email: string, password: string) {
   }
 }
 
+async function completeEmailVerification(page: Page, email: string) {
+  const codeInput = page
+    .getByRole("textbox", { name: /verification code|bestätigungscode|code/i })
+    .or(page.locator('input[name="code"]'))
+    .first();
+
+  await expect(page.getByRole("heading", { name: /bestätigen.*e-mail|verify.*email/i })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(codeInput).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(email)).toBeVisible();
+
+  await codeInput.pressSequentially("424242", { delay: 50 });
+
+  const verifyButton = page.locator('[data-localization-key="formButtonPrimary"]').last();
+  await expect(verifyButton).toBeEnabled({ timeout: 5_000 });
+  await verifyButton.click();
+}
+
 test.describe("Signup page", () => {
   test("can create a user via UI and clean it up in Clerk", async ({ page, isMobile }) => {
     test.setTimeout(90_000);
@@ -82,7 +101,7 @@ test.describe("Signup page", () => {
     test.skip(!process.env.CLERK_SECRET_KEY, "CLERK_SECRET_KEY is required for cleanup.");
 
     const unique = Date.now();
-    const email = `user+staging-signup-${unique}@googlemail.com`;
+    const email = `staging-signup-${unique}+clerk_test@staging.example.com`;
     const password = `VetCloud!${unique}Aa`;
     const consoleErrors: string[] = [];
 
@@ -114,15 +133,7 @@ test.describe("Signup page", () => {
       await submitButton.click();
       await expect(signUpRequestPromise).resolves.toBeTruthy();
 
-      // Clerk requires email verification — test mode accepts code 424242.
-      const codeInput = page.locator('input[name="code"]').first();
-      const codeVisible = await codeInput.isVisible().catch(() => false);
-      if (codeVisible) {
-        await codeInput.fill("424242");
-        const verifyButton = page.locator('[data-localization-key="formButtonPrimary"]');
-        await expect(verifyButton).toBeEnabled({ timeout: 5_000 });
-        await verifyButton.click();
-      }
+      await completeEmailVerification(page, email);
 
       await expect
         .poll(async () => {
