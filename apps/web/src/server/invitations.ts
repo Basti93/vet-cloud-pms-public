@@ -1,7 +1,7 @@
 import { randomBytes, createHash } from "crypto";
 import { and, eq, gt, lt, count } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { db } from "@/lib/db/client";
+import { adminDb as db } from "@/lib/db/client";
 import { roles, tenants, userInvitations, userRoles, users } from "@/lib/db/schema";
 import { INVITE_ROLE_TO_CODE } from "@/lib/auth/roles";
 import { invalidateRolePermissionCache } from "@/lib/auth/permission-cache";

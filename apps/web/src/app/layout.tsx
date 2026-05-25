@@ -3,7 +3,7 @@ import Script from "next/script";
 
 import { auth } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
-import { db } from "@/lib/db/client";
+import { adminDb as db } from "@/lib/db/client";
 import { users, tenants } from "@/lib/db/schema";
 import { ClerkProviderWrapper } from "@/components/ClerkProviderWrapper";
 import { TRPCProvider } from "@/lib/trpc/provider";

@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { db } from "@/lib/db/client";
+import { adminDb as db } from "@/lib/db/client";
 import {
   users,
   roles,
