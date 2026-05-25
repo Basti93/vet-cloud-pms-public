@@ -47,7 +47,9 @@ function getAppDb(): DrizzleDb {
 
 function getAdminDb(): DrizzleDb {
   if (!_adminDb) {
-    const url = process.env.DATABASE_URL;
+    // Prefer DATABASE_URL_ADMIN (superuser) so adminDb bypasses RLS.
+    // Falls back to DATABASE_URL for local dev where RLS is not enforced.
+    const url = process.env.DATABASE_URL_ADMIN ?? process.env.DATABASE_URL;
     if (!url) {
       throw new Error("DATABASE_URL is not set");
     }
