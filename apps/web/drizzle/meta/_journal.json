@@ -243,28 +243,28 @@
     {
       "idx": 34,
       "version": "7",
-      "when": 1748037600000,
+      "when": 1779139400000,
       "tag": "0035_add-missing-tenant-columns",
       "breakpoints": true
     },
     {
       "idx": 35,
       "version": "7",
-      "when": 1748037700000,
+      "when": 1779139500000,
       "tag": "0036_add-missing-user-columns",
       "breakpoints": true
     },
     {
       "idx": 36,
       "version": "7",
-      "when": 1748037800000,
+      "when": 1779139600000,
       "tag": "0037_vet-schedules-and-absences",
       "breakpoints": true
     },
     {
       "idx": 37,
       "version": "7",
-      "when": 1748131200000,
+      "when": 1779139700000,
       "tag": "0038_enable_rls",
       "breakpoints": true
     }
