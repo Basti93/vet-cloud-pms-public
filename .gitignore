@@ -17,6 +17,7 @@ build/
 .turbo
 .vercel
 coverage/
+apps/web/coverage-public/
 .vitest/
 # Isolated git branches for parallel sessions
 .claude/worktrees/

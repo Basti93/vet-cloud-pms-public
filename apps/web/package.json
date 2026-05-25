@@ -14,6 +14,7 @@
     "test:unit": "vitest run --coverage --exclude 'src/server/routers/__tests__/**'",
     "test:watch": "vitest --coverage",
     "test:ui": "vitest --ui",
+    "coverage:public": "node scripts/build-public-coverage-report.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
