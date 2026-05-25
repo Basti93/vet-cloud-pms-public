@@ -3,7 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { clerkClient } from "@clerk/nextjs/server";
 import { rm } from "fs/promises";
 import path from "path";
-import { db } from "@/lib/db/client";
+import { adminDb as db } from "@/lib/db/client";
 import {
   users,
   tenants,

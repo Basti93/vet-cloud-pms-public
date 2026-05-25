@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, eq, gt } from "drizzle-orm";
-import { db } from "@/lib/db/client";
+import { adminDb as db } from "@/lib/db/client";
 import { tenantDeletionSchedules, tenants } from "@/lib/db/schema";
 import { sendTenantLifecycleEmail } from "@/lib/email/service";
 import { logEventAsync, serializeLogError } from "@/server/trpc/logging-middleware";

@@ -1,7 +1,7 @@
 import { Webhook } from "svix";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db/client";
+import { adminDb as db } from "@/lib/db/client";
 import { users, tenants, userInvitations } from "@/lib/db/schema";
 import { randomUUID } from "crypto";
 import { and, eq } from "drizzle-orm";

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db/client";
+import { adminDb as db } from "@/lib/db/client";
 import { owners } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { verifyUnsubscribeToken } from "@/lib/unsubscribe";

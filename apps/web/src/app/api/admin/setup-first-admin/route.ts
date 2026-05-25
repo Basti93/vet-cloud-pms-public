@@ -1,5 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
-import { db } from "@/lib/db/client";
+import { adminDb as db } from "@/lib/db/client";
 import { users, roles, userRoles } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { clerkClient } from "@clerk/nextjs/server";
