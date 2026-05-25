@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --coverage",
     "test:watch": "vitest --coverage",
+    "test:ui": "vitest --ui",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
@@ -23,8 +24,8 @@
     "script": "tsx scripts"
   },
   "dependencies": {
-    "@clerk/localizations": "^4.5.5",
-    "@clerk/nextjs": "^7",
+    "@clerk/localizations": "^4.6.8",
+    "@clerk/nextjs": "^7.4.1",
     "@fullcalendar/core": "^6",
     "@fullcalendar/daygrid": "^6",
     "@fullcalendar/interaction": "^6",
@@ -61,10 +62,11 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@clerk/testing": "^2.0.27",
+    "@clerk/testing": "^2.0.33",
     "@playwright/test": "^1.60.0",
     "@swc/helpers": "^0.5.17",
     "@tailwindcss/postcss": "^4",
+    "@testcontainers/postgresql": "^12.0.0",
     "@testing-library/react": "^16",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^24.12.2",
@@ -83,6 +85,7 @@
     "stylelint-config-standard": "^39.0.1",
     "stylelint-config-tailwindcss": "^1.0.0",
     "tailwindcss": "^4",
+    "testcontainers": "^12.0.0",
     "tsx": "^4",
     "typescript": "^6.0.3",
     "vitest": "^4.1.5"

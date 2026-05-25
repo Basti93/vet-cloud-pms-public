@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createAdminRouter, procedure } from "../adminTrpc";
+import { adminProcedure as procedure, createTRPCRouter as createAdminRouter } from "../trpc";
 import { db } from "@/lib/db/client";
 import { systemLogs } from "@/lib/db/schema";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";

@@ -183,7 +183,7 @@ export default function SubscriptionPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="subscription-page">
       {/* Checkout Status Messages */}
       {statusMessage === "success" && (
         <div className="p-4 rounded-lg bg-green-50 border border-green-200 text-green-800 text-sm">
@@ -366,6 +366,7 @@ export default function SubscriptionPage() {
                 return (
                   <button
                     key={tier}
+                    data-testid={`subscription-tier-${tier}`}
                     onClick={() => handleSelectTier(tier)}
                     disabled={
                       createCheckoutMutation.isPending ||

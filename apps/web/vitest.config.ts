@@ -9,9 +9,12 @@ export default defineConfig({
     environment: 'jsdom',
     // Playwright E2E tests live in e2e/ — exclude from Vitest
     exclude: ['node_modules', 'e2e/**'],
+    // Cap parallel workers — testcontainers integration tests start Postgres
+    // containers; 2 workers = 2 containers max, safe on 4GB server.
+    maxWorkers: 2,
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'json', 'html', 'lcov'],
+      reporter: ['text', 'json', 'json-summary', 'html', 'lcov'],
       exclude: [
         'node_modules/',
         'dist/',

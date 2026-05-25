@@ -16,10 +16,9 @@
  *     tenant before writing, preventing cross-patient injection.
  *   - All mutations write to the immutable audit log for DSGVO compliance.
  *
- * Known gap (backlog):
- *   - list procedures do not check MEDICAL_READ, so any authenticated tenant
- *     user (including Receptionist) can read medical records. Needs gating once
- *     the patient-detail UI is audited for role visibility.
+ * Security model note:
+ *   - All list procedures now require MEDICAL_READ (added 2026-05-23).
+ *     Receptionist role has no MEDICAL_* permissions and cannot read records.
  */
 
 import { z } from "zod";
@@ -28,12 +27,13 @@ import { createTRPCRouter, tenantProcedure } from "@/server/trpc";
 import { diagnoses, medications, vitals, patients, PERMISSIONS } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
 import { requirePermission } from "@/server/trpc/middleware";
-import { writeAuditLog } from "@/server/audit";
+import { auditedMutation } from "@/server/trpc/audited-mutation";
 
 // ── Diagnoses ─────────────────────────────────────────────────────────────────
 
 const diagnosesRouter = createTRPCRouter({
   list: tenantProcedure
+    .use(requirePermission(PERMISSIONS.MEDICAL_READ))
     .input(z.object({ patientId: z.string().uuid(), tenantId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const [patient] = await ctx.db
@@ -53,7 +53,27 @@ const diagnosesRouter = createTRPCRouter({
         .orderBy(diagnoses.dateOfDiagnosis);
     }),
 
-  create: tenantProcedure
+  create: auditedMutation({
+    entity: "diagnosis",
+    event: "diagnosis.created",
+    action: "create",
+    summary: "Diagnosis created",
+    entityId: (result) => (result as { id: string }).id,
+    changes: (_result, input) => {
+      const data = input as {
+        patientId: string;
+        status: string;
+        severity?: string;
+        dateOfDiagnosis: Date;
+      };
+      return {
+        patientId: data.patientId,
+        status: data.status,
+        severity: data.severity ?? null,
+        dateOfDiagnosis: data.dateOfDiagnosis.toISOString(),
+      };
+    },
+  })
     .use(requirePermission(PERMISSIONS.MEDICAL_CREATE))
     .input(
       z.object({
@@ -95,24 +115,23 @@ const diagnosesRouter = createTRPCRouter({
         })
         .returning();
 
-      await writeAuditLog(ctx, {
-        tenantId: input.tenantId,
-        action: "create",
-        entity: { type: "diagnosis", id: diagnosis!.id },
-        event: "diagnosis.created",
-        summary: "Diagnosis created",
-        changes: {
-          patientId: input.patientId,
-          status: input.status,
-          severity: input.severity ?? null,
-          dateOfDiagnosis: input.dateOfDiagnosis.toISOString(),
-        },
-      });
-
       return diagnosis;
     }),
 
-  update: tenantProcedure
+  update: auditedMutation({
+    entity: "diagnosis",
+    event: "diagnosis.updated",
+    action: "update",
+    summary: "Diagnosis updated",
+    entityId: (result) => (result as { id: string }).id,
+    changes: (_result, input) => {
+      const data = input as { status?: string; description?: string };
+      return {
+        status: data.status,
+        descriptionUpdated: data.description !== undefined,
+      };
+    },
+  })
     .use(requirePermission(PERMISSIONS.MEDICAL_UPDATE))
     .input(
       z.object({
@@ -133,18 +152,6 @@ const diagnosesRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND" });
       }
 
-      await writeAuditLog(ctx, {
-        tenantId: input.tenantId,
-        action: "update",
-        entity: { type: "diagnosis", id: diagnosis.id },
-        event: "diagnosis.updated",
-        summary: "Diagnosis updated",
-        changes: {
-          status: input.status,
-          descriptionUpdated: input.description !== undefined,
-        },
-      });
-
       return diagnosis;
     }),
 });
@@ -153,6 +160,7 @@ const diagnosesRouter = createTRPCRouter({
 
 const medicationsRouter = createTRPCRouter({
   list: tenantProcedure
+    .use(requirePermission(PERMISSIONS.MEDICAL_READ))
     .input(z.object({ patientId: z.string().uuid(), tenantId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const [patient] = await ctx.db
@@ -172,7 +180,29 @@ const medicationsRouter = createTRPCRouter({
         .orderBy(medications.startDate);
     }),
 
-  create: tenantProcedure
+  create: auditedMutation({
+    entity: "medication",
+    event: "medication.created",
+    action: "create",
+    summary: "Medication created",
+    entityId: (result) => (result as { id: string }).id,
+    changes: (_result, input) => {
+      const data = input as {
+        patientId: string;
+        diagnosisId?: string;
+        route: string;
+        startDate: Date;
+        endDate?: Date;
+      };
+      return {
+        patientId: data.patientId,
+        diagnosisId: data.diagnosisId ?? null,
+        route: data.route,
+        startDate: data.startDate.toISOString(),
+        endDate: data.endDate?.toISOString() ?? null,
+      };
+    },
+  })
     .use(requirePermission(PERMISSIONS.MEDICAL_CREATE))
     .input(
       z.object({
@@ -218,25 +248,23 @@ const medicationsRouter = createTRPCRouter({
         })
         .returning();
 
-      await writeAuditLog(ctx, {
-        tenantId: input.tenantId,
-        action: "create",
-        entity: { type: "medication", id: medication!.id },
-        event: "medication.created",
-        summary: "Medication created",
-        changes: {
-          patientId: input.patientId,
-          diagnosisId: input.diagnosisId ?? null,
-          route: input.route,
-          startDate: input.startDate.toISOString(),
-          endDate: input.endDate?.toISOString() ?? null,
-        },
-      });
-
       return medication;
     }),
 
-  update: tenantProcedure
+  update: auditedMutation({
+    entity: "medication",
+    event: "medication.updated",
+    action: "update",
+    summary: "Medication updated",
+    entityId: (result) => (result as { id: string }).id,
+    changes: (_result, input) => {
+      const data = input as { endDate?: Date; notes?: string };
+      return {
+        endDate: data.endDate?.toISOString() ?? null,
+        notesUpdated: data.notes !== undefined,
+      };
+    },
+  })
     .use(requirePermission(PERMISSIONS.MEDICAL_UPDATE))
     .input(
       z.object({
@@ -257,18 +285,6 @@ const medicationsRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND" });
       }
 
-      await writeAuditLog(ctx, {
-        tenantId: input.tenantId,
-        action: "update",
-        entity: { type: "medication", id: medication.id },
-        event: "medication.updated",
-        summary: "Medication updated",
-        changes: {
-          endDate: input.endDate?.toISOString() ?? null,
-          notesUpdated: input.notes !== undefined,
-        },
-      });
-
       return medication;
     }),
 });
@@ -277,6 +293,7 @@ const medicationsRouter = createTRPCRouter({
 
 const vitalsRouter = createTRPCRouter({
   list: tenantProcedure
+    .use(requirePermission(PERMISSIONS.MEDICAL_READ))
     .input(z.object({ patientId: z.string().uuid(), tenantId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const [patient] = await ctx.db
@@ -296,7 +313,31 @@ const vitalsRouter = createTRPCRouter({
         .orderBy(vitals.recordedAt);
     }),
 
-  create: tenantProcedure
+  create: auditedMutation({
+    entity: "vital",
+    event: "vital.created",
+    action: "create",
+    summary: "Vitals recorded",
+    entityId: (result) => (result as { id: string }).id,
+    changes: (_result, input) => {
+      const data = input as {
+        patientId: string;
+        recordedAt: Date;
+        weight?: number;
+        temperature?: string;
+        heartRate?: number;
+        respiratoryRate?: number;
+      };
+      return {
+        patientId: data.patientId,
+        recordedAt: data.recordedAt.toISOString(),
+        hasWeight: data.weight !== undefined,
+        hasTemperature: data.temperature !== undefined,
+        hasHeartRate: data.heartRate !== undefined,
+        hasRespiratoryRate: data.respiratoryRate !== undefined,
+      };
+    },
+  })
     .use(requirePermission(PERMISSIONS.MEDICAL_CREATE))
     .input(
       z.object({
@@ -338,22 +379,6 @@ const vitalsRouter = createTRPCRouter({
         })
         .returning();
 
-      await writeAuditLog(ctx, {
-        tenantId: input.tenantId,
-        action: "create",
-        entity: { type: "vital", id: vital!.id },
-        event: "vital.created",
-        summary: "Vitals recorded",
-        changes: {
-          patientId: input.patientId,
-          recordedAt: input.recordedAt.toISOString(),
-          hasWeight: input.weight !== undefined,
-          hasTemperature: input.temperature !== undefined,
-          hasHeartRate: input.heartRate !== undefined,
-          hasRespiratoryRate: input.respiratoryRate !== undefined,
-        },
-      });
-
       return vital;
     }),
 });
@@ -364,7 +389,19 @@ const vitalsRouter = createTRPCRouter({
 // simple for MVP. Structured allergy records (substance, reaction, severity) can
 // be added later without a breaking schema change.
 const allergiesRouter = createTRPCRouter({
-  update: tenantProcedure
+  update: auditedMutation({
+    entity: "patient",
+    event: "patient.allergies_updated",
+    action: "update",
+    summary: "Patient allergies updated",
+    entityId: (result) => (result as { id: string }).id,
+    changes: (_result, input) => {
+      const data = input as { allergies?: string };
+      return {
+        hasAllergiesText: Boolean(data.allergies && data.allergies.trim().length > 0),
+      };
+    },
+  })
     .use(requirePermission(PERMISSIONS.MEDICAL_UPDATE))
     .input(
       z.object({
@@ -383,17 +420,6 @@ const allergiesRouter = createTRPCRouter({
       if (!patient) {
         throw new TRPCError({ code: "NOT_FOUND" });
       }
-
-      await writeAuditLog(ctx, {
-        tenantId: input.tenantId,
-        action: "update",
-        entity: { type: "patient", id: patient.id },
-        event: "patient.allergies_updated",
-        summary: "Patient allergies updated",
-        changes: {
-          hasAllergiesText: Boolean(input.allergies && input.allergies.trim().length > 0),
-        },
-      });
 
       return patient;
     }),

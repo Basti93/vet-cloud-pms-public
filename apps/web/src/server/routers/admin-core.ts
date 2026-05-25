@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createAdminRouter, procedure } from "../adminTrpc";
+import { adminProcedure as procedure, createTRPCRouter as createAdminRouter } from "../trpc";
 import { db } from "@/lib/db/client";
 import { TRPCError } from "@trpc/server";
 import {
@@ -12,7 +12,7 @@ import {
   tenantDeletionSchedules,
   featureFlags,
 } from "@/lib/db/schema";
-import { eq, like, desc, and, count, gte, lte, lt, sql, inArray } from "drizzle-orm";
+import { eq, and, count, gte, lte, lt, sql } from "drizzle-orm";
 import { writeAuditLog } from "@/server/audit";
 import { executeDueTenantDeletions, hardDeleteTenantById } from "@/server/tenant-deletion";
 import { sendTenantLifecycleEmail } from "@/lib/email/service";
@@ -20,6 +20,7 @@ import { randomUUID } from "crypto";
 import { createDefaultRoles } from "@/lib/auth/permissions";
 import { invalidateAllRolePermissions } from "@/lib/auth/permission-cache";
 import { getTierByPriceId } from "@/lib/stripe/prices";
+import { queryTenantsWithStats } from "@/server/queries/tenant-stats";
 
 function getStripeDashboardUrls(stripeCustomerId: string | null, stripeSubscriptionId: string | null) {
   const isTestMode = (process.env.STRIPE_SECRET_KEY ?? "").startsWith("sk_test_");
@@ -49,80 +50,7 @@ export const adminCoreRouter = createAdminRouter({
       })
     )
     .query(async ({ input }) => {
-      const query = db.select({
-        id: tenants.id,
-        name: tenants.name,
-        slug: tenants.slug,
-        plan: tenants.subscriptionPlan,
-        status: tenants.subscriptionStatus,
-        email: tenants.email,
-        createdAt: tenants.createdAt,
-        stripeCustomerId: tenants.stripeCustomerId,
-      }).from(tenants);
-
-      // Add filters
-      const conditions = [];
-      if (input.search) {
-        conditions.push(like(tenants.name, `%${input.search}%`));
-      }
-      if (input.plan) {
-        conditions.push(eq(tenants.subscriptionPlan, input.plan));
-      }
-      if (input.status) {
-        conditions.push(eq(tenants.subscriptionStatus, input.status));
-      }
-
-      if (conditions.length > 0) {
-        query.where(and(...conditions));
-      }
-
-      // Get user count per tenant
-      const result = await query.orderBy(desc(tenants.createdAt)).limit(input.limit + 1);
-
-      const items = result.slice(0, input.limit);
-      const nextCursor = result.length > input.limit ? result[input.limit].id : null;
-
-      // Get user counts
-      const tenantsWithCounts = await Promise.all(
-        items.map(async (tenant) => {
-          const [result] = await db
-            .select({ count: count(users.id) })
-            .from(users)
-            .where(eq(users.tenantId, tenant.id));
-          return { ...tenant, userCount: result?.count ?? 0 };
-        })
-      );
-
-      const deletionSchedules = await db
-        .select({
-          tenantId: tenantDeletionSchedules.tenantId,
-          deletionStatus: tenantDeletionSchedules.status,
-          deletionScheduledFor: tenantDeletionSchedules.scheduledFor,
-        })
-        .from(tenantDeletionSchedules)
-        .where(
-          items.length > 0
-            ? inArray(
-                tenantDeletionSchedules.tenantId,
-                items.map((item) => item.id)
-              )
-            : undefined
-        );
-      const deletionMap = new Map(
-        deletionSchedules.map((row) => [row.tenantId, row])
-      );
-
-      return {
-        items: tenantsWithCounts.map((tenant) => {
-          const deletion = deletionMap.get(tenant.id);
-          return {
-            ...tenant,
-            deletionStatus: deletion?.deletionStatus ?? null,
-            deletionScheduledFor: deletion?.deletionScheduledFor ?? null,
-          };
-        }),
-        nextCursor,
-      };
+      return queryTenantsWithStats(db, input);
     }),
 
   /**

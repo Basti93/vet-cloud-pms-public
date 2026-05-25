@@ -4,8 +4,8 @@
  */
 
 import { z } from 'zod';
-import { createTRPCRouter, protectedProcedure } from '@/server/trpc';
-import { users, emailSettings, tenants } from '@/lib/db/schema';
+import { createTRPCRouter, tenantProcedure } from '@/server/trpc';
+import { emailSettings, tenants } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { sendConfirmationEmail, SendConfirmationEmailInput } from '@/lib/email/service';
@@ -20,21 +20,10 @@ export const emailRouter = createTRPCRouter({
   /**
    * Get email settings for a tenant
    */
-  getSettings: protectedProcedure
+  getSettings: tenantProcedure
     .input(z.object({ tenantId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       try {
-        // Verify user belongs to this tenant
-        const [user] = await ctx.db
-          .select({ tenantId: users.tenantId })
-          .from(users)
-          .where(eq(users.clerkId, ctx.userId!))
-          .limit(1);
-
-        if (user?.tenantId !== input.tenantId) {
-          throw new TRPCError({ code: 'FORBIDDEN' });
-        }
-
         let [settings] = await ctx.db
           .select()
           .from(emailSettings)
@@ -70,7 +59,7 @@ export const emailRouter = createTRPCRouter({
   /**
    * Update email settings for a tenant
    */
-  updateSettings: protectedProcedure
+  updateSettings: tenantProcedure
     .input(
       z.object({
         tenantId: z.string().uuid(),
@@ -86,17 +75,6 @@ export const emailRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Verify user has permission
-      const [user] = await ctx.db
-        .select({ tenantId: users.tenantId })
-        .from(users)
-        .where(eq(users.clerkId, ctx.userId!))
-        .limit(1);
-
-      if (user?.tenantId !== input.tenantId) {
-        throw new TRPCError({ code: 'FORBIDDEN' });
-      }
-
       const { tenantId, ...updateData } = input;
       const normalizedUpdateData = {
         ...updateData,
@@ -130,7 +108,7 @@ export const emailRouter = createTRPCRouter({
   /**
    * Send test confirmation email
    */
-  sendTestEmail: protectedProcedure
+  sendTestEmail: tenantProcedure
     .input(
       z.object({
         tenantId: z.string().uuid(),
@@ -138,17 +116,6 @@ export const emailRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Verify user belongs to this tenant
-      const [user] = await ctx.db
-        .select({ tenantId: users.tenantId })
-        .from(users)
-        .where(eq(users.clerkId, ctx.userId!))
-        .limit(1);
-
-      if (user?.tenantId !== input.tenantId) {
-        throw new TRPCError({ code: 'FORBIDDEN' });
-      }
-
       // Get tenant name for test email
       const [tenant] = await ctx.db
         .select({ name: tenants.name })
