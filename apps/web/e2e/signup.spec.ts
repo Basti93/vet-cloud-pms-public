@@ -114,6 +114,16 @@ test.describe("Signup page", () => {
       await submitButton.click();
       await expect(signUpRequestPromise).resolves.toBeTruthy();
 
+      // Clerk requires email verification — test mode accepts code 424242.
+      const codeInput = page.locator('input[name="code"]').first();
+      const codeVisible = await codeInput.isVisible().catch(() => false);
+      if (codeVisible) {
+        await codeInput.fill("424242");
+        const verifyButton = page.locator('[data-localization-key="formButtonPrimary"]');
+        await expect(verifyButton).toBeEnabled({ timeout: 5_000 });
+        await verifyButton.click();
+      }
+
       await expect
         .poll(async () => {
           const ids = await findClerkUserIdsByEmail(cleanupRequest, email);
