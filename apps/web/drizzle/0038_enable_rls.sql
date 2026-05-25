@@ -40,12 +40,13 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
   GRANT USAGE, SELECT ON SEQUENCES TO app_user;--> statement-breakpoint
 
 -- ============================================================================
--- Step 3: Enable RLS on all 25 tenant-scoped tables
+-- Step 3: Enable RLS on all 23 tenant-scoped tables
 -- ============================================================================
 -- Global tables intentionally excluded: tenants, vaccination_types, system_logs,
 -- role_permissions, user_roles, standalone_accounts, website_pages,
 -- website_page_revisions, website_domains, website_assets, website_asset_usages,
 -- website_leads, tenant_deletion_schedules (admin cross-tenant access needed)
+-- Deferred (no CREATE TABLE in migration history): feature_flags, user_invitations
 
 ALTER TABLE roles                          ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE users                          ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
@@ -67,10 +68,8 @@ ALTER TABLE tenant_vaccination_type_config ENABLE ROW LEVEL SECURITY;--> stateme
 ALTER TABLE vaccinations                   ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE vaccination_settings           ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE vaccination_email_logs         ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
-ALTER TABLE feature_flags                  ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE calendar_access_tokens         ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE calendar_access_audit          ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
-ALTER TABLE user_invitations               ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE website_projects               ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 
 -- ============================================================================
@@ -218,13 +217,6 @@ CREATE POLICY tenant_write ON vaccination_email_logs FOR ALL    TO app_user
   USING (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
   WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);--> statement-breakpoint
 
--- feature_flags
-CREATE POLICY tenant_read  ON feature_flags FOR SELECT TO app_user
-  USING (tenant_id = current_setting('app.current_tenant_id', true)::uuid);--> statement-breakpoint
-CREATE POLICY tenant_write ON feature_flags FOR ALL    TO app_user
-  USING (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
-  WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);--> statement-breakpoint
-
 -- calendar_access_tokens
 CREATE POLICY tenant_read  ON calendar_access_tokens FOR SELECT TO app_user
   USING (tenant_id = current_setting('app.current_tenant_id', true)::uuid);--> statement-breakpoint
@@ -236,13 +228,6 @@ CREATE POLICY tenant_write ON calendar_access_tokens FOR ALL    TO app_user
 CREATE POLICY tenant_read   ON calendar_access_audit FOR SELECT TO app_user
   USING (tenant_id = current_setting('app.current_tenant_id', true)::uuid);--> statement-breakpoint
 CREATE POLICY tenant_insert ON calendar_access_audit FOR INSERT TO app_user
-  WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);--> statement-breakpoint
-
--- user_invitations
-CREATE POLICY tenant_read  ON user_invitations FOR SELECT TO app_user
-  USING (tenant_id = current_setting('app.current_tenant_id', true)::uuid);--> statement-breakpoint
-CREATE POLICY tenant_write ON user_invitations FOR ALL    TO app_user
-  USING (tenant_id = current_setting('app.current_tenant_id', true)::uuid)
   WITH CHECK (tenant_id = current_setting('app.current_tenant_id', true)::uuid);--> statement-breakpoint
 
 -- ============================================================================
