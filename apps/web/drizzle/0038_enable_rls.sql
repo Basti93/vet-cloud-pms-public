@@ -11,11 +11,9 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'app_user') THEN
     CREATE ROLE app_user NOINHERIT LOGIN;
   END IF;
+  EXECUTE 'GRANT CONNECT ON DATABASE ' || quote_ident(current_database()) || ' TO app_user';
 END
 $$;--> statement-breakpoint
-
--- Grant database access
-GRANT CONNECT ON DATABASE CURRENT_CATALOG TO app_user;--> statement-breakpoint
 
 -- Grant schema access
 GRANT USAGE ON SCHEMA public TO app_user;--> statement-breakpoint
