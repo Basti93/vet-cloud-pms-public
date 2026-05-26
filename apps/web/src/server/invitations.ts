@@ -204,7 +204,7 @@ export async function acceptInvite(params: { token: string; clerkUserId: string 
     throw new TRPCError({ code: "BAD_REQUEST", message: "Invitation expired" });
   }
 
-  const [user] = await db
+  let [user] = await db
     .select({
       id: users.id,
       email: users.email,
@@ -214,7 +214,27 @@ export async function acceptInvite(params: { token: string; clerkUserId: string 
     .limit(1);
 
   if (!user) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "User not found in database" });
+    // Clerk webhook may not have landed yet — create the user row on-the-fly.
+    // The webhook handler uses onConflictDoNothing so this is safe to race.
+    await db
+      .insert(users)
+      .values({
+        clerkId: params.clerkUserId,
+        email: invitation.email,
+        tenantId: invitation.tenantId,
+        active: false,
+      })
+      .onConflictDoNothing();
+
+    [user] = await db
+      .select({ id: users.id, email: users.email })
+      .from(users)
+      .where(eq(users.clerkId, params.clerkUserId))
+      .limit(1);
+
+    if (!user) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "User not found in database" });
+    }
   }
 
   if (normalizeEmail(user.email) !== normalizeEmail(invitation.email)) {

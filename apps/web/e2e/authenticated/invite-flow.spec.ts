@@ -79,14 +79,14 @@ async function deleteClerkUsersByEmail(email: string) {
 }
 
 async function completeSignup(page: Page, email: string, password: string) {
-  await expect(page.locator('input[name="emailAddress"]').first()).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('input[name="emailAddress"]').first()).toBeVisible({ timeout: 10_000 });
   await page.locator('input[name="emailAddress"]').first().fill(email);
   await page.locator('input[name="firstName"]').first().fill("Invite");
   await page.locator('input[name="lastName"]').first().fill("E2E");
   await page.locator('input[name="password"]').first().fill(password);
 
   const submitButton = page.locator('[data-localization-key="formButtonPrimary"]');
-  await expect(submitButton).toBeEnabled({ timeout: 10_000 });
+  await expect(submitButton).toBeEnabled({ timeout: 5_000 });
   await submitButton.click();
 }
 
@@ -97,7 +97,7 @@ async function completeEmailVerification(page: Page, email: string) {
     .first();
 
   await expect(page.getByRole("heading", { name: /bestätigen.*e-mail|verify.*email/i })).toBeVisible({
-    timeout: 15_000,
+    timeout: 10_000,
   });
   await expect(page.getByText(email)).toBeVisible();
   await codeInput.pressSequentially("424242", { delay: 50 });
@@ -109,17 +109,19 @@ async function completeEmailVerification(page: Page, email: string) {
 
 async function createInvitation(page: Page, email: string) {
   await page.goto("/dashboard/settings/team");
-  await expect(page.getByTestId("team-invite-form")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("team-invite-form")).toBeVisible({ timeout: 8_000 });
 
   const responsePromise = page.waitForResponse(
     (response) =>
       response.url().includes("/api/trpc/admin.createInvitation") &&
       response.request().method() === "POST",
-    { timeout: 30_000 }
+    { timeout: 15_000 }
   );
 
   await page.getByTestId("team-invite-email").fill(email);
   await page.getByTestId("team-invite-role").selectOption("reception");
+  // Wait for tenantId to load — button stays disabled until useTenant() resolves
+  await expect(page.getByTestId("team-invite-submit")).toBeEnabled({ timeout: 5_000 });
   await page.getByTestId("team-invite-submit").click();
 
   const response = await responsePromise;
@@ -127,7 +129,7 @@ async function createInvitation(page: Page, email: string) {
 
   const acceptUrl = findAcceptUrl(await response.json());
   expect(acceptUrl).toContain("/invite/accept?token=");
-  await expect(page.getByText(email)).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText(email)).toBeVisible({ timeout: 6_000 });
 
   return acceptUrl!;
 }
@@ -136,18 +138,18 @@ async function deactivateInvitedUser(page: Page, email: string) {
   await page.goto("/dashboard/settings/team");
   const userRow = page.getByTestId("team-user-row").filter({ hasText: email }).first();
 
-  if (!(await userRow.isVisible({ timeout: 10_000 }).catch(() => false))) {
+  if (!(await userRow.isVisible({ timeout: 8_000 }).catch(() => false))) {
     return;
   }
 
   page.once("dialog", (dialog) => dialog.accept());
   await userRow.getByTestId("team-user-deactivate").click();
-  await expect(userRow.getByText("Inaktiv")).toBeVisible({ timeout: 10_000 });
+  await expect(userRow.getByText("Inaktiv")).toBeVisible({ timeout: 8_000 });
 }
 
 test.describe("Invitation flow", () => {
   test("invited user can sign up and accept invitation", async ({ page, browser }: { page: Page; browser: Browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(90_000);
     test.skip(!process.env.CLERK_SECRET_KEY, "CLERK_SECRET_KEY is required for Clerk cleanup.");
 
     const unique = Date.now();
@@ -163,19 +165,18 @@ test.describe("Invitation flow", () => {
       await setupClerkTestingToken({ page: acceptPage });
       await acceptPage.goto(acceptUrl);
 
-      await expect(acceptPage.getByTestId("invite-accept-title")).toBeVisible({
-        timeout: 15_000,
-      });
+      await expect(acceptPage.getByTestId("invite-accept-title")).toBeVisible({ timeout: 8_000 });
       await acceptPage.getByTestId("invite-accept-register").click();
       await expect(acceptPage).toHaveURL(/\/sign-up/);
 
       await completeSignup(acceptPage, email, password);
       await completeEmailVerification(acceptPage, email);
-      await expect(acceptPage).toHaveURL(/\/dashboard/, { timeout: 30_000 });
+      // Clerk auth + acceptInvitation mutation + router.replace — allow 20s for the chain
+      await expect(acceptPage).toHaveURL(/\/dashboard/, { timeout: 20_000 });
 
       await expect
         .poll(async () => (await findClerkUserIdsByEmail(email)).length, {
-          timeout: 25_000,
+          timeout: 12_000,
           intervals: [2_000, 3_000, 5_000],
         })
         .toBeGreaterThan(0);

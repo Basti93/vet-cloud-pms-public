@@ -41,16 +41,16 @@ test.describe("Appointment lifecycle", () => {
     // Fill start time
     await form.locator('input[type="datetime-local"]').first().fill(nextWeekdayDatetimeLocal());
 
-    // Submit
+    // Submit and wait for modal to close (mutation completed before navigating)
     await page.getByTestId("appointment-submit").click();
+    await expect(page.getByTestId("appointment-form")).toBeHidden({ timeout: 15_000 });
 
-    // Modal should close → navigate to appointments
     await page.goto("/dashboard/appointments");
-    await expect(page.getByTestId("appointments-page")).toBeVisible();
+    await expect(page.getByTestId("appointments-page")).toBeVisible({ timeout: 15_000 });
 
     // Find and open the appointment we just created
     const row = page.getByTestId("appointment-row").filter({ hasText: "E2E Lifecycle Test" }).first();
-    await expect(row).toBeVisible({ timeout: 10_000 });
+    await expect(row).toBeVisible({ timeout: 15_000 });
     await row.click();
 
     // Change status to confirmed

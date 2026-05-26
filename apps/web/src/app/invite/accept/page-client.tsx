@@ -22,10 +22,13 @@ export default function AcceptInvitationClient() {
   });
 
   useEffect(() => {
-    if (!isLoaded || !isSignedIn) return;
-    if (!token || acceptInvitation.isPending || acceptInvitation.isSuccess) return;
+    if (!isLoaded || !isSignedIn || !token) return;
+    if (acceptInvitation.isPending || acceptInvitation.isSuccess || acceptInvitation.isError) return;
     acceptInvitation.mutate({ token });
-  }, [token, acceptInvitation, isLoaded, isSignedIn]);
+    // acceptInvitation excluded from deps intentionally — object ref changes on every state
+    // change and would cause an infinite re-render loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, isLoaded, isSignedIn]);
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6">

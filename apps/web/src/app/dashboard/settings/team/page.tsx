@@ -420,7 +420,7 @@ export default function TeamPage() {
           <button
             data-testid="team-invite-submit"
             type="submit"
-            disabled={createInvitationMutation.isPending || seatsAvailable <= 0}
+            disabled={!tenantId || createInvitationMutation.isPending || seatsAvailable <= 0}
             className="px-4 py-2 rounded-lg text-white font-medium disabled:opacity-50"
             style={{ backgroundColor: "var(--color-accent)" }}
             title={seatsAvailable <= 0 ? "Keine Plätze verfügbar" : undefined}
