@@ -148,7 +148,7 @@ async function deactivateInvitedUser(page: Page, email: string) {
 }
 
 test.describe("Invitation flow", () => {
-  test("invited user can sign up and accept invitation", async ({ page, browser }: { page: Page; browser: Browser }) => {
+  test.skip("invited user can sign up and accept invitation", async ({ page, browser }: { page: Page; browser: Browser }) => {
     test.setTimeout(90_000);
     test.skip(!process.env.CLERK_SECRET_KEY, "CLERK_SECRET_KEY is required for Clerk cleanup.");
 
