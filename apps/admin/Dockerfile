@@ -23,6 +23,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3001
 ENV HOSTNAME=0.0.0.0
+# Next.js uses this origin for internal middleware/RSC self-fetches.
+ENV __NEXT_PRIVATE_ORIGIN=http://localhost:3001
 
 RUN apk add --no-cache curl && \
     addgroup --system --gid 1001 nodejs && \
