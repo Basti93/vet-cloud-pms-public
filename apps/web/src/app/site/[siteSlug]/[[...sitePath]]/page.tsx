@@ -15,24 +15,51 @@ interface Props {
   searchParams: Promise<{ preview?: string }>;
 }
 
-async function getTenantAccess(projectId: string) {
-  const [row] = await db
-    .select({ websiteEnabled: tenants.websiteEnabled, previewToken: tenants.previewToken, tenantId: tenants.id })
-    .from(websiteProjects)
-    .innerJoin(tenants, eq(tenants.id, websiteProjects.ownerTenantId))
-    .where(eq(websiteProjects.id, projectId))
-    .limit(1);
-  return row ?? null;
+interface AccessInfo {
+  ownerType: 'tenant' | 'standalone';
+  websiteEnabled: boolean | null;
+  tenantId: string | null;
+  // token from tenant row (tenant projects) or project row (standalone projects)
+  previewToken: string | null;
 }
 
-async function canView(tenantId: string, previewToken: string | null | undefined, dbPreviewToken: string | null | undefined): Promise<boolean> {
-  if (previewToken && dbPreviewToken && previewToken === dbPreviewToken) return true;
+async function getAccessInfo(projectId: string): Promise<AccessInfo | null> {
+  const [row] = await db
+    .select({
+      ownerType: websiteProjects.ownerType,
+      projectPreviewToken: websiteProjects.previewToken,
+      tenantId: tenants.id,
+      websiteEnabled: tenants.websiteEnabled,
+      tenantPreviewToken: tenants.previewToken,
+    })
+    .from(websiteProjects)
+    .leftJoin(tenants, eq(tenants.id, websiteProjects.ownerTenantId))
+    .where(eq(websiteProjects.id, projectId))
+    .limit(1);
+
+  if (!row) return null;
+
+  const isStandalone = row.ownerType === 'standalone';
+  return {
+    ownerType: row.ownerType as 'tenant' | 'standalone',
+    // standalone projects are never publicly enabled
+    websiteEnabled: isStandalone ? false : (row.websiteEnabled ?? false),
+    tenantId: row.tenantId,
+    previewToken: isStandalone ? row.projectPreviewToken : row.tenantPreviewToken,
+  };
+}
+
+async function canView(access: AccessInfo, urlToken: string | null | undefined): Promise<boolean> {
+  if (urlToken && access.previewToken && urlToken === access.previewToken) return true;
+  // standalone projects: only preview token grants access, no Clerk fallback
+  if (access.ownerType === 'standalone') return false;
+  if (!access.tenantId) return false;
   const { userId } = await auth();
   if (!userId) return false;
   const [member] = await db
     .select({ id: users.id })
     .from(users)
-    .where(and(eq(users.clerkId, userId), eq(users.tenantId, tenantId)))
+    .where(and(eq(users.clerkId, userId), eq(users.tenantId, access.tenantId)))
     .limit(1);
   return Boolean(member);
 }
@@ -47,9 +74,13 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const resolved = await resolvePublishedWebsitePage({ projectId, path });
   if (!resolved) return {};
 
-  const access = await getTenantAccess(projectId);
-  const robots = access && !access.websiteEnabled ? { index: false, follow: false } : undefined;
-  return { title: resolved.project.name, ...(robots ? { robots } : {}) };
+  const access = await getAccessInfo(projectId);
+  // noindex for disabled tenant sites and all standalone prospect sites
+  const noindex = access && (!access.websiteEnabled || access.ownerType === 'standalone');
+  return {
+    title: resolved.project.name,
+    ...(noindex ? { robots: { index: false, follow: false } } : {}),
+  };
 }
 
 export default async function WebsiteProjectPublicPage({ params, searchParams }: Props) {
@@ -59,9 +90,9 @@ export default async function WebsiteProjectPublicPage({ params, searchParams }:
   const projectId = await resolveProjectByHostOrSlug({ slug: siteSlug, host: headerList.get('x-forwarded-host') ?? headerList.get('host') });
   if (!projectId) notFound();
 
-  const access = await getTenantAccess(projectId);
+  const access = await getAccessInfo(projectId);
   if (access && !access.websiteEnabled) {
-    const allowed = await canView(access.tenantId, preview, access.previewToken);
+    const allowed = await canView(access, preview);
     if (!allowed) notFound();
   }
 

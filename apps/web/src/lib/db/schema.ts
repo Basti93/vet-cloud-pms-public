@@ -328,6 +328,7 @@ export const websiteProjects = pgTable(
     seoConfig: jsonb("seo_config"),
     logoAsset: jsonb("logo_asset"),
     customCss: text("custom_css"),
+    previewToken: varchar("preview_token", { length: 64 }),
     publishedAt: timestamp("published_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .default(sql`now()`)

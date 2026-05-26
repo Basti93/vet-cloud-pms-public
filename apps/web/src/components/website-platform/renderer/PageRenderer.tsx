@@ -13,7 +13,7 @@ export function PageRenderer({ resolved, assetMap, previewToken }: { resolved: R
   });
 
   return (
-    <PraxisLayout resolved={resolved} assetMap={assetMap}>
+    <PraxisLayout resolved={resolved} assetMap={assetMap} previewToken={previewToken}>
       {resolved.blocks.map((block) => (
         <BlockRenderer key={block.id} block={block} capabilities={resolved.project.capabilities} assetMap={assetMap} projectId={resolved.project.id} pagePath={resolved.page.path} templateVars={templateVars} previewToken={previewToken} tenantHoursRows={resolved.project.tenantHoursRows} tenantConsultationHoursRows={resolved.project.tenantConsultationHoursRows} tenantOpeningHoursRows={resolved.project.tenantOpeningHoursRows} tenantSpecialHours={resolved.project.tenantSpecialHours} tenantContactInfo={resolved.project.tenantContactInfo} />
       ))}
