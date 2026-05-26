@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { createTestDb, createTestCaller, seedTestTenant, type TestDb } from "@/server/__tests__/helpers";
-import { appointments, appointmentHolds, owners, patients } from "@/lib/db/schema";
+import { appointments, appointmentHolds, owners, patients, tenants } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 
 vi.mock("@/lib/email/service");
@@ -24,6 +24,10 @@ beforeAll(async () => {
   tenantId = tenant.id;
   clerkId = user.clerkId;
   vetUserId = user.id;
+  await db
+    .update(tenants)
+    .set({ websiteEnabled: true })
+    .where(eq(tenants.id, tenantId));
 }, 60_000);
 
 afterAll(async () => {
