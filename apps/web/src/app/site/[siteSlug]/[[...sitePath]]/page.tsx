@@ -6,7 +6,7 @@ import { PageRenderer } from '@/components/website-platform/renderer/PageRendere
 import { collectAssetIds } from '@/lib/website-platform/assets';
 import { loadAssetUrlMap } from '@/lib/website-platform/assets-server';
 import { resolveProjectByHostOrSlug, resolvePublishedWebsitePage } from '@/lib/website-platform/resolve-project';
-import { db } from '@/lib/db/client';
+import { adminDb } from '@/lib/db/client';
 import { tenants, websiteProjects, users } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 
@@ -24,7 +24,7 @@ interface AccessInfo {
 }
 
 async function getAccessInfo(projectId: string): Promise<AccessInfo | null> {
-  const [row] = await db
+  const [row] = await adminDb
     .select({
       ownerType: websiteProjects.ownerType,
       projectPreviewToken: websiteProjects.previewToken,
@@ -56,7 +56,7 @@ async function canView(access: AccessInfo, urlToken: string | null | undefined):
   if (!access.tenantId) return false;
   const { userId } = await auth();
   if (!userId) return false;
-  const [member] = await db
+  const [member] = await adminDb
     .select({ id: users.id })
     .from(users)
     .where(and(eq(users.clerkId, userId), eq(users.tenantId, access.tenantId)))
@@ -64,9 +64,8 @@ async function canView(access: AccessInfo, urlToken: string | null | undefined):
   return Boolean(member);
 }
 
-export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { siteSlug, sitePath } = await params;
-  const { preview } = await searchParams;
   const headerList = await headers();
   const projectId = await resolveProjectByHostOrSlug({ slug: siteSlug, host: headerList.get('x-forwarded-host') ?? headerList.get('host') });
   if (!projectId) return {};

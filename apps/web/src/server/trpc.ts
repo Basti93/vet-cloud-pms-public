@@ -4,7 +4,7 @@ import superjson from "superjson";
 import { ZodError } from "zod";
 import { adminDb, db } from "@/lib/db/client";
 import { tenantDeletionSchedules, users, tenants } from "@/lib/db/schema";
-import { and, eq, isNotNull } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { withTenantContext } from "./tenant-context";
 import { checkRateLimit, getRateLimitInfo } from "@/lib/rateLimit";
 import { logEvent, logEventAsync } from "./trpc/logging-middleware";
@@ -320,8 +320,19 @@ export const publicProcedure = t.procedure
   .use(systemLoggingMiddleware)
   .use(rateLimitMiddleware);
 
+/**
+ * Public procedure for deliberately unscoped read/write flows.
+ * Use only for public endpoints that must work before a tenant RLS context
+ * exists, and enforce access checks inside the procedure.
+ */
+export const publicAdminDbProcedure = t.procedure
+  .use(({ ctx, next }) => next({ ctx: { ...ctx, db: ctx.adminDb } }))
+  .use(systemLoggingMiddleware)
+  .use(rateLimitMiddleware);
+
 /** Public booking procedure — no auth, stricter 20 req/60s rate limit for public booking */
 export const publicBookingProcedure = t.procedure
+  .use(({ ctx, next }) => next({ ctx: { ...ctx, db: ctx.adminDb } }))
   .use(systemLoggingMiddleware)
   .use(publicBookingRateLimitMiddleware);
 

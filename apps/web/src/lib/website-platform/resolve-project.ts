@@ -1,4 +1,4 @@
-import { db } from "@/lib/db/client";
+import { adminDb } from "@/lib/db/client";
 import { roles, tenants, userRoles, users, websiteDomains, websitePageRevisions, websitePages, websiteProjects } from "@/lib/db/schema";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { normalizeBlocks, normalizeCapabilities, normalizeThemeConfig, websiteProjectSeoSchema } from "./schemas";
@@ -52,9 +52,14 @@ export function normalizeWebsitePath(pathname?: string | null) {
 }
 
 export async function resolveProjectByHostOrSlug(input: { host?: string | null; slug?: string | null }) {
+  if (input.slug) {
+    const [project] = await adminDb.select({ id: websiteProjects.id }).from(websiteProjects).where(eq(websiteProjects.slug, input.slug)).limit(1);
+    if (project) return project.id;
+  }
+
   const host = normalizeWebsiteHost(input.host);
   if (host) {
-    const [domainMatch] = await db
+    const [domainMatch] = await adminDb
       .select({ projectId: websiteProjects.id })
       .from(websiteDomains)
       .innerJoin(websiteProjects, eq(websiteProjects.id, websiteDomains.websiteProjectId))
@@ -63,17 +68,12 @@ export async function resolveProjectByHostOrSlug(input: { host?: string | null; 
     if (domainMatch) return domainMatch.projectId;
   }
 
-  if (input.slug) {
-    const [project] = await db.select({ id: websiteProjects.id }).from(websiteProjects).where(eq(websiteProjects.slug, input.slug)).limit(1);
-    return project?.id ?? null;
-  }
-
   return null;
 }
 
 export async function resolvePublishedWebsitePage(input: { projectId: string; path: string }): Promise<ResolvedWebsitePage | null> {
   const normalizedPath = normalizeWebsitePath(input.path);
-  const [row] = await db
+  const [row] = await adminDb
     .select({
       projectId: websiteProjects.id,
       projectName: websiteProjects.name,
@@ -122,7 +122,7 @@ export async function resolvePublishedWebsitePage(input: { projectId: string; pa
   if (!row) return null;
 
   const teamMembers = row.ownerTenantId
-    ? await db
+    ? await adminDb
         .select({ id: users.id, title: users.title, firstName: users.firstName, lastName: users.lastName })
         .from(users)
         .innerJoin(userRoles, eq(userRoles.userId, users.id))

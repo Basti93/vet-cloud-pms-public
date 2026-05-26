@@ -1,7 +1,7 @@
 import { redirect, notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { auth } from '@clerk/nextjs/server';
-import { db } from '@/lib/db/client';
+import { adminDb } from '@/lib/db/client';
 import { tenants, websiteProjects, users } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { resolvePublishedWebsitePage } from '@/lib/website-platform/resolve-project';
@@ -15,7 +15,7 @@ interface Props {
 }
 
 async function getTenantData(practiceSlug: string) {
-  const [row] = await db
+  const [row] = await adminDb
     .select({
       tenantId: tenants.id,
       tenantName: tenants.name,
@@ -34,7 +34,7 @@ async function getTenantData(practiceSlug: string) {
 async function isAuthenticatedMember(tenantId: string): Promise<boolean> {
   const { userId } = await auth();
   if (!userId) return false;
-  const [member] = await db
+  const [member] = await adminDb
     .select({ id: users.id })
     .from(users)
     .where(and(eq(users.clerkId, userId), eq(users.tenantId, tenantId)))

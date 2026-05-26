@@ -311,6 +311,7 @@ function StepDate({
   primaryColor,
   browserSessionId,
   embeddingOrigin,
+  previewToken,
   onBack,
   onSelect,
 }: {
@@ -320,6 +321,7 @@ function StepDate({
   primaryColor: string;
   browserSessionId: string;
   embeddingOrigin?: string;
+  previewToken?: string;
   onBack: () => void;
   onSelect: (slot: Slot, holdToken: string, holdExpiresAt: Date) => void;
 }) {
@@ -350,6 +352,7 @@ function StepDate({
         date: selectedDay!,
         vetId: vetId || undefined,
         embeddingOrigin,
+        previewToken,
       },
       { enabled: !!selectedDay, staleTime: 0 }
     );
@@ -363,7 +366,7 @@ function StepDate({
     setHoldError(null);
     // Release hold when switching day
     if (holdToken) {
-      releaseHoldMutation.mutate({ holdToken, embeddingOrigin });
+      releaseHoldMutation.mutate({ holdToken, embeddingOrigin, previewToken });
       setHoldToken(null);
       setHoldExpiresAt(null);
     }
@@ -373,7 +376,7 @@ function StepDate({
     setHoldError(null);
     // Release previous hold before creating a new one
     if (holdToken) {
-      releaseHoldMutation.mutate({ holdToken, embeddingOrigin });
+      releaseHoldMutation.mutate({ holdToken, embeddingOrigin, previewToken });
       setHoldToken(null);
       setHoldExpiresAt(null);
     }
@@ -386,6 +389,7 @@ function StepDate({
         vetId: vetId || undefined,
         browserSessionId,
         embeddingOrigin,
+        previewToken,
       },
       {
         onSuccess: (data) => {
@@ -403,7 +407,7 @@ function StepDate({
 
   const handleBack = () => {
     if (holdToken) {
-      releaseHoldMutation.mutate({ holdToken, embeddingOrigin });
+      releaseHoldMutation.mutate({ holdToken, embeddingOrigin, previewToken });
     }
     onBack();
   };
@@ -790,6 +794,7 @@ function StepConfirm({
   primaryColor,
   browserSessionId,
   embeddingOrigin,
+  previewToken,
   holdToken: _holdToken,
   holdExpiresAt,
   onHoldExpired,
@@ -805,6 +810,7 @@ function StepConfirm({
   primaryColor: string;
   browserSessionId: string;
   embeddingOrigin?: string;
+  previewToken?: string;
   holdToken?: string | null;
   holdExpiresAt?: Date | null;
   onHoldExpired?: () => void;
@@ -851,6 +857,7 @@ function StepConfirm({
       vetId: selectedVetId || undefined,
       browserSessionId,
       embeddingOrigin,
+      previewToken,
     });
   };
 
@@ -1018,12 +1025,12 @@ export default function BookingClient({
     : TYPE_PAIRINGS.modern;
 
   const { data: vets } = trpc.booking.listPublicVets.useQuery(
-    { tenantId: clinic?.id || "", embeddingOrigin },
+    { tenantId: clinic?.id || "", embeddingOrigin, previewToken },
     { enabled: !!clinic?.id, retry: false }
   );
 
   const { data: vetAvailability } = trpc.booking.getVetAvailability.useQuery(
-    { tenantId: clinic?.id || "", embeddingOrigin },
+    { tenantId: clinic?.id || "", embeddingOrigin, previewToken },
     { enabled: !!clinic?.id }
   );
 
@@ -1074,13 +1081,13 @@ export default function BookingClient({
   /** Called when navigating back from StepDetails → StepDate */
   const handleDetailsBack = useCallback(() => {
     if (holdToken) {
-      releaseHoldMutation.mutate({ holdToken, embeddingOrigin });
+      releaseHoldMutation.mutate({ holdToken, embeddingOrigin, previewToken });
     }
     setHoldToken(null);
     setHoldExpiresAt(null);
     updateField("date", undefined);
     setStep("date");
-  }, [holdToken, releaseHoldMutation, updateField, embeddingOrigin]);
+  }, [holdToken, releaseHoldMutation, updateField, embeddingOrigin, previewToken]);
 
   // Helper: Get vet display name by ID
   const getVetDisplayName = (vetId: string) => {
@@ -1109,7 +1116,7 @@ export default function BookingClient({
       autoSuggestAttemptedRef.current = clinic.id;
 
       suggestVetMutation.mutate(
-        { tenantId: clinic.id, embeddingOrigin },
+        { tenantId: clinic.id, embeddingOrigin, previewToken },
         {
           onSuccess: (data) => {
             if (data?.id) {
@@ -1126,7 +1133,7 @@ export default function BookingClient({
         }
       );
     }
-  }, [step, selectedVetId, clinic?.id, vets, updateField, suggestVetMutation, embeddingOrigin]);
+  }, [step, selectedVetId, clinic?.id, vets, updateField, suggestVetMutation, embeddingOrigin, previewToken]);
 
   // Loading state
   if (clinicLoading) {
@@ -1232,6 +1239,7 @@ export default function BookingClient({
                   primaryColor={primaryColor}
                   browserSessionId={formState.browserSessionId!}
                   embeddingOrigin={embeddingOrigin}
+                  previewToken={previewToken}
                   onBack={() => setStep("vet")}
                   onSelect={(s, token, expiresAt) => {
                     updateField("date", JSON.stringify(s));
@@ -1268,6 +1276,7 @@ export default function BookingClient({
                   primaryColor={primaryColor}
                   browserSessionId={formState.browserSessionId!}
                   embeddingOrigin={embeddingOrigin}
+                  previewToken={previewToken}
                   holdToken={holdToken}
                   holdExpiresAt={holdExpiresAt}
                   onHoldExpired={handleHoldExpired}

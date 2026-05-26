@@ -6,7 +6,7 @@ import {
   frameAncestorSourcesForDomain,
   normalizeEmbeddingDomains,
 } from '@/lib/booking/embed-origin';
-import { db } from '@/lib/db/client';
+import { adminDb } from '@/lib/db/client';
 import { tenants, websiteDomains, websiteProjects } from '@/lib/db/schema';
 import { and, eq } from 'drizzle-orm';
 
@@ -39,7 +39,7 @@ async function resolveWebsiteDomain(host: string) {
   const cached = domainCache.get(host);
   if (cached && cached.expiresAt > Date.now()) return cached.result;
 
-  const [row] = await db
+  const [row] = await adminDb
     .select({
       projectSlug: websiteProjects.slug,
       ownerTenantId: websiteProjects.ownerTenantId,
@@ -64,7 +64,7 @@ async function getBookingFrameAncestors(pathname: string) {
   const tenantSlug = pathname.split('/')[2];
   if (!tenantSlug) return ["'self'"];
 
-  const [tenant] = await db
+  const [tenant] = await adminDb
     .select({ allowedEmbeddingDomains: tenants.allowedEmbeddingDomains })
     .from(tenants)
     .where(eq(tenants.slug, tenantSlug))
@@ -88,7 +88,7 @@ async function getBookingFrameAncestors(pathname: string) {
   ];
 }
 
-const clerkProtectedProxy = clerkMiddleware(async (auth, req) => {
+const clerkProtectedProxy = clerkMiddleware(async (auth) => {
   const authObj = await auth();
   if (!authObj.userId) {
     return authObj.redirectToSignIn();

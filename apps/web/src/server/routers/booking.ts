@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { eq, and, gte, gt, lt, sql, ne } from "drizzle-orm";
-import { createTRPCRouter, publicProcedure, publicBookingProcedure, tenantProcedure } from "@/server/trpc";
+import { createTRPCRouter, publicAdminDbProcedure, publicBookingProcedure, tenantProcedure } from "@/server/trpc";
 import { tenants, appointments, owners, patients, users, userRoles, roles, appointmentHolds, emailSettings } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
 import { sendConfirmationEmail, sendBookingNotificationEmail, sendBookingRequestEmail } from "@/lib/email/service";
@@ -94,6 +94,45 @@ async function assertEmbeddingOriginAllowed(
       message: "Diese Domain ist nicht autorisiert, das Buchungs-Widget einzubinden",
     });
   }
+}
+
+async function assertPublicBookingTenantAllowed(
+  db: Db,
+  input: { tenantId: string; previewToken?: string },
+  userId?: string | null
+) {
+  const [tenant] = await db
+    .select({
+      id: tenants.id,
+      websiteEnabled: tenants.websiteEnabled,
+      previewToken: tenants.previewToken,
+    })
+    .from(tenants)
+    .where(eq(tenants.id, input.tenantId))
+    .limit(1);
+
+  if (!tenant) {
+    throw new TRPCError({ code: "NOT_FOUND" });
+  }
+
+  if (tenant.websiteEnabled) return;
+
+  const isPreviewValid =
+    input.previewToken &&
+    tenant.previewToken &&
+    input.previewToken === tenant.previewToken;
+  if (isPreviewValid) return;
+
+  if (userId) {
+    const [member] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.clerkId, userId), eq(users.tenantId, input.tenantId)))
+      .limit(1);
+    if (member) return;
+  }
+
+  throw new TRPCError({ code: "NOT_FOUND" });
 }
 
 // ── Router ────────────────────────────────────────────────────────────────────
@@ -353,7 +392,7 @@ export const bookingRouter = createTRPCRouter({
     }),
 
   /** Public: Fetch clinic info by slug for the booking widget header */
-  getClinic: publicProcedure
+  getClinic: publicAdminDbProcedure
     .input(
       z.object({
         slug: z.string().min(1),
@@ -415,14 +454,16 @@ export const bookingRouter = createTRPCRouter({
     }),
 
   /** Public: List vets for booking widget */
-  listPublicVets: publicProcedure
+  listPublicVets: publicAdminDbProcedure
     .input(
       z.object({
         tenantId: z.string().uuid(),
         embeddingOrigin: z.string().optional(),
+        previewToken: z.string().optional(),
       })
     )
     .query(async ({ ctx, input }) => {
+      await assertPublicBookingTenantAllowed(ctx.db, input, ctx.userId);
       await assertEmbeddingOriginAllowed(ctx.db, ctx.headers, {
         tenantId: input.tenantId,
         embeddingOrigin: input.embeddingOrigin,
@@ -458,9 +499,11 @@ export const bookingRouter = createTRPCRouter({
         startTime: z.date().optional(),
         endTime: z.date().optional(),
         embeddingOrigin: z.string().optional(),
+        previewToken: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
+      await assertPublicBookingTenantAllowed(ctx.db, input, ctx.userId);
       await assertEmbeddingOriginAllowed(ctx.db, ctx.headers, {
         tenantId: input.tenantId,
         embeddingOrigin: input.embeddingOrigin,
@@ -485,16 +528,18 @@ export const bookingRouter = createTRPCRouter({
     }),
 
   /** Public: Return available 30-min slots for a given tenant + calendar date (optionally filtered by vet) */
-  getAvailableSlots: publicProcedure
+  getAvailableSlots: publicAdminDbProcedure
     .input(
       z.object({
         tenantId: z.string().uuid(),
         date: z.date(),
         vetId: z.string().uuid().optional(),
         embeddingOrigin: z.string().optional(),
+        previewToken: z.string().optional(),
       })
     )
     .query(async ({ ctx, input }) => {
+      await assertPublicBookingTenantAllowed(ctx.db, input, ctx.userId);
       await assertEmbeddingOriginAllowed(ctx.db, ctx.headers, {
         tenantId: input.tenantId,
         embeddingOrigin: input.embeddingOrigin,
@@ -532,9 +577,11 @@ export const bookingRouter = createTRPCRouter({
         vetId: z.string().uuid().optional(),
         browserSessionId: z.string().uuid(),
         embeddingOrigin: z.string().optional(),
+        previewToken: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
+      await assertPublicBookingTenantAllowed(ctx.db, input, ctx.userId);
       await assertEmbeddingOriginAllowed(ctx.db, ctx.headers, {
         tenantId: input.tenantId,
         embeddingOrigin: input.embeddingOrigin,
@@ -794,9 +841,11 @@ export const bookingRouter = createTRPCRouter({
         vetId: z.string().uuid().optional(),
         browserSessionId: z.string().uuid(),
         embeddingOrigin: z.string().optional(),
+        previewToken: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
+      await assertPublicBookingTenantAllowed(ctx.db, input, ctx.userId);
       await assertEmbeddingOriginAllowed(ctx.db, ctx.headers, {
         tenantId: input.tenantId,
         embeddingOrigin: input.embeddingOrigin,
@@ -840,11 +889,12 @@ export const bookingRouter = createTRPCRouter({
     }),
 
   /** Public: Release a hold (user went back or navigated away) */
-  releaseHold: publicProcedure
+  releaseHold: publicAdminDbProcedure
     .input(
       z.object({
         holdToken: z.string().uuid(),
         embeddingOrigin: z.string().optional(),
+        previewToken: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -855,6 +905,11 @@ export const bookingRouter = createTRPCRouter({
         .limit(1);
 
       if (hold?.tenantId) {
+        await assertPublicBookingTenantAllowed(
+          ctx.db,
+          { tenantId: hold.tenantId, previewToken: input.previewToken },
+          ctx.userId
+        );
         await assertEmbeddingOriginAllowed(ctx.db, ctx.headers, {
           tenantId: hold.tenantId,
           embeddingOrigin: input.embeddingOrigin,
@@ -868,16 +923,18 @@ export const bookingRouter = createTRPCRouter({
     }),
 
   /** Public: Check if a slot is available (no active hold + no booking) */
-  checkSlotAvailability: publicProcedure
+  checkSlotAvailability: publicAdminDbProcedure
     .input(
       z.object({
         tenantId: z.string().uuid(),
         slotDatetime: z.date(),
         vetId: z.string().uuid().optional(),
         embeddingOrigin: z.string().optional(),
+        previewToken: z.string().optional(),
       })
     )
     .query(async ({ ctx, input }) => {
+      await assertPublicBookingTenantAllowed(ctx.db, input, ctx.userId);
       await assertEmbeddingOriginAllowed(ctx.db, ctx.headers, {
         tenantId: input.tenantId,
         embeddingOrigin: input.embeddingOrigin,
@@ -892,14 +949,16 @@ export const bookingRouter = createTRPCRouter({
     }),
 
   /** Public: Check which vets have available slots in next 14 days */
-  getVetAvailability: publicProcedure
+  getVetAvailability: publicAdminDbProcedure
     .input(
       z.object({
         tenantId: z.string().uuid(),
         embeddingOrigin: z.string().optional(),
+        previewToken: z.string().optional(),
       })
     )
     .query(async ({ ctx, input }) => {
+      await assertPublicBookingTenantAllowed(ctx.db, input, ctx.userId);
       await assertEmbeddingOriginAllowed(ctx.db, ctx.headers, {
         tenantId: input.tenantId,
         embeddingOrigin: input.embeddingOrigin,
@@ -909,7 +968,7 @@ export const bookingRouter = createTRPCRouter({
       return scheduleService.getVetAvailability(input.tenantId);
     }),
 
-  getEmbedCode: publicProcedure
+  getEmbedCode: publicAdminDbProcedure
     .input(z.object({ slug: z.string().min(1) }))
     .query(({ input }) => {
       const bookingUrl = `${getMainDomain()}/book/${input.slug}`;

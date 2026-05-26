@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
-import { db } from '@/lib/db/client';
+import { adminDb } from '@/lib/db/client';
 import { tenants, users } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import BookingClient from './BookingClient';
@@ -14,7 +14,7 @@ export default async function BookingPage({ params, searchParams }: Props) {
   const { tenantSlug } = await params;
   const { preview: previewToken } = await searchParams;
 
-  const [tenant] = await db
+  const [tenant] = await adminDb
     .select({ id: tenants.id, websiteEnabled: tenants.websiteEnabled, previewToken: tenants.previewToken })
     .from(tenants)
     .where(eq(tenants.slug, tenantSlug))
@@ -27,7 +27,7 @@ export default async function BookingPage({ params, searchParams }: Props) {
     if (!isPreviewValid) {
       const { userId } = await auth();
       if (!userId) notFound();
-      const [member] = await db
+      const [member] = await adminDb
         .select({ id: users.id })
         .from(users)
         .where(and(eq(users.clerkId, userId), eq(users.tenantId, tenant.id)))
