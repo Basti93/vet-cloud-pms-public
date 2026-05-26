@@ -34,6 +34,22 @@ const clerkProtectedProxy = clerkMiddleware(async (auth, req) => {
 });
 const clerkAuthStateProxy = clerkMiddleware();
 
+function keepInternalRewriteHttp(res: Response | void) {
+  const rewrite = res?.headers.get("x-middleware-rewrite");
+  if (!rewrite) return res;
+
+  const url = new URL(rewrite);
+  const internalHosts = new Set(["localhost", "0.0.0.0", "[::]"]);
+  const port = process.env.PORT || "3001";
+
+  if (url.protocol === "https:" && internalHosts.has(url.hostname) && url.port === port) {
+    url.protocol = "http:";
+    res.headers.set("x-middleware-rewrite", url.toString());
+  }
+
+  return res;
+}
+
 export async function proxy(req: NextRequest, event: NextFetchEvent) {
   // Guard against accidental document navigation to RSC/Flight URLs.
   // Internal Next.js RSC fetches include the `rsc: 1` header and should pass through.
@@ -44,10 +60,12 @@ export async function proxy(req: NextRequest, event: NextFetchEvent) {
   }
 
   if (isProtectedRoute(req)) {
-    return clerkProtectedProxy(req, event);
+    return keepInternalRewriteHttp(await clerkProtectedProxy(req, event));
   }
 
-  return isPublicRoute(req) ? clerkAuthStateProxy(req, event) : NextResponse.next();
+  return isPublicRoute(req)
+    ? keepInternalRewriteHttp(await clerkAuthStateProxy(req, event))
+    : NextResponse.next();
 }
 
 export const config = {
