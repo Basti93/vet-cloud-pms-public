@@ -11,7 +11,7 @@ import { resolveAssetUrl } from '@/lib/website-platform/assets';
 import { BookingDialog } from '@/components/website-platform/blocks/WebsiteBlocks';
 
 
-export function PraxisLayout({ resolved, assetMap, children }: { resolved: ResolvedWebsitePage; assetMap?: Record<string, string>; children?: ReactNode }) {
+export function PraxisLayout({ resolved, assetMap, children, previewToken }: { resolved: ResolvedWebsitePage; assetMap?: Record<string, string>; children?: ReactNode; previewToken?: string }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [bookingOpen, setBookingOpen] = useState(false);
   const bookingUrl = getBookingUrl(resolved.project.capabilities);
@@ -19,6 +19,7 @@ export function PraxisLayout({ resolved, assetMap, children }: { resolved: Resol
     ? resolved.project.capabilities.booking.tenantSlug
     : null;
   const basePath = `/site/${resolved.project.slug}`;
+  const previewSuffix = previewToken ? `?preview=${previewToken}` : '';
   const phone = resolved.project.tenantContactInfo?.phone;
   const themeStyles = generateThemeStyles(
     resolved.project.themeConfig.palette,
@@ -32,15 +33,21 @@ export function PraxisLayout({ resolved, assetMap, children }: { resolved: Resol
   const faviconHref = logoUrl ?? `data:image/svg+xml,${encodeURIComponent(faviconSvg)}`;
 
   const navItems = [
-    { label: 'Start', href: `${basePath}#start` },
-    { label: 'Über uns', href: `${basePath}#team` },
-    { label: 'Leistungen', href: `${basePath}#leistungen` },
-    { label: 'Sprechzeiten', href: `${basePath}#sprechzeiten` },
-    { label: 'Kontakt', href: `${basePath}#kontakt` },
+    { label: 'Start', href: `${basePath}${previewSuffix}#start` },
+    { label: 'Über uns', href: `${basePath}${previewSuffix}#team` },
+    { label: 'Leistungen', href: `${basePath}${previewSuffix}#leistungen` },
+    { label: 'Sprechzeiten', href: `${basePath}${previewSuffix}#sprechzeiten` },
+    { label: 'Kontakt', href: `${basePath}${previewSuffix}#kontakt` },
   ];
 
   return (
     <div style={{ ...themeStyles, fontFamily: 'var(--font-body)', color: 'var(--color-fg)', background: 'var(--color-bg)' }} className="min-h-screen">
+      {previewToken && (
+        <div className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white" style={{ background: '#b45309' }}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          Diese Seite ist nicht öffentlich — sie dient ausschließlich zur Vorschau und ist nicht im Internet auffindbar.
+        </div>
+      )}
       <link rel="icon" href={faviconHref} />
 
       {/* Custom CSS override */}
@@ -55,7 +62,7 @@ export function PraxisLayout({ resolved, assetMap, children }: { resolved: Resol
       >
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           {/* Logo / monogram */}
-          <a href={`${basePath}#start`} className="flex items-center gap-2.5">
+          <a href={`${basePath}${previewSuffix}#start`} className="flex items-center gap-2.5">
             {logoUrl ? (
               <img src={logoUrl} alt={resolved.project.name} className="h-9 w-auto object-contain" />
             ) : (
@@ -239,14 +246,14 @@ export function PraxisLayout({ resolved, assetMap, children }: { resolved: Resol
               <h3 className="mb-3 font-bold text-white">Rechtliches</h3>
               <div className="flex flex-col gap-2 text-sm">
                 <a
-                  href={`${basePath}/impressum`}
+                  href={`${basePath}/impressum${previewSuffix}`}
                   className="transition-colors hover:text-white"
                   style={{ color: 'rgba(255,255,255,0.7)' }}
                 >
                   Impressum
                 </a>
                 <a
-                  href={`${basePath}/datenschutz`}
+                  href={`${basePath}/datenschutz${previewSuffix}`}
                   className="transition-colors hover:text-white"
                   style={{ color: 'rgba(255,255,255,0.7)' }}
                 >
