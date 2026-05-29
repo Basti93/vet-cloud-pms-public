@@ -25,7 +25,7 @@ const createCaller = createCallerFactory(appRouter);
 export async function createTestDb() {
   const container = await new PostgreSqlContainer("postgres:16-alpine").start();
   const connectionUri = container.getConnectionUri();
-  const sql = postgres(connectionUri, { max: 1 });
+  const sql = postgres(connectionUri, { max: 5 });
   const db = drizzle(sql, { schema }) as TestDb;
   await migrate(db as any, {
     migrationsFolder: resolve(process.cwd(), "drizzle"),
