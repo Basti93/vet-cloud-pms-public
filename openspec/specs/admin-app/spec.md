@@ -1,9 +1,9 @@
 # Admin Application
 
+## Purpose
+
 The admin app (`apps/admin`) is a separate Next.js application for Vet Cloud PMS system administrators, providing tenant management, user inspection, and audit log access via a tRPC proxy to the main web API.
-
 ## Requirements
-
 ### Requirement: System Admin Identity Separation
 System administrators SHALL be defined exclusively via the `ADMIN_CLERK_IDS` environment variable on the web app and MUST NOT appear in the `users` database table. System admin identity is completely external to the multi-tenant user model.
 
@@ -73,3 +73,31 @@ Every state-mutating action performed by a system admin MUST produce a `system_l
 #### Scenario: Plan update by system admin
 - **WHEN** a system admin changes a tenant's subscription plan
 - **THEN** a `system_logs` row is written with `action: "config_change"` and `metadata` containing `systemAdminId` and the before/after plan values
+
+### Requirement: System Admin Feedback Triage
+System admins SHALL be able to list, inspect, filter, and update user feedback submissions across all tenants from the internal admin application.
+
+#### Scenario: Admin views feedback list
+- **WHEN** a system admin navigates to `/dashboard/feedback`
+- **THEN** the admin app displays feedback submissions across all tenants sorted by newest first
+
+#### Scenario: Admin filters feedback
+- **WHEN** a system admin filters feedback by status, category, tenant, source module, or search text
+- **THEN** the admin app displays only feedback submissions matching those filters
+
+#### Scenario: Admin views feedback context
+- **WHEN** a system admin opens or scans a feedback submission
+- **THEN** the admin app shows the tenant, submitting user, source module, source path, submitted message, status, priority, created timestamp, and browser metadata when available
+
+#### Scenario: Admin updates feedback status
+- **WHEN** a system admin changes a feedback submission status
+- **THEN** the system persists the new status and records the system admin identity and update timestamp
+
+#### Scenario: Admin action is logged
+- **WHEN** a system admin changes feedback status, priority, or triage notes
+- **THEN** the system writes a `system_logs` row with `tenantId: null`, `userId: null`, and the admin's Clerk ID in `metadata.systemAdminId`
+
+#### Scenario: Non-admin attempts feedback triage
+- **WHEN** a Clerk user whose ID is not listed in `ADMIN_CLERK_IDS` calls an admin feedback procedure
+- **THEN** the request is rejected with `FORBIDDEN` before returning any feedback data
+
