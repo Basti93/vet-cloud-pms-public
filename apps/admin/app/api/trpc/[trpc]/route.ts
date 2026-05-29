@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
+import { auth } from "@clerk/nextjs/server";
 
 const ALLOWED_TRPC_PREFIX = "adminDashboard.";
 
@@ -62,11 +63,15 @@ async function proxy(req: NextRequest, trpcPath: string) {
   const requestId = req.headers.get("x-request-id") ?? randomUUID();
   const startedAt = Date.now();
 
+  // Get Clerk session token server-side from cookies — browser never needs to
+  // handle the token directly, so TRPCProvider can stay free of useAuth().
+  const { getToken } = await auth();
+  const sessionToken = await getToken();
+
   const upstreamHeaders = new Headers();
   const contentType = req.headers.get("content-type");
   if (contentType) upstreamHeaders.set("content-type", contentType);
-  const authorization = req.headers.get("authorization");
-  if (authorization) upstreamHeaders.set("authorization", authorization);
+  if (sessionToken) upstreamHeaders.set("authorization", `Bearer ${sessionToken}`);
   upstreamHeaders.set("x-request-id", requestId);
   upstreamHeaders.set("x-admin-proxy", "1");
 
