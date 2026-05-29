@@ -7,7 +7,8 @@ export interface SendEmailOptions {
   to: string;
   from?: string;
   subject: string;
-  html: string;
+  html?: string;
+  text?: string;
   replyTo?: string;
 }
 

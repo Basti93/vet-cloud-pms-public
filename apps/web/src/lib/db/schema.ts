@@ -1238,6 +1238,48 @@ export const vaccinationEmailLogs = pgTable(
 );
 
 // ============================================================================
+// EMAIL_LOGS (Universal email send tracking — all types)
+// ============================================================================
+
+export const EMAIL_TYPES = [
+  "confirmation",
+  "reminder",
+  "booking_request",
+  "booking_notification",
+  "invitation",
+  "account_deletion",
+  "tenant_deactivation",
+  "tenant_lifecycle",
+  "payment_failed",
+  "trial_ending",
+  "trial_expired",
+  "vaccination_reminder",
+  "vaccination_digest",
+  "consultation_request",
+] as const;
+
+export type EmailType = typeof EMAIL_TYPES[number];
+
+export const emailLogs = pgTable(
+  "email_logs",
+  {
+    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+    tenantId: uuid("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+    emailType: varchar("email_type", { length: 60, enum: EMAIL_TYPES }).notNull(),
+    recipientEmail: varchar("recipient_email", { length: 255 }).notNull(),
+    status: varchar("status", { length: 20, enum: ["sent", "failed"] }).notNull(),
+    errorMessage: text("error_message"),
+    messageId: varchar("message_id", { length: 255 }),
+    sentAt: timestamp("sent_at", { withTimezone: true }).default(sql`now()`).notNull(),
+  },
+  (table) => ({
+    tenantIdIdx: index("email_logs_tenant_id_idx").on(table.tenantId),
+    statusSentAtIdx: index("email_logs_status_sent_at_idx").on(table.status, table.sentAt),
+    emailTypeIdx: index("email_logs_email_type_idx").on(table.emailType),
+  })
+);
+
+// ============================================================================
 // FEATURE_FLAGS (Per-Tenant Feature Toggle)
 // ============================================================================
 

@@ -1,11 +1,11 @@
 import { z } from "zod";
-import { eq, and, gte, lte, count, asc } from "drizzle-orm";
+import { eq, and, gte, lte, count, asc, sql } from "drizzle-orm";
 import { createTRPCRouter, protectedProcedure } from "@/server/trpc";
 import {
   appointments,
   patients,
   users,
-  appointmentEmailLogs,
+  emailLogs,
 } from "@/lib/db/schema";
 
 export const statisticsRouter = createTRPCRouter({
@@ -105,30 +105,32 @@ export const statisticsRouter = createTRPCRouter({
       const totalUniquePatients = patientAppointmentCounts.length;
       const returningRate = totalUniquePatients > 0 ? (returningPatientCount / totalUniquePatients) * 100 : 0;
 
-      // Email delivery rate
-      const emailLogs = await ctx.db
-        .select()
-        .from(appointmentEmailLogs)
+      // Email counts by type
+      const emailByType = await ctx.db
+        .select({
+          emailType: emailLogs.emailType,
+          count: sql<number>`count(*)`,
+        })
+        .from(emailLogs)
         .where(
           and(
-            eq(appointmentEmailLogs.tenantId, input.tenantId),
-            gte(appointmentEmailLogs.sentAt, input.from),
-            lte(appointmentEmailLogs.sentAt, input.to)
+            eq(emailLogs.tenantId, input.tenantId),
+            eq(emailLogs.status, "sent"),
+            gte(emailLogs.sentAt, input.from),
+            lte(emailLogs.sentAt, input.to)
           )
-        );
-
-      const sentCount = emailLogs.filter((e) => e.status === "sent").length;
-      const emailDeliveryRate = emailLogs.length > 0 ? (sentCount / emailLogs.length) * 100 : 0;
+        )
+        .groupBy(emailLogs.emailType);
 
       return {
         totalAppointments,
-        completionRate: Math.round(completionRate * 10) / 10, // 1 decimal
+        completionRate: Math.round(completionRate * 10) / 10,
         noShowRate: Math.round(noShowRate * 10) / 10,
         onlineConversionRate: Math.round(onlineConversionRate * 10) / 10,
         avgDuration,
         newPatients: newPatients[0]?.count || 0,
         returningRate: Math.round(returningRate * 10) / 10,
-        emailDeliveryRate: Math.round(emailDeliveryRate * 10) / 10,
+        emailByType: emailByType.map((r) => ({ emailType: r.emailType, count: Number(r.count) })),
         voiceAIBookings: voiceAICount,
         voiceAIRate: Math.round(voiceAIRate * 10) / 10,
         sourceBreakdown,

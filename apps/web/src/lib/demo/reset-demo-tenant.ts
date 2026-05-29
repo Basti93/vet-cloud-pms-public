@@ -5,6 +5,7 @@ import {
   appointmentEmailLogs,
   appointmentHolds,
   diagnoses,
+  emailLogs,
   emailSettings,
   medications,
   owners,
@@ -326,6 +327,7 @@ export async function resetDemoTenantData({
   const vaccinationEmailLogsResult = await db
     .delete(vaccinationEmailLogs)
     .where(eq(vaccinationEmailLogs.tenantId, DEMO_TENANT_ID));
+  await db.delete(emailLogs).where(eq(emailLogs.tenantId, DEMO_TENANT_ID));
   const appointmentHoldsResult = await db
     .delete(appointmentHolds)
     .where(eq(appointmentHolds.tenantId, DEMO_TENANT_ID));
@@ -500,6 +502,55 @@ export async function resetDemoTenantData({
       });
     })
   );
+
+  // Seed email_logs with realistic demo data spread over last 30 days
+  const nowMs = now.getTime();
+  const day = 24 * 60 * 60 * 1000;
+  function daysAgo(d: number, hourOffset = 0) {
+    return new Date(nowMs - d * day + hourOffset * 3600 * 1000);
+  }
+  const demoEmailRows: (typeof emailLogs.$inferInsert)[] = [
+    // Confirmations — one per appointment roughly
+    ...Array.from({ length: 58 }, (_, i) => ({
+      tenantId: DEMO_TENANT_ID, emailType: "confirmation" as const,
+      recipientEmail: `kunde${i + 1}@example.de`, status: "sent" as const,
+      sentAt: daysAgo(Math.floor(i * 0.5), i % 8),
+    })),
+    // Reminders
+    ...Array.from({ length: 44 }, (_, i) => ({
+      tenantId: DEMO_TENANT_ID, emailType: "reminder" as const,
+      recipientEmail: `kunde${i + 1}@example.de`, status: "sent" as const,
+      sentAt: daysAgo(Math.floor(i * 0.65) + 1, (i % 6) + 7),
+    })),
+    // Booking requests (online booking confirmation step)
+    ...Array.from({ length: 18 }, (_, i) => ({
+      tenantId: DEMO_TENANT_ID, emailType: "booking_request" as const,
+      recipientEmail: `neukunde${i + 1}@example.de`, status: "sent" as const,
+      sentAt: daysAgo(Math.floor(i * 1.5), i % 5),
+    })),
+    // Booking notifications to practice
+    ...Array.from({ length: 18 }, (_, i) => ({
+      tenantId: DEMO_TENANT_ID, emailType: "booking_notification" as const,
+      recipientEmail: `praxis@example.de`, status: "sent" as const,
+      sentAt: daysAgo(Math.floor(i * 1.5), i % 5 + 1),
+    })),
+    // Vaccination reminders
+    ...Array.from({ length: 22 }, (_, i) => ({
+      tenantId: DEMO_TENANT_ID, emailType: "vaccination_reminder" as const,
+      recipientEmail: `impf${i + 1}@example.de`, status: "sent" as const,
+      sentAt: daysAgo(i + 1, 9),
+    })),
+    // Vaccination digests
+    ...Array.from({ length: 4 }, (_, i) => ({
+      tenantId: DEMO_TENANT_ID, emailType: "vaccination_digest" as const,
+      recipientEmail: `digest${i + 1}@example.de`, status: "sent" as const,
+      sentAt: daysAgo(i * 7 + 2, 9),
+    })),
+    // Invitations
+    { tenantId: DEMO_TENANT_ID, emailType: "invitation" as const, recipientEmail: "neu@example.de", status: "sent" as const, sentAt: daysAgo(12) },
+    { tenantId: DEMO_TENANT_ID, emailType: "invitation" as const, recipientEmail: "kollegin@example.de", status: "sent" as const, sentAt: daysAgo(5) },
+  ];
+  await db.insert(emailLogs).values(demoEmailRows);
 
   const [persistedUsers] = await db
     .select({ count: sql`count(*)` })
