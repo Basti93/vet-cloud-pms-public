@@ -60,7 +60,7 @@ export default defineConfig({
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
       testIgnore: /authenticated\//,
-      testMatch: [/booking\.spec\.ts/, /signup\.spec\.ts/],
+      testMatch: [/booking\.spec\.ts/, /signup\.spec\.ts/, /production-smoke\.spec\.ts/],
     },
 
     // ── 3. Authenticated tests ────────────────────────────────────────────────
