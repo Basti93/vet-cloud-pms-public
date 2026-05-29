@@ -1,6 +1,6 @@
 import type { EmailProvider } from '../types';
 import { SmtpProvider, createSmtpProvider } from './smtp';
-import { db } from '@/lib/db/client';
+import { adminDb } from '@/lib/db/client';
 import { emailSettings, systemLogs } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { decryptSecret } from '@/lib/crypto';
@@ -17,7 +17,7 @@ export type TenantProviderResult = {
 export async function getProviderForTenant(tenantId?: string | null): Promise<TenantProviderResult> {
   if (tenantId) {
     try {
-      const [settings] = await db
+      const [settings] = await adminDb
         .select()
         .from(emailSettings)
         .where(eq(emailSettings.tenantId, tenantId))
@@ -42,7 +42,7 @@ export async function getProviderForTenant(tenantId?: string | null): Promise<Te
     } catch (error) {
       console.error('[email] getProviderForTenant error for tenant', tenantId, '— falling back to system SMTP:', error);
       try {
-        await db.insert(systemLogs).values({
+        await adminDb.insert(systemLogs).values({
           level: 'error',
           category: 'email',
           eventType: 'tenant_smtp_resolve_failed',
