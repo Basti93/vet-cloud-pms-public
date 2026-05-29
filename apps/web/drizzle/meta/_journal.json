@@ -281,6 +281,13 @@
       "when": 1779820000000,
       "tag": "0040_user_feedback",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1779821000000,
+      "tag": "0041_email_logs",
+      "breakpoints": true
     }
   ]
 }

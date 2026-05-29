@@ -4,6 +4,7 @@ import { useState } from "react";
 import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { trpc } from "@/lib/trpc";
 import { getSystemDomain } from "@/lib/system-name";
 
 export default function DashboardLayout({
@@ -14,6 +15,10 @@ export default function DashboardLayout({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
   const systemDomain = getSystemDomain();
+  const { data: badge } = trpc.adminDashboard.emailLogs.getFailureBadge.useQuery(
+    undefined,
+    { refetchInterval: 300_000, refetchOnWindowFocus: false }
+  );
 
   const closeMobileMenu = () => setMobileMenuOpen(false);
 
@@ -60,6 +65,18 @@ export default function DashboardLayout({
             onClick={closeMobileMenu}
           >
             Fehlerprotokoll
+          </Link>
+          <Link
+            href="/dashboard/emails"
+            className="flex items-center justify-between rounded-lg px-4 py-2 text-gray-700 transition hover:bg-gray-100"
+            onClick={closeMobileMenu}
+          >
+            <span>E-Mail Log</span>
+            {(badge?.failedLast24h ?? 0) > 0 && (
+              <span className="ml-2 rounded-full bg-red-500 px-1.5 py-0.5 text-xs font-bold text-white">
+                {badge!.failedLast24h}
+              </span>
+            )}
           </Link>
           <Link
             href="/dashboard/reminders"

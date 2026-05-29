@@ -1,11 +1,11 @@
 import { z } from "zod";
-import { eq, and, gte, lte, count, asc } from "drizzle-orm";
+import { eq, and, gte, lte, count, asc, sql } from "drizzle-orm";
 import { createTRPCRouter, protectedProcedure } from "@/server/trpc";
 import {
   appointments,
   patients,
   users,
-  appointmentEmailLogs,
+  emailLogs,
 } from "@/lib/db/schema";
 
 export const statisticsRouter = createTRPCRouter({
@@ -105,30 +105,37 @@ export const statisticsRouter = createTRPCRouter({
       const totalUniquePatients = patientAppointmentCounts.length;
       const returningRate = totalUniquePatients > 0 ? (returningPatientCount / totalUniquePatients) * 100 : 0;
 
-      // Email delivery rate
-      const emailLogs = await ctx.db
-        .select()
-        .from(appointmentEmailLogs)
+      // Email delivery rate — from universal email_logs table
+      const [emailRow] = await ctx.db
+        .select({
+          total: sql<number>`count(*)`,
+          sent: sql<number>`count(*) filter (where ${emailLogs.status} = 'sent')`,
+          failed: sql<number>`count(*) filter (where ${emailLogs.status} = 'failed')`,
+        })
+        .from(emailLogs)
         .where(
           and(
-            eq(appointmentEmailLogs.tenantId, input.tenantId),
-            gte(appointmentEmailLogs.sentAt, input.from),
-            lte(appointmentEmailLogs.sentAt, input.to)
+            eq(emailLogs.tenantId, input.tenantId),
+            gte(emailLogs.sentAt, input.from),
+            lte(emailLogs.sentAt, input.to)
           )
         );
 
-      const sentCount = emailLogs.filter((e) => e.status === "sent").length;
-      const emailDeliveryRate = emailLogs.length > 0 ? (sentCount / emailLogs.length) * 100 : 0;
+      const emailTotal = Number(emailRow?.total ?? 0);
+      const emailSent = Number(emailRow?.sent ?? 0);
+      const emailFailed = Number(emailRow?.failed ?? 0);
+      const emailDeliveryRate = emailTotal > 0 ? (emailSent / emailTotal) * 100 : 0;
 
       return {
         totalAppointments,
-        completionRate: Math.round(completionRate * 10) / 10, // 1 decimal
+        completionRate: Math.round(completionRate * 10) / 10,
         noShowRate: Math.round(noShowRate * 10) / 10,
         onlineConversionRate: Math.round(onlineConversionRate * 10) / 10,
         avgDuration,
         newPatients: newPatients[0]?.count || 0,
         returningRate: Math.round(returningRate * 10) / 10,
         emailDeliveryRate: Math.round(emailDeliveryRate * 10) / 10,
+        emailFailed,
         voiceAIBookings: voiceAICount,
         voiceAIRate: Math.round(voiceAIRate * 10) / 10,
         sourceBreakdown,

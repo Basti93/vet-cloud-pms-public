@@ -25,6 +25,7 @@ import { adminVaccinationsRouter } from "./admin-vaccinations";
 import { subscriptionsRouter } from "./subscriptions";
 import { websitePlatformRouter } from "./website-platform";
 import { feedbackRouter } from "./feedback";
+import { emailLogsRouter } from "./emailLogs";
 
 export const appRouter = createTRPCRouter({
   appointments: appointmentsRouter,
@@ -41,6 +42,7 @@ export const appRouter = createTRPCRouter({
     vaccinations: adminVaccinationsRouter,
     contactRequests: adminContactRequestsRouter,
     feedback: adminFeedbackRouter,
+    emailLogs: emailLogsRouter,
   }),
   medical: medicalRouter,
   vet: vetRouter,

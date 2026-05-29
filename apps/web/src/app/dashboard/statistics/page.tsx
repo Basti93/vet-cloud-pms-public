@@ -234,7 +234,12 @@ export default function StatisticsPage() {
           unit="%"
           icon={<CheckCircle size={18} />}
           loading={isLoading || metricsLoading}
-          hint={t("statistics.metrics.emailDeliveryHint")}
+          highlight={(metrics?.emailFailed ?? 0) > 0 ? "danger" : undefined}
+          hint={
+            (metrics?.emailFailed ?? 0) > 0
+              ? `${metrics!.emailFailed} Fehler im gewählten Zeitraum`
+              : t("statistics.metrics.emailDeliveryHint")
+          }
         />
         <StatCard
           label={t("statistics.metrics.voiceAIBookings")}
