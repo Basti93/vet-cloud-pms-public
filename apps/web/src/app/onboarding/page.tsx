@@ -6,6 +6,8 @@ import { Card } from "@/components/ui/card";
 import { useState } from "react";
 import { CheckCircle, Building2, Loader2 } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
+import { trackEvent } from "@/lib/analytics/tracker";
+import { AnalyticsEvents } from "@/lib/analytics/events";
 
 export default function OnboardingPage() {
   const { user } = useUser();
@@ -16,6 +18,7 @@ export default function OnboardingPage() {
 
   const createTenant = trpc.tenant.create.useMutation({
     onSuccess: () => {
+      trackEvent(AnalyticsEvents.SIGNUP_COMPLETED);
       setShowSuccess(true);
       setTimeout(() => {
         router.push("/dashboard");

@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { sendTrialEndingEmail, sendPaymentFailedAdminEmail } from "@/lib/email/service";
 import { TRIAL_DAYS, getTierByPriceId, getAddonByPriceId, type TierName, type BillingInterval } from "@/lib/stripe/prices";
 import Stripe from "stripe";
+import { trackServerEvent } from "@/lib/analytics/tracker-server";
 
 /** Extracts tier + billing interval + website builder state from subscription items. */
 async function syncSubscriptionItems(subscription: Stripe.Subscription): Promise<{
@@ -364,6 +365,10 @@ export async function POST(request: NextRequest) {
               .where(eq(tenants.id, tenant[0].id));
 
             console.log(`[Stripe Webhook] checkout.session.completed — tenant ${tenant[0].id} linked to subscription ${subscriptionId}, price ${completedPriceId}`);
+            await trackServerEvent("subscription_activated", {
+              tier: String(completedItemSync.subscriptionPlan ?? "unknown"),
+              billing_interval: String(completedItemSync.billingInterval ?? "unknown"),
+            });
           }
         }
         break;
