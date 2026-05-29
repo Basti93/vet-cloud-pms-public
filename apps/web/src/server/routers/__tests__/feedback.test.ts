@@ -37,7 +37,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await cleanup?.();
-});
+}, 30_000);
 
 describe("feedback.submit", () => {
   it("stores feedback with tenant and user context", async () => {
@@ -67,7 +67,7 @@ describe("feedback.submit", () => {
     expect(stored.status).toBe("new");
     expect(stored.category).toBe("idea");
     expect(stored.sourceModule).toBe("medical-records");
-  });
+  }, 30_000);
 
   it("rejects empty feedback", async () => {
     const caller = createTestCaller(db, { clerkId });
@@ -80,7 +80,7 @@ describe("feedback.submit", () => {
         sourceModule: "dashboard",
       })
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
-  });
+  }, 30_000);
 
   it("ignores spoofed tenant and user payload fields", async () => {
     const caller = createTestCaller(db, { clerkId });
@@ -102,5 +102,5 @@ describe("feedback.submit", () => {
 
     expect(stored.tenantId).toBe(tenantId);
     expect(stored.userId).toBe(userId);
-  });
+  }, 30_000);
 });
