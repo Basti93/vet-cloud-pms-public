@@ -75,7 +75,7 @@ async function clerkRequest<T>(secretKey: string, apiPath: string, init?: Reques
 
 async function upsertClerkUser(secretKey: string, user: DemoUser): Promise<ClerkUpsertResult> {
   const email = user.email.trim().toLowerCase();
-  const query = new URLSearchParams({ "email_address[]": email });
+  const query = new URLSearchParams({ "email_address": email });
   const existing = await clerkRequest<
     Array<{
       id: string;
