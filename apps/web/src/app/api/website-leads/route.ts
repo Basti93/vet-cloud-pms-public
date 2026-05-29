@@ -4,7 +4,7 @@ import { db } from '@/lib/db/client';
 import { websiteLeads, websiteProjects } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { checkRateLimit } from '@/lib/rateLimit';
-import { Resend } from 'resend';
+import { getEmailProvider } from '@/lib/email/providers';
 
 const leadSchema = z.object({
   websiteProjectId: z.string().uuid(),
@@ -48,11 +48,10 @@ export async function POST(request: NextRequest) {
   });
 
   const notifyEmail = (project.capabilities as { contactForm?: { notifyEmail?: string } } | null)?.contactForm?.notifyEmail;
-  if (notifyEmail && process.env.RESEND_API_KEY) {
+  if (notifyEmail) {
     try {
-      const resend = new Resend(process.env.RESEND_API_KEY);
-      const from = process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev';
-      await resend.emails.send({
+      const from = process.env.SMTP_FROM ?? 'noreply@example.com';
+      await getEmailProvider().send({
         from: `${project.name} Website <${from}>`,
         to: notifyEmail,
         subject: `Neue Website-Anfrage: ${parsed.data.name}`,
