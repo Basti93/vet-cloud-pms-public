@@ -16,7 +16,7 @@ The system SHALL send all outgoing email through nodemailer using SMTP credentia
 - **THEN** `provider.send()` throws, error propagates to caller unchanged
 
 ### Requirement: Email provider selected via environment variable
-The system SHALL instantiate the correct provider based on `EMAIL_PROVIDER` env var. Valid values: `smtp`, `resend` (legacy, for rollback only).
+The system SHALL instantiate the correct provider based on `EMAIL_PROVIDER` env var. Only valid value: `smtp`.
 
 #### Scenario: SMTP provider selected
 - **WHEN** `EMAIL_PROVIDER=smtp` (or env var is absent and default is `smtp`)
@@ -27,15 +27,11 @@ The system SHALL instantiate the correct provider based on `EMAIL_PROVIDER` env 
 - **THEN** `getEmailProvider()` throws `Error: Unknown email provider: <value>`
 
 ### Requirement: service.ts uses provider abstraction
-All send functions in `service.ts` SHALL use `getEmailProvider().send()` instead of calling the Resend SDK directly.
+All send functions in `service.ts` SHALL use `getEmailProvider().send()` or `getProviderForTenant()` instead of any third-party email SDK directly.
 
 #### Scenario: Confirmation email sent
 - **WHEN** `sendConfirmationEmail()` is called
-- **THEN** it delegates to `getEmailProvider().send()` with correct `from`, `to`, `subject`, `text`
-
-#### Scenario: No direct Resend import in service.ts
-- **WHEN** codebase is built
-- **THEN** `service.ts` has no import from `'resend'`
+- **THEN** it delegates to the resolved provider `.send()` with correct `from`, `to`, `subject`, `text`
 
 ### Requirement: Sender address conventions
 The system SHALL use `noreply@example.com` as the `from` address on all outbound emails. Email body text referencing support contact SHALL use `info@example.com`.
@@ -63,9 +59,3 @@ Mailpit SHALL be available as a Docker Compose service for local development. Wh
 - **WHEN** SMTP credentials are dummy values (`user=test`, `pass=test`)
 - **THEN** Mailpit accepts the connection and delivers to its inbox
 
-### Requirement: resend package removed
-The `resend` npm package SHALL be removed from dependencies after migration. No file in `apps/web/src` SHALL import from `'resend'`.
-
-#### Scenario: Clean dependency tree
-- **WHEN** `npm ls resend` is run after migration
-- **THEN** package is not listed as a direct dependency

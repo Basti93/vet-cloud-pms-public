@@ -1,6 +1,6 @@
 /**
  * HTML email template for vaccination reminders.
- * Returns a complete HTML string suitable for the Resend `html` field.
+ * Returns a complete HTML string suitable for use as the email `html` body.
  * Plain template function — no @react-email/components dependency needed.
  */
 

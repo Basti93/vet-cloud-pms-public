@@ -180,7 +180,7 @@ async function scheduleTenantDeletionFor30Days(
         reason,
         practiceName,
         operation: "tenant_deactivation_notification",
-        provider: "resend",
+        provider: "smtp",
         ...serializedError,
       },
     });
