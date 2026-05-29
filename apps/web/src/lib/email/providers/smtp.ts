@@ -22,6 +22,9 @@ export class SmtpProvider implements EmailProvider {
       secure: config.port === 465,
       requireTLS: config.port === 587,
       pool: true,
+      connectionTimeout: 5000,
+      greetingTimeout: 5000,
+      socketTimeout: 10000,
       auth: {
         user: config.user,
         pass: config.pass,
