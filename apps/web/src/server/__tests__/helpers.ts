@@ -3,9 +3,9 @@
 // own isolated Postgres container — no state bleed between files.
 //
 // Usage:
-//   const { db, cleanup } = await createTestDb();
+//   const { db, adminDb, cleanup } = await createTestDb();
 //   const { tenant, user } = await seedTestTenant(db);
-//   const caller = createTestCaller(db, { clerkId: user.clerkId, permissions: [PERMISSIONS.APPOINTMENTS_CREATE] });
+//   const caller = createTestCaller(db, { clerkId: user.clerkId, adminDb, permissions: [PERMISSIONS.APPOINTMENTS_CREATE] });
 //   afterAll(cleanup);
 
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
@@ -25,15 +25,21 @@ const createCaller = createCallerFactory(appRouter);
 export async function createTestDb() {
   const container = await new PostgreSqlContainer("postgres:16-alpine").start();
   const connectionUri = container.getConnectionUri();
-  const sql = postgres(connectionUri, { max: 5 });
+  // Two separate pools so withTenantContext (transaction on sql) and ctx.adminDb
+  // (adminSql) never compete for the same connection — prevents pool deadlocks.
+  const sql = postgres(connectionUri, { max: 1 });
+  const adminSql = postgres(connectionUri, { max: 1 });
   const db = drizzle(sql, { schema }) as TestDb;
+  const adminDb = drizzle(adminSql, { schema }) as TestDb;
   await migrate(db as any, {
     migrationsFolder: resolve(process.cwd(), "drizzle"),
   });
   return {
     db,
+    adminDb,
     cleanup: async () => {
       await sql.end();
+      await adminSql.end();
       await container.stop();
     },
   };
@@ -72,17 +78,22 @@ export async function seedTestTenant(
  * Pre-populates `permissionCache` so `requirePermission` never hits the global
  * DB. The `enforceTenantIsActive` middleware will still query testcontainers for
  * the user by clerkId — seed that user first with `seedTestTenant`.
+ *
+ * Pass `adminDb` from `createTestDb()` when the procedure uses `ctx.adminDb`
+ * inside its handler (i.e. inside the withTenantContext transaction). Without a
+ * separate connection, the transaction and adminDb queries deadlock on max:1 pool.
  */
 export function createTestCaller(
   db: TestDb,
   {
     clerkId = "test_clerk_user_id",
     permissions = [] as string[],
-  }: { clerkId?: string; permissions?: string[] } = {}
+    adminDb,
+  }: { clerkId?: string; permissions?: string[]; adminDb?: TestDb } = {}
 ) {
   return createCaller({
     db: db as any,
-    adminDb: db as any,
+    adminDb: (adminDb ?? db) as any,
     userId: clerkId,
     headers: new Headers(),
     // Cast required: TRPCContext types permissionCache as undefined (initial value),

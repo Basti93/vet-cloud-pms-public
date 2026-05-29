@@ -28,13 +28,14 @@ vi.mock("@/server/audit", () => ({
 }));
 
 let db: TestDb;
+let adminDb: TestDb;
 let cleanup: () => Promise<void>;
 let tenantId: string;
 let userId: string;
 let clerkId: string;
 
 beforeAll(async () => {
-  ({ db, cleanup } = await createTestDb());
+  ({ db, adminDb, cleanup } = await createTestDb());
   const { tenant, user } = await seedTestTenant(db);
   tenantId = tenant.id;
   userId = user.id;
@@ -47,7 +48,7 @@ afterAll(async () => {
 
 describe("feedback.submit", () => {
   it("stores feedback with tenant and user context", async () => {
-    const caller = createTestCaller(db, { clerkId });
+    const caller = createTestCaller(db, { clerkId, adminDb });
 
     const result = await caller.feedback.submit({
       message: "Diagnosen brauchen ein Feld fuer Verlauf.",
@@ -76,7 +77,7 @@ describe("feedback.submit", () => {
   });
 
   it("rejects empty feedback", async () => {
-    const caller = createTestCaller(db, { clerkId });
+    const caller = createTestCaller(db, { clerkId, adminDb });
 
     await expect(
       caller.feedback.submit({
@@ -89,7 +90,7 @@ describe("feedback.submit", () => {
   });
 
   it("ignores spoofed tenant and user payload fields", async () => {
-    const caller = createTestCaller(db, { clerkId });
+    const caller = createTestCaller(db, { clerkId, adminDb });
 
     const result = await caller.feedback.submit({
       message: "Bitte kompaktere Vitalzeichenansicht.",
