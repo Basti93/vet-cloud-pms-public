@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import type { NextFetchEvent, NextRequest } from "next/server";
 
 const isProtectedRoute = createRouteMatcher(["/dashboard(.*)"]);
-const isPublicRoute = createRouteMatcher(["/", "/sign-in(.*)", "/access-denied"]);
 
 const clerkProtectedProxy = clerkMiddleware(async (auth, req) => {
   await auth.protect();
@@ -27,14 +26,17 @@ const clerkPublicProxy = clerkMiddleware();
 // when running behind an HTTPS reverse proxy. The container itself runs plain
 // HTTP, so Next.js following that rewrite hits EPROTO. Two cases to handle:
 //
-// 1. Self-rewrite (same path): Clerk is injecting auth state. Returning
-//    NextResponse.next() lets Next.js render the route; auth() reads the
-//    session from the cookie. Stripping the header would leave no
-//    x-middleware-next and produce a blank page.
+// 1. Self-rewrite (same path): Clerk is injecting auth state via rewrite.
+//    We can't follow it (loop), so return NextResponse.next() instead — but
+//    we MUST carry Clerk's x-middleware-request-* headers forward, otherwise
+//    auth() in Server Components and Route Handlers throws "can't detect
+//    clerkMiddleware". Clerk encodes the auth state as:
+//      x-middleware-override-headers: clerk-auth-token, ...
+//      x-middleware-request-clerk-auth-token: <value>
 //
 // 2. Different path on internal host: protocol mismatch only — rewrite the
 //    URL to http: so Next.js can follow it within the container.
-function fixInternalRewrite(res: Response | void, currentPath: string) {
+function fixInternalRewrite(res: Response | void, req: NextRequest) {
   if (!res) return res;
   const rewrite = res.headers.get("x-middleware-rewrite");
   if (!rewrite) return res;
@@ -43,9 +45,17 @@ function fixInternalRewrite(res: Response | void, currentPath: string) {
   const internalHosts = new Set(["localhost", "0.0.0.0", "[::]"]);
   const port = process.env.PORT || "3001";
 
-  if (internalHosts.has(url.hostname) && url.pathname === currentPath) {
-    // Self-rewrite: break the potential loop, render route normally.
-    return NextResponse.next();
+  if (internalHosts.has(url.hostname) && url.pathname === req.nextUrl.pathname) {
+    // Copy Clerk's auth state headers so auth() works in downstream handlers.
+    const overrideList = res.headers.get("x-middleware-override-headers");
+    const requestHeaders = new Headers(req.headers);
+    if (overrideList) {
+      for (const key of overrideList.split(",").map((k) => k.trim())) {
+        const value = res.headers.get(`x-middleware-request-${key}`);
+        if (value !== null) requestHeaders.set(key, value);
+      }
+    }
+    return NextResponse.next({ request: { headers: requestHeaders } });
   }
 
   if (url.protocol === "https:" && internalHosts.has(url.hostname) && url.port === port) {
@@ -71,16 +81,13 @@ export async function proxy(req: NextRequest, event: NextFetchEvent) {
 
   if (isProtectedRoute(req)) {
     const res = await clerkProtectedProxy(req, event);
-    return fixInternalRewrite(res, req.nextUrl.pathname);
+    return fixInternalRewrite(res, req);
   }
 
   // Run clerkMiddleware() for all remaining routes (including /api/trpc/*) so
   // that Clerk sets auth state headers. Route handlers that call auth() require
   // clerkMiddleware() to have run on the same request first.
-  return fixInternalRewrite(
-    await clerkPublicProxy(req, event),
-    req.nextUrl.pathname,
-  );
+  return fixInternalRewrite(await clerkPublicProxy(req, event), req);
 }
 
 export const config = {

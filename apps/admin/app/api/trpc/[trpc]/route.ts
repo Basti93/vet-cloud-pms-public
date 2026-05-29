@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
-import { auth } from "@clerk/nextjs/server";
 
 const ALLOWED_TRPC_PREFIX = "adminDashboard.";
 
@@ -63,10 +62,12 @@ async function proxy(req: NextRequest, trpcPath: string) {
   const requestId = req.headers.get("x-request-id") ?? randomUUID();
   const startedAt = Date.now();
 
-  // Get Clerk session token server-side from cookies — browser never needs to
-  // handle the token directly, so TRPCProvider can stay free of useAuth().
-  const { getToken } = await auth();
-  const sessionToken = await getToken();
+  // Read the Clerk session JWT directly from the __session cookie.
+  // auth() requires clerkMiddleware() to have injected auth headers, but those
+  // are lost when fixInternalRewrite returns NextResponse.next() for self-rewrites.
+  // The __session cookie is the raw session JWT — identical to what auth().getToken()
+  // would return — and is always present on authenticated requests.
+  const sessionToken = req.cookies.get("__session")?.value ?? null;
 
   const upstreamHeaders = new Headers();
   const contentType = req.headers.get("content-type");
