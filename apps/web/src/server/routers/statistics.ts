@@ -105,26 +105,22 @@ export const statisticsRouter = createTRPCRouter({
       const totalUniquePatients = patientAppointmentCounts.length;
       const returningRate = totalUniquePatients > 0 ? (returningPatientCount / totalUniquePatients) * 100 : 0;
 
-      // Email delivery rate — from universal email_logs table
-      const [emailRow] = await ctx.db
+      // Email counts by type
+      const emailByType = await ctx.db
         .select({
-          total: sql<number>`count(*)`,
-          sent: sql<number>`count(*) filter (where ${emailLogs.status} = 'sent')`,
-          failed: sql<number>`count(*) filter (where ${emailLogs.status} = 'failed')`,
+          emailType: emailLogs.emailType,
+          count: sql<number>`count(*)`,
         })
         .from(emailLogs)
         .where(
           and(
             eq(emailLogs.tenantId, input.tenantId),
+            eq(emailLogs.status, "sent"),
             gte(emailLogs.sentAt, input.from),
             lte(emailLogs.sentAt, input.to)
           )
-        );
-
-      const emailTotal = Number(emailRow?.total ?? 0);
-      const emailSent = Number(emailRow?.sent ?? 0);
-      const emailFailed = Number(emailRow?.failed ?? 0);
-      const emailDeliveryRate = emailTotal > 0 ? (emailSent / emailTotal) * 100 : 0;
+        )
+        .groupBy(emailLogs.emailType);
 
       return {
         totalAppointments,
@@ -134,8 +130,7 @@ export const statisticsRouter = createTRPCRouter({
         avgDuration,
         newPatients: newPatients[0]?.count || 0,
         returningRate: Math.round(returningRate * 10) / 10,
-        emailDeliveryRate: Math.round(emailDeliveryRate * 10) / 10,
-        emailFailed,
+        emailByType: emailByType.map((r) => ({ emailType: r.emailType, count: Number(r.count) })),
         voiceAIBookings: voiceAICount,
         voiceAIRate: Math.round(voiceAIRate * 10) / 10,
         sourceBreakdown,

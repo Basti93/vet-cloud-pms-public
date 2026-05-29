@@ -1,11 +1,28 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Calendar, TrendingUp, Users, CheckCircle, Activity } from "lucide-react";
+import { Calendar, TrendingUp, Users, CheckCircle, Activity, Mail } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { useTenant } from "@/hooks/useTenant";
 import { useLocale } from "@/lib/user/preferences-context";
 import { Skeleton } from "@/components/ui/skeleton";
+
+const EMAIL_TYPE_LABELS: Record<string, string> = {
+  confirmation: "Terminbestätigungen",
+  reminder: "Terminerinnerungen",
+  booking_request: "Buchungsanfragen",
+  booking_notification: "Buchungsbenachrichtigungen",
+  invitation: "Einladungen",
+  vaccination_reminder: "Impf-Erinnerungen",
+  vaccination_digest: "Impf-Digests",
+  account_deletion: "Kontolöschungen",
+  tenant_deactivation: "Praxis deaktiviert",
+  tenant_lifecycle: "Lifecycle",
+  payment_failed: "Zahlungsfehler",
+  trial_ending: "Testphase endet",
+  trial_expired: "Testphase abgelaufen",
+  consultation_request: "Beratungsanfragen",
+};
 
 function StatCard({
   label,
@@ -212,7 +229,7 @@ export default function StatisticsPage() {
       </div>
 
       {/* Secondary KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard
           label={t("statistics.metrics.newPatients")}
           value={metrics?.newPatients ?? 0}
@@ -229,19 +246,6 @@ export default function StatisticsPage() {
           hint={t("statistics.metrics.returningRateHint")}
         />
         <StatCard
-          label={t("statistics.metrics.emailDelivery")}
-          value={metrics?.emailDeliveryRate ?? 0}
-          unit="%"
-          icon={<CheckCircle size={18} />}
-          loading={isLoading || metricsLoading}
-          highlight={(metrics?.emailFailed ?? 0) > 0 ? "danger" : undefined}
-          hint={
-            (metrics?.emailFailed ?? 0) > 0
-              ? `${metrics!.emailFailed} Fehler im gewählten Zeitraum`
-              : t("statistics.metrics.emailDeliveryHint")
-          }
-        />
-        <StatCard
           label={t("statistics.metrics.voiceAIBookings")}
           value={metrics?.voiceAIBookings ?? 0}
           icon={<Activity size={18} />}
@@ -256,6 +260,32 @@ export default function StatisticsPage() {
           loading={isLoading || metricsLoading}
           hint={t("statistics.metrics.avgDurationHint")}
         />
+      </div>
+
+      {/* Email breakdown */}
+      <div className="bg-surface rounded-2xl border border-border shadow-sm p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Mail size={18} className="text-muted" />
+          <h2 className="text-xl font-bold text-fg">E-Mail Versand</h2>
+        </div>
+        {metricsLoading || isLoading ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+            {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-14 rounded-xl" />)}
+          </div>
+        ) : !metrics?.emailByType?.length ? (
+          <p className="text-sm text-muted">Keine E-Mails im gewählten Zeitraum</p>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+            {metrics.emailByType
+              .sort((a, b) => b.count - a.count)
+              .map(({ emailType, count }) => (
+                <div key={emailType} className="rounded-xl border border-border bg-surface px-4 py-3">
+                  <p className="text-2xl font-bold text-fg">{count}</p>
+                  <p className="text-xs text-muted mt-0.5">{EMAIL_TYPE_LABELS[emailType] ?? emailType}</p>
+                </div>
+              ))}
+          </div>
+        )}
       </div>
 
       {/* Vet Utilization */}
