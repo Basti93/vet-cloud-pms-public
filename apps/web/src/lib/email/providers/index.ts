@@ -6,15 +6,7 @@ import { eq } from 'drizzle-orm';
 import { decryptSecret } from '@/lib/crypto';
 
 export function getEmailProvider(): EmailProvider {
-  const provider = process.env.EMAIL_PROVIDER ?? 'smtp';
-
-  switch (provider) {
-    case 'smtp':
-      return createSmtpProvider();
-
-    default:
-      throw new Error(`Unknown email provider: ${provider}`);
-  }
+  return createSmtpProvider();
 }
 
 export type TenantProviderResult = {

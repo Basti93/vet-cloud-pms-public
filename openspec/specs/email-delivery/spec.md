@@ -15,17 +15,6 @@ The system SHALL send all outgoing email through nodemailer using SMTP credentia
 - **WHEN** SMTP server rejects credentials
 - **THEN** `provider.send()` throws, error propagates to caller unchanged
 
-### Requirement: Email provider selected via environment variable
-The system SHALL instantiate the correct provider based on `EMAIL_PROVIDER` env var. Only valid value: `smtp`.
-
-#### Scenario: SMTP provider selected
-- **WHEN** `EMAIL_PROVIDER=smtp` (or env var is absent and default is `smtp`)
-- **THEN** `getEmailProvider()` returns an `SmtpProvider` instance
-
-#### Scenario: Unknown provider value
-- **WHEN** `EMAIL_PROVIDER` is set to an unrecognized value
-- **THEN** `getEmailProvider()` throws `Error: Unknown email provider: <value>`
-
 ### Requirement: service.ts uses provider abstraction
 All send functions in `service.ts` SHALL use `getEmailProvider().send()` or `getProviderForTenant()` instead of any third-party email SDK directly.
 
