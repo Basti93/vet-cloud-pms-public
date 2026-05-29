@@ -655,17 +655,31 @@ export const bookingRouter = createTRPCRouter({
         });
       }
 
-      // Create owner + patient for unverified booking
-      const [owner] = await ctx.db
-        .insert(owners)
-        .values({
-          tenantId: input.tenantId,
-          firstName: input.owner.firstName,
-          lastName: input.owner.lastName,
-          email: input.owner.email,
-          phone: input.owner.phone,
-        })
-        .returning();
+      // Find or create owner — email is unique per tenant (case-insensitive).
+      // Returning bookers reuse their existing record; new bookers get a new one.
+      let [owner] = await ctx.db
+        .select()
+        .from(owners)
+        .where(
+          and(
+            eq(owners.tenantId, input.tenantId),
+            sql`lower(${owners.email}) = lower(${input.owner.email})`,
+          )
+        )
+        .limit(1);
+
+      if (!owner) {
+        [owner] = await ctx.db
+          .insert(owners)
+          .values({
+            tenantId: input.tenantId,
+            firstName: input.owner.firstName,
+            lastName: input.owner.lastName,
+            email: input.owner.email,
+            phone: input.owner.phone,
+          })
+          .returning();
+      }
 
       const [patient] = await ctx.db
         .insert(patients)
