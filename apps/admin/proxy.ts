@@ -50,17 +50,33 @@ function keepInternalRewriteHttp(res: Response | void) {
   return res;
 }
 
+const requestCounts = new Map<string, number>();
+
 export async function proxy(req: NextRequest, event: NextFetchEvent) {
+  const key = `${req.method} ${req.nextUrl.pathname}`;
+  const count = (requestCounts.get(key) ?? 0) + 1;
+  requestCounts.set(key, count);
+
+  console.log(`[proxy] #${count} ${key} | rsc=${req.headers.get("rsc")} | _rsc=${req.nextUrl.searchParams.get("_rsc")} | subreq=${req.headers.get("x-middleware-subrequest")} | referer=${req.headers.get("referer")}`);
+
+  if (count > 10) {
+    console.error(`[proxy] LOOP DETECTED: ${key} called ${count} times`);
+  }
+
   // Guard against accidental document navigation to RSC/Flight URLs.
   // Internal Next.js RSC fetches include the `rsc: 1` header and should pass through.
   if (req.nextUrl.searchParams.has("_rsc") && req.headers.get("rsc") !== "1") {
     const cleanUrl = req.nextUrl.clone();
     cleanUrl.searchParams.delete("_rsc");
+    console.log(`[proxy] stripping _rsc, redirecting to ${cleanUrl.pathname}`);
     return NextResponse.redirect(cleanUrl);
   }
 
   if (isProtectedRoute(req)) {
-    return keepInternalRewriteHttp(await clerkProtectedProxy(req, event));
+    const res = await clerkProtectedProxy(req, event);
+    const rewrite = (res as Response | null)?.headers?.get("x-middleware-rewrite");
+    if (rewrite) console.log(`[proxy] protected rewrite → ${rewrite}`);
+    return keepInternalRewriteHttp(res);
   }
 
   return isPublicRoute(req)
