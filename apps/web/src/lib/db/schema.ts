@@ -1406,6 +1406,66 @@ export const userInvitations = pgTable(
 );
 
 // ============================================================================
+// USER FEEDBACK (Authenticated product feedback)
+// ============================================================================
+
+export const userFeedback = pgTable(
+  "user_feedback",
+  {
+    id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    sourcePath: varchar("source_path", { length: 500 }).notNull(),
+    sourceModule: varchar("source_module", { length: 80 }).notNull(),
+    message: text("message").notNull(),
+    category: varchar("category", {
+      length: 30,
+      enum: ["bug", "idea", "question", "other"],
+    })
+      .default("other")
+      .notNull(),
+    status: varchar("status", {
+      length: 30,
+      enum: ["new", "reviewing", "planned", "done", "dismissed"],
+    })
+      .default("new")
+      .notNull(),
+    priority: varchar("priority", {
+      length: 20,
+      enum: ["low", "normal", "high"],
+    })
+      .default("normal")
+      .notNull(),
+    triageNotes: text("triage_notes"),
+    updatedByAdminClerkId: varchar("updated_by_admin_clerk_id", { length: 255 }),
+    ipAddress: varchar("ip_address", { length: 45 }),
+    userAgent: text("user_agent"),
+    browserMetadata: jsonb("browser_metadata"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (table) => ({
+    tenantIdIdx: index("user_feedback_tenant_id_idx").on(table.tenantId),
+    tenantStatusIdx: index("user_feedback_tenant_status_idx").on(table.tenantId, table.status),
+    statusIdx: index("user_feedback_status_idx").on(table.status),
+    categoryIdx: index("user_feedback_category_idx").on(table.category),
+    sourceModuleIdx: index("user_feedback_source_module_idx").on(table.sourceModule),
+    createdAtIdx: index("user_feedback_created_at_idx").on(table.createdAt),
+    adminListIdx: index("user_feedback_admin_list_idx").on(
+      table.status,
+      table.priority,
+      table.createdAt
+    ),
+  })
+);
+
+// ============================================================================
 // CONTACT REQUESTS (Landing page consultation requests)
 // ============================================================================
 

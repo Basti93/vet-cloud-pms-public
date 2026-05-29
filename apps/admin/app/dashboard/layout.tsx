@@ -76,6 +76,17 @@ export default function DashboardLayout({
             Kontaktanfragen
           </Link>
           <Link
+            href="/dashboard/feedback"
+            className={`block rounded-lg px-4 py-2 transition ${
+              pathname === "/dashboard/feedback"
+                ? "bg-gray-100 font-semibold text-gray-900"
+                : "text-gray-700 hover:bg-gray-100"
+            }`}
+            onClick={closeMobileMenu}
+          >
+            Feedback
+          </Link>
+          <Link
             href="/dashboard/vaccinations"
             className="block rounded-lg px-4 py-2 text-gray-700 transition hover:bg-gray-100"
             onClick={closeMobileMenu}

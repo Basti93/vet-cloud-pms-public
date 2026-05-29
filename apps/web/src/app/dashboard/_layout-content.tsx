@@ -1,15 +1,18 @@
 "use client";
 
-import { ReactNode, useState } from "react";
+import { ReactNode, useMemo, useState } from "react";
 import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
-import { LayoutDashboard, Calendar, Users, Phone, ClipboardList, Clock, Menu, X, Settings, ChevronDown, User, Building2, Syringe, TrendingUp, Globe2, PawPrint } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { LayoutDashboard, Calendar, Users, Phone, ClipboardList, Clock, Menu, X, Settings, ChevronDown, User, Building2, Syringe, TrendingUp, Globe2, PawPrint, MessageSquare } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { useLocale } from "@/lib/user/preferences-context";
 import { usePraxis } from "@/lib/praxis/context";
 import { getSystemDomain } from "@/lib/system-name";
 import { PERMISSIONS } from "@/lib/db/schema";
 import { useFeatureTracking } from "@/lib/analytics/use-feature-tracking";
+import { DashboardFeedbackDialog, inferFeedbackModule } from "@/components/feedback/dashboard-feedback-dialog";
+import { ModuleTestingPrompt } from "@/components/feedback/module-testing-prompt";
 
 function useNavItems() {
   const { t } = useLocale();
@@ -54,6 +57,8 @@ export default function DashboardContent({ children }: { children: ReactNode }) 
   useFeatureTracking();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsExpanded, setSettingsExpanded] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const pathname = usePathname();
   const { praxis } = usePraxis(); // Tenant name already loaded server-side
   const { data: permissions, isLoading: permissionsLoading, isFetched: permissionsFetched } =
     trpc.admin.getUserPermissions.useQuery();
@@ -65,6 +70,8 @@ export default function DashboardContent({ children }: { children: ReactNode }) 
   const BETA_NAV_ITEMS = useBetaNavItems();
   const USER_NAV_ITEMS = useUserNavItems();
   const ADMIN_NAV_ITEMS = useAdminNavItems();
+  const currentFeedbackModule = inferFeedbackModule(pathname);
+  const testingPrompt = useMemo(() => getTestingPrompt(pathname), [pathname]);
   const canManageSettings = Boolean(
     permissionsFetched &&
       permissions &&
@@ -201,6 +208,19 @@ export default function DashboardContent({ children }: { children: ReactNode }) 
           </div>
         </nav>
         <div className="px-4 py-4" style={{ borderColor: 'var(--color-border-strong)', borderTopWidth: '1px' }}>
+          <button
+            type="button"
+            onClick={() => {
+              setSidebarOpen(false);
+              setFeedbackOpen(true);
+            }}
+            className="mb-3 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors hover:opacity-90"
+            style={{ color: 'var(--color-accent-soft)' }}
+            data-testid="sidebar-feedback-button"
+          >
+            <MessageSquare size={18} />
+            Feedback
+          </button>
           <div className="flex items-center gap-3">
             <UserButton appearance={{ elements: { avatarBox: "w-8 h-8" } }} />
             <p className="text-xs" style={{ color: 'var(--color-accent-soft)' }}>
@@ -241,10 +261,50 @@ export default function DashboardContent({ children }: { children: ReactNode }) 
                 </p>
               </div>
             )}
+            {testingPrompt && (
+              <ModuleTestingPrompt
+                moduleKey={testingPrompt.moduleKey}
+                moduleName={testingPrompt.moduleName}
+                sourcePath={pathname}
+              />
+            )}
             {children}
           </div>
         </main>
       </div>
+      <DashboardFeedbackDialog
+        open={feedbackOpen}
+        onOpenChange={setFeedbackOpen}
+        defaultSourceModule={currentFeedbackModule}
+      />
     </div>
   );
+}
+
+function getTestingPrompt(pathname: string): { moduleKey: string; moduleName: string } | null {
+  if (pathname.includes("/book/") || pathname.startsWith("/dashboard/bookings")) {
+    return null;
+  }
+
+  if (/^\/dashboard\/patients\/[^/]+/.test(pathname)) {
+    return { moduleKey: "medical-records", moduleName: "Krankenakte" };
+  }
+
+  const testingModules: Record<string, { moduleKey: string; moduleName: string }> = {
+    "/dashboard/clients": { moduleKey: "clients", moduleName: "Kundenverwaltung" },
+    "/dashboard/patients": { moduleKey: "patients", moduleName: "Tierverwaltung" },
+    "/dashboard/appointments": { moduleKey: "appointments", moduleName: "Termine" },
+    "/dashboard/schedule": { moduleKey: "schedule", moduleName: "Kalender" },
+    "/dashboard/vaccinations": { moduleKey: "vaccinations", moduleName: "Impfungen" },
+    "/dashboard/statistics": { moduleKey: "statistics", moduleName: "Statistiken" },
+    "/dashboard/voice": { moduleKey: "voice", moduleName: "KI-Rezeption" },
+    "/dashboard/websites": { moduleKey: "website-builder", moduleName: "Website" },
+    "/dashboard/settings": { moduleKey: "settings", moduleName: "Einstellungen" },
+  };
+
+  const match = Object.entries(testingModules)
+    .sort((a, b) => b[0].length - a[0].length)
+    .find(([prefix]) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+
+  return match?.[1] ?? null;
 }

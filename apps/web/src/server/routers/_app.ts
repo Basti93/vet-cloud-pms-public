@@ -10,6 +10,7 @@ import { adminUsersRouter } from "./admin-users";
 import { adminRemindersRouter } from "./admin-reminders";
 import { adminAuditRouter } from "./admin-audit";
 import { adminContactRequestsRouter } from "./admin-contact-requests";
+import { adminFeedbackRouter } from "./admin-feedback";
 import { medicalRouter } from "./medical";
 import { vetRouter } from "./vet";
 import { emailRouter } from "./email";
@@ -23,6 +24,7 @@ import { vaccinationSettingsRouter } from "./vaccinationSettings";
 import { adminVaccinationsRouter } from "./admin-vaccinations";
 import { subscriptionsRouter } from "./subscriptions";
 import { websitePlatformRouter } from "./website-platform";
+import { feedbackRouter } from "./feedback";
 
 export const appRouter = createTRPCRouter({
   appointments: appointmentsRouter,
@@ -38,6 +40,7 @@ export const appRouter = createTRPCRouter({
     audit: adminAuditRouter,
     vaccinations: adminVaccinationsRouter,
     contactRequests: adminContactRequestsRouter,
+    feedback: adminFeedbackRouter,
   }),
   medical: medicalRouter,
   vet: vetRouter,
@@ -51,6 +54,7 @@ export const appRouter = createTRPCRouter({
   vaccinationSettings: vaccinationSettingsRouter,
   subscriptions: subscriptionsRouter,
   websitePlatform: websitePlatformRouter,
+  feedback: feedbackRouter,
 });
 
 export type AppRouter = typeof appRouter;
