@@ -121,7 +121,7 @@ export default function DashboardLayout({
         <div className="space-y-3 border-t border-gray-200 p-4 md:mt-auto">
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-700">Admin</span>
-            <UserButton afterSignOutUrl="/sign-in" />
+            <UserButton />
           </div>
         </div>
       </div>
