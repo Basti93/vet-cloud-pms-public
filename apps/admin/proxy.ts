@@ -40,11 +40,10 @@ export async function proxy(req: NextRequest, event: NextFetchEvent) {
     return clerkProtectedProxy(req, event);
   }
 
-  if (isPublicRoute(req)) {
-    return clerkPublicProxy(req, event);
-  }
-
-  return NextResponse.next();
+  // Run clerkMiddleware() for all remaining routes (including /api/trpc/*) so
+  // that Clerk sets auth state headers. Route handlers that call auth() require
+  // clerkMiddleware() to have run on the same request first.
+  return clerkPublicProxy(req, event);
 }
 
 export const config = {
