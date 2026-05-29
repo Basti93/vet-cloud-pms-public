@@ -65,15 +65,23 @@ Integration tests SHALL run against a real Postgres instance (via Docker) with a
 - **THEN** the procedure returns `FORBIDDEN`
 
 ### Requirement: E2E Tests Run Against Staging
-Playwright E2E tests SHALL run against `https://staging.example.com` — no local server, no mocked network, real database. Tests MUST use the dedicated `e2e` tenant with credentials from GitHub secrets (`E2E_EMAIL`, `E2E_PASSWORD`).
+Playwright E2E tests SHALL run against `https://staging.example.com` — no local server, no mocked network, real database. Blocking staging E2E MUST use the dedicated `e2e` tenant with credentials from GitHub secrets (`E2E_EMAIL`, `E2E_PASSWORD`) and MUST run in a deterministic mode that avoids concurrent mutation of shared tenant state.
 
 #### Scenario: E2E run on staging deployment
 - **WHEN** a commit is pushed to `staging` after the deploy completes
-- **THEN** the deploy workflow resets the e2e tenant, runs the full Playwright suite against staging, and uploads the report on failure
+- **THEN** the deploy workflow resets the e2e tenant, verifies E2E readiness, runs the blocking business-smoke Playwright suite against staging, and uploads failure artifacts
 
 #### Scenario: E2E tenant reset
 - **WHEN** the pre-E2E reset runs
 - **THEN** `POST /api/cron/reset-e2e-tenant` wipes transient data, creates two active e2e vets, seeds 09:00-17:00 schedules, disables outbound emails, and returns the preview token
+
+#### Scenario: E2E readiness check
+- **WHEN** the staging E2E workflow starts browser tests
+- **THEN** the workflow has already verified staging health, the reset preview token, seeded vets and schedules, the E2E user's tenant membership, and the permissions required by authenticated smoke flows
+
+#### Scenario: Authenticated E2E isolation
+- **WHEN** authenticated staging E2E tests mutate tenant data
+- **THEN** those tests run serially or use isolated per-test data so one test cannot invalidate another test's assertions
 
 ### Requirement: E2E Tests Cover Eight Critical Paths
 The eight canonical E2E tests SHALL be maintained and kept passing: booking flow (unauthenticated), booking management views, login and dashboard load, patient CRUD, calendar and appointment creation, patient appointment history, settings page smoke, and admin UI tenant list.
@@ -85,6 +93,51 @@ The eight canonical E2E tests SHALL be maintained and kept passing: booking flow
 #### Scenario: Admin UI smoke test
 - **WHEN** the E2E suite runs
 - **THEN** test 8 authenticates at `apps.example.com` and verifies the tenant list is visible
+
+### Requirement: E2E Tests Cover Critical Business Smoke Paths
+Blocking E2E tests SHALL cover only high-value business smoke paths that require a deployed browser environment. The blocking suite MUST include public booking, authenticated dashboard access, patient create/search, appointment creation, invitation acceptance, and Clerk test-mode signup. Lower-value page rendering checks and business-rule permutations SHALL be covered by integration, unit, or component tests instead of blocking staging E2E.
+
+#### Scenario: Public booking smoke
+- **WHEN** the blocking E2E suite runs
+- **THEN** it loads `/book/REDACTED?preview=...`, completes the multi-step booking form using stable selectors, and reaches the `booking-success` state
+
+#### Scenario: Authenticated clinic workflow smoke
+- **WHEN** the blocking E2E suite runs
+- **THEN** it authenticates as the E2E clinic user and proves dashboard access, patient creation/search, and appointment creation work against staging
+
+#### Scenario: Invitation acceptance smoke
+- **WHEN** the blocking E2E suite runs
+- **THEN** it creates an invitation, accepts it with Clerk test-mode credentials, and verifies the invited user reaches the expected tenant context
+
+#### Scenario: Signup smoke
+- **WHEN** the blocking E2E suite runs
+- **THEN** it creates a Clerk test-mode signup using a `+clerk_test` email and the configured test verification code without sending real email
+
+#### Scenario: Lower-value checks moved down
+- **WHEN** a test only verifies static page rendering, copy, visual layout, or server-side business rules
+- **THEN** it is implemented as an integration, unit, or component test unless it is part of a critical browser workflow
+
+### Requirement: E2E Failure Artifacts
+The staging E2E workflow MUST upload Playwright artifacts from paths that are actually produced during CI, including screenshots, traces, and error context for failed tests.
+
+#### Scenario: Failed Playwright test
+- **WHEN** a Playwright test fails in CI
+- **THEN** the GitHub Actions run exposes the relevant `test-results` artifacts so the failure can be diagnosed without re-running the job
+
+#### Scenario: Missing report directory avoided
+- **WHEN** CI uses the GitHub reporter
+- **THEN** the workflow does not rely solely on a `playwright-report` directory unless the HTML reporter is also enabled
+
+### Requirement: Browser Matrix Separation
+The blocking staging E2E gate SHALL use Chromium for deterministic deploy confidence. Mobile and WebKit coverage SHALL run in a non-blocking scheduled or manually triggered matrix unless the runner dependency baseline is explicitly maintained and verified.
+
+#### Scenario: WebKit dependency unavailable
+- **WHEN** WebKit cannot launch on the CI runner because a system dependency is missing
+- **THEN** the blocking staging deploy gate is not failed solely by the non-blocking WebKit/mobile matrix
+
+#### Scenario: Scheduled browser coverage
+- **WHEN** the non-blocking browser matrix runs
+- **THEN** it reports mobile/WebKit regressions separately from the staging deploy gate
 
 ### Requirement: New Feature Testing Checklist
 Every new feature SHALL satisfy all applicable checklist items before merging: TypeScript types compile, a unit test exists if the feature contains non-trivial pure logic, an integration test exists if the feature touches `tenant_id` or auth, `data-testid` attributes are added to new interactive elements, E2E tests are updated if a critical user path changed, and a manual smoke test on staging is done before merging to `main`.
@@ -103,6 +156,17 @@ Every Playwright test SHALL declare `test.setTimeout(N)` matching the complexity
 #### Scenario: waitForResponse on tRPC mutation
 - **WHEN** a test uses `page.waitForResponse` to intercept a tRPC POST
 - **THEN** the timeout argument is at least 30_000 to handle cold-server Clerk latency
+
+### Requirement: Public Coverage Reports Do Not Expose Source
+
+Coverage output published to a public URL SHALL NOT include raw application source code, annotated source pages, source maps, or full coverage JSON files that reveal source-bearing report structure.
+
+#### Scenario: staging coverage report is published publicly
+
+- **WHEN** the staging integration workflow publishes coverage to `coverage.staging.example.com`
+- **THEN** the published files contain aggregate coverage totals and file path summaries only
+- **AND** the published files do not include Vitest/Istanbul per-file HTML source views
+- **AND** the full source-bearing coverage report is available only as a short-retention GitHub Actions artifact
 
 ### Requirement: Deliberate Test Exclusions
 Snapshot tests, 100% coverage targets, database mocking in integration tests, E2E tests for edge/error cases, visual regression tests, and load/performance tests SHALL NOT be added. Edge cases belong in integration tests; visual testing is not done at current scale.
