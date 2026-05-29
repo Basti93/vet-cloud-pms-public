@@ -4,6 +4,12 @@ import { eq } from "drizzle-orm";
 import { createTestDb, createTestCaller, seedTestTenant, type TestDb } from "@/server/__tests__/helpers";
 import { userFeedback } from "@/lib/db/schema";
 
+vi.mock("@/server/trpc/logging-middleware", () => ({
+  logEventAsync: vi.fn(),
+  logEvent: vi.fn(async () => undefined),
+  serializeLogError: (err: unknown) => ({ errorMessage: String(err) }),
+  loggingMiddleware: ({ next }: { next: () => Promise<unknown> }) => next(),
+}));
 vi.mock("@clerk/nextjs/server", () => ({
   clerkClient: vi.fn(async () => ({
     users: {
@@ -67,7 +73,7 @@ describe("feedback.submit", () => {
     expect(stored.status).toBe("new");
     expect(stored.category).toBe("idea");
     expect(stored.sourceModule).toBe("medical-records");
-  }, 30_000);
+  });
 
   it("rejects empty feedback", async () => {
     const caller = createTestCaller(db, { clerkId });
@@ -80,7 +86,7 @@ describe("feedback.submit", () => {
         sourceModule: "dashboard",
       })
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
-  }, 30_000);
+  });
 
   it("ignores spoofed tenant and user payload fields", async () => {
     const caller = createTestCaller(db, { clerkId });
@@ -102,5 +108,5 @@ describe("feedback.submit", () => {
 
     expect(stored.tenantId).toBe(tenantId);
     expect(stored.userId).toBe(userId);
-  }, 30_000);
+  });
 });

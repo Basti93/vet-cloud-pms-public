@@ -43,10 +43,11 @@ function keepInternalRewriteHttp(res: Response | void, currentPath: string) {
   const internalHosts = new Set(["localhost", "0.0.0.0", "[::]"]);
   const port = process.env.PORT || "3001";
 
-  // Self-rewrite to same path = infinite loop. Strip the header instead.
+  // Self-rewrite: Clerk injecting auth state into same URL.
+  // Stripping the header leaves no x-middleware-next → Next.js renders empty body → blank page.
+  // Return next() instead so Next.js proceeds to render the route; auth() reads from session cookie.
   if (internalHosts.has(url.hostname) && url.pathname === currentPath) {
-    res.headers.delete("x-middleware-rewrite");
-    return res;
+    return NextResponse.next();
   }
 
   if (url.protocol === "https:" && internalHosts.has(url.hostname) && url.port === port) {
