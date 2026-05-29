@@ -288,6 +288,13 @@
       "when": 1779821000000,
       "tag": "0041_email_logs",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1779822000000,
+      "tag": "0042_tenant-smtp-config",
+      "breakpoints": true
     }
   ]
 }
