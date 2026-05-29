@@ -34,13 +34,20 @@ const clerkProtectedProxy = clerkMiddleware(async (auth, req) => {
 });
 const clerkAuthStateProxy = clerkMiddleware();
 
-function keepInternalRewriteHttp(res: Response | void) {
-  const rewrite = res?.headers.get("x-middleware-rewrite");
+function keepInternalRewriteHttp(res: Response | void, currentPath: string) {
+  if (!res) return res;
+  const rewrite = res.headers.get("x-middleware-rewrite");
   if (!rewrite) return res;
 
   const url = new URL(rewrite);
   const internalHosts = new Set(["localhost", "0.0.0.0", "[::]"]);
   const port = process.env.PORT || "3001";
+
+  // Self-rewrite to same path = infinite loop. Strip the header instead.
+  if (internalHosts.has(url.hostname) && url.pathname === currentPath) {
+    res.headers.delete("x-middleware-rewrite");
+    return res;
+  }
 
   if (url.protocol === "https:" && internalHosts.has(url.hostname) && url.port === port) {
     url.protocol = "http:";
@@ -51,6 +58,7 @@ function keepInternalRewriteHttp(res: Response | void) {
 }
 
 const requestCounts = new Map<string, number>();
+const LOOP_BREAK_THRESHOLD = 25;
 
 export async function proxy(req: NextRequest, event: NextFetchEvent) {
   const key = `${req.method} ${req.nextUrl.pathname}`;
@@ -61,6 +69,10 @@ export async function proxy(req: NextRequest, event: NextFetchEvent) {
 
   if (count > 10) {
     console.error(`[proxy] LOOP DETECTED: ${key} called ${count} times`);
+  }
+
+  if (count > LOOP_BREAK_THRESHOLD) {
+    return new NextResponse("Loop Detected", { status: 508 });
   }
 
   // Guard against accidental document navigation to RSC/Flight URLs.
@@ -76,11 +88,11 @@ export async function proxy(req: NextRequest, event: NextFetchEvent) {
     const res = await clerkProtectedProxy(req, event);
     const rewrite = (res as Response | null)?.headers?.get("x-middleware-rewrite");
     if (rewrite) console.log(`[proxy] protected rewrite → ${rewrite}`);
-    return keepInternalRewriteHttp(res);
+    return keepInternalRewriteHttp(res, req.nextUrl.pathname);
   }
 
   return isPublicRoute(req)
-    ? keepInternalRewriteHttp(await clerkAuthStateProxy(req, event))
+    ? keepInternalRewriteHttp(await clerkAuthStateProxy(req, event), req.nextUrl.pathname)
     : NextResponse.next();
 }
 
