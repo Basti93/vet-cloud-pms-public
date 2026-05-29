@@ -14,7 +14,7 @@ function ConfirmationContent() {
   const [status, setStatus] = useState<ConfirmationStatus>('loading');
   const [message, setMessage] = useState('');
 
-  const confirmAppointmentMutation = trpc.appointments.confirmFromEmail.useMutation({
+  const { mutate: confirmMutate } = trpc.appointments.confirmFromEmail.useMutation({
     onSuccess: () => {
       setStatus('success');
       setMessage('Ihr Termin wurde erfolgreich bestätigt!');
@@ -26,37 +26,33 @@ function ConfirmationContent() {
   });
 
   useEffect(() => {
-    const confirmAppointment = async () => {
-      if (!token) {
+    if (!token) {
+      setStatus('invalid-token');
+      setMessage('Ungültiger oder fehlender Bestätigungslink');
+      return;
+    }
+
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3) {
         setStatus('invalid-token');
-        setMessage('Ungültiger oder fehlender Bestätigungslink');
+        setMessage('Ungültiger Bestätigungslink');
         return;
       }
 
-      try {
-        const parts = token.split('.');
-        if (parts.length !== 3) {
-          setStatus('invalid-token');
-          setMessage('Ungültiger Bestätigungslink');
-          return;
-        }
+      const payload = JSON.parse(
+        Buffer.from(parts[1], 'base64').toString('utf-8')
+      );
 
-        const payload = JSON.parse(
-          Buffer.from(parts[1], 'base64').toString('utf-8')
-        );
-
-        confirmAppointmentMutation.mutate({
-          appointmentId: payload.appointmentId,
-          token,
-        });
-      } catch {
-        setStatus('invalid-token');
-        setMessage('Ungültiger Bestätigungslink');
-      }
-    };
-
-    confirmAppointment();
-  }, [token, confirmAppointmentMutation]);
+      confirmMutate({ appointmentId: payload.appointmentId, token });
+    } catch {
+      setStatus('invalid-token');
+      setMessage('Ungültiger Bestätigungslink');
+    }
+    // confirmMutate is stable across renders (React Query guarantees this).
+    // Omitting it from deps is intentional — we only want to fire once per token.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   return (
     <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8">
