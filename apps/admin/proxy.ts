@@ -58,21 +58,35 @@ function keepInternalRewriteHttp(res: Response | void, currentPath: string) {
 }
 
 const requestCounts = new Map<string, number>();
-const LOOP_BREAK_THRESHOLD = 25;
+const requestTimestamps = new Map<string, number[]>();
+const LOOP_WINDOW_MS = 500;
+const LOOP_THRESHOLD = 8;
 
-export async function proxy(req: NextRequest, event: NextFetchEvent) {
-  const key = `${req.method} ${req.nextUrl.pathname}`;
+function trackRequest(key: string): { count: number; isLooping: boolean } {
   const count = (requestCounts.get(key) ?? 0) + 1;
   requestCounts.set(key, count);
 
+  const now = Date.now();
+  const prev = (requestTimestamps.get(key) ?? []).filter(t => now - t < LOOP_WINDOW_MS);
+  prev.push(now);
+  requestTimestamps.set(key, prev);
+
+  return { count, isLooping: prev.length > LOOP_THRESHOLD };
+}
+
+export async function proxy(req: NextRequest, event: NextFetchEvent) {
+  const key = `${req.method} ${req.nextUrl.pathname}`;
+  const { count, isLooping } = trackRequest(key);
+
   console.log(`[proxy] #${count} ${key} | rsc=${req.headers.get("rsc")} | _rsc=${req.nextUrl.searchParams.get("_rsc")} | subreq=${req.headers.get("x-middleware-subrequest")} | referer=${req.headers.get("referer")}`);
 
-  if (count > 10) {
-    console.error(`[proxy] LOOP DETECTED: ${key} called ${count} times`);
+  if (isLooping) {
+    console.error(`[proxy] LOOP DETECTED: ${key} called ${count} times (${LOOP_THRESHOLD}+ hits in ${LOOP_WINDOW_MS}ms)`);
+    return new NextResponse("Loop Detected", { status: 508 });
   }
 
-  if (count > LOOP_BREAK_THRESHOLD) {
-    return new NextResponse("Loop Detected", { status: 508 });
+  if (req.nextUrl.pathname === "/api/health") {
+    return NextResponse.next();
   }
 
   // Guard against accidental document navigation to RSC/Flight URLs.
