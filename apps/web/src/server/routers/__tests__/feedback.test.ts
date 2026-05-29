@@ -89,25 +89,19 @@ describe("feedback.submit", () => {
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
-  it("ignores spoofed tenant and user payload fields", async () => {
+  it("rejects requests with a spoofed tenantId", async () => {
     const caller = createTestCaller(db, { clerkId, adminDb });
 
-    const result = await caller.feedback.submit({
-      message: "Bitte kompaktere Vitalzeichenansicht.",
-      category: "idea",
-      sourcePath: "/dashboard/patients/patient-1",
-      sourceModule: "medical-records",
-      tenantId: "00000000-0000-4000-8000-000000000999",
-      userId: "00000000-0000-4000-8000-000000000998",
-    } as any);
-
-    const [stored] = await db
-      .select()
-      .from(userFeedback)
-      .where(eq(userFeedback.id, result.id))
-      .limit(1);
-
-    expect(stored.tenantId).toBe(tenantId);
-    expect(stored.userId).toBe(userId);
+    // enforceTenantOwnership reads getRawInput() before Zod strips unknown fields.
+    // Any tenantId that doesn't match the authenticated tenant is blocked outright.
+    await expect(
+      caller.feedback.submit({
+        message: "Bitte kompaktere Vitalzeichenansicht.",
+        category: "idea",
+        sourcePath: "/dashboard/patients/patient-1",
+        sourceModule: "medical-records",
+        tenantId: "00000000-0000-4000-8000-000000000999",
+      } as any)
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 });
