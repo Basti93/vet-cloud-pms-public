@@ -80,3 +80,20 @@ All git commits SHALL use the Conventional Commits format: `<type>: <description
 #### Scenario: New feature commit
 - **WHEN** a developer commits a new feature
 - **THEN** the commit message starts with `feat:` followed by a concise description (e.g. `feat: add vaccination reminders`)
+
+## ADDED Requirements
+
+### Requirement: Reversible encryption for stored secrets
+When a secret must be stored in the database and retrieved in plaintext for use (e.g., SMTP passwords, API keys), the system SHALL encrypt it using AES-256-GCM via a `lib/crypto.ts` helper. The encryption key SHALL be stored as an env var (never in the DB or source). Encrypted values SHALL be stored as a single colon-delimited string `"<iv>:<ciphertext>:<authTag>"` (all base64).
+
+#### Scenario: Encrypt and persist a secret
+- **WHEN** code calls `encryptSecret(plaintext)` with `SMTP_CREDENTIAL_KEY` set
+- **THEN** returns a `"iv:ciphertext:tag"` string safe for DB storage
+
+#### Scenario: Decrypt a stored secret
+- **WHEN** code calls `decryptSecret(stored)` with the same key
+- **THEN** returns the original plaintext
+
+#### Scenario: Missing key throws at call time
+- **WHEN** `encryptSecret` or `decryptSecret` is called and `SMTP_CREDENTIAL_KEY` is not set
+- **THEN** throws an error immediately — never silently stores plaintext
