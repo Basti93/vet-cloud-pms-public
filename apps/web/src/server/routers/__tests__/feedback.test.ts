@@ -4,9 +4,22 @@ import { eq } from "drizzle-orm";
 import { createTestDb, createTestCaller, seedTestTenant, type TestDb } from "@/server/__tests__/helpers";
 import { userFeedback } from "@/lib/db/schema";
 
-vi.mock("@/lib/email/service");
+vi.mock("@clerk/nextjs/server", () => ({
+  clerkClient: vi.fn(async () => ({
+    users: {
+      getUser: vi.fn(async () => ({
+        emailAddresses: [{ emailAddress: "admin@example.test" }],
+      })),
+    },
+  })),
+}));
+vi.mock("@/lib/email/service", () => ({
+  sendTenantLifecycleEmail: vi.fn(async () => ({ success: true, messageId: "msg_1" })),
+}));
 vi.mock("@/lib/events/appointment");
-vi.mock("@/server/audit");
+vi.mock("@/server/audit", () => ({
+  writeAuditLog: vi.fn(async () => undefined),
+}));
 
 let db: TestDb;
 let cleanup: () => Promise<void>;

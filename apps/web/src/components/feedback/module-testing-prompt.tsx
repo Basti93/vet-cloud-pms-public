@@ -28,7 +28,8 @@ export function ModuleTestingPrompt({
       <div>
         <p className="font-semibold">Modul im Test: {moduleName}</p>
         <p className="mt-1 text-[var(--color-muted)]">
-          Bitte nutzen und Feedback senden, wenn etwas fehlt oder hakt.
+          Sende uns Feedback, wenn etwas fehlt oder hakt. Wir werden uns so schnell wie
+          möglich darum kümmern. Danke
         </p>
       </div>
       <Button
