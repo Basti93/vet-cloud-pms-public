@@ -8,8 +8,9 @@ import { createTRPCRouter, tenantProcedure } from '@/server/trpc';
 import { emailSettings, tenants } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
-import { sendConfirmationEmail, SendConfirmationEmailInput } from '@/lib/email/service';
+import { getProviderForTenant } from '@/lib/email/providers';
 import { getSystemDomain } from '@/lib/system-name';
+import { encryptSecret } from '@/lib/crypto';
 
 const FIXED_REMINDER_HOURS = 24;
 
@@ -49,7 +50,11 @@ export const emailRouter = createTRPCRouter({
           console.log('Created settings:', settings);
         }
 
-        return settings;
+        const { smtpPassEncrypted, ...rest } = settings;
+        return {
+          ...rest,
+          smtpPassMasked: smtpPassEncrypted ? '••••••••' : null,
+        };
       } catch (error) {
         console.error('Error in getSettings:', error);
         throw error;
@@ -72,12 +77,29 @@ export const emailRouter = createTRPCRouter({
         confirmationBody: z.string().optional(),
         reminderSubject: z.string().max(255).optional(),
         reminderBody: z.string().optional(),
+        smtpEnabled: z.boolean().optional(),
+        smtpHost: z.string().max(255).optional(),
+        smtpPort: z.number().int().min(1).max(65535).optional(),
+        smtpUser: z.string().max(255).optional(),
+        smtpPass: z.string().optional(),
+        smtpFromEmail: z.string().email().max(255).optional().or(z.literal('')),
+        smtpFromName: z.string().max(100).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const { tenantId, ...updateData } = input;
+      const { tenantId, smtpPass, smtpFromEmail, ...rest } = input;
+
+      const smtpUpdate: Record<string, unknown> = {};
+      if (smtpPass && smtpPass.length > 0) {
+        smtpUpdate.smtpPassEncrypted = encryptSecret(smtpPass);
+      }
+      if (smtpFromEmail !== undefined) {
+        smtpUpdate.smtpFromEmail = smtpFromEmail === '' ? null : smtpFromEmail;
+      }
+
       const normalizedUpdateData = {
-        ...updateData,
+        ...rest,
+        ...smtpUpdate,
         reminderHoursBefore: FIXED_REMINDER_HOURS,
       };
 
@@ -127,20 +149,22 @@ export const emailRouter = createTRPCRouter({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Praxis nicht gefunden' });
       }
 
-      // Send test email
-      const testEmailData: SendConfirmationEmailInput = {
-        to: input.recipientEmail,
-        practiceName: tenant.name,
-        ownerFirstName: 'Max',
-        patientName: 'Bella',
-        patientSpecies: 'Hund',
-        appointmentDate: new Date().toLocaleDateString('de-DE'),
-        appointmentTime: '14:30',
-        appointmentDateTime: `${new Date().toLocaleDateString('de-DE')} um 14:30 Uhr`,
-        vetName: 'Dr. Schmidt',
-      };
+      // Resolve provider (tenant SMTP if configured, else system)
+      const { provider, from: customFrom } = await getProviderForTenant(input.tenantId);
+      const from = customFrom ?? `${tenant.name} <${process.env.SMTP_FROM ?? 'noreply@example.com'}>`;
 
-      const result = await sendConfirmationEmail(testEmailData);
+      let result: { success: boolean; messageId?: string; error?: unknown };
+      try {
+        const { messageId } = await provider.send({
+          from,
+          to: input.recipientEmail,
+          subject: `Testmail von ${tenant.name}`,
+          text: `Dies ist eine Testmail von ${tenant.name}.\n\nWenn Sie diese E-Mail erhalten haben, funktioniert Ihre E-Mail-Konfiguration korrekt.`,
+        });
+        result = { success: true, messageId };
+      } catch (error) {
+        result = { success: false, error };
+      }
 
       if (!result.success) {
         throw new TRPCError({

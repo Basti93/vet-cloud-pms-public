@@ -1,24 +1,26 @@
 import nodemailer from 'nodemailer';
 import type { EmailProvider, SendEmailOptions, EmailMetrics } from '../types';
 
+export type SmtpConfig = {
+  host: string;
+  port: number;
+  user: string;
+  pass: string;
+  fromEmail: string;
+};
+
 export class SmtpProvider implements EmailProvider {
   name = 'smtp';
   private transporter: nodemailer.Transporter;
   private fromEmail: string;
 
-  constructor(config: {
-    host: string;
-    port: number;
-    user: string;
-    pass: string;
-    fromEmail: string;
-  }) {
+  constructor(config: SmtpConfig) {
     this.fromEmail = config.fromEmail;
     this.transporter = nodemailer.createTransport({
       host: config.host,
       port: config.port,
-      secure: false,
-      requireTLS: config.port !== 1025, // skip TLS for local Mailpit
+      secure: config.port === 465,
+      requireTLS: config.port === 587,
       pool: true,
       auth: {
         user: config.user,

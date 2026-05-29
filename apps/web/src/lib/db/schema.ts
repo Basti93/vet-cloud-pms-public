@@ -984,6 +984,13 @@ export const emailSettings = pgTable(
     reminderBody: text("reminder_body")
       .default("Hallo {ownerFirstName},\n\nIhr Termin für {patientName} findet morgen um {appointmentTime} statt.\n\nBeste Grüße,\n{practiceName}")
       .notNull(),
+    smtpEnabled: boolean("smtp_enabled").default(false).notNull(),
+    smtpHost: varchar("smtp_host", { length: 255 }),
+    smtpPort: smallint("smtp_port"),
+    smtpUser: varchar("smtp_user", { length: 255 }),
+    smtpPassEncrypted: text("smtp_pass_encrypted"),
+    smtpFromEmail: varchar("smtp_from_email", { length: 255 }),
+    smtpFromName: varchar("smtp_from_name", { length: 100 }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .default(sql`now()`)
       .notNull(),

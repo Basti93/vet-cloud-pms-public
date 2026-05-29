@@ -23,6 +23,16 @@ export default function EmailSettingsPage() {
   const [bookingNotificationEnabled, setBookingNotificationEnabled] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
 
+  // SMTP state
+  const [smtpEnabled, setSmtpEnabled] = useState(false);
+  const [smtpHost, setSmtpHost] = useState('');
+  const [smtpPort, setSmtpPort] = useState('');
+  const [smtpUser, setSmtpUser] = useState('');
+  const [smtpPass, setSmtpPass] = useState('');
+  const [smtpPassHasStored, setSmtpPassHasStored] = useState(false);
+  const [smtpFromEmail, setSmtpFromEmail] = useState('');
+  const [smtpFromName, setSmtpFromName] = useState('');
+
   // Get current tenant
   const tenant = trpc.tenant.getCurrent.useQuery();
 
@@ -43,6 +53,14 @@ export default function EmailSettingsPage() {
       setReminderSubject(emailSettings.data.reminderSubject);
       setReminderBody(emailSettings.data.reminderBody);
       setBookingNotificationEnabled(emailSettings.data.bookingNotificationEnabled);
+      setSmtpEnabled(emailSettings.data.smtpEnabled);
+      setSmtpHost(emailSettings.data.smtpHost ?? '');
+      setSmtpPort(String(emailSettings.data.smtpPort ?? ''));
+      setSmtpUser(emailSettings.data.smtpUser ?? '');
+      setSmtpPass('');
+      setSmtpPassHasStored(!!emailSettings.data.smtpPassMasked);
+      setSmtpFromEmail(emailSettings.data.smtpFromEmail ?? '');
+      setSmtpFromName(emailSettings.data.smtpFromName ?? '');
       setIsDirty(false);
     }
   }, [emailSettings.data]);
@@ -91,6 +109,13 @@ export default function EmailSettingsPage() {
       reminderSubject,
       reminderBody,
       bookingNotificationEnabled,
+      smtpEnabled,
+      smtpHost: smtpHost || undefined,
+      smtpPort: smtpPort ? parseInt(smtpPort, 10) : undefined,
+      smtpUser: smtpUser || undefined,
+      smtpPass: smtpPass || undefined,
+      smtpFromEmail: smtpFromEmail || undefined,
+      smtpFromName: smtpFromName || undefined,
     });
   };
 
@@ -103,6 +128,14 @@ export default function EmailSettingsPage() {
       setReminderSubject(emailSettings.data.reminderSubject);
       setReminderBody(emailSettings.data.reminderBody);
       setBookingNotificationEnabled(emailSettings.data.bookingNotificationEnabled);
+      setSmtpEnabled(emailSettings.data.smtpEnabled);
+      setSmtpHost(emailSettings.data.smtpHost ?? '');
+      setSmtpPort(String(emailSettings.data.smtpPort ?? ''));
+      setSmtpUser(emailSettings.data.smtpUser ?? '');
+      setSmtpPass('');
+      setSmtpPassHasStored(!!emailSettings.data.smtpPassMasked);
+      setSmtpFromEmail(emailSettings.data.smtpFromEmail ?? '');
+      setSmtpFromName(emailSettings.data.smtpFromName ?? '');
       setIsDirty(false);
       setError(undefined);
       setSaveSuccess(false);
@@ -295,6 +328,100 @@ export default function EmailSettingsPage() {
                 disabled={isUpdating}
               />
             </div>
+          </div>
+
+          {/* Custom SMTP */}
+          <div className="bg-surface rounded-lg border border-[var(--color-border)] p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-fg">Eigener Mailserver</h2>
+                <p className="text-sm text-muted">E-Mails über Ihren eigenen SMTP-Server versenden</p>
+              </div>
+              <ToggleSwitch
+                checked={smtpEnabled}
+                onChange={(checked) => { setSmtpEnabled(checked); handleFieldChange(); }}
+                disabled={isUpdating}
+              />
+            </div>
+
+            {smtpEnabled && (
+              <div className="space-y-4 border-t border-[var(--color-border)] pt-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-fg mb-2">SMTP-Server</label>
+                    <input
+                      type="text"
+                      value={smtpHost}
+                      onChange={(e) => { setSmtpHost(e.target.value); handleFieldChange(); }}
+                      placeholder="mail.example.com"
+                      disabled={isUpdating}
+                      className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg bg-bg text-fg disabled:opacity-50"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-fg mb-2">Port</label>
+                    <input
+                      type="number"
+                      value={smtpPort}
+                      onChange={(e) => { setSmtpPort(e.target.value); handleFieldChange(); }}
+                      placeholder="465"
+                      disabled={isUpdating}
+                      className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg bg-bg text-fg disabled:opacity-50"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-fg mb-2">Benutzername</label>
+                    <input
+                      type="text"
+                      value={smtpUser}
+                      onChange={(e) => { setSmtpUser(e.target.value); handleFieldChange(); }}
+                      disabled={isUpdating}
+                      className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg bg-bg text-fg disabled:opacity-50"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-fg mb-2">Passwort</label>
+                    <input
+                      type="password"
+                      value={smtpPass}
+                      onChange={(e) => { setSmtpPass(e.target.value); handleFieldChange(); }}
+                      placeholder={smtpPassHasStored && smtpPass === '' ? '••••••••' : ''}
+                      disabled={isUpdating}
+                      className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg bg-bg text-fg disabled:opacity-50"
+                    />
+                    {smtpPassHasStored && smtpPass === '' && (
+                      <p className="text-xs text-muted mt-1">Leer lassen um gespeichertes Passwort beizubehalten</p>
+                    )}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-fg mb-2">Absender-E-Mail</label>
+                    <input
+                      type="email"
+                      value={smtpFromEmail}
+                      onChange={(e) => { setSmtpFromEmail(e.target.value); handleFieldChange(); }}
+                      placeholder="praxis@example.com"
+                      disabled={isUpdating}
+                      className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg bg-bg text-fg disabled:opacity-50"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-fg mb-2">Absendername</label>
+                    <input
+                      type="text"
+                      value={smtpFromName}
+                      onChange={(e) => { setSmtpFromName(e.target.value); handleFieldChange(); }}
+                      placeholder="Tierarztpraxis Mustermann"
+                      disabled={isUpdating}
+                      className="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg bg-bg text-fg disabled:opacity-50"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Save/Cancel buttons - only show when dirty */}
