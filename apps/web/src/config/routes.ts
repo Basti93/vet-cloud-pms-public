@@ -20,6 +20,7 @@ export const PUBLIC_ROUTES = [
   '/api/cron/reset-e2e-tenant',              // CRON_SECRET-protected E2E tenant reset
   '/api/cron/check-trial-expirations',       // CRON_SECRET-protected trial expiration check
   '/api/cron/sync-stripe-subscriptions',     // CRON_SECRET-protected Stripe sync
+  '/confirm(.*)',                             // token-protected appointment confirmation link from emails
   '/api/unsubscribe',                        // token-protected unsubscribe link from emails
   '/api/website-leads',                      // Public website contact/lead form
   '/api/calendar(.*)',            // JWT-protected
