@@ -19,12 +19,8 @@ export function GlobalQueryActivity() {
   const mutatingCount = useIsMutating();
   const isActive = fetchingCount + mutatingCount > 0;
   const [visible, setVisible] = useState(false);
-  const [label, setLabel] = useState("Loading data...");
+  const [label] = useState(() => getLoadingLabel());
   const shownAtRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    setLabel(getLoadingLabel());
-  }, []);
 
   useEffect(() => {
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
