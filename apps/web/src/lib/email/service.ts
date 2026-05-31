@@ -5,9 +5,9 @@ import { renderVaccinationDigestEmail, type VaccinationDigestItem } from "./Vacc
 import { getSystemDomain } from "@/lib/system-name";
 import { db } from "@/lib/db/client";
 import { emailLogs, type EmailType } from "@/lib/db/schema";
+import type { EmailProvider } from "./types";
 
 const systemProvider = getEmailProvider();
-
 const SYSTEM_DOMAIN = getSystemDomain();
 const FROM_EMAIL = process.env.SMTP_FROM ?? "noreply@example.com";
 
@@ -49,6 +49,86 @@ async function logEmail(params: {
   }
 }
 
+// ─── Dispatch ─────────────────────────────────────────────────────────────────
+
+export interface TemplateResult {
+  to: string;
+  subject: string;
+  text: string;
+  html?: string;
+  emailType: EmailType;
+  tenantId?: string;
+  /** "tenant" = resolve via getProviderForTenant (may use custom SMTP); "system" = always system SMTP */
+  providerKind: "tenant" | "system";
+  /** Fallback display name for the "from" header on tenant emails */
+  tenantName?: string;
+}
+
+/**
+ * Central send path. `build` is called inside the try/catch so builder errors
+ * (e.g. missing env vars) are caught and returned as `{ success: false }`.
+ * Pass `injectedProvider` in tests to skip all DB/SMTP calls.
+ */
+export async function dispatch(
+  build: () => TemplateResult,
+  injectedProvider?: EmailProvider
+): Promise<{ success: boolean; messageId?: string; error?: unknown }> {
+  let template: TemplateResult | undefined;
+  try {
+    template = build();
+
+    let provider: EmailProvider;
+    let from: string;
+
+    if (injectedProvider) {
+      provider = injectedProvider;
+      from =
+        template.providerKind === "tenant" && template.tenantName
+          ? tenantSender(template.tenantName)
+          : systemSender();
+    } else if (template.providerKind === "tenant") {
+      const resolved = await getProviderForTenant(template.tenantId);
+      provider = resolved.provider;
+      from = resolved.from ?? (template.tenantName ? tenantSender(template.tenantName) : systemSender());
+    } else {
+      provider = systemProvider;
+      from = systemSender();
+    }
+
+    const { messageId } = await provider.send({
+      from,
+      to: template.to,
+      subject: template.subject,
+      text: template.text,
+      html: template.html,
+    });
+
+    await logEmail({
+      tenantId: template.tenantId,
+      emailType: template.emailType,
+      recipientEmail: template.to,
+      status: "sent",
+      messageId,
+    });
+
+    return { success: true, messageId };
+  } catch (error) {
+    if (template) {
+      await logEmail({
+        tenantId: template.tenantId,
+        emailType: template.emailType,
+        recipientEmail: template.to,
+        status: "failed",
+        errorMessage: String(error),
+      });
+    }
+    console.error("Error dispatching email:", error);
+    return { success: false, error };
+  }
+}
+
+// ─── Input interfaces ─────────────────────────────────────────────────────────
+
 export interface SendConfirmationEmailInput {
   tenantId?: string;
   to: string;
@@ -75,6 +155,20 @@ export interface SendReminderEmailInput {
   vetName?: string;
   customSubject?: string;
   customBody?: string;
+}
+
+export interface SendBookingRequestEmailInput {
+  tenantId?: string;
+  to: string;
+  practiceName: string;
+  ownerFirstName: string;
+  patientName: string;
+  patientSpecies: string;
+  appointmentDate: string;
+  appointmentTime: string;
+  appointmentDateTime: string;
+  confirmUrl: string;
+  cancelUrl: string;
 }
 
 export interface SendBookingNotificationInput {
@@ -119,6 +213,16 @@ export interface SendUserInvitationEmailInput {
   expiresAt: string;
 }
 
+export interface SendVaccinationDigestEmailInput {
+  tenantId?: string;
+  ownerEmail: string;
+  ownerName: string;
+  items: VaccinationDigestItem[];
+  clinicName: string;
+  bookingUrl?: string;
+  unsubscribeUrl?: string;
+}
+
 export interface SendVaccinationReminderEmailInput {
   tenantId: string;
   vaccinationId: string;
@@ -145,39 +249,13 @@ export interface SendConsultationRequestEmailInput {
   message?: string;
 }
 
+// ─── Template builders ────────────────────────────────────────────────────────
+
 function optionalValue(value: string | undefined) {
   return value && value.trim().length > 0 ? value.trim() : "Nicht angegeben";
 }
 
-export async function sendConsultationRequestEmail(input: SendConsultationRequestEmailInput) {
-  const subject = `Neue Beratungsanfrage: ${input.practiceName || input.name}`;
-  const text = `
-Neue Beratungsanfrage über die Landingpage
-
-Name: ${input.name}
-E-Mail: ${input.email}
-Telefon: ${optionalValue(input.phone)}
-Praxis: ${optionalValue(input.practiceName)}
-Rolle/Funktion: ${optionalValue(input.role)}
-Website mitbuchen: ${input.websiteInterest ? "Ja" : "Nein / nicht angegeben"}
-
-Nachricht:
-${optionalValue(input.message)}
-  `.trim();
-
-  const recipient = getConsultationRecipient();
-  try {
-    const { messageId } = await systemProvider.send({ from: systemSender(), to: recipient, subject, text });
-    await logEmail({ emailType: "consultation_request", recipientEmail: recipient, status: "sent", messageId });
-    return { success: true, messageId };
-  } catch (error) {
-    await logEmail({ emailType: "consultation_request", recipientEmail: recipient, status: "failed", errorMessage: String(error) });
-    console.error("Error sending consultation request email:", error);
-    return { success: false, error };
-  }
-}
-
-export async function sendConfirmationEmail(input: SendConfirmationEmailInput) {
+function buildConfirmationEmail(input: SendConfirmationEmailInput): TemplateResult {
   const placeholders: EmailPlaceholders = {
     practiceName: input.practiceName,
     ownerFirstName: input.ownerFirstName,
@@ -188,24 +266,18 @@ export async function sendConfirmationEmail(input: SendConfirmationEmailInput) {
     appointmentDateTime: input.appointmentDateTime,
     vetName: input.vetName || "Unser Team",
   };
-
-  const text = emailTemplates.confirmation.render(emailTemplates.confirmation.defaultBody, placeholders);
-  const subject = emailTemplates.confirmation.defaultSubject.replace("{practiceName}", input.practiceName);
-
-  try {
-    const { provider, from: customFrom } = await getProviderForTenant(input.tenantId);
-    const from = customFrom ?? tenantSender(input.practiceName);
-    const { messageId } = await provider.send({ from, to: input.to, subject, text });
-    await logEmail({ tenantId: input.tenantId, emailType: "confirmation", recipientEmail: input.to, status: "sent", messageId });
-    return { success: true, messageId };
-  } catch (error) {
-    await logEmail({ tenantId: input.tenantId, emailType: "confirmation", recipientEmail: input.to, status: "failed", errorMessage: String(error) });
-    console.error("Error sending confirmation email:", error);
-    return { success: false, error };
-  }
+  return {
+    to: input.to,
+    subject: emailTemplates.confirmation.defaultSubject.replace("{practiceName}", input.practiceName),
+    text: emailTemplates.confirmation.render(emailTemplates.confirmation.defaultBody, placeholders),
+    emailType: "confirmation",
+    tenantId: input.tenantId,
+    providerKind: "tenant",
+    tenantName: input.practiceName,
+  };
 }
 
-export async function sendReminderEmail(input: SendReminderEmailInput) {
+function buildReminderEmail(input: SendReminderEmailInput): TemplateResult {
   const placeholders: EmailPlaceholders = {
     practiceName: input.practiceName,
     ownerFirstName: input.ownerFirstName,
@@ -216,41 +288,24 @@ export async function sendReminderEmail(input: SendReminderEmailInput) {
     appointmentDateTime: input.appointmentDateTime,
     vetName: input.vetName || "Unser Team",
   };
-
   const bodyTemplate = input.customBody?.trim() || emailTemplates.reminder.defaultBody;
   const subjectTemplate = input.customSubject?.trim() || emailTemplates.reminder.defaultSubject;
-  const text = emailTemplates.reminder.render(bodyTemplate, placeholders);
-  const subject = emailTemplates.reminder.render(subjectTemplate, placeholders);
-
-  try {
-    const { provider, from: customFrom } = await getProviderForTenant(input.tenantId);
-    const from = customFrom ?? tenantSender(input.practiceName);
-    const { messageId } = await provider.send({ from, to: input.to, subject, text });
-    await logEmail({ tenantId: input.tenantId, emailType: "reminder", recipientEmail: input.to, status: "sent", messageId });
-    return { success: true, messageId };
-  } catch (error) {
-    await logEmail({ tenantId: input.tenantId, emailType: "reminder", recipientEmail: input.to, status: "failed", errorMessage: String(error) });
-    console.error("Error sending reminder email:", error);
-    return { success: false, error };
-  }
+  return {
+    to: input.to,
+    subject: emailTemplates.reminder.render(subjectTemplate, placeholders),
+    text: emailTemplates.reminder.render(bodyTemplate, placeholders),
+    emailType: "reminder",
+    tenantId: input.tenantId,
+    providerKind: "tenant",
+    tenantName: input.practiceName,
+  };
 }
 
-export interface SendBookingRequestEmailInput {
-  tenantId?: string;
-  to: string;
-  practiceName: string;
-  ownerFirstName: string;
-  patientName: string;
-  patientSpecies: string;
-  appointmentDate: string;
-  appointmentTime: string;
-  appointmentDateTime: string;
-  confirmUrl: string;
-  cancelUrl: string;
-}
-
-export async function sendBookingRequestEmail(input: SendBookingRequestEmailInput) {
-  const text = `Hallo ${input.ownerFirstName},
+function buildBookingRequestEmail(input: SendBookingRequestEmailInput): TemplateResult {
+  return {
+    to: input.to,
+    subject: `Terminanfrage bestätigen – ${input.practiceName}`,
+    text: `Hallo ${input.ownerFirstName},
 
 Ihre Buchungsanfrage für ${input.patientName} (${input.patientSpecies}) am ${input.appointmentDateTime} bei ${input.practiceName} ist eingegangen.
 
@@ -261,27 +316,15 @@ Wenn Sie diesen Termin nicht gebucht haben oder absagen möchten:
 ${input.cancelUrl}
 
 Mit freundlichen Grüßen,
-${input.practiceName}`;
-
-  try {
-    const { provider, from: customFrom } = await getProviderForTenant(input.tenantId);
-    const from = customFrom ?? tenantSender(input.practiceName);
-    const { messageId } = await provider.send({
-      from,
-      to: input.to,
-      subject: `Terminanfrage bestätigen – ${input.practiceName}`,
-      text,
-    });
-    await logEmail({ tenantId: input.tenantId, emailType: "booking_request", recipientEmail: input.to, status: "sent", messageId });
-    return { success: true, messageId };
-  } catch (error) {
-    await logEmail({ tenantId: input.tenantId, emailType: "booking_request", recipientEmail: input.to, status: "failed", errorMessage: String(error) });
-    console.error("Error sending booking request email:", error);
-    return { success: false, error };
-  }
+${input.practiceName}`,
+    emailType: "booking_request",
+    tenantId: input.tenantId,
+    providerKind: "tenant",
+    tenantName: input.practiceName,
+  };
 }
 
-export async function sendBookingNotificationEmail(input: SendBookingNotificationInput) {
+function buildBookingNotificationEmail(input: SendBookingNotificationInput): TemplateResult {
   const placeholders: EmailPlaceholders = {
     practiceName: input.practiceName,
     ownerFirstName: input.ownerFirstName,
@@ -293,28 +336,24 @@ export async function sendBookingNotificationEmail(input: SendBookingNotificatio
     appointmentDateTime: input.appointmentDateTime,
     vetName: input.vetName || "Unzugewiesen",
   };
-
-  const text = emailTemplates.bookingNotification.render(emailTemplates.bookingNotification.defaultBody, placeholders);
-  const subject = emailTemplates.bookingNotification.defaultSubject
-    .replace("{practiceName}", input.practiceName)
-    .replace("{patientName}", input.patientName)
-    .replace("{appointmentDate}", input.appointmentDate);
-
-  try {
-    const { messageId } = await systemProvider.send({ from: systemSender(), to: input.to, subject, text });
-    await logEmail({ tenantId: input.tenantId, emailType: "booking_notification", recipientEmail: input.to, status: "sent", messageId });
-    return { success: true, messageId };
-  } catch (error) {
-    await logEmail({ tenantId: input.tenantId, emailType: "booking_notification", recipientEmail: input.to, status: "failed", errorMessage: String(error) });
-    console.error("Error sending booking notification email:", error);
-    return { success: false, error };
-  }
+  return {
+    to: input.to,
+    subject: emailTemplates.bookingNotification.defaultSubject
+      .replace("{practiceName}", input.practiceName)
+      .replace("{patientName}", input.patientName)
+      .replace("{appointmentDate}", input.appointmentDate),
+    text: emailTemplates.bookingNotification.render(emailTemplates.bookingNotification.defaultBody, placeholders),
+    emailType: "booking_notification",
+    tenantId: input.tenantId,
+    providerKind: "system",
+  };
 }
 
-export async function sendAccountDeletionEmail(input: SendAccountDeletionEmailInput) {
-  const subject = "Bestätigung: Kontolöschung angefordert";
-  const text = `
-Hallo,
+function buildAccountDeletionEmail(input: SendAccountDeletionEmailInput): TemplateResult {
+  return {
+    to: input.to,
+    subject: "Bestätigung: Kontolöschung angefordert",
+    text: `Hallo,
 
 Sie haben eine Anfrage zum Löschen Ihres Kontos und aller damit verbundenen Daten gestellt.
 
@@ -336,24 +375,17 @@ WARNUNG: Nach der Bestätigung werden folgende Daten permanent gelöscht:
 Diese Aktion kann nicht rückgängig gemacht werden.
 
 Mit freundlichen Grüßen,
-Ihr ${SYSTEM_DOMAIN} Team
-  `.trim();
-
-  try {
-    const { messageId } = await systemProvider.send({ from: systemSender(), to: input.to, subject, text });
-    await logEmail({ emailType: "account_deletion", recipientEmail: input.to, status: "sent", messageId });
-    return { success: true, messageId };
-  } catch (error) {
-    await logEmail({ emailType: "account_deletion", recipientEmail: input.to, status: "failed", errorMessage: String(error) });
-    console.error("Error sending account deletion email:", error);
-    return { success: false, error };
-  }
+Ihr ${SYSTEM_DOMAIN} Team`,
+    emailType: "account_deletion",
+    providerKind: "system",
+  };
 }
 
-export async function sendTenantDeactivationEmail(input: SendTenantDeactivationEmailInput) {
-  const subject = `Praxis deaktiviert: ${input.practiceName}`;
-  const text = `
-Hallo,
+function buildTenantDeactivationEmail(input: SendTenantDeactivationEmailInput): TemplateResult {
+  return {
+    to: input.to,
+    subject: `Praxis deaktiviert: ${input.practiceName}`,
+    text: `Hallo,
 
 Ihre Praxis "${input.practiceName}" wurde deaktiviert und zur endgültigen Löschung vorgemerkt.
 
@@ -365,37 +397,29 @@ ${input.reactivateUrl}
 Nach dem Löschdatum werden alle Daten permanent entfernt.
 
 Mit freundlichen Grüßen,
-Ihr ${SYSTEM_DOMAIN} Team
-  `.trim();
-
-  try {
-    const { messageId } = await systemProvider.send({ from: systemSender(), to: input.to, subject, text });
-    await logEmail({ emailType: "tenant_deactivation", recipientEmail: input.to, status: "sent", messageId });
-    return { success: true, messageId };
-  } catch (error) {
-    await logEmail({ emailType: "tenant_deactivation", recipientEmail: input.to, status: "failed", errorMessage: String(error) });
-    return { success: false, error };
-  }
+Ihr ${SYSTEM_DOMAIN} Team`,
+    emailType: "tenant_deactivation",
+    providerKind: "system",
+  };
 }
 
-export async function sendTenantLifecycleEmail(input: SendTenantLifecycleEmailInput) {
-  try {
-    const { messageId } = await systemProvider.send({ from: systemSender(), to: input.to, subject: input.subject, text: input.body });
-    await logEmail({ emailType: "tenant_lifecycle", recipientEmail: input.to, status: "sent", messageId });
-    return { success: true, messageId };
-  } catch (error) {
-    await logEmail({ emailType: "tenant_lifecycle", recipientEmail: input.to, status: "failed", errorMessage: String(error) });
-    return { success: false, error };
-  }
+function buildTenantLifecycleEmail(input: SendTenantLifecycleEmailInput): TemplateResult {
+  return {
+    to: input.to,
+    subject: input.subject,
+    text: input.body,
+    emailType: "tenant_lifecycle",
+    providerKind: "system",
+  };
 }
 
-export async function sendUserInvitationEmail(input: SendUserInvitationEmailInput) {
+function buildUserInvitationEmail(input: SendUserInvitationEmailInput): TemplateResult {
   const roleLabel =
     input.role === "admin" ? "Administrator" : input.role === "vet" ? "Tierarzt" : "Empfang";
-
-  const subject = `Einladung zu ${input.practiceName}`;
-  const text = `
-Hallo,
+  return {
+    to: input.to,
+    subject: `Einladung zu ${input.practiceName}`,
+    text: `Hallo,
 
 Sie wurden zu "${input.practiceName}" eingeladen.
 
@@ -406,30 +430,14 @@ Gültig bis: ${input.expiresAt}
 Wenn Sie diese Einladung nicht erwartet haben, ignorieren Sie diese E-Mail.
 
 Mit freundlichen Grüßen,
-Ihr ${SYSTEM_DOMAIN} Team
-  `.trim();
-
-  try {
-    const { messageId } = await systemProvider.send({ from: systemSender(), to: input.to, subject, text });
-    await logEmail({ tenantId: input.tenantId, emailType: "invitation", recipientEmail: input.to, status: "sent", messageId });
-    return { success: true, messageId };
-  } catch (error) {
-    await logEmail({ tenantId: input.tenantId, emailType: "invitation", recipientEmail: input.to, status: "failed", errorMessage: String(error) });
-    return { success: false, error };
-  }
+Ihr ${SYSTEM_DOMAIN} Team`,
+    emailType: "invitation",
+    tenantId: input.tenantId,
+    providerKind: "system",
+  };
 }
 
-export interface SendVaccinationDigestEmailInput {
-  tenantId?: string;
-  ownerEmail: string;
-  ownerName: string;
-  items: VaccinationDigestItem[];
-  clinicName: string;
-  bookingUrl?: string;
-  unsubscribeUrl?: string;
-}
-
-export async function sendVaccinationDigestEmail(input: SendVaccinationDigestEmailInput) {
+function buildVaccinationDigestEmail(input: SendVaccinationDigestEmailInput): TemplateResult {
   const petNames = [...new Set(input.items.map((i) => i.petName))];
   const subject =
     petNames.length === 1
@@ -455,19 +463,19 @@ export async function sendVaccinationDigestEmail(input: SendVaccinationDigestEma
     ...(input.bookingUrl ? ["", `Jetzt buchen: ${input.bookingUrl}`] : []),
   ].join("\n");
 
-  try {
-    const { provider, from: customFrom } = await getProviderForTenant(input.tenantId);
-    const from = customFrom ?? tenantSender(input.clinicName);
-    const { messageId } = await provider.send({ from, to: input.ownerEmail, subject, html, text });
-    await logEmail({ tenantId: input.tenantId, emailType: "vaccination_digest", recipientEmail: input.ownerEmail, status: "sent", messageId });
-    return { success: true, messageId };
-  } catch (error) {
-    await logEmail({ tenantId: input.tenantId, emailType: "vaccination_digest", recipientEmail: input.ownerEmail, status: "failed", errorMessage: String(error) });
-    return { success: false, error };
-  }
+  return {
+    to: input.ownerEmail,
+    subject,
+    text,
+    html,
+    emailType: "vaccination_digest",
+    tenantId: input.tenantId,
+    providerKind: "tenant",
+    tenantName: input.clinicName,
+  };
 }
 
-export async function sendVaccinationReminderEmail(input: SendVaccinationReminderEmailInput) {
+function buildVaccinationReminderEmail(input: SendVaccinationReminderEmailInput): TemplateResult {
   const dueDate = input.dueDate.toLocaleDateString("de-DE");
 
   const applyPlaceholders = (template: string) =>
@@ -479,11 +487,11 @@ export async function sendVaccinationReminderEmail(input: SendVaccinationReminde
       .split("{clinicName}").join(input.clinicName)
       .split("{bookingUrl}").join(input.bookingUrl ?? "");
 
-  const subject = applyPlaceholders(input.customSubject);
   const baseBody = applyPlaceholders(input.customBody);
-  const text = input.bookingUrl && !input.customBody.includes("{bookingUrl}")
-    ? `${baseBody}\n\nDirekt Termin buchen:\n${input.bookingUrl}`
-    : baseBody;
+  const text =
+    input.bookingUrl && !input.customBody.includes("{bookingUrl}")
+      ? `${baseBody}\n\nDirekt Termin buchen:\n${input.bookingUrl}`
+      : baseBody;
 
   const html = renderVaccinationReminderEmail({
     ownerName: input.ownerName,
@@ -495,17 +503,75 @@ export async function sendVaccinationReminderEmail(input: SendVaccinationReminde
     unsubscribeUrl: input.unsubscribeUrl,
   });
 
-  try {
-    const { provider, from: customFrom } = await getProviderForTenant(input.tenantId);
-    const from = customFrom ?? tenantSender(input.clinicName);
-    const { messageId } = await provider.send({ from, to: input.ownerEmail, subject, html, text });
-    await logEmail({ tenantId: input.tenantId, emailType: "vaccination_reminder", recipientEmail: input.ownerEmail, status: "sent", messageId });
-    return { success: true, messageId };
-  } catch (error) {
-    await logEmail({ tenantId: input.tenantId, emailType: "vaccination_reminder", recipientEmail: input.ownerEmail, status: "failed", errorMessage: String(error) });
-    return { success: false, error };
-  }
+  return {
+    to: input.ownerEmail,
+    subject: applyPlaceholders(input.customSubject),
+    text,
+    html,
+    emailType: "vaccination_reminder",
+    tenantId: input.tenantId,
+    providerKind: "tenant",
+    tenantName: input.clinicName,
+  };
 }
+
+function buildConsultationRequestEmail(input: SendConsultationRequestEmailInput): TemplateResult {
+  const recipient = getConsultationRecipient();
+  return {
+    to: recipient,
+    subject: `Neue Beratungsanfrage: ${input.practiceName || input.name}`,
+    text: `Neue Beratungsanfrage über die Landingpage
+
+Name: ${input.name}
+E-Mail: ${input.email}
+Telefon: ${optionalValue(input.phone)}
+Praxis: ${optionalValue(input.practiceName)}
+Rolle/Funktion: ${optionalValue(input.role)}
+Website mitbuchen: ${input.websiteInterest ? "Ja" : "Nein / nicht angegeben"}
+
+Nachricht:
+${optionalValue(input.message)}`,
+    emailType: "consultation_request",
+    providerKind: "system",
+  };
+}
+
+// ─── Named exports ────────────────────────────────────────────────────────────
+
+export const sendConfirmationEmail = (input: SendConfirmationEmailInput) =>
+  dispatch(() => buildConfirmationEmail(input));
+
+export const sendReminderEmail = (input: SendReminderEmailInput) =>
+  dispatch(() => buildReminderEmail(input));
+
+export const sendBookingRequestEmail = (input: SendBookingRequestEmailInput) =>
+  dispatch(() => buildBookingRequestEmail(input));
+
+export const sendBookingNotificationEmail = (input: SendBookingNotificationInput) =>
+  dispatch(() => buildBookingNotificationEmail(input));
+
+export const sendAccountDeletionEmail = (input: SendAccountDeletionEmailInput) =>
+  dispatch(() => buildAccountDeletionEmail(input));
+
+export const sendTenantDeactivationEmail = (input: SendTenantDeactivationEmailInput) =>
+  dispatch(() => buildTenantDeactivationEmail(input));
+
+export const sendTenantLifecycleEmail = (input: SendTenantLifecycleEmailInput) =>
+  dispatch(() => buildTenantLifecycleEmail(input));
+
+export const sendUserInvitationEmail = (input: SendUserInvitationEmailInput) =>
+  dispatch(() => buildUserInvitationEmail(input));
+
+export const sendVaccinationDigestEmail = (input: SendVaccinationDigestEmailInput) =>
+  dispatch(() => buildVaccinationDigestEmail(input));
+
+export const sendVaccinationReminderEmail = (input: SendVaccinationReminderEmailInput) =>
+  dispatch(() => buildVaccinationReminderEmail(input));
+
+export const sendConsultationRequestEmail = (input: SendConsultationRequestEmailInput) =>
+  dispatch(() => buildConsultationRequestEmail(input));
+
+// ─── Multi-recipient functions ────────────────────────────────────────────────
 
 export async function sendPaymentFailedAdminEmail(input: {
   clinicName: string;
@@ -514,9 +580,12 @@ export async function sendPaymentFailedAdminEmail(input: {
   stripePortalUrl?: string;
 }) {
   const gracePeriodDate = input.gracePeriodEndsAt.toLocaleDateString("de-DE");
-  const subject = `Zahlungsfehlgeschlagen: ${input.clinicName}`;
-  const text = `
-Hallo,
+  const results = await Promise.allSettled(
+    input.adminEmails.map(async (to) => {
+      const result = await dispatch(() => ({
+        to,
+        subject: `Zahlungsfehlgeschlagen: ${input.clinicName}`,
+        text: `Hallo,
 
 Zahlung für "${input.clinicName}" konnte nicht eingezogen werden.
 
@@ -531,22 +600,13 @@ ${input.stripePortalUrl || "Im Konto-Bereich unter Einstellungen"}
 Bei Fragen kontaktieren Sie uns unter info@example.com
 
 Mit freundlichen Grüßen,
-Ihr Vet Cloud Team
-  `.trim();
-
-  const results = await Promise.allSettled(
-    input.adminEmails.map(async (to) => {
-      try {
-        const { messageId } = await systemProvider.send({ from: systemSender(), to, subject, text });
-        await logEmail({ emailType: "payment_failed", recipientEmail: to, status: "sent", messageId });
-        return { success: true, messageId };
-      } catch (error) {
-        await logEmail({ emailType: "payment_failed", recipientEmail: to, status: "failed", errorMessage: String(error) });
-        throw error;
-      }
+Ihr Vet Cloud Team`,
+        emailType: "payment_failed" as EmailType,
+        providerKind: "system" as const,
+      }));
+      if (!result.success) throw result.error;
     })
   );
-
   const failed = results.filter((r) => r.status === "rejected");
   if (failed.length > 0) {
     console.error("Errors sending payment failed emails:", failed);
@@ -560,9 +620,12 @@ export async function sendTrialExpiredAdminEmail(input: {
   adminEmails: string[];
   adminDashboardUrl: string;
 }) {
-  const subject = `Testphase abgelaufen: ${input.clinicName}`;
-  const text = `
-Hallo,
+  const results = await Promise.allSettled(
+    input.adminEmails.map(async (to) => {
+      const result = await dispatch(() => ({
+        to,
+        subject: `Testphase abgelaufen: ${input.clinicName}`,
+        text: `Hallo,
 
 Die 90-Tage Testphase für "${input.clinicName}" ist abgelaufen. Die Praxis wurde deaktiviert.
 
@@ -574,22 +637,13 @@ Weitere Schritte:
 Bei Fragen kontaktieren Sie uns unter info@example.com
 
 Mit freundlichen Grüßen,
-Ihr Vet Cloud Team
-  `.trim();
-
-  const results = await Promise.allSettled(
-    input.adminEmails.map(async (to) => {
-      try {
-        const { messageId } = await systemProvider.send({ from: systemSender(), to, subject, text });
-        await logEmail({ emailType: "trial_expired", recipientEmail: to, status: "sent", messageId });
-        return { success: true, messageId };
-      } catch (error) {
-        await logEmail({ emailType: "trial_expired", recipientEmail: to, status: "failed", errorMessage: String(error) });
-        throw error;
-      }
+Ihr Vet Cloud Team`,
+        emailType: "trial_expired" as EmailType,
+        providerKind: "system" as const,
+      }));
+      if (!result.success) throw result.error;
     })
   );
-
   const failed = results.filter((r) => r.status === "rejected");
   if (failed.length > 0) {
     console.error("Errors sending trial expired emails:", failed);
@@ -598,15 +652,16 @@ Ihr Vet Cloud Team
   return { success: true };
 }
 
-export async function sendTrialEndingEmail(input: {
+export const sendTrialEndingEmail = (input: {
   clinicEmail: string;
   clinicName: string;
   billingUrl: string;
-}) {
-  const subject = "Deine Testphase endet bald";
+}) => {
   const mainDomain = getSystemDomain();
-  const text = `
-Hallo ${input.clinicName},
+  return dispatch(() => ({
+    to: input.clinicEmail,
+    subject: "Deine Testphase endet bald",
+    text: `Hallo ${input.clinicName},
 
 Deine kostenlosen 3 Monate enden bald. Nach dieser Zeit müssen Sie sich für einen Tarif anmelden, um Zugriff auf Vet Cloud zu behalten.
 
@@ -623,15 +678,8 @@ Ohne ein aktives Abo wird Ihre Klinik deaktiviert und nach 30 Tagen gelöscht.
 Bei Fragen schreiben Sie uns: info@example.com
 
 Mit freundlichen Grüßen,
-Ihr Vet Cloud Team
-  `.trim();
-
-  try {
-    const { messageId } = await systemProvider.send({ from: systemSender(), to: input.clinicEmail, subject, text });
-    await logEmail({ emailType: "trial_ending", recipientEmail: input.clinicEmail, status: "sent", messageId });
-    return { success: true, messageId };
-  } catch (error) {
-    await logEmail({ emailType: "trial_ending", recipientEmail: input.clinicEmail, status: "failed", errorMessage: String(error) });
-    return { success: false, error };
-  }
-}
+Ihr Vet Cloud Team`,
+    emailType: "trial_ending" as EmailType,
+    providerKind: "system" as const,
+  }));
+};
