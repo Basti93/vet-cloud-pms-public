@@ -1,4 +1,4 @@
-import { adminDb } from "@/lib/db/client";
+import { adminDb, type Database } from "@/lib/db/client";
 import { roles, tenants, userRoles, users, websiteDomains, websitePageRevisions, websitePages, websiteProjects } from "@/lib/db/schema";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { normalizeBlocks, normalizeCapabilities, normalizeThemeConfig, websiteProjectSeoSchema } from "./schemas";
@@ -51,15 +51,22 @@ export function normalizeWebsitePath(pathname?: string | null) {
   return path.length > 1 ? path.replace(/\/$/, "") : "/";
 }
 
-export async function resolveProjectByHostOrSlug(input: { host?: string | null; slug?: string | null }) {
+export async function resolveProjectByHostOrSlug(
+  input: { host?: string | null; slug?: string | null },
+  database: Database = adminDb
+) {
   if (input.slug) {
-    const [project] = await adminDb.select({ id: websiteProjects.id }).from(websiteProjects).where(eq(websiteProjects.slug, input.slug)).limit(1);
+    const [project] = await database
+      .select({ id: websiteProjects.id })
+      .from(websiteProjects)
+      .where(eq(websiteProjects.slug, input.slug))
+      .limit(1);
     if (project) return project.id;
   }
 
   const host = normalizeWebsiteHost(input.host);
   if (host) {
-    const [domainMatch] = await adminDb
+    const [domainMatch] = await database
       .select({ projectId: websiteProjects.id })
       .from(websiteDomains)
       .innerJoin(websiteProjects, eq(websiteProjects.id, websiteDomains.websiteProjectId))
@@ -71,9 +78,12 @@ export async function resolveProjectByHostOrSlug(input: { host?: string | null; 
   return null;
 }
 
-export async function resolvePublishedWebsitePage(input: { projectId: string; path: string }): Promise<ResolvedWebsitePage | null> {
+export async function resolvePublishedWebsitePage(
+  input: { projectId: string; path: string },
+  database: Database = adminDb
+): Promise<ResolvedWebsitePage | null> {
   const normalizedPath = normalizeWebsitePath(input.path);
-  const [row] = await adminDb
+  const [row] = await database
     .select({
       projectId: websiteProjects.id,
       projectName: websiteProjects.name,
@@ -122,7 +132,7 @@ export async function resolvePublishedWebsitePage(input: { projectId: string; pa
   if (!row) return null;
 
   const teamMembers = row.ownerTenantId
-    ? await adminDb
+    ? await database
         .select({ id: users.id, title: users.title, firstName: users.firstName, lastName: users.lastName })
         .from(users)
         .innerJoin(userRoles, eq(userRoles.userId, users.id))
@@ -174,7 +184,7 @@ export async function resolvePublishedWebsitePage(input: { projectId: string; pa
       logoAsset: row.logoAsset as import('./types').WebsiteAssetRef | null,
       customCss: row.customCss,
       tenantMonogram: row.tenantMonogram ?? null,
-      teamMembers: teamMembers.map((m) => ({
+      teamMembers: teamMembers.map((m: { id: string; title: string | null; firstName: string | null; lastName: string | null }) => ({
         id: m.id,
         fullName: [m.title, m.firstName, m.lastName].filter(Boolean).join(' '),
         title: m.title,
