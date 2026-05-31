@@ -46,6 +46,13 @@ interface AuditInput {
   metadata?: Record<string, unknown>;
 }
 
+/**
+ * @internal
+ * Router mutations must use `auditedMutation`, `auditedProtectedMutation`, or
+ * `auditedAdminMutation` from `@/server/trpc/audited-mutation` instead of
+ * calling this directly. Direct calls are reserved for non-tRPC contexts:
+ * cron jobs, `tenant-deletion.ts`, `invitations.ts`, background scripts.
+ */
 export async function writeAuditLog(
   ctx: TRPCContext & { dbUserId?: string },
   input: AuditInput,

@@ -13,6 +13,7 @@ import {
   featureFlags,
 } from "@/lib/db/schema";
 import { eq, and, count, gte, lte, lt, sql } from "drizzle-orm";
+// eslint-disable-next-line no-restricted-imports -- adminProcedure mutations — auditedAdminMutation migration deferred; multiple complex mutations with cross-tenant tenantId resolution
 import { writeAuditLog } from "@/server/audit";
 import { executeDueTenantDeletions, hardDeleteTenantById } from "@/server/tenant-deletion";
 import { sendTenantLifecycleEmail } from "@/lib/email/service";

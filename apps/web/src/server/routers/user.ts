@@ -3,6 +3,7 @@ import { eq, and } from "drizzle-orm";
 import { createTRPCRouter, protectedProcedure } from "@/server/trpc";
 import { users, vetSchedules, vetAbsences, userRoles, roles } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
+// eslint-disable-next-line no-restricted-imports -- audit calls are inside conditional branches and if-blocks; unconditional auditedMutation wrapper would log no-op mutations
 import { writeAuditLog } from "@/server/audit";
 import { ROLE_CODES } from "@/lib/auth/roles";
 

@@ -4,7 +4,9 @@ import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, tenantProcedure } from "@/server/trpc";
 import { appointments, owners, patients, PERMISSIONS } from "@/lib/db/schema";
 import { requirePermission } from "@/server/trpc/middleware";
+// eslint-disable-next-line no-restricted-imports -- owners.create has conditional audit paths (created vs reactivated vs no-op); auditedMutation cannot skip the no-op early-return branch
 import { writeAuditLog } from "@/server/audit";
+import { auditedMutation } from "@/server/trpc/audited-mutation";
 
 const ownerFields = {
   firstName: z.string().min(1).max(100),
@@ -220,7 +222,13 @@ export const ownersRouter = createTRPCRouter({
       return owner;
     }),
 
-  update: tenantProcedure
+  update: auditedMutation({
+    entity: "owner",
+    action: "update",
+    event: "owner.updated",
+    summary: "Owner updated",
+    entityId: (result) => (result as { id: string }).id,
+  })
     .use(requirePermission(PERMISSIONS.PATIENTS_UPDATE))
     .input(
       z.object({
@@ -262,19 +270,20 @@ export const ownersRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Tierhalter nicht gefunden" });
       }
 
-      await writeAuditLog(ctx, {
-        tenantId,
-        action: "update",
-        entity: { type: "owner", id: updated.id },
-        event: "owner.updated",
-        summary: "Owner updated",
-        changes: data,
-      });
-
       return updated;
     }),
 
-  merge: tenantProcedure
+  merge: auditedMutation({
+    entity: "owner",
+    action: "update",
+    event: "owner.merged",
+    summary: "Owner merged",
+    entityId: (_, input) => (input as { targetId: string }).targetId,
+    changes: (_, input) => ({
+      sourceId: (input as { sourceId: string }).sourceId,
+      targetId: (input as { targetId: string }).targetId,
+    }),
+  })
     .use(requirePermission(PERMISSIONS.PATIENTS_UPDATE))
     .input(
       z.object({
@@ -308,19 +317,17 @@ export const ownersRouter = createTRPCRouter({
           .where(and(eq(owners.id, input.sourceId), eq(owners.tenantId, input.tenantId)));
       });
 
-      await writeAuditLog(ctx, {
-        tenantId: input.tenantId,
-        action: "update",
-        entity: { type: "owner", id: input.targetId },
-        event: "owner.merged",
-        summary: "Owner merged",
-        changes: { sourceId: input.sourceId, targetId: input.targetId },
-      });
-
       return { success: true, targetId: input.targetId };
     }),
 
-  delete: tenantProcedure
+  delete: auditedMutation({
+    entity: "owner",
+    action: "delete",
+    event: "owner.deactivated",
+    summary: "Owner deactivated",
+    entityId: (_, input) => (input as { id: string }).id,
+    changes: () => ({ active: false }),
+  })
     .use(requirePermission(PERMISSIONS.PATIENTS_UPDATE))
     .input(z.object({ id: z.string().uuid(), tenantId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
@@ -334,15 +341,6 @@ export const ownersRouter = createTRPCRouter({
           .update(owners)
           .set({ active: false, updatedAt: new Date() })
           .where(and(eq(owners.id, input.id), eq(owners.tenantId, input.tenantId)));
-      });
-
-      await writeAuditLog(ctx, {
-        tenantId: input.tenantId,
-        action: "delete",
-        entity: { type: "owner", id: input.id },
-        event: "owner.deactivated",
-        summary: "Owner deactivated",
-        changes: { active: false },
       });
 
       return { success: true };

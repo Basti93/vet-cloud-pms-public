@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { createTRPCRouter, tenantProcedure } from "@/server/trpc";
 import { tenants, userFeedback, users } from "@/lib/db/schema";
 import { sendTenantLifecycleEmail } from "@/lib/email/service";
+// eslint-disable-next-line no-restricted-imports -- audit call is inside if (created) guard; additional admin notification logic follows the audit call inside the same branch
 import { writeAuditLog } from "@/server/audit";
 import { logEventAsync, serializeLogError } from "@/server/trpc/logging-middleware";
 

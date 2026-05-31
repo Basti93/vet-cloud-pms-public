@@ -5,6 +5,7 @@ import path from 'path';
 import { and, desc, eq } from 'drizzle-orm';
 import { createTRPCRouter, protectedProcedure, type TRPCContext } from '@/server/trpc';
 import { roles, tenants, userRoles, users, websiteAssets, websiteDomains, websiteLeads, websitePageRevisions, websitePages, websiteProjects } from '@/lib/db/schema';
+// eslint-disable-next-line no-restricted-imports -- protectedProcedure mutations where tenantId comes from queried project record, not ctx — auditedProtectedMutation requires tenantId callback returning from nested result field
 import { writeAuditLog } from '@/server/audit';
 import { assetRefSchema, capabilityConfigSchema, normalizeBlocks, pageBlocksSchema, themeConfigSchema, websiteProjectSeoSchema } from '@/lib/website-platform/schemas';
 import { normalizeWebsiteHost, normalizeWebsitePath } from '@/lib/website-platform/resolve-project';

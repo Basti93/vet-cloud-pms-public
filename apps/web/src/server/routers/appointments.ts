@@ -6,7 +6,7 @@ import { TRPCError } from "@trpc/server";
 import { verifyConfirmationToken } from "@/lib/tokens/confirmation";
 import { requirePermission } from "@/server/trpc/middleware";
 import { appointmentEvents } from "@/lib/events/appointment";
-import { writeAuditLog } from "@/server/audit";
+import { auditedMutation } from "@/server/trpc/audited-mutation";
 
 export const appointmentsRouter = createTRPCRouter({
   // ── List (simple) ──────────────────────────────────────────────────────────
@@ -109,7 +109,24 @@ export const appointmentsRouter = createTRPCRouter({
     }),
 
   // ── Create ─────────────────────────────────────────────────────────────────
-  create: tenantProcedure
+  create: auditedMutation({
+    entity: "appointment",
+    action: "create",
+    event: "appointment.created",
+    summary: "Appointment created",
+    entityId: (result) => (result as { id: string }).id,
+    changes: (result) => {
+      const r = result as { patientId: string; vetId: string | null; startTime: Date; endTime: Date; source: string; status: string };
+      return {
+        patientId: r.patientId,
+        vetId: r.vetId,
+        startTime: r.startTime.toISOString(),
+        endTime: r.endTime.toISOString(),
+        source: r.source,
+        status: r.status,
+      };
+    },
+  })
     .use(requirePermission(PERMISSIONS.APPOINTMENTS_CREATE))
     .input(
       z.object({
@@ -131,22 +148,6 @@ export const appointmentsRouter = createTRPCRouter({
         .values({ ...input, status: "scheduled" })
         .returning();
 
-      await writeAuditLog(ctx, {
-        tenantId: input.tenantId,
-        action: "create",
-        entity: { type: "appointment", id: created.id },
-        event: "appointment.created",
-        summary: "Appointment created",
-        changes: {
-          patientId: created.patientId,
-          vetId: created.vetId,
-          startTime: created.startTime.toISOString(),
-          endTime: created.endTime.toISOString(),
-          source: created.source,
-          status: created.status,
-        },
-      });
-
       appointmentEvents.notifyChange({
         tenantId: input.tenantId,
         vetId: input.vetId,
@@ -159,7 +160,13 @@ export const appointmentsRouter = createTRPCRouter({
     }),
 
   // ── Update ─────────────────────────────────────────────────────────────────
-  update: tenantProcedure
+  update: auditedMutation({
+    entity: "appointment",
+    action: "update",
+    event: "appointment.updated",
+    summary: "Appointment updated",
+    entityId: (result) => (result as { id: string }).id,
+  })
     .use(requirePermission(PERMISSIONS.APPOINTMENTS_UPDATE))
     .input(
       z.object({
@@ -182,15 +189,6 @@ export const appointmentsRouter = createTRPCRouter({
         .returning();
 
       if (!updated) throw new TRPCError({ code: "NOT_FOUND" });
-
-      await writeAuditLog(ctx, {
-        tenantId,
-        action: "update",
-        entity: { type: "appointment", id: updated.id },
-        event: "appointment.updated",
-        summary: "Appointment updated",
-        changes: data,
-      });
 
       appointmentEvents.notifyChange({
         tenantId,
@@ -234,7 +232,14 @@ export const appointmentsRouter = createTRPCRouter({
     }),
 
   // ── Delete ─────────────────────────────────────────────────────────────────
-  delete: tenantProcedure
+  delete: auditedMutation({
+    entity: "appointment",
+    action: "delete",
+    event: "appointment.deleted",
+    summary: "Appointment deleted",
+    entityId: (_, input) => (input as { id: string }).id,
+    changes: () => ({ deleted: true }),
+  })
     .use(requirePermission(PERMISSIONS.APPOINTMENTS_CANCEL))
     .input(z.object({ id: z.string().uuid(), tenantId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
@@ -251,15 +256,6 @@ export const appointmentsRouter = createTRPCRouter({
       await ctx.db
         .delete(appointments)
         .where(and(eq(appointments.id, input.id), eq(appointments.tenantId, input.tenantId)));
-
-      await writeAuditLog(ctx, {
-        tenantId: input.tenantId,
-        action: "delete",
-        entity: { type: "appointment", id: input.id },
-        event: "appointment.deleted",
-        summary: "Appointment deleted",
-        changes: { deleted: true },
-      });
 
       appointmentEvents.notifyChange({
         tenantId: input.tenantId,

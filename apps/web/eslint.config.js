@@ -30,6 +30,19 @@ export default defineConfig([
       "react/no-unescaped-entities": "warn",
       "prefer-const": "error",
       "import/no-anonymous-default-export": "warn",
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "@/server/audit",
+              importNames: ["writeAuditLog"],
+              message:
+                "Use auditedMutation or auditedProtectedMutation in routers. Direct writeAuditLog is reserved for non-tRPC contexts (cron jobs, invitations, tenant-deletion).",
+            },
+          ],
+        },
+      ],
     },
   },
   globalIgnores([
