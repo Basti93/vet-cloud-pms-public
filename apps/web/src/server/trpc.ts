@@ -88,43 +88,40 @@ const enforceTenantIsActive = t.middleware(async ({ ctx, path, next }) => {
     throw new TRPCError({ code: "UNAUTHORIZED" });
   }
 
-  // Use adminDb (superuser) for bootstrap lookups — RLS is not yet set on this connection
-  // because app.current_tenant_id hasn't been established yet.
-  const [user] = await ctx.adminDb
-    .select({ id: users.id, tenantId: users.tenantId, active: users.active })
+  // Single adminDb query covers user, tenant status, and deletion schedule.
+  // adminDb (superuser) used because RLS is not yet established at this point.
+  const [row] = await ctx.adminDb
+    .select({
+      userId: users.id,
+      tenantId: users.tenantId,
+      userActive: users.active,
+      tenantDeactivatedAt: tenants.deactivatedAt,
+      scheduledDeletionId: tenantDeletionSchedules.id,
+    })
     .from(users)
+    .innerJoin(tenants, eq(tenants.id, users.tenantId))
+    .leftJoin(
+      tenantDeletionSchedules,
+      and(
+        eq(tenantDeletionSchedules.tenantId, users.tenantId),
+        eq(tenantDeletionSchedules.status, "scheduled")
+      )
+    )
     .where(eq(users.clerkId, ctx.userId))
     .limit(1);
 
-  if (!user?.tenantId) {
+  if (!row?.tenantId) {
     throw new TRPCError({ code: "FORBIDDEN" });
   }
 
-  if (!user.active && !INACTIVE_USER_ALLOWED_PATHS.has(path)) {
+  if (!row.userActive && !INACTIVE_USER_ALLOWED_PATHS.has(path)) {
     throw new TRPCError({
       code: "FORBIDDEN",
       message: "USER_INACTIVE",
     });
   }
 
-  const [scheduledDeletion] = await ctx.adminDb
-    .select({ id: tenantDeletionSchedules.id })
-    .from(tenantDeletionSchedules)
-    .where(
-      and(
-        eq(tenantDeletionSchedules.tenantId, user.tenantId),
-        eq(tenantDeletionSchedules.status, "scheduled")
-      )
-    )
-    .limit(1);
-
-  const [tenantData] = await ctx.adminDb
-    .select({ deactivatedAt: tenants.deactivatedAt })
-    .from(tenants)
-    .where(eq(tenants.id, user.tenantId))
-    .limit(1);
-
-  const isDeactivated = scheduledDeletion || tenantData?.deactivatedAt;
+  const isDeactivated = row.scheduledDeletionId || row.tenantDeactivatedAt;
 
   if (isDeactivated && !DEACTIVATION_ALLOWED_PATHS.has(path)) {
     throw new TRPCError({
@@ -136,8 +133,8 @@ const enforceTenantIsActive = t.middleware(async ({ ctx, path, next }) => {
   // Wrap the downstream procedure in a transaction with SET LOCAL app.current_tenant_id.
   // ctx.db is replaced by the transaction client so all procedures get RLS-scoped queries
   // without any changes to individual procedure handlers.
-  return withTenantContext(ctx.db, user.tenantId, (tx) =>
-    next({ ctx: { tenantId: user.tenantId, dbUserId: user.id, db: tx } })
+  return withTenantContext(ctx.db, row.tenantId, (tx) =>
+    next({ ctx: { tenantId: row.tenantId, dbUserId: row.userId, db: tx } })
   );
 });
 
