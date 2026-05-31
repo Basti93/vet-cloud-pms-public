@@ -16,6 +16,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { randomUUID, randomBytes } from "crypto";
 import { sendTenantDeactivationEmail } from "@/lib/email/service";
 import { getMainDomain } from "@/lib/env";
+// eslint-disable-next-line no-restricted-imports -- tenant.update fires two audit events (onboarding_completed + created_from_placeholder); auditedMutation cannot emit multiple events per mutation
 import { writeAuditLog } from "@/server/audit";
 import { logEventAsync, serializeLogError } from "@/server/trpc/logging-middleware";
 import { requirePermission } from "@/server/trpc/middleware";

@@ -4,7 +4,7 @@ import { createTRPCRouter, tenantProcedure } from "@/server/trpc";
 import { patients, owners, PERMISSIONS } from "@/lib/db/schema";
 import { TRPCError } from "@trpc/server";
 import { requirePermission } from "@/server/trpc/middleware";
-import { writeAuditLog } from "@/server/audit";
+import { auditedMutation } from "@/server/trpc/audited-mutation";
 
 export const patientsRouter = createTRPCRouter({
   // List patients (with optional search)
@@ -77,7 +77,17 @@ export const patientsRouter = createTRPCRouter({
     }),
 
   // Create patient under an existing owner
-  create: tenantProcedure
+  create: auditedMutation({
+    entity: "patient",
+    action: "create",
+    event: "patient.created",
+    summary: "Patient created",
+    entityId: (result) => (result as { patient: { id: string } }).patient!.id,
+    changes: (result) => ({
+      ownerId: (result as { owner: { id: string } }).owner.id,
+      species: (result as { patient: { species: string } }).patient!.species,
+    }),
+  })
     .use(requirePermission(PERMISSIONS.PATIENTS_CREATE))
     .input(
       z.object({
@@ -117,18 +127,6 @@ export const patientsRouter = createTRPCRouter({
           notes: input.notes,
         })
         .returning();
-
-      await writeAuditLog(ctx, {
-        tenantId: input.tenantId,
-        action: "create",
-        entity: { type: "patient", id: patient!.id },
-        event: "patient.created",
-        summary: "Patient created",
-        changes: {
-          ownerId: owner.id,
-          species: patient!.species,
-        },
-      });
 
       return { patient, owner };
     }),

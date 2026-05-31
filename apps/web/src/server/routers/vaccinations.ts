@@ -14,7 +14,7 @@ import {
 } from "@/lib/db/schema";
 import { createTRPCRouter, tenantProcedure } from "@/server/trpc";
 import { requirePermission } from "@/server/trpc/middleware";
-import { writeAuditLog } from "@/server/audit";
+import { auditedMutation } from "@/server/trpc/audited-mutation";
 
 // Shape returned by getTypes — unified across global and custom types
 const effectiveTypeSchema = z.object({
@@ -321,7 +321,18 @@ export const vaccinationsRouter = createTRPCRouter({
         .orderBy(desc(vaccinations.administeredDate));
     }),
 
-  create: tenantProcedure
+  create: auditedMutation({
+    entity: "vaccination",
+    action: "create",
+    event: "vaccination.created",
+    summary: (_, input) => `Vaccination ${(input as { type: string }).type} recorded`,
+    entityId: (result) => (result as { id: string }).id,
+    changes: (result, input) => ({
+      patientId: (input as { patientId: string }).patientId,
+      administeredDate: (input as { administeredDate: Date }).administeredDate.toISOString(),
+      expiryDate: (input as { expiryDate: Date }).expiryDate.toISOString(),
+    }),
+  })
     .use(requirePermission(PERMISSIONS.MEDICAL_CREATE))
     .input(
       z.object({
@@ -373,23 +384,16 @@ export const vaccinationsRouter = createTRPCRouter({
         })
         .returning();
 
-      await writeAuditLog(ctx, {
-        tenantId: input.tenantId,
-        action: "create",
-        entity: { type: "vaccination", id: created.id },
-        event: "vaccination.created",
-        summary: `Vaccination ${input.type} recorded`,
-        changes: {
-          patientId: input.patientId,
-          administeredDate: input.administeredDate.toISOString(),
-          expiryDate: input.expiryDate.toISOString(),
-        },
-      });
-
       return created;
     }),
 
-  update: tenantProcedure
+  update: auditedMutation({
+    entity: "vaccination",
+    action: "update",
+    event: "vaccination.updated",
+    summary: "Vaccination record updated",
+    entityId: (_, input) => (input as { vaccinationId: string }).vaccinationId,
+  })
     .use(requirePermission(PERMISSIONS.MEDICAL_UPDATE))
     .input(
       z.object({
@@ -461,18 +465,16 @@ export const vaccinationsRouter = createTRPCRouter({
         .where(and(eq(vaccinations.id, input.vaccinationId), eq(vaccinations.tenantId, input.tenantId)))
         .returning();
 
-      await writeAuditLog(ctx, {
-        tenantId: input.tenantId,
-        action: "update",
-        entity: { type: "vaccination", id: input.vaccinationId },
-        event: "vaccination.updated",
-        summary: "Vaccination record updated",
-      });
-
       return updated;
     }),
 
-  delete: tenantProcedure
+  delete: auditedMutation({
+    entity: "vaccination",
+    action: "delete",
+    event: "vaccination.deleted",
+    summary: "Vaccination record deleted",
+    entityId: (_, input) => (input as { vaccinationId: string }).vaccinationId,
+  })
     .use(requirePermission(PERMISSIONS.MEDICAL_UPDATE))
     .input(
       z.object({
@@ -496,14 +498,6 @@ export const vaccinationsRouter = createTRPCRouter({
       if (!deleted) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Vaccination not found" });
       }
-
-      await writeAuditLog(ctx, {
-        tenantId: input.tenantId,
-        action: "delete",
-        entity: { type: "vaccination", id: input.vaccinationId },
-        event: "vaccination.deleted",
-        summary: "Vaccination record archived",
-      });
 
       return { success: true };
     }),
