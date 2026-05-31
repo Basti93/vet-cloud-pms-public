@@ -8,6 +8,23 @@ import { and, eq } from "drizzle-orm";
 import { withTenantContext } from "./tenant-context";
 import { checkRateLimit, getRateLimitInfo } from "@/lib/rateLimit";
 import { logEvent, logEventAsync } from "./trpc/logging-middleware";
+import type { AppRouter } from "./routers/_app";
+
+// Derive a typed union of every procedure path in the router tree.
+// import type is erased at runtime — no circular module evaluation.
+// Procedures are detected by the presence of a "meta" key; sub-routers are recursed.
+type RouterPath<T, Prefix extends string = ""> = T extends object
+  ? {
+      [K in Exclude<keyof T, `_${string}` | "createCaller" | symbol | number>]:
+        "meta" extends keyof T[K]
+          ? `${Prefix}${K & string}`
+          : T[K] extends object
+          ? RouterPath<T[K], `${Prefix}${K & string}.`>
+          : `${Prefix}${K & string}`;
+    }[Exclude<keyof T, `_${string}` | "createCaller" | symbol | number>]
+  : never;
+
+type AppRouterPath = RouterPath<AppRouter>;
 
 // ============================================================================
 // Context
@@ -59,7 +76,9 @@ const enforceUserIsAuthenticated = t.middleware(({ ctx, next }) => {
 // Procedures that remain accessible while a tenant's deletion is scheduled or
 // the tenant is deactivated. These paths let users view status and manage their
 // own account (cancel, reactivate, check seat info) without being fully locked out.
-const DEACTIVATION_ALLOWED_PATHS = new Set([
+// `satisfies AppRouterPath[]` checks each string against the router at build time;
+// Set<string> keeps the .has(path) call compatible with tRPC's string path param.
+const DEACTIVATION_ALLOWED_PATHS = new Set<AppRouterPath>([
   "tenant.getDeletionStatus",
   "tenant.getCurrent",
   "tenant.requestDeletion",
@@ -76,7 +95,7 @@ const DEACTIVATION_ALLOWED_PATHS = new Set([
 
 // Procedures accessible to deactivated users (e.g. seat limit exceeded on downgrade).
 // Kept minimal — just enough to show the user their status and let an admin fix it.
-const INACTIVE_USER_ALLOWED_PATHS = new Set([
+const INACTIVE_USER_ALLOWED_PATHS = new Set<AppRouterPath>([
   "admin.getCurrentUser",
   "admin.getUserPermissions",
 ]);
@@ -98,7 +117,7 @@ const enforceTenantIsActive = t.middleware(async ({ ctx, path, next }) => {
     throw new TRPCError({ code: "FORBIDDEN" });
   }
 
-  if (!user.active && !INACTIVE_USER_ALLOWED_PATHS.has(path)) {
+  if (!user.active && !INACTIVE_USER_ALLOWED_PATHS.has(path as AppRouterPath)) {
     throw new TRPCError({
       code: "FORBIDDEN",
       message: "USER_INACTIVE",
@@ -124,7 +143,7 @@ const enforceTenantIsActive = t.middleware(async ({ ctx, path, next }) => {
 
   const isDeactivated = scheduledDeletion || tenantData?.deactivatedAt;
 
-  if (isDeactivated && !DEACTIVATION_ALLOWED_PATHS.has(path)) {
+  if (isDeactivated && !DEACTIVATION_ALLOWED_PATHS.has(path as AppRouterPath)) {
     throw new TRPCError({
       code: "FORBIDDEN",
       message: "TENANT_DEACTIVATED",
