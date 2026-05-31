@@ -1,20 +1,27 @@
 # Vet Cloud PMS
 
 Cloud-basiertes Veterinary Practice Management System (SaaS) für Tierarztpraxen in DACH.  
-**Phase:** 1 (Validation Demo) | **Status:** Funktionsfähig, lokal & in Entwicklung
+**Phase:** 3 in progress | **Status:** Aktive Produktentwicklung auf `staging`
 
 ## 🚀 Quick Start
 
 ```bash
-cd apps/web
-npm install
-npm run db:push    # Neon PostgreSQL Schema initialisieren
-npm run db:seed    # Globale Referenzdaten (tenant-unabhängig)
-npm run db:seed:demo  # Demo-Tenant vollständig neu aufbauen
-npm run dev        # http://localhost:3000
+corepack enable
+pnpm install
+pnpm run dev        # apps/web auf http://localhost:3000
 ```
 
-## 📋 Features (Phase 1)
+Weitere wichtige Checks aus dem Repo-Root:
+
+```bash
+pnpm --filter @vet-cloud/web run typecheck
+pnpm run lint
+pnpm run rag:search -- "tenant isolation"
+```
+
+Schemaänderungen laufen über Drizzle in `apps/web`: `pnpm --filter @vet-cloud/web run db:generate` und Migrationen werden beim Containerstart automatisch ausgeführt.
+
+## 📋 Aktuelle Kernfunktionen
 
 ✅ **Multi-Tenant Setup** — Isolierte Daten pro Tierarztpraxis  
 ✅ **Terminplanung (Kalender)** — FullCalendar Integration, echte tRPC-Daten  
@@ -28,14 +35,14 @@ npm run dev        # http://localhost:3000
 
 | Layer | Tech |
 |-------|------|
-| **Frontend** | Next.js 15 (App Router), React 19, TypeScript |
+| **Frontend** | Next.js 16 (App Router), React 19, TypeScript |
 | **Styling** | Tailwind CSS, PostCSS, shadcn/ui |
 | **API** | tRPC v11, Node.js |
-| **Database** | Neon PostgreSQL (EU/Frankfurt), Drizzle ORM |
+| **Database** | PostgreSQL (Frankfurt), Drizzle ORM |
 | **Auth** | Clerk (EU Region) |
 | **Voice** | Vapi AI (German Assistant) |
 | **Monorepo** | Turborepo |
-| **Deployment** | Vercel (Phase 2) / Hetzner (Production) |
+| **Deployment** | Hetzner/Coolify container deployments |
 
 ## 📁 Project Structure
 
@@ -63,8 +70,8 @@ apps/web/
 Kopiere `.env.local.example` → `.env.local` und setze:
 
 ```env
-# Database (Neon PostgreSQL)
-DATABASE_URL=postgresql://user:password@ep-xxx.eu-central-1.neon.tech/vet_cloud_pms?sslmode=require
+# Database (PostgreSQL)
+DATABASE_URL=postgresql://user:***@host:5432/vet_cloud_pms?sslmode=require
 
 # Clerk Authentication
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=REDACTED
@@ -108,19 +115,12 @@ Alle über `/api/trpc/`:
 
 Typsicher dank tRPC v11!
 
-## 🌐 Deployment (Phase 2)
+## 🌐 Deployment
 
-**Vercel** (Staging):
-```bash
-git push → Automatic Deploy
-```
-
-**Hetzner/Docker** (Production):
-- Docker Image bauen
-- PostgreSQL on Neon (bleibt extern)
-- Umgebungsvariablen via Hetzner Console
-
-Siehe `DEPLOYMENT.md` für Details.
+- `staging` deployt automatisch in die Coolify-Staging-Umgebung.
+- `main` deployt automatisch in Produktion.
+- Container führen Drizzle-Migrationen beim Start aus; keine manuellen Produktionsmigrationen aus Agent-Sessions.
+- Details und Anforderungen stehen in `openspec/specs/deployment/spec.md`.
 
 ## 🤝 Team
 
@@ -131,23 +131,11 @@ Siehe `DEPLOYMENT.md` für Details.
 
 ## 📚 Documentation
 
-### For All AI Models
-- **[`docs/AI_INTEGRATION.md`](docs/AI_INTEGRATION.md)** — How to use any AI for development (Claude, ChatGPT, etc.)
-- **[`docs/CODEBASE_ARCHITECTURE.md`](docs/CODEBASE_ARCHITECTURE.md)** — Directory structure & key patterns
-- **[`docs/IMPLEMENTATION_PATTERNS.md`](docs/IMPLEMENTATION_PATTERNS.md)** — Code conventions & patterns
-- **[`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md)** — Common issues & debugging
-
-### For Claude Code Specifically
-- **[`.claude/docs/`](.claude/docs/)** — Claude-optimized guides
-  - `RAG_GUIDE.md` — Semantic code search (MCP tool)
-  - `MEMORY_STRATEGY.md` — Persistent memory across sessions
-  - And more...
-
-### Project Documentation
-- **[`docs/`](docs/)** — All project documentation (20+ guides)
-- **[`DEPLOYMENT.md`](DEPLOYMENT.md)** — Vercel & Hetzner setup
-- **[`PRODUCT.md`](PRODUCT.md)** — Product vision & market
-- And 15+ other topic-specific documents
+### Source of truth
+- **[`AGENTS.md`](AGENTS.md)** — Codex/agent workflow, required commands, OpenSpec process.
+- **[`CLAUDE.md`](CLAUDE.md)** — Current phase and Claude-oriented developer context.
+- **[`openspec/specs/`](openspec/specs/)** — Standing product, architecture, deployment, testing, and implementation requirements.
+- **[`openspec/changes/`](openspec/changes/)** — Active and parked change proposals with tasks/design/spec deltas.
 
 ## ✅ Commit Convention
 
