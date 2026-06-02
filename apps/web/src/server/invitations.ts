@@ -9,7 +9,7 @@ import { invalidateRolePermissionCache } from "@/lib/auth/permission-cache";
 const INVITE_EXPIRY_DAYS = 7;
 
 function normalizeEmail(email: string) {
-  return email.trim().toLowerCase();
+  return email.trim().toLowerCase().replace(/\+clerk_test(?=@)/i, "");
 }
 
 export function hashInviteToken(token: string) {

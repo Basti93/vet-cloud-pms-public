@@ -41,6 +41,12 @@ Every new interactive element added to the UI SHALL include a `data-testid` attr
 ### Requirement: Unit Tests Cover Pure Logic Only
 Vitest unit tests SHALL target pure functions with non-trivial logic. Unit tests MUST NOT mock or instantiate a database, network connection, or React component. tRPC procedure handlers and functions that only call the database SHALL NOT have unit tests.
 
+### Requirement: Minimum Function Coverage Floor
+The `apps/web` Vitest coverage report SHALL maintain a minimum of 50% function coverage across all included files. Pure data-constant modules (e.g. `lib/theme.ts`) are excluded from the coverage report. New pure-function modules added to `lib/` MUST include corresponding unit tests before merging.
+
+### Requirement: Cross-Functional Test Chains
+Multi-module flows that cross lib boundaries (e.g. token generation → URL building → template rendering) SHALL have at least one cross-functional unit test that drives the full chain as a pure-function test. The chain test MUST NOT touch the database, network, or React — it exercises only in-memory function composition.
+
 #### Scenario: Date window calculation tested
 - **WHEN** a new date-based calculation function is written (e.g. vaccination expiry window, reminder offset)
 - **THEN** a unit test covering the boundary conditions is added to `apps/web/src/lib/**/__tests__/*.test.ts`
