@@ -8,8 +8,6 @@ interface Props {
   searchParams: Promise<{ preview?: string }>;
 }
 
-export { canAccessPublicBookingTenant };
-
 export default async function BookingPage({ params, searchParams }: Props) {
   const { tenantSlug } = await params;
   const { preview: previewToken } = await searchParams;

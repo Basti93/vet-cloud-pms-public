@@ -46,7 +46,7 @@ export async function canView(
   options?: { database?: Database; userId?: string | null }
 ): Promise<boolean> {
   const database = options?.database ?? adminDb;
-  const userId = options?.userId ?? (await auth()).userId;
+  const userId = options?.userId !== undefined ? options.userId : (await auth()).userId;
 
   if (urlToken && access.previewToken && urlToken === access.previewToken) return true;
   // standalone projects: only preview token grants access, no Clerk fallback

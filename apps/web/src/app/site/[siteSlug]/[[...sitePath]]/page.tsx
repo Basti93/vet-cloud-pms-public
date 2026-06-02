@@ -9,15 +9,12 @@ import {
   resolveProjectByHostOrSlug,
   resolvePublishedWebsitePage,
 } from "@/lib/website-platform/resolve-project";
-import { canView, getAccessInfo, type AccessInfo } from "@/lib/public-route/site-access";
+import { canView, getAccessInfo } from "@/lib/public-route/site-access";
 
 interface Props {
   params: Promise<{ siteSlug: string; sitePath?: string[] }>;
   searchParams: Promise<{ preview?: string }>;
 }
-
-export type { AccessInfo };
-export { canView, getAccessInfo };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { siteSlug, sitePath } = await params;
