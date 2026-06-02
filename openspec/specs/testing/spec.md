@@ -42,10 +42,62 @@ Every new interactive element added to the UI SHALL include a `data-testid` attr
 Vitest unit tests SHALL target pure functions with non-trivial logic. Unit tests MUST NOT mock or instantiate a database, network connection, or React component. tRPC procedure handlers and functions that only call the database SHALL NOT have unit tests.
 
 ### Requirement: Minimum Function Coverage Floor
-The `apps/web` Vitest coverage report SHALL maintain a minimum of 50% function coverage across all included files. Pure data-constant modules (e.g. `lib/theme.ts`) are excluded from the coverage report. New pure-function modules added to `lib/` MUST include corresponding unit tests before merging.
+The `apps/web` Vitest coverage report SHALL maintain a minimum of 50% function coverage across all included files. Pure data-constant modules (e.g. `lib/theme.ts`) are excluded from the coverage report. New pure-function modules added to `lib/` MUST include corresponding unit tests before merging. CI MUST fail if function coverage drops below 50%.
+
+#### Scenario: Coverage check in CI
+- **WHEN** a PR is merged and the vitest suite runs with `--coverage`
+- **THEN** the reported `Functions` percentage is ≥50%
+
+#### Scenario: New pure lib function added
+- **WHEN** a developer adds a new pure function (no DB/network deps) to `src/lib/**/*.ts`
+- **THEN** a unit test covering at least the happy path and one edge case is added in the same PR
+
+### Requirement: Pure Function Test Isolation
+Tests for in-memory state (e.g., `permission-cache.ts`) SHALL reset module-level state in `beforeEach` using the module's own invalidation/reset functions. Tests MUST NOT rely on execution order.
+
+#### Scenario: Permission cache tests run in any order
+- **WHEN** `permission-cache.test.ts` tests run in any order
+- **THEN** each test starts with an empty cache due to `invalidateAllRolePermissions()` in `beforeEach`
+
+### Requirement: Env Stub Pattern for Env-Dependent Functions
+Tests that exercise env-variable-dependent code SHALL use `vi.stubEnv()` to set values and `afterEach(() => vi.unstubAllEnvs())` to restore them. Hard-coding `process.env.*` mutations in tests is not permitted.
+
+#### Scenario: System name resolved from env
+- **WHEN** `getSystemDomain()` is tested with `NEXT_PUBLIC_SYSTEM_NAME=test.example.com`
+- **THEN** `vi.stubEnv('NEXT_PUBLIC_SYSTEM_NAME', 'test.example.com')` is used, not `process.env.NEXT_PUBLIC_SYSTEM_NAME = '...'`
 
 ### Requirement: Cross-Functional Test Chains
-Multi-module flows that cross lib boundaries (e.g. token generation → URL building → template rendering) SHALL have at least one cross-functional unit test that drives the full chain as a pure-function test. The chain test MUST NOT touch the database, network, or React — it exercises only in-memory function composition.
+Multi-module flows that cross lib boundaries (e.g. token generation → URL building → template rendering) SHALL have at least one cross-functional unit test that drives the full chain as a pure-function test. The chain test MUST NOT touch the database, network, or React — it exercises only in-memory function composition. Chain tests SHALL live in a `__tests__/cross-functional/` directory adjacent to the primary module.
+
+#### Scenario: Schedule-to-block chain tested
+- **WHEN** `createDefaultWebsiteBlocks` is called with a `DaySchedule[]` input
+- **THEN** the resulting hours block reflects the normalized opening hours derived from `normalizeWeekSchedule` and `openingHoursToDisplayRows`
+
+#### Scenario: Email template pipeline tested end-to-end
+- **WHEN** `replacePlaceholders` is called with a template and full placeholder set followed by URL embedding
+- **THEN** the rendered output contains all substituted values and a properly formatted confirmation URL
+
+### Requirement: Injectable sendFn Tests
+Functions that accept a `sendFn` injectable parameter SHALL be tested using `vi.fn()` as the injectable, asserting both the call arguments and the return value propagation.
+
+#### Scenario: Payment failed email sends correct content
+- **WHEN** `sendPaymentFailedAdminEmail` is called with a `vi.fn()` sendFn
+- **THEN** sendFn is called with subject containing the clinic name and text containing the grace period date
+
+#### Scenario: sendFn return value is propagated
+- **WHEN** the injectable sendFn returns `{ success: false, error: 'network' }`
+- **THEN** `sendPaymentFailedAdminEmail` returns that same value to the caller
+
+### Requirement: Schema Normalizer Tests
+Zod-based normalizer functions (`normalizeThemeConfig`, `normalizeCapabilities`, `normalizeBlocks`) SHALL be tested with empty input (verifying defaults), valid partial input, and invalid input (verifying safe fallback or throw).
+
+#### Scenario: normalizeThemeConfig applies defaults
+- **WHEN** `normalizeThemeConfig` is called with `null` or `{}`
+- **THEN** result contains `palette: "sage"`, `typography: "modern"`, `radius: "lg"`, `density: "comfortable"`
+
+#### Scenario: normalizeBlocks returns empty array for garbage input
+- **WHEN** `normalizeBlocks` is called with a non-array value
+- **THEN** result is an empty array (`.catch([])` behavior)
 
 #### Scenario: Date window calculation tested
 - **WHEN** a new date-based calculation function is written (e.g. vaccination expiry window, reminder offset)
