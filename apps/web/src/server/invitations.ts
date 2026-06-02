@@ -9,7 +9,11 @@ import { invalidateRolePermissionCache } from "@/lib/auth/permission-cache";
 const INVITE_EXPIRY_DAYS = 7;
 
 function normalizeEmail(email: string) {
-  return email.trim().toLowerCase().replace(/\+clerk_test(?=@)/i, "");
+  return email.trim().toLowerCase();
+}
+
+function normalizeEmailForComparison(email: string) {
+  return normalizeEmail(email).replace(/\+clerk_test(?=@)/i, "");
 }
 
 export function hashInviteToken(token: string) {
@@ -237,7 +241,7 @@ export async function acceptInvite(params: { token: string; clerkUserId: string 
     }
   }
 
-  if (normalizeEmail(user.email) !== normalizeEmail(invitation.email)) {
+  if (normalizeEmailForComparison(user.email) !== normalizeEmailForComparison(invitation.email)) {
     throw new TRPCError({
       code: "FORBIDDEN",
       message: "Invitation email does not match signed-in account",
