@@ -1,33 +1,61 @@
 // @vitest-environment node
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import { createTestDb, createTestCaller, seedTestTenant, type TestDb } from "@/server/__tests__/helpers";
-import { appointments, appointmentHolds, owners, patients, tenants } from "@/lib/db/schema";
+import type { TestDb } from "@/server/__tests__/helpers";
+import { appointments, appointmentHolds, owners, patients, roles, tenants, userRoles } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
 
 vi.mock("@/lib/email/service");
 vi.mock("@/lib/events/appointment");
 vi.mock("@/server/audit");
 
 process.env.JWT_SECRET = "test-secret-at-least-32-chars-long!!";
+process.env.SMTP_HOST ??= "localhost";
+process.env.SMTP_USER ??= "test-user";
+process.env.SMTP_PASS ??= "test-pass";
+
+let createTestDb!: (typeof import("@/server/__tests__/helpers"))["createTestDb"];
+let createTestCaller!: (typeof import("@/server/__tests__/helpers"))["createTestCaller"];
+let seedTestTenant!: (typeof import("@/server/__tests__/helpers"))["seedTestTenant"];
 
 let db: TestDb;
+let adminDb: TestDb;
 let cleanup: () => Promise<void>;
 let tenantId: string;
 let clerkId: string;
 let vetUserId: string;
+let tenantSlug: string;
 
 const browserSessionId = "00000000-0000-4000-8000-000000000099";
 
 beforeAll(async () => {
-  ({ db, cleanup } = await createTestDb());
+  ({ createTestDb, createTestCaller, seedTestTenant } = await import("@/server/__tests__/helpers"));
+
+  ({ db, adminDb, cleanup } = await createTestDb());
   const { tenant, user } = await seedTestTenant(db);
   tenantId = tenant.id;
+  tenantSlug = tenant.slug;
   clerkId = user.clerkId;
   vetUserId = user.id;
   await db
     .update(tenants)
     .set({ websiteEnabled: true })
     .where(eq(tenants.id, tenantId));
+
+  const [vetRole] = await db
+    .insert(roles)
+    .values({
+      tenantId,
+      code: "vet",
+      name: "Vet",
+      description: "Veterinarian",
+      isSystem: true,
+      isEditableByTenant: false,
+      baseVersion: 1,
+    })
+    .returning();
+
+  await db.insert(userRoles).values({ userId: vetUserId, roleId: vetRole.id });
 }, 60_000);
 
 afterAll(async () => {
@@ -140,5 +168,101 @@ describe("booking.confirm", () => {
       caller.booking.confirm({ appointmentId: appt.id, tenantId })
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
+});
 
+describe("public booking access guards", () => {
+  it("returns clinic data for enabled tenant and hides disabled tenants without valid preview", async () => {
+    const anonCaller = createTestCaller(db, { clerkId: "", permissions: [], adminDb });
+
+    const enabledClinic = await anonCaller.booking.getClinic({ slug: tenantSlug });
+    expect(enabledClinic?.id).toBe(tenantId);
+
+    const { tenant: disabledTenant } = await seedTestTenant(db, {
+      clerkId: `disabled_clerk_${Date.now()}`,
+      slug: `disabled-${Date.now()}`,
+    });
+    await db
+      .update(tenants)
+      .set({ websiteEnabled: false, previewToken: "preview-token-123" })
+      .where(eq(tenants.id, disabledTenant.id));
+
+    const hiddenWithoutPreview = await anonCaller.booking.getClinic({ slug: disabledTenant.slug });
+    expect(hiddenWithoutPreview).toBeNull();
+
+    const hiddenWithInvalidPreview = await anonCaller.booking.getClinic({
+      slug: disabledTenant.slug,
+      previewToken: "wrong-token",
+    });
+    expect(hiddenWithInvalidPreview).toBeNull();
+
+    const visibleWithValidPreview = await anonCaller.booking.getClinic({
+      slug: disabledTenant.slug,
+      previewToken: "preview-token-123",
+    });
+    expect(visibleWithValidPreview?.id).toBe(disabledTenant.id);
+  });
+
+  it("public booking procedures require enabled tenant or matching preview token", async () => {
+    const anonCaller = createTestCaller(db, { clerkId: "", permissions: [], adminDb });
+
+    const enabledVets = await anonCaller.booking.listPublicVets({ tenantId });
+    expect(enabledVets).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: vetUserId }),
+      ])
+    );
+
+    const { tenant: disabledTenant, user: disabledUser } = await seedTestTenant(db, {
+      clerkId: `disabled_proc_clerk_${Date.now()}`,
+      slug: `disabled-proc-${Date.now()}`,
+    });
+    await db
+      .update(tenants)
+      .set({ websiteEnabled: false, previewToken: "preview-token-proc-123" })
+      .where(eq(tenants.id, disabledTenant.id));
+
+    const [disabledVetRole] = await db
+      .insert(roles)
+      .values({
+        tenantId: disabledTenant.id,
+        code: "vet",
+        name: "Vet",
+        description: "Veterinarian",
+        isSystem: true,
+        isEditableByTenant: false,
+        baseVersion: 1,
+      })
+      .returning();
+
+    await db.insert(userRoles).values({ userId: disabledUser.id, roleId: disabledVetRole.id });
+
+    await expect(
+      anonCaller.booking.listPublicVets({ tenantId: disabledTenant.id })
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+    await expect(
+      anonCaller.booking.listPublicVets({
+        tenantId: disabledTenant.id,
+        previewToken: "wrong-token",
+      })
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+    const allowedWithValidPreview = await anonCaller.booking.listPublicVets({
+      tenantId: disabledTenant.id,
+      previewToken: "preview-token-proc-123",
+    });
+    expect(allowedWithValidPreview).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: disabledUser.id }),
+      ])
+    );
+  });
+
+  it("rejects arbitrary tenant IDs in public booking procedures", async () => {
+    const anonCaller = createTestCaller(db, { clerkId: "", permissions: [], adminDb });
+
+    await expect(
+      anonCaller.booking.listPublicVets({ tenantId: randomUUID() })
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
 });

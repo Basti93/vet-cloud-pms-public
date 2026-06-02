@@ -7,6 +7,12 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    env: {
+      JWT_SECRET: 'test-secret-at-least-32-chars-long!!',
+      SMTP_HOST: 'localhost',
+      SMTP_USER: 'test-user',
+      SMTP_PASS: 'test-pass',
+    },
     // Playwright E2E tests live in e2e/ — exclude from Vitest
     exclude: ['node_modules', 'e2e/**'],
     // Cap parallel workers — testcontainers integration tests start Postgres
