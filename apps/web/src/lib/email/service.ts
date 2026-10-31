@@ -19,14 +19,6 @@ function tenantSender(tenantName: string) {
   return `${tenantName} <${FROM_EMAIL}>`;
 }
 
-function getConsultationRecipient() {
-  const recipient = process.env.CONSULTATION_RECIPIENT_EMAIL?.trim();
-  if (!recipient) {
-    throw new Error("Missing CONSULTATION_RECIPIENT_EMAIL environment variable");
-  }
-  return recipient;
-}
-
 async function logEmail(params: {
   tenantId?: string | null;
   emailType: EmailType;
@@ -237,16 +229,6 @@ export interface SendVaccinationReminderEmailInput {
   unsubscribeUrl?: string;
   customSubject: string;
   customBody: string;
-}
-
-export interface SendConsultationRequestEmailInput {
-  name: string;
-  email: string;
-  phone?: string;
-  practiceName?: string;
-  role?: string;
-  websiteInterest?: boolean;
-  message?: string;
 }
 
 // ─── Template builders ────────────────────────────────────────────────────────
@@ -515,27 +497,6 @@ function buildVaccinationReminderEmail(input: SendVaccinationReminderEmailInput)
   };
 }
 
-function buildConsultationRequestEmail(input: SendConsultationRequestEmailInput): TemplateResult {
-  const recipient = getConsultationRecipient();
-  return {
-    to: recipient,
-    subject: `Neue Beratungsanfrage: ${input.practiceName || input.name}`,
-    text: `Neue Beratungsanfrage über die Landingpage
-
-Name: ${input.name}
-E-Mail: ${input.email}
-Telefon: ${optionalValue(input.phone)}
-Praxis: ${optionalValue(input.practiceName)}
-Rolle/Funktion: ${optionalValue(input.role)}
-Website mitbuchen: ${input.websiteInterest ? "Ja" : "Nein / nicht angegeben"}
-
-Nachricht:
-${optionalValue(input.message)}`,
-    emailType: "consultation_request",
-    providerKind: "system",
-  };
-}
-
 // ─── Named exports ────────────────────────────────────────────────────────────
 
 export const sendConfirmationEmail = (input: SendConfirmationEmailInput) =>
@@ -567,9 +528,6 @@ export const sendVaccinationDigestEmail = (input: SendVaccinationDigestEmailInpu
 
 export const sendVaccinationReminderEmail = (input: SendVaccinationReminderEmailInput) =>
   dispatch(() => buildVaccinationReminderEmail(input));
-
-export const sendConsultationRequestEmail = (input: SendConsultationRequestEmailInput) =>
-  dispatch(() => buildConsultationRequestEmail(input));
 
 // ─── Multi-recipient functions ────────────────────────────────────────────────
 

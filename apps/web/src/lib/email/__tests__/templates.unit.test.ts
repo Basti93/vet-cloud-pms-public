@@ -29,7 +29,6 @@ const {
   sendTenantLifecycleEmail,
   sendUserInvitationEmail,
   sendVaccinationReminderEmail,
-  sendConsultationRequestEmail,
 } = await import("../service");
 
 function last(): SentEmail {
@@ -209,25 +208,3 @@ describe("vaccination reminder email", () => {
   });
 });
 
-describe("consultation request email", () => {
-  it("subject contains name when no practice name", async () => {
-    vi.stubEnv("CONSULTATION_RECIPIENT_EMAIL", "sales@example.com");
-    await sendConsultationRequestEmail({ name: "Franz Müller", email: "franz@test.de" });
-    expect(last().subject).toContain("Franz Müller");
-    vi.unstubAllEnvs();
-  });
-
-  it("uses Nicht angegeben for missing optional fields", async () => {
-    vi.stubEnv("CONSULTATION_RECIPIENT_EMAIL", "sales@example.com");
-    await sendConsultationRequestEmail({ name: "Test", email: "test@test.de" });
-    expect(last().text).toContain("Nicht angegeben");
-    vi.unstubAllEnvs();
-  });
-
-  it("returns success: false when CONSULTATION_RECIPIENT_EMAIL is missing", async () => {
-    vi.stubEnv("CONSULTATION_RECIPIENT_EMAIL", "");
-    const result = await sendConsultationRequestEmail({ name: "Test", email: "test@test.de" });
-    expect(result.success).toBe(false);
-    vi.unstubAllEnvs();
-  });
-});

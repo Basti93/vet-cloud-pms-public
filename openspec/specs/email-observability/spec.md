@@ -19,7 +19,7 @@ Every call to a `sendXxx()` function in `service.ts` SHALL insert a row into `em
 The `email_logs` table SHALL have columns: `id`, `tenant_id` (nullable for system emails), `email_type` (enum of all types), `recipient_email`, `status` (`sent` | `failed`), `error_message` (nullable), `message_id` (nullable), `sent_at`.
 
 #### Scenario: System email with no tenant
-- **WHEN** `sendConsultationRequestEmail()` is called (no tenant context)
+- **WHEN** a system email without a tenant context is called (no tenant context)
 - **THEN** row is inserted with `tenant_id = null`
 
 #### Scenario: Tenant email linked to tenant

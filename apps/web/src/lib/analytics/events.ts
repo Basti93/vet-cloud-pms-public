@@ -1,7 +1,4 @@
 export const AnalyticsEvents = {
-  LANDING_CTA_CLICK: "landing_cta_click",
-  CONTACT_FORM_SUBMITTED: "contact_form_submitted",
-  CONTACT_FORM_SUCCESS: "contact_form_success",
   SIGNUP_STARTED: "signup_started",
   SIGNUP_COMPLETED: "signup_completed",
   ONBOARDING_COMPLETED: "onboarding_completed",

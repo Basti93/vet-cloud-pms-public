@@ -1,10 +1,9 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("Production smoke", () => {
-  test("homepage loads and primary CTA is present", async ({ page }) => {
+  test("root redirects unauthenticated visitors to sign-in", async ({ page }) => {
     await page.goto("/");
-    await expect(page).toHaveURL(/example\.de/);
-    await expect(page.getByRole("link", { name: /demo buchen|unverbindliche demo buchen/i }).first()).toBeVisible();
+    await expect(page).toHaveURL(/sign-in/);
   });
 
   test("sign-in page renders clerk form shell", async ({ page }) => {

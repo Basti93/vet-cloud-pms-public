@@ -42,7 +42,7 @@ Schemaänderungen laufen über Drizzle in `apps/web`: `pnpm --filter @vet-cloud/
 | **Auth** | Clerk (EU Region) |
 | **Voice** | Vapi AI (German Assistant) |
 | **Monorepo** | Turborepo |
-| **Deployment** | Hetzner/Coolify container deployments |
+| **Deployment** | Container deployments |
 
 ## 📁 Project Structure
 
@@ -117,7 +117,7 @@ Typsicher dank tRPC v11!
 
 ## 🌐 Deployment
 
-- `staging` deployt automatisch in die Coolify-Staging-Umgebung.
+- `staging` deployt automatisch in die Staging-Umgebung.
 - `main` deployt automatisch in Produktion.
 - Container führen Drizzle-Migrationen beim Start aus; keine manuellen Produktionsmigrationen aus Agent-Sessions.
 

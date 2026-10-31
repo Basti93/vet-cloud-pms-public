@@ -11,8 +11,6 @@ dotenv.config({ path: path.resolve(import.meta.dirname, ".env.test") });
  * E2E tests run against the staging environment.
  * Set PLAYWRIGHT_BASE_URL to override (e.g. for local testing).
  *
- * CI: triggered on PR to main via .github/workflows/e2e.yml
- *
  * Credentials (GitHub secrets / local .env.test):
  *   E2E_EMAIL          — test user email (user@example.com)
  *   E2E_PASSWORD       — test user password

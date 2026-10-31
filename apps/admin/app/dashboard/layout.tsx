@@ -86,13 +86,6 @@ export default function DashboardLayout({
             Reminder E-Mails
           </Link>
           <Link
-            href="/dashboard/contact-requests"
-            className="block rounded-lg px-4 py-2 text-gray-700 transition hover:bg-gray-100"
-            onClick={closeMobileMenu}
-          >
-            Kontaktanfragen
-          </Link>
-          <Link
             href="/dashboard/feedback"
             className={`block rounded-lg px-4 py-2 transition ${
               pathname === "/dashboard/feedback"
