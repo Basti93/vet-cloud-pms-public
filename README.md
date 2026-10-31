@@ -1,7 +1,6 @@
 # Vet Cloud PMS
 
-Cloud-basiertes Veterinary Practice Management System (SaaS) für Tierarztpraxen in DACH.  
-**Phase:** 3 in progress | **Status:** Aktive Produktentwicklung auf `staging`
+Open-Source-Praxisverwaltung für Tierarztpraxen: Termine, Patienten, Impfungen und Online-Buchung.
 
 ## 🚀 Quick Start
 
