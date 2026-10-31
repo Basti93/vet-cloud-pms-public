@@ -120,22 +120,11 @@ Typsicher dank tRPC v11!
 - `staging` deployt automatisch in die Coolify-Staging-Umgebung.
 - `main` deployt automatisch in Produktion.
 - Container führen Drizzle-Migrationen beim Start aus; keine manuellen Produktionsmigrationen aus Agent-Sessions.
-- Details und Anforderungen stehen in `openspec/specs/deployment/spec.md`.
-
-## 🤝 Team
-
-- **Maintainer** — Senior Fullstack Dev, Architecture  
-  Email: user@example.com
-- **Product** — Product Owner, Sales  
-  (Kontakt wird hinzugefügt)
 
 ## 📚 Documentation
 
 ### Source of truth
-- **[`AGENTS.md`](AGENTS.md)** — Codex/agent workflow, required commands, OpenSpec process.
-- **[`CLAUDE.md`](CLAUDE.md)** — Current phase and Claude-oriented developer context.
 - **[`openspec/specs/`](openspec/specs/)** — Standing product, architecture, deployment, testing, and implementation requirements.
-- **[`openspec/changes/`](openspec/changes/)** — Active and parked change proposals with tasks/design/spec deltas.
 
 ## ✅ Commit Convention
 

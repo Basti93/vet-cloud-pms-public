@@ -8,8 +8,6 @@ export const PUBLIC_ROUTES = [
   '/invite/accept(.*)',
   '/book(.*)',          // Online booking pages
   '/site(.*)',          // Public website platform pages
-  '/impressum(.*)',     // Legal notice
-  '/datenschutz(.*)',   // Privacy policy
   '/api/webhooks/clerk',
   '/api/webhooks/stripe',
   '/api/trpc/booking(.*)',        // publicBookingProcedure
